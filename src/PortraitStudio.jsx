@@ -396,7 +396,7 @@ export default function PortraitStudio() {
       <style>{CSS}</style>
 
       <header style={S.header}>
-        <Logo height={44} />
+        <Logo height={35} />
         <div style={S.headerRight}>
           <button style={S.creditChip} onClick={() => setScreen("store")}>
             <span style={S.creditDot} />
