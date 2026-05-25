@@ -531,7 +531,7 @@ function HomeScreen({
         <h1 style={S.heroTitle}>내 얼굴로 만드는 인생 프로필</h1>
         <p style={S.heroDesc}>
           증명사진이나 셀카 한 장이면 충분해요.<br />
-          정면이 잘 보이고 밝게 찍힌 사진일 수록 결과가 잘 나와요.
+          정면이 잘 보이고 밝게 찍힌 사진일수록 결과가 잘 나와요.
         </p>
       </div>
 
