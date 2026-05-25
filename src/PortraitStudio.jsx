@@ -498,7 +498,7 @@ function Splash() {
     <div style={S.splash}>
       <style>{CSS}</style>
       <div className="splashLogo">
-        <Logo height={92} />
+        <Logo height={74} />
       </div>
       <div style={S.splashDots}>
         {HEARTS.map((c, i) => (

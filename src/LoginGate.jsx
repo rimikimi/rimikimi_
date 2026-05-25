@@ -53,7 +53,7 @@ export default function LoginGate({ Logo }) {
   return (
     <div style={S.wrap}>
       <div style={S.logoBox}>
-        {Logo ? <Logo height={88} /> : <span style={S.fallback}>rimikimi</span>}
+        {Logo ? <Logo height={70} /> : <span style={S.fallback}>rimikimi</span>}
       </div>
 
       <p style={S.tagline}>상상이 현실이 되는 곳</p>
