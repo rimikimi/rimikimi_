@@ -528,10 +528,10 @@ function HomeScreen({
           <span style={{ ...S.kickerHeart, background: HEARTS[0] }} />
           STEP 01
         </div>
-        <h1 style={S.heroTitle}>내 얼굴로 만드는<br />인생 프로필</h1>
+        <h1 style={S.heroTitle}>내 얼굴로 만드는 인생 프로필</h1>
         <p style={S.heroDesc}>
-          증명사진이나 셀카 한 장이면 충분해요. 정면이 잘 보이고 밝게 찍힌
-          사진일수록 결과가 예뻐요.
+          증명사진이나 셀카 한 장이면 충분해요.<br />
+          정면이 잘 보이고 밝게 찍힌 사진일 수록 결과가 잘 나와요.
         </p>
       </div>
 
@@ -953,8 +953,9 @@ const S = {
     transform: "rotate(45deg)", display: "inline-block",
   },
   heroTitle: {
-    fontFamily: "'Jua', sans-serif", fontSize: 34, lineHeight: 1.25,
-    fontWeight: 400, margin: 0, letterSpacing: "-0.01em",
+    fontFamily: "'Jua', sans-serif", fontSize: 27, lineHeight: 1.25,
+    fontWeight: 400, margin: 0, letterSpacing: "-0.02em",
+    whiteSpace: "nowrap",
   },
   heroDesc: {
     fontSize: 13.5, lineHeight: 1.7, opacity: 0.65, marginTop: 12,
