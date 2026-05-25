@@ -8,7 +8,7 @@
 // 5. 결과 + 갱신된 quota 반환
 // ============================================================
 
-import { getAuthedUser, countTodayUsage, FREE_DAILY } from "./_lib/auth.js";
+import { getAuthedUser, countTodayUsage, FREE_DAILY, isUnlimited } from "./_lib/auth.js";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -21,18 +21,22 @@ export default async function handler(req, res) {
     return res.status(auth.status).json({ error: auth.error });
   }
   const { user, admin } = auth;
+  const unlimited = isUnlimited(user);
 
-  // 2) 오늘 사용량
-  const usage = await countTodayUsage(admin, user.id);
-  if (usage.error) {
-    return res.status(500).json({ error: "사용 기록 조회 실패: " + usage.error });
-  }
-  if (usage.count >= FREE_DAILY) {
-    return res.status(429).json({
-      error: `오늘의 무료 한도(${FREE_DAILY}장)를 모두 사용했어요. 내일 자정에 다시 사용 가능합니다.`,
-      quotaUsed: usage.count,
-      quotaLimit: FREE_DAILY,
-    });
+  // 2) 오늘 사용량 (무제한 사용자는 건너뜀)
+  let usage = { count: 0 };
+  if (!unlimited) {
+    usage = await countTodayUsage(admin, user.id);
+    if (usage.error) {
+      return res.status(500).json({ error: "사용 기록 조회 실패: " + usage.error });
+    }
+    if (usage.count >= FREE_DAILY) {
+      return res.status(429).json({
+        error: `오늘의 무료 한도(${FREE_DAILY}장)를 모두 사용했어요. 내일 자정에 다시 사용 가능합니다.`,
+        quotaUsed: usage.count,
+        quotaLimit: FREE_DAILY,
+      });
+    }
   }
 
   // 3) 요청 본문 확인
@@ -106,18 +110,21 @@ export default async function handler(req, res) {
     });
   }
 
-  // 5) 성공 → 사용 기록에 한 줄 추가 (실패해도 일단 결과는 돌려줌)
-  await admin
-    .from("usage_log")
-    .insert({ user_id: user.id })
-    .then(() => {})
-    .catch((e) => console.error("usage_log insert 실패:", e));
+  // 5) 성공 → 사용 기록에 한 줄 추가 (무제한 사용자는 기록도 안 남김)
+  if (!unlimited) {
+    await admin
+      .from("usage_log")
+      .insert({ user_id: user.id })
+      .then(() => {})
+      .catch((e) => console.error("usage_log insert 실패:", e));
+  }
 
   const inline = imgPart.inlineData || imgPart.inline_data;
   return res.status(200).json({
     mimeType: inline.mimeType || inline.mime_type || "image/png",
     base64: inline.data,
-    quotaUsed: usage.count + 1,
-    quotaLimit: FREE_DAILY,
+    quotaUsed: unlimited ? 0 : usage.count + 1,
+    quotaLimit: unlimited ? null : FREE_DAILY,
+    unlimited,
   });
 }

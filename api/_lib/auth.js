@@ -13,6 +13,19 @@ import { createClient } from "@supabase/supabase-js";
 // 하루 무료 횟수 (한 사람당)
 export const FREE_DAILY = 2;
 
+// 무제한 사용자 (관리자/VIP) 화이트리스트
+// 환경변수 ADMIN_EMAILS 에 콤마로 구분된 이메일 목록을 넣어두면
+// 이 사용자들은 하루 한도 적용을 받지 않음.
+export function isUnlimited(user) {
+  const raw = process.env.ADMIN_EMAILS || "";
+  const list = raw
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+  const email = (user?.email || "").toLowerCase();
+  return !!email && list.includes(email);
+}
+
 export function makeAdmin() {
   return createClient(
     process.env.SUPABASE_URL,

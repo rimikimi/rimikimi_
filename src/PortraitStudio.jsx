@@ -212,6 +212,7 @@ export default function PortraitStudio() {
   const [activeCat, setActiveCat] = useState("전체");
   const [ageConfirmed, setAgeConfirmed] = useState(false);
   const [freeUsed, setFreeUsed] = useState(0);
+  const [unlimited, setUnlimited] = useState(false);
   const [credits, setCredits] = useState(0);
   const [generating, setGenerating] = useState(false);
   const [resultImage, setResultImage] = useState(null);
@@ -250,6 +251,7 @@ export default function PortraitStudio() {
     const token = session?.access_token;
     if (!token) {
       setFreeUsed(0);
+      setUnlimited(false);
       return;
     }
     let cancelled = false;
@@ -259,6 +261,7 @@ export default function PortraitStudio() {
       .then((r) => r.json())
       .then((j) => {
         if (cancelled) return;
+        setUnlimited(!!j?.unlimited);
         if (typeof j?.used === "number") setFreeUsed(j.used);
       })
       .catch(() => {});
@@ -294,9 +297,9 @@ export default function PortraitStudio() {
     });
   }, [query, activeCat]);
 
-  const freeLeft = Math.max(0, FREE_DAILY - freeUsed);
+  const freeLeft = unlimited ? Infinity : Math.max(0, FREE_DAILY - freeUsed);
   const canGenerateFree = freeLeft > 0;
-  const canGenerate = canGenerateFree || credits > 0;
+  const canGenerate = unlimited || canGenerateFree || credits > 0;
 
   function handleFile(e) {
     const f = e.target.files?.[0];
@@ -329,6 +332,7 @@ export default function PortraitStudio() {
       const result = await generateImage(accessToken, photo, selected.text);
       setResultImage(result.imageDataUrl);
       // 서버가 알려준 진짜 사용량으로 업데이트
+      if (typeof result.unlimited === "boolean") setUnlimited(result.unlimited);
       if (typeof result.quotaUsed === "number") setFreeUsed(result.quotaUsed);
     } catch (err) {
       // 서버가 한도 정보를 같이 줬으면 화면 카운터도 반영
@@ -370,7 +374,9 @@ export default function PortraitStudio() {
         <div style={S.headerRight}>
           <button style={S.creditChip} onClick={() => setScreen("store")}>
             <span style={S.creditDot} />
-            {credits > 0
+            {unlimited
+              ? "∞ 무제한"
+              : credits > 0
               ? credits + " 크레딧"
               : "무료 " + freeLeft + "/" + FREE_DAILY}
           </button>
