@@ -159,6 +159,49 @@ function shrinkImage(dataUrl, maxSize = 1024, quality = 0.85) {
 }
 
 /* ============================================================
+   결과 이미지를 정확한 크기로 맞추기 (중앙 크롭 후 리사이즈)
+   - 가로/세로 비율이 다르면 가운데를 기준으로 잘라냄 (CSS object-fit: cover)
+   - format: "image/png" 또는 "image/jpeg"
+   ============================================================ */
+function fitToSize(dataUrl, targetW, targetH, format = "image/png") {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const sw = img.naturalWidth;
+      const sh = img.naturalHeight;
+      const targetRatio = targetW / targetH;
+      const srcRatio = sw / sh;
+
+      // 소스에서 잘라낼 영역 (sx, sy, sCropW, sCropH)
+      let sCropW, sCropH;
+      if (srcRatio > targetRatio) {
+        // 소스가 타겟보다 가로로 더 김 → 양옆 잘라냄
+        sCropH = sh;
+        sCropW = Math.round(sh * targetRatio);
+      } else {
+        // 소스가 타겟보다 세로로 더 김 → 위아래 잘라냄
+        sCropW = sw;
+        sCropH = Math.round(sw / targetRatio);
+      }
+      const sx = Math.round((sw - sCropW) / 2);
+      const sy = Math.round((sh - sCropH) / 2);
+
+      const canvas = document.createElement("canvas");
+      canvas.width = targetW;
+      canvas.height = targetH;
+      const ctx = canvas.getContext("2d");
+      // 부드러운 다운스케일
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(img, sx, sy, sCropW, sCropH, 0, 0, targetW, targetH);
+      resolve(canvas.toDataURL(format));
+    };
+    img.onerror = () => reject(new Error("결과 이미지 처리 실패"));
+    img.src = dataUrl;
+  });
+}
+
+/* ============================================================
    이미지 생성 — 우리 중간 창구(/api/generate) 호출
    - accessToken: 로그인 사용자의 Supabase 세션 토큰
    - dataUrl: 사용자 사진 (data:image/...;base64,xxx)
@@ -219,10 +262,19 @@ async function generateImage(accessToken, dataUrl, promptText) {
   if (!json?.base64 || !json?.mimeType) {
     throw new Error("이미지 응답을 받지 못했어요. 다른 컨셉으로 시도해 주세요.");
   }
+  const rawDataUrl = "data:" + json.mimeType + ";base64," + json.base64;
+  // 결과를 정확히 768×1024 PNG 로 맞춤 (중앙 크롭)
+  let imageDataUrl;
+  try {
+    imageDataUrl = await fitToSize(rawDataUrl, 768, 1024, "image/png");
+  } catch (_) {
+    imageDataUrl = rawDataUrl; // 리사이즈 실패 시 원본 사용
+  }
   return {
-    imageDataUrl: "data:" + json.mimeType + ";base64," + json.base64,
+    imageDataUrl,
     quotaUsed: json.quotaUsed,
     quotaLimit: json.quotaLimit,
+    unlimited: json.unlimited,
   };
 }
 
