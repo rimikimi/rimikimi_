@@ -119,7 +119,7 @@ const CREDIT_PACKS = [
   { id: "l", count: 70, price: 19900, label: null },
 ];
 
-const FREE_DAILY = 2;
+const FREE_DAILY = 3;
 
 /* 로고에서 추출한 브랜드 컬러 */
 const HEARTS = ["#e6403c", "#f9c83c", "#60c9de", "#8a5da7"];
