@@ -8,7 +8,7 @@
 // 5. 결과 + 갱신된 quota 반환
 // ============================================================
 
-import { getAuthedUser, countTodayUsage, FREE_DAILY, isUnlimited } from "./_lib/auth.js";
+import { getAuthedUser, countTodayUsage, FREE_DAILY, isUnlimited, isTester } from "./_lib/auth.js";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -22,6 +22,15 @@ export default async function handler(req, res) {
   }
   const { user, admin } = auth;
   const unlimited = isUnlimited(user);
+  const tester = isTester(user);
+
+  // 1.5) 어드민/테스터 아니면 베타 차단
+  if (!unlimited && !tester) {
+    return res.status(403).json({
+      error: "현재 베타 테스터만 이용 가능해요. 곧 정식 오픈됩니다 🙏",
+      blocked: true,
+    });
+  }
 
   // 2) 오늘 사용량 (무제한 사용자는 건너뜀)
   let usage = { count: 0 };

@@ -239,6 +239,7 @@ export default function PortraitStudio() {
   const [ageConfirmed, setAgeConfirmed] = useState(false);
   const [freeUsed, setFreeUsed] = useState(0);
   const [unlimited, setUnlimited] = useState(false);
+  const [blocked, setBlocked] = useState(false);
   const [credits, setCredits] = useState(0);
   const [generating, setGenerating] = useState(false);
   const [resultImage, setResultImage] = useState(null);
@@ -278,6 +279,7 @@ export default function PortraitStudio() {
     if (!token) {
       setFreeUsed(0);
       setUnlimited(false);
+      setBlocked(false);
       return;
     }
     let cancelled = false;
@@ -288,6 +290,7 @@ export default function PortraitStudio() {
       .then((j) => {
         if (cancelled) return;
         setUnlimited(!!j?.unlimited);
+        setBlocked(!!j?.blocked);
         if (typeof j?.used === "number") setFreeUsed(j.used);
       })
       .catch(() => {});
@@ -324,8 +327,8 @@ export default function PortraitStudio() {
   }, [query, activeCat]);
 
   const freeLeft = unlimited ? Infinity : Math.max(0, FREE_DAILY - freeUsed);
-  const canGenerateFree = freeLeft > 0;
-  const canGenerate = unlimited || canGenerateFree || credits > 0;
+  const canGenerateFree = !blocked && freeLeft > 0;
+  const canGenerate = !blocked && (unlimited || canGenerateFree || credits > 0);
 
   function handleFile(e) {
     const f = e.target.files?.[0];
@@ -402,9 +405,11 @@ export default function PortraitStudio() {
             <span style={S.creditDot} />
             {unlimited
               ? "∞ 무제한"
+              : blocked
+              ? "🔒 베타 전용"
               : credits > 0
               ? credits + " 크레딧"
-              : "무료 " + freeLeft + "/" + FREE_DAILY}
+              : "베타 " + freeLeft + "/" + FREE_DAILY}
           </button>
           <button
             style={S.logoutBtn}

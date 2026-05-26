@@ -17,8 +17,18 @@ export const FREE_DAILY = 3;
 // 환경변수 ADMIN_EMAILS 에 콤마로 구분된 이메일 목록을 넣어두면
 // 이 사용자들은 하루 한도 적용을 받지 않음.
 export function isUnlimited(user) {
-  const raw = process.env.ADMIN_EMAILS || "";
-  const list = raw
+  return matchEmailList(user, process.env.ADMIN_EMAILS);
+}
+
+// 베타 테스터 화이트리스트
+// 환경변수 TESTER_EMAILS 에 등록된 사용자만 일반 사용 가능 (하루 FREE_DAILY 장)
+// 이 목록에 없는 일반 사용자는 생성 자체가 막힘.
+export function isTester(user) {
+  return matchEmailList(user, process.env.TESTER_EMAILS);
+}
+
+function matchEmailList(user, raw) {
+  const list = (raw || "")
     .split(",")
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean);
