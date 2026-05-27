@@ -230,6 +230,7 @@ export default function PortraitStudio() {
   const [selected, setSelected] = useState(null);
   const [query, setQuery] = useState("");
   const [activeCat, setActiveCat] = useState("전체");
+  const [hideSensitive, setHideSensitive] = useState(false);
   const [ageConfirmed, setAgeConfirmed] = useState(false);
   const [freeUsed, setFreeUsed] = useState(0);
   const [unlimited, setUnlimited] = useState(false);
@@ -320,13 +321,23 @@ export default function PortraitStudio() {
     setResultImage(null);
   }
 
+  // 18+ 토글 적용 후 풀(전체 풀에서 자동 제외)
+  const visiblePool = useMemo(() => {
+    return hideSensitive ? concepts.filter((p) => !p.sensitive) : concepts;
+  }, [concepts, hideSensitive]);
+
+  // 카테고리에 개수 같이 계산 — [{ name, count }]
   const categories = useMemo(() => {
-    const set = new Set(concepts.map((p) => p.category));
-    return ["전체", ...Array.from(set)];
-  }, [concepts]);
+    const counts = new Map();
+    counts.set("전체", visiblePool.length);
+    for (const p of visiblePool) {
+      counts.set(p.category, (counts.get(p.category) || 0) + 1);
+    }
+    return Array.from(counts.entries()).map(([name, count]) => ({ name, count }));
+  }, [visiblePool]);
 
   const filtered = useMemo(() => {
-    return concepts.filter((p) => {
+    return visiblePool.filter((p) => {
       const catOk = activeCat === "전체" || p.category === activeCat;
       const q = query.trim().toLowerCase();
       const qOk =
@@ -336,15 +347,26 @@ export default function PortraitStudio() {
         p.text.toLowerCase().includes(q);
       return catOk && qOk;
     });
-  }, [concepts, query, activeCat]);
+  }, [visiblePool, query, activeCat]);
 
   // 무한 스크롤 흉내 — 처음엔 30개, 스크롤 시 + 30개씩
   const PAGE_SIZE = 30;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
-  // 필터/검색 바뀌면 다시 처음부터
+  // 필터/검색/토글 바뀌면 다시 처음부터
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
-  }, [activeCat, query]);
+  }, [activeCat, query, hideSensitive]);
+
+  // 현재 카테고리가 더 이상 존재하지 않으면 "전체" 로 폴백
+  useEffect(() => {
+    if (!categories.some((c) => c.name === activeCat)) setActiveCat("전체");
+  }, [categories, activeCat]);
+
+  function resetFilters() {
+    setQuery("");
+    setActiveCat("전체");
+    setHideSensitive(false);
+  }
 
   const freeLeft = unlimited ? Infinity : Math.max(0, FREE_DAILY - freeUsed);
   const canGenerateFree = !blocked && freeLeft > 0;
@@ -466,11 +488,15 @@ export default function PortraitStudio() {
             setActiveCat={setActiveCat}
             query={query}
             setQuery={setQuery}
+            hideSensitive={hideSensitive}
+            setHideSensitive={setHideSensitive}
+            onResetFilters={resetFilters}
             prompts={filtered.slice(0, visibleCount)}
             totalFiltered={filtered.length}
             visibleCount={visibleCount}
             onShowMore={() => setVisibleCount((c) => c + PAGE_SIZE)}
             total={concepts.length}
+            poolTotal={visiblePool.length}
             onPick={pickPrompt}
             onBack={() => setScreen("home")}
           />
@@ -636,9 +662,13 @@ function GridIcon({ cells }) {
    ============================================================ */
 function GalleryScreen({
   categories, activeCat, setActiveCat, query, setQuery,
-  prompts, total, totalFiltered, visibleCount, onShowMore, onPick, onBack,
+  hideSensitive, setHideSensitive, onResetFilters,
+  prompts, total, totalFiltered, visibleCount, onShowMore,
+  poolTotal, onPick, onBack,
 }) {
   const [cols, setCols] = useState(2);
+  const hasFilter =
+    query.trim() !== "" || activeCat !== "전체" || hideSensitive;
   return (
     <div className="fade">
       <div style={S.navRow}>
@@ -654,10 +684,20 @@ function GalleryScreen({
           <span style={S.searchIcon}>⌕</span>
           <input
             style={S.searchInput}
-            placeholder={total + "개의 컨셉 검색"}
+            placeholder={poolTotal + "개의 컨셉 검색"}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
+          {query && (
+            <button
+              type="button"
+              style={S.searchClear}
+              onClick={() => setQuery("")}
+              aria-label="검색어 지우기"
+            >
+              ×
+            </button>
+          )}
         </div>
         <button
           style={S.colToggle}
@@ -671,22 +711,49 @@ function GalleryScreen({
       <div style={S.catRow}>
         {categories.map((c, i) => (
           <button
-            key={c}
+            key={c.name}
             style={{
               ...S.catChip,
-              ...(activeCat === c
+              ...(activeCat === c.name
                 ? { ...S.catChipActive, background: HEARTS[i % HEARTS.length] }
                 : {}),
             }}
-            onClick={() => setActiveCat(c)}
+            onClick={() => setActiveCat(c.name)}
           >
-            {c}
+            {c.name} <span style={S.catChipCount}>{c.count}</span>
           </button>
         ))}
       </div>
 
+      <div style={S.filterMetaRow}>
+        <span style={S.resultCount}>
+          {hasFilter
+            ? totalFiltered + "개 결과"
+            : "총 " + poolTotal + "개"}
+        </span>
+        <button
+          style={{
+            ...S.sensitiveToggle,
+            ...(hideSensitive ? S.sensitiveToggleOn : {}),
+          }}
+          onClick={() => setHideSensitive((v) => !v)}
+        >
+          {hideSensitive ? "🙈 18+ 숨김" : "👁 18+ 표시"}
+        </button>
+      </div>
+
       {prompts.length === 0 ? (
-        <div style={S.emptyState}>검색 결과가 없어요</div>
+        <div style={S.emptyState}>
+          <div>검색 결과가 없어요</div>
+          {hasFilter && (
+            <button
+              style={{ ...S.moreBtn, marginTop: 14 }}
+              onClick={onResetFilters}
+            >
+              필터 초기화
+            </button>
+          )}
+        </div>
       ) : (
         <div
           style={{
@@ -1085,11 +1152,19 @@ const S = {
   searchInput: {
     flex: 1, border: "none", background: "transparent", padding: "13px 0",
     fontSize: 14, fontFamily: "'Quicksand', sans-serif", fontWeight: 500,
-    outline: "none", color: INK,
+    outline: "none", color: INK, minWidth: 0,
+  },
+  searchClear: {
+    flexShrink: 0, background: INK + "16", color: INK,
+    border: "none", borderRadius: "50%",
+    width: 22, height: 22, fontSize: 14, lineHeight: 1,
+    cursor: "pointer", marginRight: 4,
+    display: "flex", alignItems: "center", justifyContent: "center",
+    fontFamily: "system-ui, sans-serif",
   },
   catRow: {
     display: "flex", gap: 8, overflowX: "auto",
-    paddingBottom: 6, marginBottom: 18,
+    paddingBottom: 6, marginBottom: 10,
   },
   catChip: {
     flexShrink: 0, background: "#fff",
@@ -1097,8 +1172,29 @@ const S = {
     padding: "8px 15px", fontSize: 12.5, fontWeight: 600,
     fontFamily: "'Quicksand', sans-serif", cursor: "pointer",
     color: INK, whiteSpace: "nowrap",
+    display: "inline-flex", alignItems: "center", gap: 6,
   },
   catChipActive: { color: "#fff", borderColor: "transparent" },
+  catChipCount: {
+    fontSize: 10.5, opacity: 0.6, fontWeight: 700,
+  },
+  filterMetaRow: {
+    display: "flex", justifyContent: "space-between", alignItems: "center",
+    marginBottom: 14, gap: 8,
+  },
+  resultCount: {
+    fontSize: 11.5, opacity: 0.55, fontWeight: 600,
+    fontFamily: "'Quicksand', sans-serif", letterSpacing: "0.02em",
+  },
+  sensitiveToggle: {
+    background: "#fff", border: "1.5px solid " + INK + "16",
+    borderRadius: 999, padding: "6px 12px", fontSize: 11,
+    fontWeight: 600, fontFamily: "'Quicksand', sans-serif",
+    cursor: "pointer", color: INK + "cc",
+  },
+  sensitiveToggleOn: {
+    background: INK, color: "#fff", borderColor: "transparent",
+  },
   grid: { display: "grid" },
   card: {
     background: "#fff", border: "1px solid " + INK + "10",
