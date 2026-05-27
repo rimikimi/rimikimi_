@@ -323,7 +323,7 @@ export default function PortraitStudio() {
   const categories = useMemo(() => {
     const set = new Set(concepts.map((p) => p.category));
     return ["전체", ...Array.from(set)];
-  }, []);
+  }, [concepts]);
 
   const filtered = useMemo(() => {
     return concepts.filter((p) => {
@@ -336,7 +336,15 @@ export default function PortraitStudio() {
         p.text.toLowerCase().includes(q);
       return catOk && qOk;
     });
-  }, [query, activeCat]);
+  }, [concepts, query, activeCat]);
+
+  // 무한 스크롤 흉내 — 처음엔 30개, 스크롤 시 + 30개씩
+  const PAGE_SIZE = 30;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  // 필터/검색 바뀌면 다시 처음부터
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [activeCat, query]);
 
   const freeLeft = unlimited ? Infinity : Math.max(0, FREE_DAILY - freeUsed);
   const canGenerateFree = !blocked && freeLeft > 0;
@@ -458,7 +466,10 @@ export default function PortraitStudio() {
             setActiveCat={setActiveCat}
             query={query}
             setQuery={setQuery}
-            prompts={filtered}
+            prompts={filtered.slice(0, visibleCount)}
+            totalFiltered={filtered.length}
+            visibleCount={visibleCount}
+            onShowMore={() => setVisibleCount((c) => c + PAGE_SIZE)}
             total={concepts.length}
             onPick={pickPrompt}
             onBack={() => setScreen("home")}
@@ -625,7 +636,7 @@ function GridIcon({ cells }) {
    ============================================================ */
 function GalleryScreen({
   categories, activeCat, setActiveCat, query, setQuery,
-  prompts, total, onPick, onBack,
+  prompts, total, totalFiltered, visibleCount, onShowMore, onPick, onBack,
 }) {
   const [cols, setCols] = useState(2);
   return (
@@ -725,6 +736,14 @@ function GalleryScreen({
               </div>
             </button>
           ))}
+        </div>
+      )}
+
+      {totalFiltered > visibleCount && (
+        <div style={{ display: "flex", justifyContent: "center", marginTop: 18 }}>
+          <button style={S.moreBtn} onClick={onShowMore}>
+            더 보기 ({totalFiltered - visibleCount}개 남음)
+          </button>
         </div>
       )}
     </div>
@@ -1023,6 +1042,13 @@ const S = {
     border: "2px solid " + INK + "22", borderRadius: 16, padding: "15px",
     fontSize: 15, fontWeight: 700, fontFamily: "'Quicksand', sans-serif",
     cursor: "pointer",
+  },
+  moreBtn: {
+    background: "#fff", color: INK,
+    border: "1.5px solid " + INK + "22", borderRadius: 999,
+    padding: "10px 22px", fontSize: 12.5, fontWeight: 700,
+    fontFamily: "'Quicksand', sans-serif", cursor: "pointer",
+    letterSpacing: "0.02em",
   },
   privacyNote: {
     fontSize: 10.5, lineHeight: 1.6, opacity: 0.45,
