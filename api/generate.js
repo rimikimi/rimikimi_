@@ -110,16 +110,7 @@ export default async function handler(req, res) {
   const parts = json?.candidates?.[0]?.content?.parts || [];
   const imgPart = parts.find((p) => p.inlineData || p.inline_data);
 
-  if (!imgPart) {
-    const textPart = parts.find((p) => p.text);
-    return res.status(502).json({
-      error: textPart?.text
-        ? "이미지를 만들지 못했어요: " + textPart.text.slice(0, 120)
-        : "이미지 응답을 받지 못했어요.",
-    });
-  }
-
-  // 5) 성공 → 사용 기록에 한 줄 추가 (무제한 사용자는 기록도 안 남김)
+  // 5) Gemini 가 응답을 줬으면 토큰은 이미 소비됨 → 결과 성패와 무관하게 기록
   if (!unlimited) {
     await admin
       .from("usage_log")
@@ -128,6 +119,21 @@ export default async function handler(req, res) {
       .catch((e) => console.error("usage_log insert 실패:", e));
   }
 
+  // 5a) 이미지가 없으면 (얼굴 인식 실패 등) — 안내 메시지 + 차감된 quota 동봉
+  if (!imgPart) {
+    const textPart = parts.find((p) => p.text);
+    return res.status(422).json({
+      error:
+        "사진에 사람이나 동물, 캐릭터의 얼굴이 인식되지 않아 이미지를 생성할 수 없습니다.\n사진을 다시 선택해 주세요.",
+      noFace: true,
+      modelText: textPart?.text ? textPart.text.slice(0, 200) : null,
+      quotaUsed: unlimited ? 0 : usage.count + 1,
+      quotaLimit: unlimited ? null : FREE_DAILY,
+      unlimited,
+    });
+  }
+
+  // 5b) 성공 — 이미지 반환
   const inline = imgPart.inlineData || imgPart.inline_data;
   return res.status(200).json({
     mimeType: inline.mimeType || inline.mime_type || "image/png",
