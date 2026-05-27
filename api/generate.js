@@ -9,6 +9,7 @@
 // ============================================================
 
 import { getAuthedUser, countTodayUsage, FREE_DAILY, isUnlimited, isTester } from "./_lib/auth.js";
+import { precheckHasFace } from "./_lib/precheck.js";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -63,6 +64,21 @@ export default async function handler(req, res) {
       .json({ error: "서버에 GEMINI_API_KEY 가 설정돼 있지 않습니다." });
   }
 
+  // 3.5) 사전 얼굴 검사 (Flash Lite, ~$0.002, 1~2초)
+  //      얼굴 없으면 본 모델 호출 안 함 → 차감 X
+  const pre = await precheckHasFace(apiKey, mimeType, base64);
+  if (!pre.hasFace) {
+    return res.status(422).json({
+      error:
+        "사진에 사람이나 동물, 캐릭터의 얼굴이 인식되지 않아 이미지를 생성할 수 없습니다.\n사진을 다시 선택해 주세요.",
+      noFace: true,
+      quotaUsed: unlimited ? 0 : usage.count, // 차감 안 됨
+      quotaLimit: unlimited ? null : FREE_DAILY,
+      unlimited,
+    });
+  }
+  // pre.error 있는 경우는 fail-open — 본 모델 호출로 진행
+
   // 4) Gemini 호출
   const instruction =
     "Using the person in the provided photo, generate a new portrait. " +
@@ -110,7 +126,21 @@ export default async function handler(req, res) {
   const parts = json?.candidates?.[0]?.content?.parts || [];
   const imgPart = parts.find((p) => p.inlineData || p.inline_data);
 
-  // 5) Gemini 가 응답을 줬으면 토큰은 이미 소비됨 → 결과 성패와 무관하게 기록
+  // 5) 이미지가 안 왔으면 (pre-check 통과했는데 본 모델이 거절/실패 — 드뭄)
+  //    → 차감 X (우리가 OK 라고 했으니 책임 우리쪽)
+  if (!imgPart) {
+    const textPart = parts.find((p) => p.text);
+    return res.status(502).json({
+      error: textPart?.text
+        ? "이미지 생성에 실패했어요: " + textPart.text.slice(0, 120)
+        : "이미지를 만들지 못했어요. 다른 컨셉으로 시도해 주세요.",
+      quotaUsed: unlimited ? 0 : usage.count,
+      quotaLimit: unlimited ? null : FREE_DAILY,
+      unlimited,
+    });
+  }
+
+  // 6) 성공 → 사용 기록 + 이미지 반환
   if (!unlimited) {
     await admin
       .from("usage_log")
@@ -119,21 +149,6 @@ export default async function handler(req, res) {
       .catch((e) => console.error("usage_log insert 실패:", e));
   }
 
-  // 5a) 이미지가 없으면 (얼굴 인식 실패 등) — 안내 메시지 + 차감된 quota 동봉
-  if (!imgPart) {
-    const textPart = parts.find((p) => p.text);
-    return res.status(422).json({
-      error:
-        "사진에 사람이나 동물, 캐릭터의 얼굴이 인식되지 않아 이미지를 생성할 수 없습니다.\n사진을 다시 선택해 주세요.",
-      noFace: true,
-      modelText: textPart?.text ? textPart.text.slice(0, 200) : null,
-      quotaUsed: unlimited ? 0 : usage.count + 1,
-      quotaLimit: unlimited ? null : FREE_DAILY,
-      unlimited,
-    });
-  }
-
-  // 5b) 성공 — 이미지 반환
   const inline = imgPart.inlineData || imgPart.inline_data;
   return res.status(200).json({
     mimeType: inline.mimeType || inline.mime_type || "image/png",
