@@ -70,7 +70,7 @@ export default async function handler(req, res) {
   if (!pre.hasFace) {
     return res.status(422).json({
       error:
-        "사진에 사람이나 동물, 캐릭터의 얼굴이 인식되지 않아 이미지를 생성할 수 없습니다.\n사진을 다시 선택해 주세요.",
+        "사진에 얼굴이 인식되지 않아 이미지를 생성할 수 없습니다.\n사진을 다시 선택해 주세요.\n크레딧은 차감되지 않았으니 안심하세요🙂",
       noFace: true,
       quotaUsed: unlimited ? 0 : usage.count, // 차감 안 됨
       quotaLimit: unlimited ? null : FREE_DAILY,
