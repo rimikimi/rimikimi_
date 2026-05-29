@@ -551,7 +551,8 @@ export default function PortraitStudio() {
             untilNext={untilNext}
             onInvite={shareInvite}
             inviteMsg={inviteMsg}
-            showInvite={!unlimited}
+            showInvite={true}
+            unlimited={unlimited}
           />
         )}
         {screen === "gallery" && (
@@ -647,7 +648,7 @@ function HomeScreen({
   photo, fileRef, onFile, onPick, onClear,
   ageConfirmed, setAgeConfirmed, onContinue,
   credits = 0, referralCount = 0, untilNext = 2,
-  onInvite, inviteMsg = "", showInvite = true,
+  onInvite, inviteMsg = "", showInvite = true, unlimited = false,
 }) {
   const ready = photo && ageConfirmed;
   return (
@@ -657,8 +658,11 @@ function HomeScreen({
           <div style={S.inviteBannerLeft}>
             <div style={S.inviteBannerTitle}>🎟 친구 초대하고 크레딧 받기</div>
             <div style={S.inviteBannerDesc}>
-              {credits > 0 ? "보유 크레딧 " + credits + "개 · " : ""}
-              친구 {untilNext}명만 더 초대하면 크레딧 1개! (현재 {referralCount}명 초대)
+              {unlimited
+                ? "친구에게 rimikimi를 공유해 보세요!"
+                : (credits > 0 ? "보유 크레딧 " + credits + "개 · " : "") +
+                  "친구 " + untilNext + "명만 더 초대하면 크레딧 1개! (현재 " +
+                  referralCount + "명 초대)"}
             </div>
           </div>
           <div style={S.inviteBannerBtn}>공유하기</div>
