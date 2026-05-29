@@ -699,10 +699,14 @@ function HomeScreen({
           <div style={S.uploadHint}>JPG · PNG</div>
         </button>
       ) : (
-        <div style={S.previewWrap}>
-          <img src={photo} alt="업로드한 사진" style={S.previewImg} />
-          <button style={S.previewClear} onClick={onClear}>사진 변경</button>
-        </div>
+        <>
+          <div style={S.previewWrap}>
+            <img src={photo} alt="업로드한 사진" style={S.previewImg} />
+          </div>
+          <button style={S.changePhotoBtn} onClick={onPick}>
+            🔄 사진 변경
+          </button>
+        </>
       )}
 
       <label style={S.consentRow}>
@@ -1193,6 +1197,12 @@ const S = {
     background: "rgba(35,31,32,0.88)", color: "#fff", border: "none",
     borderRadius: 999, padding: "8px 16px", fontSize: 11.5,
     fontWeight: 600, fontFamily: "'Quicksand', sans-serif", cursor: "pointer",
+  },
+  changePhotoBtn: {
+    width: "100%", boxSizing: "border-box", marginTop: 10,
+    background: "#fff", color: INK, border: "2px solid " + INK + "22",
+    borderRadius: 14, padding: "13px", fontSize: 13.5, fontWeight: 700,
+    fontFamily: "'Quicksand', sans-serif", cursor: "pointer",
   },
   consentRow: {
     display: "flex", gap: 10, alignItems: "flex-start",
