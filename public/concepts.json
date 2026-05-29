@@ -1,5 +1,75 @@
 [
   {
+    "id": 14,
+    "title": "레드 로즈 가든",
+    "category": "하이패션 / 화보",
+    "text": "Implement 100% ultra photorealism, exact facial structure from the reference photo, dark brown long hair reaching below the chest, soft natural makeup, wearing an elegant crimson red off-shoulder ball gown, gently holding a single red rose near her face with a soft smile, standing in a lush garden overflowing with blooming red roses, dreamy romantic atmosphere, soft natural daylight, full shot, shallow depth of field, 8k resolution, photorealistic, sharp focus.",
+    "sensitive": false
+  },
+  {
+    "id": 12,
+    "title": "보랏빛 요정 여왕",
+    "category": "판타지 / 콘셉트",
+    "text": "Slight warm smile. A detailed portrait of a the woman is the reference photo as a fairy queen, based on the style and elements of the reference image. She has long blonde hair braided and adorned with an elaborate crown of purple flowers, crystals, and butterflies, plus a star ornament on her forehead and butterfly earrings. She wears a lavender gown covered in lace, sequins, and beads, with large, glittering purple butterfly wings. The background setting is magical, blurred forest with warm, glowing bokeh lights. High-resolution ultra realism photograph.",
+    "sensitive": false
+  },
+  {
+    "id": 8,
+    "title": "여왕의 푸들 옥좌",
+    "category": "하이패션 / 화보",
+    "text": "Photorealistic full shot of the woman from the reference photo, 100% facial fidelity, long dark brown hair, wearing an elegant white gown with intricate silver sequin and crystal beadwork bodice and a high slit, silver high heels, sitting gracefully on a grand baroque throne with deep red velvet upholstery and ornate gold frame, legs crossed, two large fluffy white standard poodles sitting on either side of the throne, black and white checkered marble floor, dark dramatic background, luxury editorial photography, cinematic lighting, 8k resolution, ultra-detailed, sharp focus.",
+    "sensitive": false
+  },
+  {
+    "id": 7,
+    "title": "버스데이 파티 핑크",
+    "category": "파티 / 이벤트",
+    "text": "A full shot photograph of the person with long dark hair and the diamond floral necklace. She is sitting gracefully atop large, fluffy pink faux fur letters that spell 'BIRTHDAY’ . She wears the pink sequined corset top and the short, ruffled pink skirt, and holds a small, round birthday cake with lit candles in her left hand. Her legs are crossed, showing silver jeweled stiletto heels. Confetti floats around her. The background is a dimly lit, opulent party setting with white floral arrangements, numerous lit candles, champagne-colored balloons, and a dark tablecloth. The atmosphere is celebratory and luxurious.",
+    "sensitive": false
+  },
+  {
+    "id": 6,
+    "title": "핑크 퍼 코트",
+    "category": "하이패션 / 화보",
+    "text": "High-fashion portrait of a stunning young woman with long, voluminous wavy hair, wearing a luxurious oversized fluffy baby pink faux fur coat and a matching thick furry pink ushanka hat. She is posing gracefully with one hand touching her face, looking directly into the camera with a soft, glamorous expression. The background is a dreamy, out-of-focus pink winter wonderland with blurred Christmas elements. Realistic snowflakes are falling softly in the foreground and background. Soft cinematic lighting, rosy color palette, hyper-realistic skin texture, 8k resolution, magical and cozy atmosphere.",
+    "sensitive": false
+  },
+  {
+    "id": 5,
+    "title": "핑크 벨벳 글램",
+    "category": "하이패션 / 화보",
+    "text": "reference photo with 100% ultra realism and exact facial structure. She is wearing a pink velvet strapless tube dress with a high slit, a plush pink faux fur cropped jacket, and elegant pink satin gloves. She is holding a bunch of pink and metallic silver balloons. Neutral cream background, soft cinematic studio lighting. High-fashion aesthetic, photorealistic, 8k resolution 9:16, detailed textures of velvet and fur. Pink, silver and gold confetti falling from the ceiling with celebration atmosphere. Holding a small pink birthday cake with one silver candle.",
+    "sensitive": false
+  },
+  {
+    "id": 4,
+    "title": "숲속의 천사",
+    "category": "판타지 / 콘셉트",
+    "text": "Her hair is dark brown and long, reaching below the chest. She is an angel, descending upon a pathway in a forest with her wings spread. She is wearing a white matching outfit with wreath made from leaves. Slightly looking down on the land and smiling.",
+    "sensitive": false
+  },
+  {
+    "id": 3,
+    "title": "핑크 볼가운 스테이지",
+    "category": "하이패션 / 화보",
+    "text": "Her hair is dark brown and long, reaching below the chest. She is wearing a Pink ball down dress with crystal decorations, sitting on a high stool with her legs crossed. Looking down on the camera. Low angle shot. Background is black with stage lighting.",
+    "sensitive": false
+  },
+  {
+    "id": 2,
+    "title": "그리스 여신 파르테논",
+    "category": "판타지 / 콘셉트",
+    "text": "She is a greek goddess with white wrapping style clothing and gold wreath. Standing slightly sideways while looking directly into the camera. No particular facial expression. Atmosphere is bright beautiful day with Parthenon and some trees in the background.",
+    "sensitive": false
+  },
+  {
+    "id": 1,
+    "title": "피치 튤립 브라이덜",
+    "category": "웨딩 / 브라이덜",
+    "text": "Slight warm smile. Captured in a moment of grace, the bride wears a blush-ivory gown featuring a dropped waist and intricate crystal beadwork. Her hands gently clasp a bouquet of peach tulips bound by a white silk ribbon. With a modest smile, her eyes are fixed tenderly on the blooms. She is draped in the brilliance of a diamond tiara, necklace, and matching earrings, complemented by a long, flowing veil. ҃ color code: matte curtain Stage lighting.",
+    "sensitive": false
+  },
+  {
     "id": 13,
     "title": "지중해 골든아워 글래머",
     "category": "하이패션 / 화보",
