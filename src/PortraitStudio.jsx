@@ -546,6 +546,12 @@ export default function PortraitStudio() {
             ageConfirmed={ageConfirmed}
             setAgeConfirmed={setAgeConfirmed}
             onContinue={() => setScreen("gallery")}
+            credits={credits}
+            referralCount={referralCount}
+            untilNext={untilNext}
+            onInvite={shareInvite}
+            inviteMsg={inviteMsg}
+            showInvite={!unlimited}
           />
         )}
         {screen === "gallery" && (
@@ -640,10 +646,26 @@ function Splash() {
 function HomeScreen({
   photo, fileRef, onFile, onPick, onClear,
   ageConfirmed, setAgeConfirmed, onContinue,
+  credits = 0, referralCount = 0, untilNext = 2,
+  onInvite, inviteMsg = "", showInvite = true,
 }) {
   const ready = photo && ageConfirmed;
   return (
     <div className="fade">
+      {showInvite && (
+        <button style={S.inviteBanner} onClick={onInvite}>
+          <div style={S.inviteBannerLeft}>
+            <div style={S.inviteBannerTitle}>🎟 친구 초대하고 크레딧 받기</div>
+            <div style={S.inviteBannerDesc}>
+              {credits > 0 ? "보유 크레딧 " + credits + "개 · " : ""}
+              친구 {untilNext}명만 더 초대하면 크레딧 1개! (현재 {referralCount}명 초대)
+            </div>
+          </div>
+          <div style={S.inviteBannerBtn}>공유하기</div>
+        </button>
+      )}
+      {inviteMsg && <div style={S.inviteToast}>{inviteMsg}</div>}
+
       <div style={S.hero}>
         <div style={S.heroKicker}>
           <span style={{ ...S.kickerHeart, background: HEARTS[0] }} />
