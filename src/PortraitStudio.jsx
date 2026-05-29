@@ -1407,6 +1407,13 @@ const S = {
     fontFamily: "'Quicksand', sans-serif", cursor: "pointer",
     textAlign: "center", textDecoration: "none", marginBottom: 10,
   },
+  saveNotice: {
+    background: "#f9c83c22", color: "#8a6a16",
+    border: "1.5px solid #f9c83c66", borderRadius: 14,
+    padding: "13px 15px", fontSize: 12.5, lineHeight: 1.65,
+    fontWeight: 600, fontFamily: "'Quicksand', sans-serif",
+    margin: "14px 0", textAlign: "center",
+  },
   errorCard: {
     background: ACCENT + "10", color: ACCENT, borderRadius: 14,
     padding: "16px 16px", fontSize: 12.5, lineHeight: 1.65,
