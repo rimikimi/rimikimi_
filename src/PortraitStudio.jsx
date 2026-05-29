@@ -225,7 +225,7 @@ async function generateImage(accessToken, dataUrl, promptText) {
    ============================================================ */
 export default function PortraitStudio() {
   const [booting, setBooting] = useState(true);
-  const [screen, setScreen] = useState("home");
+  const [screen, setScreen] = useState("gallery");
   const [photo, setPhoto] = useState(null);
   const [selected, setSelected] = useState(null);
   const [query, setQuery] = useState("");
@@ -425,7 +425,7 @@ export default function PortraitStudio() {
 
   function pickPrompt(p) {
     setSelected(p);
-    setScreen("confirm");
+    setScreen("home"); // 컨셉 선택 후 사진 업로드 화면으로
   }
 
   async function startGenerate() {
@@ -457,7 +457,7 @@ export default function PortraitStudio() {
   }
 
   function resetToHome() {
-    setScreen("home");
+    setScreen("gallery"); // 첫 화면 = 컨셉 선택
     setSelected(null);
     setResultImage(null);
     setGenError(null);
@@ -545,14 +545,8 @@ export default function PortraitStudio() {
             onClear={() => setPhoto(null)}
             ageConfirmed={ageConfirmed}
             setAgeConfirmed={setAgeConfirmed}
-            onContinue={() => setScreen("gallery")}
-            credits={credits}
-            referralCount={referralCount}
-            untilNext={untilNext}
-            onInvite={shareInvite}
-            inviteMsg={inviteMsg}
-            showInvite={true}
-            unlimited={unlimited}
+            onContinue={() => setScreen("confirm")}
+            onBack={() => setScreen("gallery")}
           />
         )}
         {screen === "gallery" && (
@@ -572,7 +566,13 @@ export default function PortraitStudio() {
             total={concepts.length}
             poolTotal={visiblePool.length}
             onPick={pickPrompt}
-            onBack={() => setScreen("home")}
+            onBack={null}
+            credits={credits}
+            referralCount={referralCount}
+            untilNext={untilNext}
+            onInvite={shareInvite}
+            inviteMsg={inviteMsg}
+            unlimited={unlimited}
           />
         )}
         {screen === "confirm" && selected && (
@@ -727,7 +727,7 @@ function HomeScreen({
         disabled={!ready}
         onClick={onContinue}
       >
-        컨셉 고르기 →
+        이미지 만들기 →
       </button>
 
       <p style={S.privacyNote}>
@@ -762,16 +762,37 @@ function GalleryScreen({
   hideSensitive, setHideSensitive, onResetFilters,
   prompts, total, totalFiltered, visibleCount, onShowMore,
   poolTotal, onPick, onBack,
+  credits = 0, referralCount = 0, untilNext = 2,
+  onInvite, inviteMsg = "", unlimited = false,
 }) {
   const [cols, setCols] = useState(2);
   const hasFilter =
     query.trim() !== "" || activeCat !== "전체" || hideSensitive;
   return (
     <div className="fade">
+      <button style={S.inviteBanner} onClick={onInvite}>
+        <div style={S.inviteBannerLeft}>
+          <div style={S.inviteBannerTitle}>
+            {unlimited ? "🎁 친구에게 공유하기" : "🎟 친구 초대하고 크레딧 받기"}
+          </div>
+          <div style={S.inviteBannerDesc}>
+            {unlimited
+              ? "친구에게 rimikimi를 공유해 보세요!"
+              : (credits > 0 ? "보유 크레딧 " + credits + "개 · " : "") +
+                "친구 " + untilNext + "명만 더 초대하면 크레딧 1개! (현재 " +
+                referralCount + "명 초대)"}
+          </div>
+        </div>
+        <div style={S.inviteBannerBtn}>공유하기</div>
+      </button>
+      {inviteMsg && <div style={S.inviteToast}>{inviteMsg}</div>}
+
       <div style={S.navRow}>
-        <button style={S.backBtn} onClick={onBack}>←</button>
+        {onBack && (
+          <button style={S.backBtn} onClick={onBack}>←</button>
+        )}
         <div>
-          <div style={S.screenKicker}>STEP 02</div>
+          <div style={S.screenKicker}>STEP 01</div>
           <div style={S.screenTitle}>컨셉 선택</div>
         </div>
       </div>
