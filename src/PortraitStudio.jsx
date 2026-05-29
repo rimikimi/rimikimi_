@@ -582,7 +582,7 @@ export default function PortraitStudio() {
             freeLeft={freeLeft}
             credits={credits}
             canGenerate={canGenerate}
-            onBack={() => setScreen("gallery")}
+            onBack={() => setScreen("home")}
             onGenerate={startGenerate}
             onStore={() => setScreen("store")}
           />
@@ -646,35 +646,22 @@ function Splash() {
    ============================================================ */
 function HomeScreen({
   photo, fileRef, onFile, onPick, onClear,
-  ageConfirmed, setAgeConfirmed, onContinue,
-  credits = 0, referralCount = 0, untilNext = 2,
-  onInvite, inviteMsg = "", showInvite = true, unlimited = false,
+  ageConfirmed, setAgeConfirmed, onContinue, onBack,
 }) {
   const ready = photo && ageConfirmed;
   return (
     <div className="fade">
-      {showInvite && (
-        <button style={S.inviteBanner} onClick={onInvite}>
-          <div style={S.inviteBannerLeft}>
-            <div style={S.inviteBannerTitle}>🎟 친구 초대하고 크레딧 받기</div>
-            <div style={S.inviteBannerDesc}>
-              {unlimited
-                ? "친구에게 rimikimi를 공유해 보세요!"
-                : (credits > 0 ? "보유 크레딧 " + credits + "개 · " : "") +
-                  "친구 " + untilNext + "명만 더 초대하면 크레딧 1개! (현재 " +
-                  referralCount + "명 초대)"}
-            </div>
-          </div>
-          <div style={S.inviteBannerBtn}>공유하기</div>
-        </button>
-      )}
-      {inviteMsg && <div style={S.inviteToast}>{inviteMsg}</div>}
+      <div style={S.navRow}>
+        {onBack && (
+          <button style={S.backBtn} onClick={onBack}>←</button>
+        )}
+        <div>
+          <div style={S.screenKicker}>STEP 02</div>
+          <div style={S.screenTitle}>사진 업로드</div>
+        </div>
+      </div>
 
       <div style={S.hero}>
-        <div style={S.heroKicker}>
-          <span style={{ ...S.kickerHeart, background: HEARTS[0] }} />
-          STEP 01
-        </div>
         <h1 style={S.heroTitle}>내 얼굴로 만드는 인생 프로필</h1>
         <p style={S.heroDesc}>
           증명사진이나 셀카 한 장이면 충분해요.<br />
