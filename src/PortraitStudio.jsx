@@ -1016,8 +1016,9 @@ function ResultScreen({
             <img src={resultImage} alt={prompt.title} style={S.resultImg} />
           </div>
           <div style={S.saveNotice}>
-            🔒 보안을 위해 생성된 이미지는 앱에 별도 저장되지 않아요.<br />
-            저장 버튼으로 앨범에 꼭 별도로 저장해 주세요😉
+            🔒 보안을 위해 생성된 이미지는 앱에 별도 저장되지 않아요.
+            <br />
+            저장 버튼으로 앨범에 꼭 별도로 저장해 주세요 😉
           </div>
           <a
             href={resultImage}
@@ -1410,9 +1411,10 @@ const S = {
   saveNotice: {
     background: "#f9c83c22", color: "#8a6a16",
     border: "1.5px solid #f9c83c66", borderRadius: 14,
-    padding: "13px 15px", fontSize: 12.5, lineHeight: 1.65,
+    padding: "13px 15px", fontSize: 12.5, lineHeight: 1.7,
     fontWeight: 600, fontFamily: "'Quicksand', sans-serif",
     margin: "14px 0", textAlign: "center",
+    wordBreak: "keep-all",
   },
   errorCard: {
     background: ACCENT + "10", color: ACCENT, borderRadius: 14,
