@@ -10,6 +10,7 @@
 
 import { getAuthedUser, countTodayUsage, FREE_DAILY, isUnlimited, isTester } from "./_lib/auth.js";
 import { precheckHasFace } from "./_lib/precheck.js";
+import { getCreditInfo, consumeCredit } from "./_lib/credits.js";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -33,19 +34,32 @@ export default async function handler(req, res) {
     });
   }
 
-  // 2) 오늘 사용량 (무제한 사용자는 건너뜀)
+  // 2) 오늘 사용량 + 크레딧 (무제한 사용자는 건너뜀)
+  //    하루 한도 남으면 그걸 쓰고, 다 썼으면 크레딧으로 대체.
   let usage = { count: 0 };
+  let useCredit = false;
+  let creditsLeft = 0;
   if (!unlimited) {
     usage = await countTodayUsage(admin, user.id);
     if (usage.error) {
       return res.status(500).json({ error: "사용 기록 조회 실패: " + usage.error });
     }
+
     if (usage.count >= FREE_DAILY) {
-      return res.status(429).json({
-        error: `오늘의 무료 한도(${FREE_DAILY}장)를 모두 사용했어요. 내일 자정에 다시 사용 가능합니다.`,
-        quotaUsed: usage.count,
-        quotaLimit: FREE_DAILY,
-      });
+      // 하루 한도 소진 → 크레딧 확인
+      const credit = await getCreditInfo(admin, user.id);
+      creditsLeft = credit.error ? 0 : credit.creditsAvailable;
+      if (creditsLeft > 0) {
+        useCredit = true; // 크레딧으로 진행
+      } else {
+        return res.status(429).json({
+          error:
+            "오늘의 무료 한도를 모두 사용했어요.\n친구 2명을 초대하면 크레딧 1개가 생겨요!",
+          quotaUsed: usage.count,
+          quotaLimit: FREE_DAILY,
+          credits: 0,
+        });
+      }
     }
   }
 
@@ -140,21 +154,28 @@ export default async function handler(req, res) {
     });
   }
 
-  // 6) 성공 → 사용 기록 + 이미지 반환
+  // 6) 성공 → 사용 기록 (크레딧 사용 시 크레딧 차감, 아니면 오늘 한도 차감)
   if (!unlimited) {
-    await admin
-      .from("usage_log")
-      .insert({ user_id: user.id })
-      .then(() => {})
-      .catch((e) => console.error("usage_log insert 실패:", e));
+    if (useCredit) {
+      await consumeCredit(admin, user.id);
+      creditsLeft = Math.max(0, creditsLeft - 1);
+    } else {
+      await admin
+        .from("usage_log")
+        .insert({ user_id: user.id })
+        .then(() => {})
+        .catch((e) => console.error("usage_log insert 실패:", e));
+    }
   }
 
   const inline = imgPart.inlineData || imgPart.inline_data;
   return res.status(200).json({
     mimeType: inline.mimeType || inline.mime_type || "image/png",
     base64: inline.data,
-    quotaUsed: unlimited ? 0 : usage.count + 1,
+    quotaUsed: unlimited ? 0 : useCredit ? usage.count : usage.count + 1,
     quotaLimit: unlimited ? null : FREE_DAILY,
+    usedCredit: useCredit,
+    credits: unlimited ? null : creditsLeft,
     unlimited,
   });
 }

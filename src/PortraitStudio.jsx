@@ -238,6 +238,9 @@ export default function PortraitStudio() {
   const [concepts, setConcepts] = useState([]);
   const [conceptsLoading, setConceptsLoading] = useState(true);
   const [credits, setCredits] = useState(0);
+  const [referralCount, setReferralCount] = useState(0);
+  const [untilNext, setUntilNext] = useState(2);
+  const [inviteMsg, setInviteMsg] = useState("");
   const [generating, setGenerating] = useState(false);
   const [resultImage, setResultImage] = useState(null);
   const [genError, setGenError] = useState(null);
@@ -269,6 +272,42 @@ export default function PortraitStudio() {
       sub.subscription.unsubscribe();
     };
   }, []);
+
+  // 초대 링크(?ref=...)로 들어왔으면 기억해뒀다가 로그인 후 처리
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get("ref");
+    if (ref) {
+      localStorage.setItem("pending_ref", ref);
+      // URL 에서 ref 제거 (깔끔하게)
+      params.delete("ref");
+      const qs = params.toString();
+      const clean =
+        window.location.pathname + (qs ? "?" + qs : "") + window.location.hash;
+      window.history.replaceState({}, "", clean);
+    }
+  }, []);
+
+  // 로그인 직후, 기억해둔 초대 ref 를 서버에 전달
+  useEffect(() => {
+    const token = session?.access_token;
+    if (!token) return;
+    const pendingRef = localStorage.getItem("pending_ref");
+    if (!pendingRef) return;
+    fetch("/api/referral/claim", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + token,
+      },
+      body: JSON.stringify({ ref: pendingRef }),
+    })
+      .then((r) => r.json())
+      .then(() => {
+        localStorage.removeItem("pending_ref");
+      })
+      .catch(() => {});
+  }, [session?.access_token]);
 
   // 컨셉 목록을 public/concepts.json 에서 불러옴 (앱 시작 시 1회)
   useEffect(() => {
@@ -305,6 +344,9 @@ export default function PortraitStudio() {
         setUnlimited(!!j?.unlimited);
         setBlocked(!!j?.blocked);
         if (typeof j?.used === "number") setFreeUsed(j.used);
+        if (typeof j?.credits === "number") setCredits(j.credits);
+        if (typeof j?.referralCount === "number") setReferralCount(j.referralCount);
+        if (typeof j?.untilNext === "number") setUntilNext(j.untilNext);
       })
       .catch(() => {});
     return () => {
@@ -421,6 +463,29 @@ export default function PortraitStudio() {
     setGenError(null);
   }
 
+  // 친구 초대 — 휴대폰 기본 공유창 (카톡/문자 등 자동 노출)
+  async function shareInvite() {
+    const uid = session?.user?.id;
+    if (!uid) return;
+    const link = window.location.origin + "/?ref=" + uid;
+    const shareData = {
+      title: "rimikimi",
+      text: "내 얼굴로 인생 프로필 만들기 ✨ rimikimi 같이 해요!",
+      url: link,
+    };
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+      } else {
+        await navigator.clipboard.writeText(link);
+        setInviteMsg("초대 링크가 복사됐어요! 친구에게 붙여넣어 보내주세요 📋");
+        setTimeout(() => setInviteMsg(""), 4000);
+      }
+    } catch (_) {
+      /* 사용자가 공유 취소 — 무시 */
+    }
+  }
+
   if (booting) return <Splash />;
 
   // 세션 확인 중엔 잠깐 빈 화면 (깜빡임 방지)
@@ -443,15 +508,17 @@ export default function PortraitStudio() {
       <header style={S.header}>
         <Logo height={35} />
         <div style={S.headerRight}>
-          <button style={S.creditChip} onClick={() => setScreen("store")}>
+          <button style={S.creditChip} onClick={shareInvite}>
             <span style={S.creditDot} />
             {unlimited
               ? "∞ 무제한"
               : blocked
               ? "🔒 베타 전용"
-              : credits > 0
-              ? credits + " 크레딧"
-              : "베타 " + freeLeft + "/" + FREE_DAILY}
+              : "베타 " +
+                freeLeft +
+                "/" +
+                FREE_DAILY +
+                (credits > 0 ? " ·🎟" + credits : "")}
           </button>
           <button
             style={S.logoutBtn}
@@ -1116,6 +1183,32 @@ const S = {
     padding: "10px 22px", fontSize: 12.5, fontWeight: 700,
     fontFamily: "'Quicksand', sans-serif", cursor: "pointer",
     letterSpacing: "0.02em",
+  },
+  inviteBanner: {
+    width: "100%", display: "flex", alignItems: "center",
+    justifyContent: "space-between", gap: 12,
+    background: "linear-gradient(120deg, " + ACCENT + "14, " + HEARTS[2] + "1f)",
+    border: "1.5px solid " + ACCENT + "33", borderRadius: 16,
+    padding: "13px 15px", marginBottom: 18, cursor: "pointer",
+    textAlign: "left",
+  },
+  inviteBannerLeft: { flex: 1, minWidth: 0 },
+  inviteBannerTitle: {
+    fontSize: 13.5, fontWeight: 700, color: INK,
+    fontFamily: "'Quicksand', sans-serif", marginBottom: 3,
+  },
+  inviteBannerDesc: {
+    fontSize: 11, opacity: 0.7, fontWeight: 500, lineHeight: 1.5,
+  },
+  inviteBannerBtn: {
+    flexShrink: 0, background: ACCENT, color: "#fff",
+    borderRadius: 999, padding: "8px 14px", fontSize: 12,
+    fontWeight: 700, fontFamily: "'Quicksand', sans-serif",
+  },
+  inviteToast: {
+    background: INK, color: "#fff", borderRadius: 12,
+    padding: "11px 14px", fontSize: 12, fontWeight: 600,
+    marginBottom: 16, textAlign: "center", lineHeight: 1.5,
   },
   privacyNote: {
     fontSize: 10.5, lineHeight: 1.6, opacity: 0.45,
