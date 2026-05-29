@@ -1016,9 +1016,13 @@ function ResultScreen({
             <img src={resultImage} alt={prompt.title} style={S.resultImg} />
           </div>
           <div style={S.saveNotice}>
-            🔒 보안을 위해 생성된 이미지는 앱에 별도 저장되지 않아요.
+            🔒 보안을 위해 생성된 이미지는
             <br />
-            저장 버튼으로 앨범에 꼭 별도로 저장해 주세요 😉
+            앱에 별도 저장되지 않아요.
+            <br />
+            저장 버튼으로
+            <br />
+            앨범에 꼭 별도로 저장해 주세요 😉
           </div>
           <a
             href={resultImage}
