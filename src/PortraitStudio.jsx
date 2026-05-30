@@ -369,23 +369,28 @@ export default function PortraitStudio() {
   }, [concepts, hideSensitive]);
 
   // 카테고리에 개수 같이 계산 — [{ name, count }]
+  // 컨셉은 categories 배열을 가질 수 있음 (다중 카테고리). 호환을 위해 category(단일)도 fallback.
   const categories = useMemo(() => {
     const counts = new Map();
     counts.set("전체", visiblePool.length);
     for (const p of visiblePool) {
-      counts.set(p.category, (counts.get(p.category) || 0) + 1);
+      const cats = p.categories || (p.category ? [p.category] : []);
+      for (const cat of cats) {
+        counts.set(cat, (counts.get(cat) || 0) + 1);
+      }
     }
     return Array.from(counts.entries()).map(([name, count]) => ({ name, count }));
   }, [visiblePool]);
 
   const filtered = useMemo(() => {
     return visiblePool.filter((p) => {
-      const catOk = activeCat === "전체" || p.category === activeCat;
+      const cats = p.categories || (p.category ? [p.category] : []);
+      const catOk = activeCat === "전체" || cats.includes(activeCat);
       const q = query.trim().toLowerCase();
       const qOk =
         !q ||
         p.title.toLowerCase().includes(q) ||
-        p.category.toLowerCase().includes(q) ||
+        cats.some((c) => c.toLowerCase().includes(q)) ||
         p.text.toLowerCase().includes(q);
       return catOk && qOk;
     });
