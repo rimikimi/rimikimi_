@@ -1,5 +1,27 @@
 [
   {
+    "id": 303,
+    "title": "카페 데님",
+    "category": "스트릿 패션",
+    "categories": [
+      "스트릿 패션",
+      "일상 스냅"
+    ],
+    "text": "East Asian young woman, long straight dark brown hair, gentle smile, sipping a cold latte through a transparent straw, black cotton baseball cap, white and pink horizontal stripe long-sleeve top, high-waisted cuffed light blue denim shorts, white crew socks, clean silver leather running shoes, black nylon backpack, sitting casually on a low red brick ledge, one knee bent upwards with her foot resting on the ledge, holding a transparent plastic cup with a dome lid and latte inside, relaxed posture, cafe exterior, textured dark red brick wall background, large glass window, lush green leaves, leafy branches overhead, urban garden, bright afternoon sunlight, dramatic dappled shadows, leaf- patterned shadows cast on the subject's face and the wall, high contrast, warm natural light, youthful, casual, serene, aesthetic summer afternoon, trendy lifestyle portrait, 50mm portrait lens, f/2.8 aperture, ISO 100, 1/250s shutter speed, sharp focus, natural depth of field, high-resolution DSLR photography.",
+    "sensitive": false
+  },
+  {
+    "id": 302,
+    "title": "가든 티타임 일러스트",
+    "category": "예술 / 클래식",
+    "categories": [
+      "예술 / 클래식",
+      "파티 / 이벤트"
+    ],
+    "text": "A vector digital 2D illustration of the specified person in the reference photo, low bun dark brown hair, bearing the user's likeness, with a serene and contemplative expression, seated at a formal tea party table. Wearing a tailored off white and #eac2fc and gold tweed suit jacket with gold accent buttons. multi-strand pearl necklace and matching pearl earrings. An elaborate #eac2fc short brim cloche hat with off white ribbon bow. The body is angled slightly to the right, head turned to the left with soft gaze with warm smile. The setting is an elegant British garden pavilion and outdoor tea party atmosphere. The background features white trellis-work lattice adorned with green climbing ivy. White multi-pane mullion windows to the right look out onto a detailed garden and classical stone fountain. The table is covered with a crisp white and pink linen tablecloth and presented with a formal afternoon tea desserts and service. A multi-tier silver-plated cake stand (three tiers) holds fresh scones with clotted cream and strawberry jam on the top tier, delicate cherry tarts and a varied assortment of multi colored macarons and cakes on the middle tier, and shortbread cookies on the bottom tier. Fine chinaware with a classic green leaf floral pattern, including multiple plates, a full teacup and saucer in the foreground, and an elegant silver-plated teapot, sugar bowl, and cream jug. wide shot composition. Soft, natural, diffused daylight creating a warm, elegant atmosphere. Shallow depth of field with sharp focus on the subject's face and the immediate table setting, with a smooth bokeh of the garden background.",
+    "sensitive": false
+  },
+  {
     "id": 95,
     "title": "로즈 니트",
     "category": "스튜디오 프로필",
