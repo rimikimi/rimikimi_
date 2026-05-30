@@ -570,6 +570,7 @@ export default function PortraitStudio() {
             onShowMore={() => setVisibleCount((c) => c + PAGE_SIZE)}
             total={concepts.length}
             poolTotal={visiblePool.length}
+            fullPool={visiblePool}
             onPick={pickPrompt}
             onBack={null}
             credits={credits}
@@ -756,10 +757,44 @@ function GalleryScreen({
   poolTotal, onPick, onBack,
   credits = 0, referralCount = 0, untilNext = 2,
   onInvite, inviteMsg = "", unlimited = false,
+  fullPool = [],
 }) {
   const [cols, setCols] = useState(2);
   const hasFilter =
     query.trim() !== "" || activeCat !== "전체" || hideSensitive;
+
+  // G 레이아웃: 추천 + 카테고리별 카로셀
+  // 필터 없을 때(=첫 진입) 보여줌. 필터 켜지면 기존 그리드로 폴백.
+  // 추천: 가장 큰 ID 8개 (최신 우선)
+  // 카테고리 순서: 각 카테고리에서 가장 큰 ID 기준으로 카테고리 정렬 (= 최근에 새 컨셉이 추가된 카테고리 먼저)
+  const showHomeLayout = !hasFilter;
+  const homeData = useMemo(() => {
+    if (!showHomeLayout) return null;
+    const pool = fullPool;
+    // 1) 추천: 가장 큰 ID 8개
+    const featured = [...pool].sort((a, b) => b.id - a.id).slice(0, 8);
+    // 2) 카테고리별 컨셉 모음
+    const byCat = new Map(); // catName -> { items, latestId }
+    for (const p of pool) {
+      const cats = p.categories || (p.category ? [p.category] : []);
+      for (const cat of cats) {
+        if (!byCat.has(cat)) byCat.set(cat, { items: [], latestId: 0 });
+        const g = byCat.get(cat);
+        g.items.push(p);
+        if (p.id > g.latestId) g.latestId = p.id;
+      }
+    }
+    // 카테고리 정렬: 최근 업데이트(=최대 ID) 큰 순
+    const rows = Array.from(byCat.entries())
+      .map(([name, g]) => ({
+        name,
+        latestId: g.latestId,
+        count: g.items.length,
+        items: g.items.sort((a, b) => b.id - a.id).slice(0, 10), // 각 줄에 최신 10개
+      }))
+      .sort((a, b) => b.latestId - a.latestId);
+    return { featured, rows };
+  }, [showHomeLayout, fullPool]);
   return (
     <div className="fade">
       <button style={S.inviteBanner} onClick={onInvite}>
@@ -852,7 +887,13 @@ function GalleryScreen({
         </button>
       </div>
 
-      {prompts.length === 0 ? (
+      {showHomeLayout && homeData ? (
+        <HomeLayout
+          data={homeData}
+          onPick={onPick}
+          onMore={(catName) => setActiveCat(catName)}
+        />
+      ) : prompts.length === 0 ? (
         <div style={S.emptyState}>
           <div>검색 결과가 없어요</div>
           {hasFilter && (
@@ -923,6 +964,84 @@ function GalleryScreen({
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ============================================================
+   홈 레이아웃 (필터 없을 때 첫 화면)
+   - 추천 영역 (가장 큰 ID 8개, 큰 카드 가로 스크롤)
+   - 카테고리별 1줄씩 (최근 업데이트 카테고리 먼저)
+   ============================================================ */
+function HomeLayout({ data, onPick, onMore }) {
+  return (
+    <div>
+      {/* 추천 */}
+      {data.featured.length > 0 && (
+        <div style={S.homeSection}>
+          <div style={S.homeRowHead}>
+            <div style={S.homeRowTitle}>🔥 추천</div>
+          </div>
+          <div style={S.homeRailFeatured}>
+            {data.featured.map((p) => (
+              <button
+                key={p.id}
+                style={S.featuredCard}
+                onClick={() => onPick(p)}
+                aria-label={p.title}
+              >
+                <img
+                  src={`/thumbs/${p.id}.webp`}
+                  alt={p.title}
+                  style={S.featuredImg}
+                  loading="lazy"
+                />
+                <div style={S.featuredOverlay}>
+                  <div style={S.featuredTitle}>{p.title}</div>
+                </div>
+                {p.sensitive && <div style={S.sensitiveTag}>18+</div>}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 카테고리별 줄 */}
+      {data.rows.map((row) => (
+        <div key={row.name} style={S.homeSection}>
+          <div style={S.homeRowHead}>
+            <div style={S.homeRowTitle}>
+              {row.name}
+              <span style={S.homeRowCount}>{row.count}</span>
+            </div>
+            <button style={S.homeRowMore} onClick={() => onMore(row.name)}>
+              더보기 →
+            </button>
+          </div>
+          <div style={S.homeRail}>
+            {row.items.map((p) => (
+              <button
+                key={p.id}
+                style={S.railCard}
+                onClick={() => onPick(p)}
+                aria-label={p.title}
+              >
+                <img
+                  src={`/thumbs/${p.id}.webp`}
+                  alt={p.title}
+                  style={S.railImg}
+                  loading="lazy"
+                />
+                {p.sensitive && (
+                  <div style={{ ...S.sensitiveTag, fontSize: 8.5, padding: "2px 5px" }}>
+                    18+
+                  </div>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -1241,6 +1360,68 @@ const S = {
     padding: "10px 22px", fontSize: 12.5, fontWeight: 700,
     fontFamily: "'Quicksand', sans-serif", cursor: "pointer",
     letterSpacing: "0.02em",
+  },
+
+  /* === 홈 레이아웃 (G) === */
+  homeSection: { marginBottom: 24 },
+  homeRowHead: {
+    display: "flex", justifyContent: "space-between", alignItems: "baseline",
+    marginBottom: 10, padding: "0 2px",
+  },
+  homeRowTitle: {
+    fontSize: 15, fontWeight: 700, color: INK,
+    fontFamily: "'Quicksand', sans-serif",
+    display: "flex", alignItems: "baseline", gap: 7,
+  },
+  homeRowCount: {
+    fontSize: 11.5, opacity: 0.45, fontWeight: 600,
+  },
+  homeRowMore: {
+    background: "transparent", border: "none", color: ACCENT,
+    fontSize: 12, fontWeight: 700, cursor: "pointer",
+    fontFamily: "'Quicksand', sans-serif",
+  },
+  homeRail: {
+    display: "flex", gap: 8, overflowX: "auto",
+    scrollSnapType: "x mandatory",
+    paddingBottom: 8,
+    margin: "0 -20px", paddingLeft: 20, paddingRight: 20,
+  },
+  homeRailFeatured: {
+    display: "flex", gap: 12, overflowX: "auto",
+    scrollSnapType: "x mandatory",
+    paddingBottom: 8,
+    margin: "0 -20px", paddingLeft: 20, paddingRight: 20,
+  },
+  railCard: {
+    flexShrink: 0, width: 110, aspectRatio: "3/4",
+    background: "#f0ece4", borderRadius: 12, overflow: "hidden",
+    border: "none", padding: 0, cursor: "pointer", position: "relative",
+    scrollSnapAlign: "start",
+  },
+  railImg: {
+    width: "100%", height: "100%", objectFit: "cover", display: "block",
+  },
+  featuredCard: {
+    flexShrink: 0, width: 200, aspectRatio: "3/4",
+    background: "#f0ece4", borderRadius: 16, overflow: "hidden",
+    border: "none", padding: 0, cursor: "pointer", position: "relative",
+    scrollSnapAlign: "start",
+    boxShadow: "0 4px 14px rgba(35,31,32,0.08)",
+  },
+  featuredImg: {
+    width: "100%", height: "100%", objectFit: "cover", display: "block",
+  },
+  featuredOverlay: {
+    position: "absolute", left: 0, right: 0, bottom: 0,
+    padding: "20px 12px 11px",
+    background: "linear-gradient(to top, rgba(35,31,32,0.78), rgba(35,31,32,0))",
+  },
+  featuredTitle: {
+    color: "#fff", fontSize: 12.5, fontWeight: 700,
+    fontFamily: "'Quicksand', sans-serif", letterSpacing: "-0.01em",
+    textShadow: "0 1px 2px rgba(0,0,0,0.3)",
+    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
   },
   inviteBanner: {
     width: "100%", display: "flex", alignItems: "center",
