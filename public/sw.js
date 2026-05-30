@@ -10,7 +10,7 @@
 // 새 버전 배포 시: 아래 VERSION 만 올리면 됨.
 // ============================================================
 
-const VERSION = "v2";
+const VERSION = "v3";
 const STATIC_CACHE = `rimikimi-static-${VERSION}`;
 const THUMB_CACHE = `rimikimi-thumbs-${VERSION}`;
 const DATA_CACHE = `rimikimi-data-${VERSION}`;
@@ -31,16 +31,19 @@ self.addEventListener("install", (event) => {
   );
 });
 
-// 활성화: 옛 버전 캐시 정리
+// 활성화: 옛 버전 캐시 정리 + 모든 클라이언트 강제 새로고침
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys
-          .filter((k) => !k.endsWith(`-${VERSION}`))
-          .map((k) => caches.delete(k))
-      )
-    ).then(() => self.clients.claim())
+    (async () => {
+      const keys = await caches.keys();
+      await Promise.all(
+        keys.filter((k) => !k.endsWith(`-${VERSION}`)).map((k) => caches.delete(k))
+      );
+      await self.clients.claim();
+      // 모든 열린 탭을 새로고침 (옛 썸네일 표시 방지)
+      const clients = await self.clients.matchAll({ type: "window" });
+      for (const c of clients) c.navigate(c.url);
+    })()
   );
 });
 
@@ -61,9 +64,10 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // 3) 썸네일 — cache-first (안 바뀌니까 영구)
+  // 3) 썸네일 — stale-while-revalidate
+  //    (cache-first 였는데 깨진 썸네일이 영구 캐싱되는 문제로 SWR 로 변경)
   if (url.pathname.startsWith("/thumbs/")) {
-    event.respondWith(cacheFirst(req, THUMB_CACHE));
+    event.respondWith(staleWhileRevalidate(req, THUMB_CACHE));
     return;
   }
 
