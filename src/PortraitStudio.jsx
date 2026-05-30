@@ -824,50 +824,31 @@ function GalleryScreen({
         </div>
       </div>
 
-      <div style={S.galleryControls}>
-        <div style={S.searchWrap}>
-          <span style={S.searchIcon}>⌕</span>
-          <input
-            style={S.searchInput}
-            placeholder={poolTotal + "개의 컨셉 검색"}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-          {query && (
+      <div style={S.stickyBar}>
+        <div style={S.catRowSticky}>
+          {categories.map((c, i) => (
             <button
-              type="button"
-              style={S.searchClear}
-              onClick={() => setQuery("")}
-              aria-label="검색어 지우기"
+              key={c.name}
+              style={{
+                ...S.catChip,
+                ...(activeCat === c.name
+                  ? { ...S.catChipActive, background: HEARTS[i % HEARTS.length] }
+                  : {}),
+              }}
+              onClick={() => setActiveCat(c.name)}
             >
-              ×
+              {c.name} <span style={S.catChipCount}>{c.count}</span>
             </button>
-          )}
-        </div>
-        <button
-          style={S.colToggle}
-          onClick={() => setCols((c) => (c === 2 ? 4 : 2))}
-          aria-label={cols === 2 ? "4열로 보기" : "2열로 보기"}
-        >
-          <GridIcon cells={cols === 2 ? 4 : 2} />
-        </button>
-      </div>
-
-      <div style={S.catRow}>
-        {categories.map((c, i) => (
+          ))}
           <button
-            key={c.name}
-            style={{
-              ...S.catChip,
-              ...(activeCat === c.name
-                ? { ...S.catChipActive, background: HEARTS[i % HEARTS.length] }
-                : {}),
-            }}
-            onClick={() => setActiveCat(c.name)}
+            style={{ ...S.catChip, flexShrink: 0, marginLeft: 4 }}
+            onClick={() => setCols((c) => (c === 2 ? 4 : 2))}
+            aria-label={cols === 2 ? "4열로 보기" : "2열로 보기"}
+            title={cols === 2 ? "4열로 보기" : "2열로 보기"}
           >
-            {c.name} <span style={S.catChipCount}>{c.count}</span>
+            <GridIcon cells={cols === 2 ? 4 : 2} />
           </button>
-        ))}
+        </div>
       </div>
 
       <div style={S.filterMetaRow}>
@@ -1497,6 +1478,21 @@ const S = {
   catRow: {
     display: "flex", gap: 8, overflowX: "auto",
     paddingBottom: 6, marginBottom: 10,
+  },
+  stickyBar: {
+    position: "sticky", top: 0, zIndex: 50,
+    background: BG, marginBottom: 10,
+    paddingTop: 6,
+    margin: "0 -20px 10px",
+    paddingLeft: 20, paddingRight: 20,
+    borderBottom: "1px solid " + INK + "10",
+    boxShadow: "0 2px 8px rgba(35,31,32,0.04)",
+  },
+  catRowSticky: {
+    display: "flex", gap: 8, overflowX: "auto",
+    paddingTop: 8, paddingBottom: 8,
+    margin: "0 -20px", paddingLeft: 20, paddingRight: 20,
+    WebkitOverflowScrolling: "touch",
   },
   catChip: {
     flexShrink: 0, background: "#fff",
