@@ -4,7 +4,7 @@
     "title": "로즈 니트",
     "category": "스튜디오 프로필",
     "text": "A 32-year-old woman, implemented with 100% ultra photorealism. Ensure to keep and maintain the same facial structure, natural dark brown hair, soft makeup from the reference photo. Her physical specifications are a height of 167cm, weight of 53kg, **breast size 70D** , waist 24 inches, and hips 36 inches. The photos must be in 8k resolution(5:7)with ultra high definition, her face must have 100% fidelity to the provided reference photo. Her skin is flawless. Very well-cared skin. Image Generation Prompt Subject & Attire: A stunning young woman in the reference photo with pale porcelain skin, and dark, soft black hair tied back loosely with a few wisps framing her face. She is wearing an elegant, form-fitting, off-the-shoulder white dress made of semi- sheer, fine-mesh fabric. The dress features an asymmetrical shoulder line exposing her left shoulder and long, gossamer sleeves that extend partially over her hands. The texture of the fabric should be visible, showing a subtle knit or mesh pattern that reacts to the light. Pose: A graceful and poised fashion editorial stance. Her right arm, wearing a rose gold Rolex dayjust watch with diamond, is raised with her hand resting softly near her chin, casting a very faint shadow. Her left arm is relaxed at her side, with her fingers gently touching her hip. She has a serene, direct gaze toward the camera with soft, neutral lip color and minimalist makeup that emphasizes her natural beauty. Her head is slightly tilted, creating an elegant line along her neck. Environment & Composition: A minimalist, high-end studio setting. The background is a solid, seamless, cool-toned pastel blue with a soft gradient. The shot is a medium-full body vertical portrait, focusing on the subject from the head to the mid-thigh. The composition is clean, centered, and balanced, evoking a sense of calm and luxury. Lighting & Photography Style: The lighting is the defining characteristic: soft, diffused studio light with a prominent, ethereal \"glow\" or \"lens flare\" effect centered on her torso. This central highlight should appear as a bright, overexposed soft-white circle that fades into the surrounding fabric, making the white dress look like it is radiating light. The overall mood is airy and dreamlike. Subtle, soft shadows define the contours of her face and collarbone. Setting & Composition: Vertical orientation. High-fashion magazine aesthetic. The subject is the sole focus against a non-distracting, matte background. The lower portion of the frame should have ample negative space to maintain the minimalist feel. (Optionally include: clean, modern sans-serif typography at the bottom left for a branded look). Technical Specifications:",
-    "sensitive": true,
+    "sensitive": false,
     "categories": [
       "스튜디오 프로필"
     ]
@@ -74,7 +74,7 @@
     "title": "스튜디오 무드",
     "category": "스튜디오 프로필",
     "text": "soft makeup from the reference photo. The photos must be in 8k resolution(9:16)with ultra high definition, her face must have 100% fidelity to the provided reference photo. Subject & Likeness: A high-resolution, photorealistic portrait of the woman in the reference photo with long, straight, sleek hair parted down to the sides. She has a high-fashion editorial gaze directed toward the camera. Pose & Composition: Full-body studio shot. The subject is seated gracefully on a #464D77 floor in a \"crouched\" high-fashion pose. One leg is bent upward toward the chest, while the other is tucked beneath, creating a dynamic, triangular composition. She leans slightly forward, exuding poise and sophistication. Apparel & Styling: Top: A sleek, #F4EDED bodysuit featuring a deep plunging V-neckline and a high, black choker with heart-shaped diamond pendant. Bottoms: black pantyhose Makeup & Grooming: Bold matte-red lipstick, flawlessly smooth skin with a dewy finish, and a subtle smoky eye. High ponytail tied with #F4EDED ribbon Environment & Lighting: Minimalist, monochromatic #464D77 studio background with a soft, seamless floor-to-wall transition. The lighting is soft and diffused (butterfly lighting), creating gentle shadows that define the body's silhouette without being harsh. Technical Specs: 8k resolution, shot on 85mm lens, f/2.8, cinematic fashion photography, high-end magazine aesthetic, hyper-realistic textures, intricate fabric details, sharp focus on the face.",
-    "sensitive": true,
+    "sensitive": false,
     "categories": [
       "스튜디오 프로필"
     ]
@@ -158,7 +158,7 @@
     "title": "레인 무드",
     "category": "일상 스냅",
     "text": "soft makeup from the reference photo. The photos must be in 8k resolution(9:16)with ultra high definition, her face must have 100% fidelity to the provided reference photo. An extremely detailed photo of the person in the reference photo shows a woman with dark, wet-look, tousled hair and in a serene expression, her head tilted back. A brilliant rainbow spectrum of light streams across her face, neck, and the sheer, iridescent sequined top she wears, casting vibrant bands of red, orange, yellow, green, blue, and purple. Her skin and hair are generously dusted with fine, sparkling glitter that catches the multi-colored light. The light highlights the contours of her face, the texture of the glitter, the moisture in her hair, and the reflective sequins. The background is a soft, neutral gradient of pale blue and lavender, enhancing the ethereal quality. The lighting is dramatic and photographic, emphasizing the spectral colors and sparkling textures.",
-    "sensitive": true,
+    "sensitive": false,
     "categories": [
       "일상 스냅"
     ]
@@ -270,7 +270,7 @@
     "title": "요트 위 비치웨어",
     "category": "비치 / 리조트",
     "text": "soft makeup from the reference photo. The photos must be in 8k resolution(9:16)with ultra high definition, her face must have 100% fidelity to the provided reference photo. A detailed photograph of a woman in the reference photo, wearing the #eb4511 colored strappy backless one-piece swimsuit and color #ffffff extremely wide- brimmed straw hat with #8EB1C7 ribbon decoration with bow and longtail, slightly covering her face, seated on the white leather cushion of the yacht's helm. She is looking back over her left shoulder towards the camera, her left hand lightly touching the brim of her hat, and her right hand resting on the steering wheel. She has a apple watch8 on her left wrist. The background shows the clear and bright turquoise ocean and the distant sandy island with modern buildings under a blue sky with white clouds. Strong sunlight casts distinct shadows. The yacht's controls are visible.",
-    "sensitive": true,
+    "sensitive": false,
     "categories": [
       "비치 / 리조트"
     ]
@@ -290,7 +290,7 @@
     "title": "컨셉 34",
     "category": "하이패션 / 화보",
     "text": "soft makeup from the reference photo. The photos must be in 8k resolution(9:16)with ultra high definition, her face must have 100% fidelity to the provided reference photo. A moody photograph of a woman with sleek dark hair, reclined on dark stone steps. She wears a deep red velvet gown with spaghetti straps, a plunging neckline, and a high slit, paired with matching long opera gloves and large diamond chandelier earrings. Her makeup is dramatic, and she gazes off to the side. The scene is lit by a single overhead light source in a low-key setting, highlighting the rich texture of the velvet and the stone.",
-    "sensitive": true,
+    "sensitive": false,
     "categories": [
       "하이패션 / 화보"
     ]
@@ -300,7 +300,7 @@
     "title": "컨셉 33",
     "category": "하이패션 / 화보",
     "text": "soft makeup from the reference photo. The photos must be in 8k resolution(9:16)with ultra high definition, her face must have 100% fidelity to the provided reference photo. reference photo walking gracefully toward the camera through a grand, modern stone colonnade colored . She is wearing a luxurious, floor-length #507dbc silk gown with a deep plunging V-neckline, long sleeves, and a high thigh-slit that reveals her leg mid-stride, creating a sense of flowing movement. She is looking away to the side with a refined, elegant expression and #ef5d60 lips. The setting is a long, symmetrical corridor of classical stone arches and heavy pillars , receding into a soft-focus background. The lighting is dramatic and high-contrast (chiaroscuro), with bright golden sunlight filtering through the arches, casting sharp circular light patterns and deep shadows on the marblestone floor. The color grade is moody and sophisticated, emphasizing the vibrant #507dbc of the dress against the tones of the stone architecture. Shot on 35mm lens, f/1.8, 8k resolution, photorealistic, Vogue fashion style, sharp focus on the subject, highly detailed fabric textures.",
-    "sensitive": true,
+    "sensitive": false,
     "categories": [
       "하이패션 / 화보"
     ]
@@ -384,7 +384,7 @@
     "title": "카페 슬립 드레스",
     "category": "예술 / 클래식",
     "text": "Medium portrait, young East Asian woman, shoulder-length dark brown hair, low ponytail, face-framing strands, #ae7450 sleeveless slip dress, spaghetti straps, #fff9e9 short-puff-sleeve high-neck top, gold necklace, standing, centered, front-facing, direct gaze with smile, holding a cup of coffee on a to- go cup with a transparent straw, minimalistic rectangular #4d2c17 micro bag with straps on a shoulder, natural elegant posture, Minimalistic yet European- style cafe interior, rustic, dark wood doorway, outdoor green foliage background, dark-plank herringbone hardwood floor, deep mahogany wainscoting, off-white upper walls, vintage wooden bistro chair, dark wood side table, framed vintage monochrome photo, basket, paper bags, natural daylight, soft ambient indoor light, cozy atmosphere, slight film grain, candid, warm desaturated color palette, sharp focus, shallow depth of field, 35mm lens, f/4.0, ISO 400, high-resolution photo, realistic texture.",
-    "sensitive": true,
+    "sensitive": false,
     "categories": [
       "예술 / 클래식",
       "일상 스냅"
@@ -395,7 +395,7 @@
     "title": "가든 레이스",
     "category": "웨딩 / 브라이덜",
     "text": "Female bride, smiling, joyful, off-the-shoulder wedding dress, sheer long sleeves, ruched bodice, flowing skirt, floor-length veil, delicate white lace details, holding a cascata bouquet, white roses, yellow accents. Standing, full- body shot, facing forward, smiling towards the viewer, hands holding the bouquet, veil draping and spreading widely, elegant posture. Environment & Composition: Outdoor garden terrace, white stone flooring, stone steps, classical white columns, ornate white double doors, climbing white rose vines, lush green trees in background, sunny day, abundant floral arrangements, natural light. Bright sunlight, dappled light through trees, warm glow, soft shadows, high-key lighting, airy atmosphere, natural photography, film grain, slight lens flare on veil, crisp details, soft background bokeh. Setting & Composition: Symmetrical composition with the bride centered, framing by floral elements and architecture, leading lines from the steps and flooring, soft natural background, light wind moving the veil. Shot on Canon EOS R5, 50mm f/ 1.2 lens, f/1.8 aperture, 1/1600 sec shutter speed, ISO 200, natural light, raw photo, high resolution.",
-    "sensitive": true,
+    "sensitive": false,
     "categories": [
       "웨딩 / 브라이덜"
     ]
@@ -416,7 +416,7 @@
     "title": "스튜디오 튤",
     "category": "웨딩 / 브라이덜",
     "text": "3/4 side profile of a beautiful Asian woman in the reference photo, bright smile, natural clean makeup, dewy finish, sleek back low bun, pearl stud earrings, physical specifications are a height of 167cm, weight of 53kg, breast size 70D, waist 24 inches, and hips 36 inches. White strapless wedding dress, sweetheart neckline, white sheer tulle veil flowing over the back and shoulders. Head slightly turned to the left, eyes gazing forward, authentic smiling expression, slightly covering her smile with Biedermeier bouquet. Medium shot, soft white studio background, delicate white tulle fabric flowing in the background creating a dreamlike, wedding-day environment. Soft, even studio lighting, subtle background textures. amateur iphone photograph. natural skin texture, clean and refined aesthetic.",
-    "sensitive": true,
+    "sensitive": false,
     "categories": [
       "웨딩 / 브라이덜"
     ]
@@ -552,7 +552,7 @@
     "title": "레인 튤",
     "category": "웨딩 / 브라이덜",
     "text": "Young woman, dark swept-back hair, jeweled floral crystal tiara, strapless bridal gown, jeweled bodice, fully-lying pose, resting horizontally, head resting on hands, gentle melancholic expression with soft smile, direct gaze, plush white bed, abundant sheer white tulle veil, enveloping draped fabric, shallow depth of field, face sharp focus, blurred ethereal foreground, fine art photography, diffused natural indoor light, soft illumination, vintage analog film aesthetic, film grain, wide shot, high-resolution, photorealistic.",
-    "sensitive": true,
+    "sensitive": false,
     "categories": [
       "웨딩 / 브라이덜",
       "예술 / 클래식"
@@ -624,7 +624,7 @@
     "title": "스튜디오 이브닝 가운",
     "category": "하이패션 / 화보",
     "text": "Iconic 1950s dark brown bombshell, height 167cm, weight 53kg, breast size 70D, waist 24 inches, hips 36 inches, hourglass silhouette, dark brown voluminous vintage curls, retro wavy hairstyle, perfectly arched eyebrows, sharp winged eyeliner, long dark eyelashes, signature beauty mark on left cheek, shimmering teardrop diamond chandelier earrings, off-the-shoulder black silk evening gown, plunging sweetheart neckline, blowing a kiss, puckered lips, glossy lipstick, upper body leaning forward towards camera, tilted head, sultry playful expression, intimate close-up framing, head and shoulders portrait, high-contrast, dramatic chiaroscuro lighting, harsh directional side light, deep velvety shadows, cinematic film aesthetic, 35mm film grain, halide texture, sharp focus on eyes and lips, radiant skin glow, pitch black background, minimalist studio void, 8k resolution, ultra-photorealistic, masterwork, timeless Hollywood glamour.",
-    "sensitive": true,
+    "sensitive": false,
     "categories": [
       "하이패션 / 화보"
     ]
@@ -634,7 +634,7 @@
     "title": "시티 무드",
     "category": "스트릿 패션",
     "text": "Glamorous woman, bombshell, short wavy bob dark brown hair, iconic 1950s white halter-neck cocktail dress, plunging neckline, cinched waist, voluminous pleated white skirt billowing upwards, white strap high heel sandals, hourglass silhouette, iconic subway grate pose, playful expression, joyful laughter, squinting eyes, head tilted back, leaning forward slightly, knees pressed together, hands frantically clutching rising fabric, midnight New York City street, 1950s urban sidewalk, dark shop windows, vintage jewelry store signage, subway ventilation grate, dramatic upward wind effect, full body shot, vertical orientation, centered composition, high-contrast cinematic lighting, harsh spotlighting, deep shadows, 35mm film grain, vintage color grading, Kodachrome aesthetic, subtle motion blur on skirt edges, photorealistic, 8k resolution, ultra-detailed skin texture, sharp focus on face, soft focus background, RAW photo, masterpiece, Fujifilm Provia.",
-    "sensitive": true,
+    "sensitive": false,
     "categories": [
       "스트릿 패션",
       "비치 / 리조트"
@@ -676,7 +676,7 @@
     "title": "스튜디오 웨딩 가운",
     "category": "웨딩 / 브라이덜",
     "text": "Stunning East Asian bride, hourglass silhouette, slender arms, elegant collarbones, serene downcast gaze, peaceful expression, natural bridal makeup, peach-toned lips, sophisticated low bun hairstyle, strapless white organza wedding gown, overlapping scalloped petal neckline, intricate floral leaf embroidery, cinched waist, floor-length sheer tulle veil, pearl and crystal encrusted headband, delicate diamond earrings, silver wedding ring, small tight bouquet of fresh Lily of the Valley, green leaves, white ribbon wrap, half-body centered composition, head tilted down, minimalist bridal studio, soft cream background, neutral color palette, ethereal glow, high-key lighting, soft diffused studio light, gentle rim lighting on veil, shallow depth of field, 85mm lens, f/1.8, bokeh, sharp focus on facial features and bouquet, 8k resolution, photorealistic, highly detailed skin texture, masterpiece, cinematic professional bridal photography.",
-    "sensitive": true,
+    "sensitive": false,
     "categories": [
       "웨딩 / 브라이덜"
     ]
@@ -686,7 +686,7 @@
     "title": "튤 룩",
     "category": "웨딩 / 브라이덜",
     "text": "Woman, elegant facial features, soft bridal makeup, sleek dark hair, middle part, low bun, minimalist white satin wedding dress, high bateau neckline, sleeveless structured bodice, cinched waistline, voluminous floor-length overskirt, luxurious mikado silk texture, long sheer cathedral tulle veil, ethereal draping, front-facing standing pose, graceful posture, arms relaxed at sides, symmetrical stance, direct eye contact, ancient stone archway, mediterranean architecture, neutral beige limestone walls, sun-drenched courtyard, paved stone walkway, full body shot, centered framing, vertical composition, soft natural daylight, bright airy atmosphere, high-end editorial bridal photography, gentle shadows, warm sun glow, clean aesthetic, 8k resolution, ultra- photorealistic, high dynamic range, sharp details, professional color grading, cinematic quality, high-quality textures.",
-    "sensitive": true,
+    "sensitive": false,
     "categories": [
       "웨딩 / 브라이덜"
     ]
@@ -768,7 +768,7 @@
     "title": "스튜디오 레이스",
     "category": "예술 / 클래식",
     "text": "Beautiful East Asian woman, long wavy dark espresso hair, thin see-through bangs, porcelain skin, warm brown eyes, pearl necklace, pearl stud earrings, elegant white square-neck silk dress, slender hourglass figure, sweet facial expression, blowing a kiss towards the camera, palm up near lips, holding a massive bouquet of vibrant red carnations, small white card with \"Thank You\" script nestled in flowers, clean minimal white studio background, upper body portrait, centered framing, decorative pink watercolor brush strokes, scattered gold glitter particles, elegant \"Thank You\" calligraphy at bottom, small watercolor heart icon, soft natural window lighting, high-key photography, gentle rim light, warm skin tones, sharp focus on eyes and face, soft bokeh on background, romantic aesthetic, greeting card style, vertical orientation, 8k resolution, ultra-detailed, photorealistic, cinematic lighting, masterwork, high quality, RAW photo.",
-    "sensitive": true,
+    "sensitive": false,
     "categories": [
       "예술 / 클래식"
     ]
@@ -831,7 +831,7 @@
     "title": "나이트 쿠튀르",
     "category": "하이패션 / 화보",
     "text": "Stunning young woman, long wavy dark brown hair, slick high ponytail, ethereal beauty, radiant skin, delicate facial features, intricate white lace backless gown, floral embroidery, sheer tulle, elegant bridal couture, sophisticated style. Looking back over shoulder, three-quarter rear view, alluring direct gaze, head tilted slightly, graceful posture, soft shoulder curve, hand resting naturally at side. Ancient Mediterranean ruins, weathered stone pillars, classical arches, historical cathedral courtyard, atmospheric dust motes, depth of field, blurred architectural background, vertical framing. Cinematic night, intense rim lighting, warm backlight, glowing hair silhouette, soft sunbeams filtering through arches, dramatic chiaroscuro, high-fashion editorial glow, warm amber tones, soft shadows. Photorealistic, 8k resolution, highly detailed textures, Nikon D850, 85mm lens, f/1.8 aperture, sharp focus on subject, cinematic bokeh, masterpiece quality, RAW photo.",
-    "sensitive": true,
+    "sensitive": false,
     "categories": [
       "하이패션 / 화보"
     ]
@@ -851,7 +851,7 @@
     "title": "로즈 웨딩 가운",
     "category": "웨딩 / 브라이덜",
     "text": "Young Korean woman, hourglass figure, stunning facial features, almond- shaped dark eyes, elegant long dark brown wavy hair, soft bridal makeup, dewy glass skin, pale pink blush, minimalist white silk wedding gown, strapless, sleek texture, voluminous floor-length sheer white tulle veil, massive bouquet of fresh dusty pink roses, long green stems. Waist-up medium shot, arms crossed over chest holding flowers, head gently tilted, soft serene gaze, calm and graceful expression, candid preparation moment, professional stylist hands in frame, makeup artist's hand applying blush with soft brush, hair stylist's hands near head, intimate \"getting ready\" atmosphere. Indoor bridal studio, warm brick wall background, minimalist aesthetic, sophisticated interior, clean lines, vertical orientation, centered subject, rule of thirds, eye-level angle, professional fashion shoot composition, visible hands of people fixing hair and makeup and veil from both sides. Soft diffused natural lighting, golden hour glow, cinematic soft shadows, shallow depth of field, creamy bokeh background, high-end bridal photography, romantic mood, soft-focus aesthetic. 8k resolution, ultra-detailed, photorealistic, iphone Xs Max, sharp focus on eyes and roses, detailed fabric texture, intricate lace and satin details, high dynamic range, masterpiece quality.",
-    "sensitive": true,
+    "sensitive": false,
     "categories": [
       "웨딩 / 브라이덜"
     ]
@@ -861,7 +861,7 @@
     "title": "로즈 웨딩 가운",
     "category": "웨딩 / 브라이덜",
     "text": "East Asian bride, hourglass silhouette, slender and curvaceous proportions, youthful serene face, closed eyes, gentle blissful smile, head tilted, sitting gracefully on plush white bouclé sofa, leaning forward, off-the-shoulder wedding gown, shimmering sequined fabric, sparkling glitter reflections, voluminous layered tulle skirt, long sheer white bridal veil, delicate lace embroidery, holding massive bouquet of white orchids and roses, cuddling flowers close to face, luxury sunlit studio, floor-to-ceiling window background, lush indoor floral arrangements, white roses, blossoming cherry branches, white lilies, baby's breath, ethereal morning sunlight, hazy golden glow, high- key lighting, romantic dreamlike atmosphere, cinematic wedding photography, editorial portrait, soft-focus background, shallow depth of field, creamy bokeh, 8k resolution, ultra-realistic, photorealistic, sharp focus on subject, 85mm lens, intricate textile textures, shimmering particles.",
-    "sensitive": true,
+    "sensitive": false,
     "categories": [
       "웨딩 / 브라이덜",
       "일상 스냅"
@@ -913,7 +913,7 @@
     "title": "시티 니트",
     "category": "스트릿 패션",
     "text": "Ultra-detailed young East Asian woman, delicate doll-like facial features, large expressive dark brown eyes, subtle feline winged eyeliner, natural long lashes, soft pink gradient glossy lips, defined jawline, elegant neck, long espresso brown hair, soft wispy see-through bangs, wearing a chunky off-white textured cable-knit off-the-shoulder sweater, bared shoulder, delicate silver chain necklace, intimate close-up portrait, head slightly tilted, looking directly into camera, soft sultry gaze, candid car interior aesthetic, night time urban setting, luxurious car backseat, blurry city street lights visible through car window, bokeh traffic lights, moody cinematic lighting, strong blue ambient neon glow hitting side of face, soft rim light, warm skin tones, high contrast shadows, ethereal glow, 8k resolution, photorealistic, masterpiece, Sony A7R IV, 85mm lens, f/1.8, shallow depth of field, high detail skin texture, visible pores, subtle film grain, hyper-realistic, volumetric lighting.",
-    "sensitive": true,
+    "sensitive": false,
     "categories": [
       "스트릿 패션"
     ]
@@ -976,7 +976,7 @@
     "title": "카페 니트",
     "category": "일상 스냅",
     "text": "Subject & Attire: Young Asian female, fair skin, subtle rosy makeup, pink lips, long straight light brown hair, see-through bangs, silver rhinestone hair clip, white pearl earring, cream knit cardigan, light blue inner blouse, beige trousers. Pose: Seated, leaning forward, resting cheek on left palm, soft smile, direct eye contact, relaxed, casual posture. Environment & Composition: Greenhouse cafe, indoor sunroom, large glass windows, lush green plants, outdoor foliage, daytime. Lighting & Photography Style: Natural sunlight, bright backlighting, hair rim light, soft shadows, sun flares, airy, warm sun-kissed aesthetic. Setting & Composition: Medium close-up portrait, eye-level angle, centered subject, intimate framing, blurred background. Technical Specifications: Photorealistic, ultra-detailed, 8k resolution, sharp focus, shallow depth of field, bokeh, 50mm lens, f/1.8 aperture, cinematic realism.",
-    "sensitive": true,
+    "sensitive": false,
     "categories": [
       "일상 스냅"
     ]
@@ -1007,7 +1007,7 @@
     "title": "가든 이브닝 가운",
     "category": "하이패션 / 화보",
     "text": "soft makeup from the reference photo. must have 100% fidelity to the provided reference photo. 1. Subject & Pose • Pose (Front View): Standing upright, facing slightly to the side, looking down with a serene expression. Her hands are resting naturally at her sides. • Pose (Back View): Standing with her back to the camera, head turned slightly, showcasing the open-back design of the dress. • Hairstyle: A high, messy bun (top knot) with loose, curly strands framing the face, giving a romantic and effortless look. 2. Garment Details: The Dress • Color: Soft pastel baby pink (petal pink) with a subtle satin sheen. • Style: Formal A-line evening gown or prom dress. • Neckline: Halter-style high neck featuring a thick band of shimmering silver rhinestones and crystals (choker style). • Bodice: Fitted, sleeveless, and minimalist, allowing the embellishments to stand out. • Back Design: Striking backless (open back) design. The rhinestone halter band transitions into a V-shape or \"keyhole\" frame that connects to the waist. • Waist: A defined waistline accented by a wide, matching silver rhinestone- encrusted belt. • Skirt: Full-length, voluminous A-line skirt with heavy fabric folds and a slight floor-sweeping train. 3. Accessories & Styling • Jewelry: Large, dangling silver statement earrings that match the crystal embellishments on the dress. • Makeup: Soft, glamorous makeup with a focus on defined lashes and a muted pink lip color to match the dress. 4. Environment & Lighting • Setting: An outdoor garden or estate setting during early spring or autumn. • Background: Manicured green and yellow bushes, a dark wrought-iron fence, and bare deciduous trees in the distance. • Lighting: Soft, diffused natural daylight (overcast sky), which prevents harsh shadows and highlights the satin texture of the fabric. • Ground: A brick-lined walkway or patio.",
-    "sensitive": true,
+    "sensitive": false,
     "categories": [
       "하이패션 / 화보"
     ]
@@ -1100,7 +1100,7 @@
     "title": "골든아워 무드",
     "category": "하이패션 / 화보",
     "text": "Subject & Attire: A high-fashion portrait of [User/Subject Description] featuring a sleek, minimalist aesthetic. The subject is wearing a luxury ivory-white tailored power suit crafted from high-quality heavy crepe or silk. The blazer features dramatic structured power shoulders, sharp peaked lapels, and a plunging V-neckline. The waist is cinched with a wide, matching built-in belt accented by two large tonal buttons. The trousers are matching high-waisted, tapered, and slightly cropped at the ankle to reveal classic black velvet pointed-toe stiletto pumps. The subject’s hair is styled in a tight, polished low bun. Pose: The subject is captured in a confident, nonchalant editorial pose, leaning back against a textured wall with their hands tucked casually into the blazer’s flap pockets. One leg is crossed slightly over the other at the ankle, creating a slim silhouette. The chin is tilted upward towards the light source, exuding an air of sophisticated indifference and modern elegance. Environment & Composition: A minimalist urban setting. The backdrop is a matte, charcoal-gray textured concrete wall with subtle imperfections and grain. The ground consists of clean, neutral-toned pavement or stone tiles. The composition is a full-body vertical shot, centered, with ample negative space around the subject to emphasize the architectural lines of the suit and the starkness of the environment. Lighting & Photography Style: High-contrast, harsh-sunlight photography. A strong directional light source from the upper right creates sharp, well-defined shadows. A dark, elongated silhouette of the subject is cast directly onto the wall behind them. The lighting emphasizes the texture of the fabric and the grit of the concrete wall. The style is reminiscent of a high-end fashion magazine spread (Vogue or Harper's Bazaar), characterized by crisp lines and a neutral, desaturated color palette. Setting & Composition Details: The frame captures a \"Golden Hour\" or high-noon sun effect where the light is brilliant and unforgiving, highlighting the brilliant white of the suit against the dark gray wall. The camera angle is at eye level, providing a realistic and grounded perspective. The focus is razor-sharp on the subject, while the background maintains a deep depth of field to keep the wall texture visible. Technical Specifications: Shot on 35mm film, f/8 aperture for deep focus, ISO 100 for clarity, ultra-high definition, 8k resolution, highly detailed fabric textures, realistic skin pores, cinematic grain, RAW photo quality, ray-traced shadows, and photorealistic rendering.",
-    "sensitive": true,
+    "sensitive": false,
     "categories": [
       "하이패션 / 화보",
       "일상 스냅"
@@ -1131,7 +1131,7 @@
     "title": "시티 레이스",
     "category": "웨딩 / 브라이덜",
     "text": "Comprehensive Image Generation Prompt Subject & Attire: A beautiful woman in the reference photo with long, voluminous hair that flows dynamically behind her in the wind. She is wearing an exquisite, ethereal bridal gown made of ivory lace and translucent silk chiffon. The dress features long, flared sleeves, intricate floral lace embroidery on the bodice, and a plunging V- neckline. The skirt is multilayered and incredibly light, billowing extensively behind her like a gossamer sail, catching the light and showing its sheer texture. She holds a lush bouquet of large, white blooming peonies with deep green foliage in her right hand. Her physical specifications are a height of 167cm, weight of 53kg, **breast size 70D** , waist 24 inches, and hips 36 inches. Pose: The subject is captured in a cinematic, high-motion action shot, running gracefully across an alpine meadow from left to right. She is mid-stride, with her body tilted forward to convey speed and momentum. Her expression is serene yet determined, looking toward the horizon. One arm is extended forward for balance, while the other holds the bouquet close to her side. She is looking back to where she is coming from with smile from excitement. Environment & Composition: A vast, high-altitude alpine meadow filled with tall, sun-bleached golden grass and scattered wild peonies in shades of white and soft pink. In the immediate foreground, a few out-of-focus flowers provide depth. The background features a breathtaking, panoramic view of jagged, snow-dusted mountain peaks under a soft, diffused sky with bright white clouds. The composition follows the rule of thirds, with the subject placed slightly off-center to emphasize the scale of the mountain range behind her. Written across the frame with 30% opacity in white with pattern, matching the background. Top of the frame \"What would you do\" in san sarif tall modern bold font Bottom of the frame \"for LOVE?\" in elegant hand written, cursive, thin font. Lighting & Photography Style: Cinematic, soft-focus photography with a high dynamic range. The scene is illuminated by \"golden hour\" backlight, which creates a brilliant rim-light effect around the subject's hair and the edges of the translucent dress fabric. The light is airy and romantic, casting soft shadows and highlighting the textures of the lace and the blades of grass. The overall aesthetic is dreamy, high-fashion, and majestic. Setting & Composition: The setting is a remote mountain wilderness, evoking a sense of freedom and grand adventure. A wide-angle lens (approx. 35mm) is used to capture both the intimacy of the subject and the epic scale of the environment. The horizon line is placed at the lower third to allow the mountains and sky to dominate the upper frame. Technical Specifications:",
-    "sensitive": true,
+    "sensitive": false,
     "categories": [
       "웨딩 / 브라이덜"
     ]
@@ -1185,7 +1185,7 @@
     "title": "뉴욕 블랙 슬립 드레스",
     "category": "하이패션 / 화보",
     "text": "Beautiful woman, long dark brown hair, backless short black silk slip dress, delicate thin spaghetti straps, weathered silver leather mini crossbody bag, black strappy stilleto, full-body profile view, standing on cement pavement on Broadway in NYC, holding a strawberry cream lollipop, the candy is touching her pout lips, the other hand is holding an iphone, gazing at the phone, face profile softly illuminated by a small warm light from the iphone, busy street of Broadway NYC sidewalk at night, vintage cinema theater exterior, dark brick building wall, illuminated retro movie poster marquee frame with glowing warm incandescent lightbulbs, classic wall lantern, dark glass window, dramatic contrast, warm golden lighting, soft orange glow, deep shadows, chiaroscuro effect, moody, apply rule-of-third, 50mm lens, f/1.8, ISO 800, shutter speed 1/120s, shallow depth of field, natural background blur, subtle film grain",
-    "sensitive": true,
+    "sensitive": false,
     "categories": [
       "하이패션 / 화보"
     ]
@@ -1387,7 +1387,7 @@
     "title": "지중해 골든아워 글래머",
     "category": "하이패션 / 화보",
     "text": "Beautiful young woman, long dark brown flowing hair, natural elegant makeup, full body shot, wearing a luxurious haute couture sheer gown heavily embellished with shimmering silver sequins and intricate crystal beadwork, delicate spaghetti straps, plunging sweetheart neckline, daring high thigh-slit, glowing bright skin, posing elegantly at a Mediterranean beach during golden hour, soft bokeh background of sparkling ocean waves and a sunset sky, cinematic lighting, high fashion photography style, 8k resolution, photorealistic, incredibly detailed fabric textures, sharp focus, RAW photo, shot on 85mm lens.",
-    "sensitive": true,
+    "sensitive": false,
     "categories": [
       "하이패션 / 화보",
       "비치 / 리조트",
@@ -1450,7 +1450,7 @@
     "title": "스튜디오 클로즈업 포트레이트",
     "category": "스튜디오 프로필",
     "text": "Beautiful young woman, slender physique, delicate facial features, thick wavy dark brown hair, messy aesthetic bun, loose wispy strands framing face, elegant long neck, defined collarbones, small silver hoop earrings, expressive almond-shaped hazel eyes, long dark eyelashes, perfectly groomed thick eyebrows, full natural lips, slightly parted mouth, subtle cupids bow, flawless skin texture. Head tilted back slightly, graceful three-quarter view, direct gaze, soft expression, chin raised, shoulders relaxed, upper body portrait, close-up shot. Minimalist studio background, soft off-white textured backdrop, rule of thirds, clean composition, focused on facial anatomy, balanced negative space. Soft cinematic lighting, chiaroscuro effect, delicate shadows under jawline and nose, luminous skin glow, crystalline catchlight in eyes, high contrast, desaturated color palette, moody atmosphere, Rembrandt lighting. Hyper-realistic, 8k resolution, photorealistic, highly detailed skin pores, individual hair strands, sharp focus on eyes, shallow depth of field, creamy bokeh background, volumetric lighting, ray tracing, ultra-HD, raw photo quality, 35mm lens.",
-    "sensitive": true,
+    "sensitive": false,
     "categories": [
       "스튜디오 프로필"
     ]
@@ -1460,7 +1460,7 @@
     "title": "백리스 실크 브라이덜",
     "category": "웨딩 / 브라이덜",
     "text": "Elegant figure, luxurious ivory liquid silk floor-length gown, backless bridal dress, low cowl back, thin spaghetti straps, diamond string dropping from neck to back, shimmering satin fabric, tailored fit, minimalist high fashion, facing away, looking back over left shoulder toward camera, graceful contrapposto stance, delicate posture, head turned, soft facial expression, wedding studio background with matte deep indigo infinite background, cinematic atmosphere, high-contrast highlights on silk, photorealistic, 8k resolution, RAW photo, professional color grading, shot on 24mm f/1.8 lens.",
-    "sensitive": true,
+    "sensitive": false,
     "categories": [
       "웨딩 / 브라이덜"
     ]
