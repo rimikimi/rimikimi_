@@ -11,6 +11,7 @@
 import { getAuthedUser, countTodayUsage, FREE_DAILY, isUnlimited, isTester } from "./_lib/auth.js";
 import { precheckHasFace } from "./_lib/precheck.js";
 import { getCreditInfo, consumeCredit } from "./_lib/credits.js";
+import { saveToGallery } from "./_lib/gallery.js";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -64,7 +65,7 @@ export default async function handler(req, res) {
   }
 
   // 3) 요청 본문 확인
-  const { mimeType, base64, prompt } = req.body || {};
+  const { mimeType, base64, prompt, conceptId, conceptTitle } = req.body || {};
   if (!mimeType || !base64 || !prompt) {
     return res
       .status(400)
@@ -169,13 +170,37 @@ export default async function handler(req, res) {
   }
 
   const inline = imgPart.inlineData || imgPart.inline_data;
+  const outMime = inline.mimeType || inline.mime_type || "image/png";
+
+  // 7) 결과를 갤러리에 1시간 보관 (실패해도 응답엔 영향 없음)
+  let galleryId = null;
+  let galleryExpiresAt = null;
+  try {
+    const saved = await saveToGallery(admin, user, {
+      conceptId: conceptId || 0,
+      conceptTitle: conceptTitle || null,
+      base64: inline.data,
+      mimeType: outMime,
+    });
+    if (saved.ok) {
+      galleryId = saved.id;
+      galleryExpiresAt = saved.expiresAt;
+    } else {
+      console.error("[gallery save failed]", saved.error);
+    }
+  } catch (e) {
+    console.error("[gallery save throw]", e?.message || e);
+  }
+
   return res.status(200).json({
-    mimeType: inline.mimeType || inline.mime_type || "image/png",
+    mimeType: outMime,
     base64: inline.data,
     quotaUsed: unlimited ? 0 : useCredit ? usage.count : usage.count + 1,
     quotaLimit: unlimited ? null : FREE_DAILY,
     usedCredit: useCredit,
     credits: unlimited ? null : creditsLeft,
     unlimited,
+    galleryId,
+    galleryExpiresAt,
   });
 }

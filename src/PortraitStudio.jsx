@@ -151,7 +151,7 @@ function fitToSize(dataUrl, targetW, targetH, format = "image/png") {
    - 반환: { imageDataUrl, quotaUsed, quotaLimit }
    - 한도 초과시 throw — err.quotaExceeded = true
    ============================================================ */
-async function generateImage(accessToken, dataUrl, promptText) {
+async function generateImage(accessToken, dataUrl, promptText, conceptMeta = {}) {
   if (!dataUrl) throw new Error("사진이 없어요. 먼저 사진을 올려주세요.");
   if (!accessToken) throw new Error("로그인이 필요해요.");
 
@@ -176,7 +176,10 @@ async function generateImage(accessToken, dataUrl, promptText) {
         "Content-Type": "application/json",
         Authorization: "Bearer " + accessToken,
       },
-      body: JSON.stringify({ mimeType, base64, prompt: promptText }),
+      body: JSON.stringify({
+        mimeType, base64, prompt: promptText,
+        conceptId: conceptMeta.id, conceptTitle: conceptMeta.title,
+      }),
     });
   } catch (e) {
     throw new Error("네트워크 요청에 실패했어요. 잠시 후 다시 시도해 주세요.");
@@ -461,7 +464,9 @@ export default function PortraitStudio() {
 
     try {
       const accessToken = session?.access_token;
-      const result = await generateImage(accessToken, photo, selected.text);
+      const result = await generateImage(accessToken, photo, selected.text, {
+        id: selected.id, title: selected.title,
+      });
       setResultImage(result.imageDataUrl);
       // 서버가 알려준 진짜 사용량으로 업데이트
       if (typeof result.unlimited === "boolean") setUnlimited(result.unlimited);
@@ -649,7 +654,14 @@ export default function PortraitStudio() {
             onInvite={shareInvite}
             inviteMsg={inviteMsg}
             onBack={() => setScreen("gallery")}
+            onOpenGallery={() => setScreen("mygallery")}
             onLogout={handleLogout}
+          />
+        )}
+        {screen === "mygallery" && (
+          <MyGalleryScreen
+            accessToken={session?.access_token}
+            onBack={() => setScreen("profile")}
           />
         )}
         {screen === "store" && (
@@ -1075,7 +1087,7 @@ function ProfileScreen({
   unlimited, blocked, freeUsed, freeLeft, credits,
   referralCount, untilNext,
   onInvite, inviteMsg = "",
-  onBack, onLogout,
+  onBack, onLogout, onOpenGallery,
 }) {
   const u = session?.user || {};
   const meta = u.user_metadata || {};
@@ -1151,6 +1163,17 @@ function ProfileScreen({
         </div>
       </div>
 
+      {/* 내 갤러리 */}
+      <button style={S.galleryEntry} onClick={onOpenGallery}>
+        <div style={S.galleryEntryLeft}>
+          <div style={S.galleryEntryTitle}>🖼 내 갤러리</div>
+          <div style={S.galleryEntryDesc}>
+            생성한 이미지는 1시간 동안만 보관돼요. 다운로드 잊지 마세요!
+          </div>
+        </div>
+        <div style={S.galleryEntryArrow}>→</div>
+      </button>
+
       {/* 친구 초대 */}
       <button style={S.inviteBanner} onClick={onInvite}>
         <div style={S.inviteBannerLeft}>
@@ -1174,6 +1197,147 @@ function ProfileScreen({
       >
         로그아웃
       </button>
+    </div>
+  );
+}
+
+/* ============================================================
+   내 갤러리 (1시간 보관)
+   ============================================================ */
+function MyGalleryScreen({ accessToken, onBack }) {
+  const [items, setItems] = useState(null); // null=로딩, []=빈, [...]=있음
+  const [error, setError] = useState(null);
+  const [tick, setTick] = useState(0); // 1초마다 남은시간 갱신
+
+  // 1초마다 리렌더 (남은 시간 카운트다운)
+  useEffect(() => {
+    const t = setInterval(() => setTick((n) => n + 1), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  // 갤러리 로드
+  useEffect(() => {
+    if (!accessToken) return;
+    let cancelled = false;
+    fetch("/api/gallery", {
+      headers: { Authorization: "Bearer " + accessToken },
+    })
+      .then((r) => r.json())
+      .then((j) => {
+        if (cancelled) return;
+        if (j.items) setItems(j.items);
+        else setError(j.error || "불러오기 실패");
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e?.message || "네트워크 오류");
+      });
+    return () => { cancelled = true; };
+  }, [accessToken]);
+
+  async function handleDelete(id) {
+    if (!confirm("이 사진을 삭제할까요?")) return;
+    await fetch("/api/gallery?id=" + id, {
+      method: "DELETE",
+      headers: { Authorization: "Bearer " + accessToken },
+    });
+    setItems((prev) => (prev || []).filter((it) => it.id !== id));
+  }
+
+  function remainingLabel(expiresAt) {
+    const ms = new Date(expiresAt).getTime() - Date.now();
+    if (ms <= 0) return "곧 사라짐";
+    const totalSec = Math.floor(ms / 1000);
+    const min = Math.floor(totalSec / 60);
+    const sec = totalSec % 60;
+    if (min >= 1) return `⏰ ${min}분 ${String(sec).padStart(2, "0")}초 남음`;
+    return `⏰ ${sec}초 남음`;
+  }
+
+  // tick 사용 (eslint 경고 회피 + 의존성)
+  void tick;
+
+  return (
+    <div className="fade">
+      <div style={S.navRow}>
+        <button style={S.backBtn} onClick={onBack}>←</button>
+        <div>
+          <div style={S.screenKicker}>내 정보</div>
+          <div style={S.screenTitle}>내 갤러리</div>
+        </div>
+      </div>
+
+      <div style={S.galleryNotice}>
+        🕐 생성된 이미지는 <b>1시간</b>만 보관돼요.<br />
+        오래 보관하려면 <b>저장 버튼</b>으로 앨범에 받아주세요!
+      </div>
+
+      {items === null && !error && (
+        <div style={S.emptyState}>불러오는 중...</div>
+      )}
+
+      {error && (
+        <div style={S.errorCard}>{error}</div>
+      )}
+
+      {items && items.length === 0 && (
+        <div style={S.emptyState}>
+          <div>아직 생성한 이미지가 없어요</div>
+          <button
+            style={{ ...S.moreBtn, marginTop: 14 }}
+            onClick={onBack}
+          >
+            컨셉 선택하러 가기
+          </button>
+        </div>
+      )}
+
+      {items && items.length > 0 && (
+        <div style={S.myGalleryGrid}>
+          {items.map((it) => {
+            const expMs = new Date(it.expiresAt).getTime() - Date.now();
+            const isExpiring = expMs < 10 * 60 * 1000; // 10분 이하면 임박
+            return (
+              <div key={it.id} style={S.myGalleryCard}>
+                <div style={S.myGalleryImgWrap}>
+                  {it.url ? (
+                    <img src={it.url} alt={it.conceptTitle || ""} style={S.myGalleryImg} />
+                  ) : (
+                    <div style={S.thumbFallback}>♡</div>
+                  )}
+                  <div
+                    style={{
+                      ...S.myGalleryTimer,
+                      ...(isExpiring ? S.myGalleryTimerWarn : {}),
+                    }}
+                  >
+                    {remainingLabel(it.expiresAt)}
+                  </div>
+                </div>
+                <div style={S.myGalleryFooter}>
+                  <div style={S.myGalleryTitle}>
+                    {it.conceptTitle || `컨셉 ${it.conceptId}`}
+                  </div>
+                  <div style={S.myGalleryActions}>
+                    <a
+                      href={it.url}
+                      download={`rimikimi_${it.conceptId}.png`}
+                      style={S.myGalleryDownload}
+                    >
+                      저장
+                    </a>
+                    <button
+                      style={S.myGalleryDelete}
+                      onClick={() => handleDelete(it.id)}
+                    >
+                      삭제
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -1470,6 +1634,79 @@ const S = {
     fontFamily: "'Quicksand', sans-serif",
   },
   statSub: { fontSize: 10.5, opacity: 0.5, fontWeight: 500, marginTop: 4 },
+
+  /* === 내 갤러리 진입 버튼 (프로필 내) === */
+  galleryEntry: {
+    width: "100%", display: "flex", alignItems: "center",
+    justifyContent: "space-between", gap: 12,
+    background: "#fff", border: "1px solid " + INK + "10",
+    borderRadius: 14, padding: "14px 16px", marginBottom: 14,
+    cursor: "pointer", textAlign: "left",
+    boxShadow: "0 2px 8px rgba(35,31,32,0.03)",
+  },
+  galleryEntryLeft: { flex: 1, minWidth: 0 },
+  galleryEntryTitle: {
+    fontSize: 14, fontWeight: 700, color: INK, marginBottom: 3,
+    fontFamily: "'Quicksand', sans-serif",
+  },
+  galleryEntryDesc: {
+    fontSize: 11, opacity: 0.6, fontWeight: 500, lineHeight: 1.5,
+  },
+  galleryEntryArrow: {
+    fontSize: 18, color: INK + "55", flexShrink: 0,
+  },
+
+  /* === 내 갤러리 화면 === */
+  galleryNotice: {
+    background: "#f9c83c22", color: "#8a6a16",
+    border: "1.5px solid #f9c83c66", borderRadius: 14,
+    padding: "12px 14px", fontSize: 12.5, lineHeight: 1.6,
+    fontWeight: 600, fontFamily: "'Quicksand', sans-serif",
+    margin: "0 0 16px", textAlign: "center",
+  },
+  myGalleryGrid: {
+    display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12,
+  },
+  myGalleryCard: {
+    background: "#fff", border: "1px solid " + INK + "10",
+    borderRadius: 14, overflow: "hidden",
+    boxShadow: "0 3px 10px rgba(35,31,32,0.04)",
+  },
+  myGalleryImgWrap: {
+    position: "relative", aspectRatio: "3/4",
+    background: "#f0ece4",
+  },
+  myGalleryImg: {
+    width: "100%", height: "100%", objectFit: "cover", display: "block",
+  },
+  myGalleryTimer: {
+    position: "absolute", left: 8, bottom: 8,
+    background: "rgba(35,31,32,0.78)", color: "#fff",
+    borderRadius: 999, padding: "4px 9px",
+    fontSize: 10, fontWeight: 700, fontFamily: "'Quicksand', sans-serif",
+    letterSpacing: "0.02em",
+  },
+  myGalleryTimerWarn: { background: ACCENT },
+  myGalleryFooter: { padding: "10px 11px 12px" },
+  myGalleryTitle: {
+    fontSize: 12, fontWeight: 700, color: INK,
+    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+    marginBottom: 8,
+  },
+  myGalleryActions: {
+    display: "grid", gridTemplateColumns: "1fr auto", gap: 6,
+  },
+  myGalleryDownload: {
+    background: INK, color: "#fff", textAlign: "center",
+    textDecoration: "none", borderRadius: 8, padding: "7px 0",
+    fontSize: 11.5, fontWeight: 700, fontFamily: "'Quicksand', sans-serif",
+  },
+  myGalleryDelete: {
+    background: "transparent", color: ACCENT,
+    border: "1px solid " + ACCENT + "44", borderRadius: 8,
+    padding: "7px 10px", fontSize: 11.5, fontWeight: 700,
+    fontFamily: "'Quicksand', sans-serif", cursor: "pointer",
+  },
   creditChip: {
     display: "flex", alignItems: "center", gap: 7,
     background: INK, color: "#fff", border: "none", borderRadius: 999,
