@@ -1,10 +1,4 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "framework": "vite",
-  "crons": [
-    {
-      "path": "/api/cron/purge",
-      "schedule": "*/5 * * * *"
-    }
-  ]
+  "framework": "vite"
 }

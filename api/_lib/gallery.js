@@ -10,10 +10,27 @@
 
 export const TTL_MINUTES = 60; // 1시간
 
-// 이미지 base64 → Storage 업로드 + DB 기록
-// 반환: { ok, id } 또는 { error }
+// 이미지 base64 → Storage 업로드 + DB 기록.
+// 저장 직전에 이 사용자의 만료된 옛 파일을 청소 (lazy purge — 작성 시).
 export async function saveToGallery(admin, user, { conceptId, conceptTitle, base64, mimeType }) {
   if (!base64 || !user?.id) return { error: "invalid input" };
+
+  // 만료 청소 (write-side lazy purge — cron 없이 동작)
+  const nowIso = new Date().toISOString();
+  try {
+    const { data: expired } = await admin
+      .from("user_gallery")
+      .select("id, storage_path")
+      .eq("user_id", user.id)
+      .lte("expires_at", nowIso)
+      .limit(100);
+    if (expired && expired.length > 0) {
+      const paths = expired.map((r) => r.storage_path);
+      const ids = expired.map((r) => r.id);
+      await admin.storage.from("gallery").remove(paths).catch(() => {});
+      await admin.from("user_gallery").delete().in("id", ids);
+    }
+  } catch (_) { /* 청소 실패는 저장 자체엔 영향 없음 */ }
 
   // 1) base64 -> Uint8Array
   const bin = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
@@ -48,9 +65,25 @@ export async function saveToGallery(admin, user, { conceptId, conceptTitle, base
   return { ok: true, id: ins.data.id, expiresAt };
 }
 
-// 사용자 갤러리 조회 — 만료 안 된 것만, signed URL 포함
+// 사용자 갤러리 조회 — 만료 안 된 것만, signed URL 포함.
+// 호출할 때마다 이 사용자의 만료된 것을 lazy purge (cron 대체).
 export async function listGallery(admin, userId) {
   const nowIso = new Date().toISOString();
+
+  // 0) 이 사용자의 만료된 row 들을 먼저 진짜 삭제 (lazy purge)
+  const { data: expired } = await admin
+    .from("user_gallery")
+    .select("id, storage_path")
+    .eq("user_id", userId)
+    .lte("expires_at", nowIso)
+    .limit(100);
+  if (expired && expired.length > 0) {
+    const paths = expired.map((r) => r.storage_path);
+    const ids = expired.map((r) => r.id);
+    await admin.storage.from("gallery").remove(paths).catch(() => {});
+    await admin.from("user_gallery").delete().in("id", ids);
+  }
+
   const { data, error } = await admin
     .from("user_gallery")
     .select("id, concept_id, concept_title, storage_path, mime_type, created_at, expires_at")
