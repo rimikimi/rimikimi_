@@ -226,7 +226,13 @@ async function generateImage(accessToken, dataUrl, promptText) {
 export default function PortraitStudio() {
   const [booting, setBooting] = useState(true);
   const [screen, setScreen] = useState("gallery");
-  const [photo, setPhoto] = useState(null);
+  // photo: 사용자가 업로드한 본인 사진 (프로필 = 입력 사진, 같은 값)
+  // localStorage 에 자동 저장돼서 다음 방문 / 새 탭에서도 그대로 살아있음
+  const [photo, setPhoto] = useState(() => {
+    try {
+      return localStorage.getItem("rimikimi_photo") || null;
+    } catch { return null; }
+  });
   const [selected, setSelected] = useState(null);
   const [query, setQuery] = useState("");
   const [activeCat, setActiveCat] = useState("전체");
@@ -254,6 +260,14 @@ export default function PortraitStudio() {
     const t = setTimeout(() => setBooting(false), 2200);
     return () => clearTimeout(t);
   }, []);
+
+  // photo 가 바뀌면 localStorage 에 자동 저장 (없으면 키 삭제)
+  useEffect(() => {
+    try {
+      if (photo) localStorage.setItem("rimikimi_photo", photo);
+      else localStorage.removeItem("rimikimi_photo");
+    } catch { /* quota 초과 등은 무시 */ }
+  }, [photo]);
 
   // 페이지 로드 시 현재 세션 확인 + 이후 변경 감지
   useEffect(() => {
@@ -510,8 +524,23 @@ export default function PortraitStudio() {
     <div style={S.app}>
       <style>{CSS}</style>
 
+      {/* 사진 업로드 input — 어느 화면에서든 fileRef.current?.click() 으로 호출 가능 */}
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        onChange={handleFile}
+        style={{ display: "none" }}
+      />
+
       <header style={S.header}>
-        <Logo height={35} />
+        <button
+          style={S.logoBtn}
+          onClick={() => setScreen("gallery")}
+          aria-label="홈"
+        >
+          <Logo height={35} />
+        </button>
         <div style={S.headerRight}>
           <button style={S.creditChip} onClick={shareInvite}>
             <span style={S.creditDot} />
@@ -526,16 +555,16 @@ export default function PortraitStudio() {
                 (credits > 0 ? " ·🎟" + credits : "")}
           </button>
           <button
-            style={S.logoutBtn}
-            onClick={handleLogout}
-            aria-label="로그아웃"
-            title={
-              session?.user?.email
-                ? session.user.email + " — 로그아웃"
-                : "로그아웃"
-            }
+            style={S.profileBtn}
+            onClick={() => setScreen("profile")}
+            aria-label="프로필"
+            title="프로필"
           >
-            로그아웃
+            {photo ? (
+              <img src={photo} alt="프로필" style={S.profileBtnImg} />
+            ) : (
+              <span style={S.profileBtnPlaceholder}>👤</span>
+            )}
           </button>
         </div>
       </header>
@@ -602,6 +631,25 @@ export default function PortraitStudio() {
             onRetry={startGenerate}
             onAgain={() => setScreen("gallery")}
             onHome={resetToHome}
+          />
+        )}
+        {screen === "profile" && (
+          <ProfileScreen
+            session={session}
+            photo={photo}
+            onPickPhoto={() => fileRef.current?.click()}
+            onClearPhoto={() => setPhoto(null)}
+            unlimited={unlimited}
+            blocked={blocked}
+            freeUsed={freeUsed}
+            freeLeft={freeLeft}
+            credits={credits}
+            referralCount={referralCount}
+            untilNext={untilNext}
+            onInvite={shareInvite}
+            inviteMsg={inviteMsg}
+            onBack={() => setScreen("gallery")}
+            onLogout={handleLogout}
           />
         )}
         {screen === "store" && (
@@ -676,14 +724,6 @@ function HomeScreen({
           사진 데이터는 저장되지 않으니 안심하세요😀
         </p>
       </div>
-
-      <input
-        ref={fileRef}
-        type="file"
-        accept="image/*"
-        onChange={onFile}
-        style={{ display: "none" }}
-      />
 
       {!photo ? (
         <button style={S.uploadBox} onClick={onPick}>
@@ -1028,6 +1068,117 @@ function HomeLayout({ data, onPick, onMore }) {
 }
 
 /* ============================================================
+   프로필
+   ============================================================ */
+function ProfileScreen({
+  session, photo, onPickPhoto, onClearPhoto,
+  unlimited, blocked, freeUsed, freeLeft, credits,
+  referralCount, untilNext,
+  onInvite, inviteMsg = "",
+  onBack, onLogout,
+}) {
+  const u = session?.user || {};
+  const meta = u.user_metadata || {};
+  const provider = u.app_metadata?.provider || meta.provider || "email";
+  const displayName =
+    meta.full_name || meta.name || meta.user_name || u.email?.split("@")[0] || "사용자";
+  const email = u.email || "(이메일 없음)";
+
+  const providerLabel = {
+    google: "Google",
+    kakao: "카카오",
+    naver: "네이버",
+    email: "이메일",
+  }[provider] || provider;
+
+  return (
+    <div className="fade">
+      <div style={S.navRow}>
+        <button style={S.backBtn} onClick={onBack}>←</button>
+        <div>
+          <div style={S.screenKicker}>내 정보</div>
+          <div style={S.screenTitle}>프로필</div>
+        </div>
+      </div>
+
+      {/* 프로필 카드 */}
+      <div style={S.profileCard}>
+        <div style={S.profileAvatar}>
+          {photo ? (
+            <img src={photo} alt="내 사진" style={S.profileAvatarImg} />
+          ) : (
+            <div style={S.profileAvatarEmpty}>📷</div>
+          )}
+        </div>
+        <div style={S.profileName}>{displayName}</div>
+        <div style={S.profileMeta}>{providerLabel} · {email}</div>
+
+        <div style={S.profilePhotoActions}>
+          <button style={S.secondaryBtn} onClick={onPickPhoto}>
+            {photo ? "사진 변경" : "사진 등록"}
+          </button>
+          {photo && (
+            <button
+              style={{ ...S.secondaryBtn, color: ACCENT, borderColor: ACCENT + "44" }}
+              onClick={onClearPhoto}
+            >
+              삭제
+            </button>
+          )}
+        </div>
+        <div style={S.profileHint}>
+          이 사진이 컨셉 생성에 자동으로 사용돼요.
+          <br />
+          기기 안에만 저장되며 서버로 전송되지 않아요.
+        </div>
+      </div>
+
+      {/* 사용량 / 크레딧 */}
+      <div style={S.statRow}>
+        <div style={S.statCard}>
+          <div style={S.statLabel}>오늘 사용</div>
+          <div style={S.statValue}>
+            {unlimited ? "∞" : `${freeUsed} / ${FREE_DAILY}`}
+          </div>
+          <div style={S.statSub}>
+            {unlimited ? "무제한" : blocked ? "베타 전용" : `${freeLeft}장 남음`}
+          </div>
+        </div>
+        <div style={S.statCard}>
+          <div style={S.statLabel}>🎟 크레딧</div>
+          <div style={S.statValue}>{credits}</div>
+          <div style={S.statSub}>친구 초대로 적립</div>
+        </div>
+      </div>
+
+      {/* 친구 초대 */}
+      <button style={S.inviteBanner} onClick={onInvite}>
+        <div style={S.inviteBannerLeft}>
+          <div style={S.inviteBannerTitle}>
+            {unlimited ? "🎁 친구에게 공유하기" : "🎟 친구 초대하고 크레딧 받기"}
+          </div>
+          <div style={S.inviteBannerDesc}>
+            {unlimited
+              ? "친구에게 rimikimi를 공유해 보세요!"
+              : `친구 ${untilNext}명만 더 초대하면 크레딧 1개! (현재 ${referralCount}명 초대)`}
+          </div>
+        </div>
+        <div style={S.inviteBannerBtn}>공유</div>
+      </button>
+      {inviteMsg && <div style={S.inviteToast}>{inviteMsg}</div>}
+
+      {/* 로그아웃 */}
+      <button
+        style={{ ...S.secondaryBtn, marginTop: 18, color: ACCENT + "cc" }}
+        onClick={onLogout}
+      >
+        로그아웃
+      </button>
+    </div>
+  );
+}
+
+/* ============================================================
    확인
    ============================================================ */
 function ConfirmScreen({
@@ -1254,6 +1405,71 @@ const S = {
     cursor: "pointer",
     letterSpacing: "0.02em",
   },
+  logoBtn: {
+    background: "transparent", border: "none", padding: 0,
+    cursor: "pointer", display: "flex", alignItems: "center",
+  },
+  profileBtn: {
+    width: 38, height: 38, borderRadius: "50%",
+    border: "2px solid " + INK + "18", background: "#fff",
+    padding: 0, cursor: "pointer", overflow: "hidden",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    flexShrink: 0,
+  },
+  profileBtnImg: {
+    width: "100%", height: "100%", objectFit: "cover", display: "block",
+  },
+  profileBtnPlaceholder: { fontSize: 16, opacity: 0.5, lineHeight: 1 },
+
+  /* === 프로필 화면 === */
+  profileCard: {
+    background: "#fff", border: "1px solid " + INK + "10",
+    borderRadius: 18, padding: "24px 20px",
+    display: "flex", flexDirection: "column", alignItems: "center",
+    textAlign: "center", marginBottom: 16,
+    boxShadow: "0 4px 14px rgba(35,31,32,0.04)",
+  },
+  profileAvatar: {
+    width: 96, height: 96, borderRadius: "50%",
+    background: "#f0ece4", overflow: "hidden",
+    border: "3px solid " + ACCENT + "22",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    marginBottom: 14,
+  },
+  profileAvatarImg: {
+    width: "100%", height: "100%", objectFit: "cover", display: "block",
+  },
+  profileAvatarEmpty: { fontSize: 32, opacity: 0.4 },
+  profileName: {
+    fontSize: 18, fontWeight: 700, color: INK, marginBottom: 4,
+    fontFamily: "'Quicksand', sans-serif",
+  },
+  profileMeta: {
+    fontSize: 11.5, opacity: 0.55, fontWeight: 500, marginBottom: 16,
+  },
+  profilePhotoActions: {
+    display: "flex", gap: 8, width: "100%", marginBottom: 12,
+  },
+  profileHint: {
+    fontSize: 10.5, lineHeight: 1.6, opacity: 0.5, fontWeight: 500,
+  },
+  statRow: {
+    display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10,
+    marginBottom: 14,
+  },
+  statCard: {
+    background: "#fff", border: "1px solid " + INK + "10",
+    borderRadius: 14, padding: "14px 12px", textAlign: "center",
+  },
+  statLabel: {
+    fontSize: 11, opacity: 0.6, fontWeight: 600, marginBottom: 6,
+    fontFamily: "'Quicksand', sans-serif",
+  },
+  statValue: {
+    fontSize: 22, fontWeight: 700, color: INK, lineHeight: 1.1,
+    fontFamily: "'Quicksand', sans-serif",
+  },
+  statSub: { fontSize: 10.5, opacity: 0.5, fontWeight: 500, marginTop: 4 },
   creditChip: {
     display: "flex", alignItems: "center", gap: 7,
     background: INK, color: "#fff", border: "none", borderRadius: 999,
