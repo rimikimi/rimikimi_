@@ -383,8 +383,11 @@ export default function PortraitStudio() {
 
   // 18+ 토글 적용 후 풀(전체 풀에서 자동 제외)
   const visiblePool = useMemo(() => {
-    return hideSensitive ? concepts.filter((p) => !p.sensitive) : concepts;
-  }, [concepts, hideSensitive]);
+    // hidden 컨셉은 어드민(무제한 사용자)에게만 노출 — 일반/테스터는 안 보임
+    let pool = unlimited ? concepts : concepts.filter((p) => !p.hidden);
+    if (hideSensitive) pool = pool.filter((p) => !p.sensitive);
+    return pool;
+  }, [concepts, hideSensitive, unlimited]);
 
   // 카테고리에 개수 같이 계산 — [{ name, count }]
   // 컨셉은 categories 배열을 가질 수 있음 (다중 카테고리). 호환을 위해 category(단일)도 fallback.
@@ -999,6 +1002,18 @@ function GalleryScreen({
                     18+
                   </div>
                 )}
+                {p.hidden && (
+                  <div
+                    style={{
+                      ...S.hiddenTag,
+                      fontSize: cols === 2 ? 9 : 7.5,
+                      padding: cols === 2 ? "3px 7px" : "2px 5px",
+                      top: p.sensitive ? (cols === 2 ? 32 : 26) : 8,
+                    }}
+                  >
+                    🔒 비공개
+                  </div>
+                )}
               </div>
             </button>
           ))}
@@ -1048,6 +1063,7 @@ function HomeLayout({ data, onPick, onMore }) {
                   <div style={S.featuredTitle}>{p.title}</div>
                 </div>
                 {p.sensitive && <div style={S.sensitiveTag}>18+</div>}
+                {p.hidden && <div style={{ ...S.hiddenTag, top: p.sensitive ? 36 : 8 }}>🔒 비공개</div>}
               </button>
             ))}
           </div>
@@ -1083,6 +1099,11 @@ function HomeLayout({ data, onPick, onMore }) {
                 {p.sensitive && (
                   <div style={{ ...S.sensitiveTag, fontSize: 8.5, padding: "2px 5px" }}>
                     18+
+                  </div>
+                )}
+                {p.hidden && (
+                  <div style={{ ...S.hiddenTag, fontSize: 8.5, padding: "2px 5px", top: p.sensitive ? 28 : 8 }}>
+                    🔒 비공개
                   </div>
                 )}
               </button>
@@ -2012,6 +2033,11 @@ const S = {
   sensitiveTag: {
     position: "absolute", top: 8, right: 8, fontWeight: 700,
     letterSpacing: "0.06em", background: ACCENT, color: "#fff",
+    borderRadius: 999,
+  },
+  hiddenTag: {
+    position: "absolute", right: 8, fontWeight: 700,
+    letterSpacing: "0.02em", background: INK, color: "#fff",
     borderRadius: 999,
   },
   emptyState: {

@@ -111,7 +111,8 @@
     "sensitive": true,
     "categories": [
       "비치 / 리조트"
-    ]
+    ],
+    "hidden": true
   },
   {
     "id": 75,
