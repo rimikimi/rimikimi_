@@ -13,8 +13,10 @@ import {
   tryEscapeKakaoAndroid,
   inAppEscapeInstructions,
 } from "./inAppBrowser";
+import { t, useLang } from "./i18n";
 
 export default function LoginGate({ Logo }) {
+  useLang(); // 언어 바뀌면 리렌더
   const [busy, setBusy] = useState(null); // 'apple' | 'kakao' | 'naver' | 'google' | null
   const [error, setError] = useState(null);
   const [inAppNotice, setInAppNotice] = useState(null); // { title, steps }
@@ -79,7 +81,7 @@ export default function LoginGate({ Logo }) {
         {Logo ? <Logo height={70} /> : <span style={S.fallback}>rimikimi</span>}
       </div>
 
-      <p style={S.tagline}>상상이 현실이 되는 곳</p>
+      <p style={S.tagline}>{t("login.tagline")}</p>
 
       <div style={S.buttons}>
         <button
@@ -88,7 +90,7 @@ export default function LoginGate({ Logo }) {
           onClick={() => signInWithSupabase("apple")}
         >
           <AppleIcon />
-          <span>{busy === "apple" ? "이동 중…" : "Apple로 시작하기"}</span>
+          <span>{busy === "apple" ? t("login.loading") : t("login.with.apple")}</span>
         </button>
 
         <button
@@ -97,7 +99,7 @@ export default function LoginGate({ Logo }) {
           onClick={() => signInWithSupabase("kakao")}
         >
           <KakaoIcon />
-          <span>{busy === "kakao" ? "이동 중…" : "카카오로 시작하기"}</span>
+          <span>{busy === "kakao" ? t("login.loading") : t("login.with.kakao")}</span>
         </button>
 
         <button
@@ -106,7 +108,7 @@ export default function LoginGate({ Logo }) {
           onClick={signInWithNaver}
         >
           <NaverIcon />
-          <span>{busy === "naver" ? "이동 중…" : "네이버로 시작하기"}</span>
+          <span>{busy === "naver" ? t("login.loading") : t("login.with.naver")}</span>
         </button>
 
         <button
@@ -115,7 +117,7 @@ export default function LoginGate({ Logo }) {
           onClick={() => signInWithSupabase("google")}
         >
           <GoogleIcon />
-          <span>{busy === "google" ? "이동 중…" : "Google로 시작하기"}</span>
+          <span>{busy === "google" ? t("login.loading") : t("login.with.google")}</span>
         </button>
       </div>
 
@@ -134,28 +136,25 @@ export default function LoginGate({ Logo }) {
                 await navigator.clipboard.writeText(window.location.origin + "/");
                 setInAppNotice({
                   ...inAppNotice,
-                  title: "✅ 주소가 복사됐어요. 외부 브라우저에 붙여넣어 주세요!",
+                  title: t("invite.copied"),
                 });
               } catch (_) {}
             }}
           >
-            📋 사이트 주소 복사하기
+            {t("login.inapp.copy")}
           </button>
           <button
             style={S.noticeClose}
             onClick={() => setInAppNotice(null)}
           >
-            닫기
+            {t("common.close")}
           </button>
         </div>
       )}
 
       {error && <p style={S.error}>{error}</p>}
 
-      <p style={S.legal}>
-        로그인하면 <u>서비스 이용약관</u>과 <u>개인정보 처리방침</u>에 동의하는
-        것으로 간주합니다.
-      </p>
+      <p style={S.legal}>{t("login.terms")}</p>
     </div>
   );
 }

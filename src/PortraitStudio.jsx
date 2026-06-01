@@ -1,6 +1,7 @@
 import React, { useState, useRef, useMemo, useEffect } from "react";
 import { supabase } from "./supabaseClient";
 import { isNative, nativePickPhoto, nativeShare } from "./nativeBridge";
+import { t, useLang, localizedTitle, localizedCategory, getLangPreference, setLang } from "./i18n";
 import LoginGate from "./LoginGate";
 
 /* ============================================================
@@ -228,6 +229,7 @@ async function generateImage(accessToken, dataUrl, promptText, conceptMeta = {})
    메인 컴포넌트
    ============================================================ */
 export default function PortraitStudio() {
+  useLang(); // 언어 변경 시 컴포넌트 트리 리렌더
   const [booting, setBooting] = useState(true);
   const [screen, setScreen] = useState("gallery");
   // photo: 사용자가 업로드한 본인 사진 (프로필 = 입력 사진, 같은 값)
@@ -393,7 +395,7 @@ export default function PortraitStudio() {
   // 컨셉은 categories 배열을 가질 수 있음 (다중 카테고리). 호환을 위해 category(단일)도 fallback.
   const categories = useMemo(() => {
     const counts = new Map();
-    counts.set("전체", visiblePool.length);
+    counts.set(t("step1.all"), counts.get(t("step1.all")) || visiblePool.length);
     for (const p of visiblePool) {
       const cats = p.categories || (p.category ? [p.category] : []);
       for (const cat of cats) {
@@ -406,7 +408,7 @@ export default function PortraitStudio() {
   const filtered = useMemo(() => {
     return visiblePool.filter((p) => {
       const cats = p.categories || (p.category ? [p.category] : []);
-      const catOk = activeCat === "전체" || cats.includes(activeCat);
+      const catOk = (activeCat === "전체" || activeCat === t("step1.all")) || cats.includes(activeCat);
       const q = query.trim().toLowerCase();
       const qOk =
         !q ||
@@ -497,8 +499,8 @@ export default function PortraitStudio() {
     if (!uid) return;
     const link = window.location.origin + "/?ref=" + uid;
     const shareData = {
-      title: "rimikimi",
-      text: "내 얼굴로 인생 프로필 만들기 ✨ rimikimi 같이 해요!",
+      title: t("invite.shareTitle"),
+      text: t("invite.shareText"),
       url: link,
     };
     try {
@@ -511,7 +513,7 @@ export default function PortraitStudio() {
       }
       // 3) 클립보드 fallback
       await navigator.clipboard.writeText(link);
-      setInviteMsg("초대 링크가 복사됐어요! 친구에게 붙여넣어 보내주세요 📋");
+      setInviteMsg(t("invite.copied"));
       setTimeout(() => setInviteMsg(""), 4000);
     } catch (_) {
       /* 사용자가 공유 취소 — 무시 */
@@ -568,14 +570,10 @@ export default function PortraitStudio() {
           <button style={S.creditChip} onClick={shareInvite}>
             <span style={S.creditDot} />
             {unlimited
-              ? "∞ 무제한"
+              ? t("header.unlimited")
               : blocked
-              ? "🔒 베타 전용"
-              : "베타 " +
-                freeLeft +
-                "/" +
-                FREE_DAILY +
-                (credits > 0 ? " ·🎟" + credits : "")}
+              ? t("header.blocked")
+              : t("header.beta", { used: freeLeft, limit: FREE_DAILY }) + (credits > 0 ? t("header.credits", { credits }) : "")}
           </button>
           <button
             style={S.profileBtn}
@@ -696,7 +694,7 @@ export default function PortraitStudio() {
       </main>
 
       <footer style={S.footer}>
-        프로토타입 · 사진은 기기 안에서만 처리되며 서버에 저장되지 않습니다
+        {t("footer.note")}
       </footer>
     </div>
   );
@@ -746,20 +744,20 @@ function HomeScreen({
       </div>
 
       <div style={S.hero}>
-        <h1 style={S.heroTitle}>내 얼굴로 만드는 인생 프로필</h1>
+        <h1 style={S.heroTitle}>{t("step2.heroTitle")}</h1>
         <p style={S.heroDesc}>
-          증명사진이나 셀카 한 장이면 충분해요.<br />
-          정확한 분석과 이미지 생성을 위해<br />
-          필터 또는 보정이 없는 정면 모습을 업로드해 주세요🙂<br />
-          사진 데이터는 저장되지 않으니 안심하세요😀
+          {t("step2.heroDesc1")}<br />
+          {t("step2.heroDesc2")}<br />
+          {t("step2.heroDesc3")}<br />
+          {t("step2.heroDesc4")}
         </p>
       </div>
 
       {!photo ? (
         <button style={S.uploadBox} onClick={onPick}>
           <div style={S.uploadIcon}>＋</div>
-          <div style={S.uploadText}>사진 올리기 / 셀카 찍기</div>
-          <div style={S.uploadHint}>JPG · PNG</div>
+          <div style={S.uploadText}>{t("step2.uploadCta")}</div>
+          <div style={S.uploadHint}>{t("step2.uploadHint")}</div>
         </button>
       ) : (
         <>
@@ -767,7 +765,7 @@ function HomeScreen({
             <img src={photo} alt="업로드한 사진" style={S.previewImg} />
           </div>
           <button style={S.changePhotoBtn} onClick={onPick}>
-            🔄 사진 변경
+            {t("step2.changePhoto")}
           </button>
         </>
       )}
@@ -790,7 +788,7 @@ function HomeScreen({
         disabled={!ready}
         onClick={onContinue}
       >
-        이미지 만들기 →
+        {t("step2.continue")}
       </button>
 
       <p style={S.privacyNote}>
@@ -870,17 +868,17 @@ function GalleryScreen({
       <button style={S.inviteBanner} onClick={onInvite}>
         <div style={S.inviteBannerLeft}>
           <div style={S.inviteBannerTitle}>
-            {unlimited ? "🎁 친구에게 공유하기" : "🎟 친구 초대하고 크레딧 받기"}
+            {unlimited ? t("invite.adminTitle") : t("invite.testerTitle")}
           </div>
           <div style={S.inviteBannerDesc}>
             {unlimited
-              ? "친구에게 rimikimi를 공유해 보세요!"
-              : (credits > 0 ? "보유 크레딧 " + credits + "개 · " : "") +
-                "친구 " + untilNext + "명만 더 초대하면 크레딧 1개! (현재 " +
-                referralCount + "명 초대)"}
+              ? t("invite.adminDesc")
+              : (credits > 0
+                  ? t("invite.testerDescWithCredits", { credits, n: untilNext, now: referralCount })
+                  : t("invite.testerDesc", { n: untilNext, now: referralCount }))}
           </div>
         </div>
-        <div style={S.inviteBannerBtn}>공유하기</div>
+        <div style={S.inviteBannerBtn}>{t("invite.btn")}</div>
       </button>
       {inviteMsg && <div style={S.inviteToast}>{inviteMsg}</div>}
 
@@ -889,8 +887,8 @@ function GalleryScreen({
           <button style={S.backBtn} onClick={onBack}>←</button>
         )}
         <div>
-          <div style={S.screenKicker}>STEP 01</div>
-          <div style={S.screenTitle}>컨셉 선택</div>
+          <div style={S.screenKicker}>{t("step1.kicker")}</div>
+          <div style={S.screenTitle}>{t("step1.title")}</div>
         </div>
       </div>
 
@@ -907,7 +905,7 @@ function GalleryScreen({
               }}
               onClick={() => setActiveCat(c.name)}
             >
-              {c.name} <span style={S.catChipCount}>{c.count}</span>
+              {localizedCategory(c.name)} <span style={S.catChipCount}>{c.count}</span>
             </button>
           ))}
           <button
@@ -924,8 +922,8 @@ function GalleryScreen({
       <div style={S.filterMetaRow}>
         <span style={S.resultCount}>
           {hasFilter
-            ? totalFiltered + "개 결과"
-            : "총 " + poolTotal + "개"}
+            ? t("step1.resultCount", { n: totalFiltered })
+            : t("step1.totalCount", { n: poolTotal })}
         </span>
         <button
           style={{
@@ -934,7 +932,7 @@ function GalleryScreen({
           }}
           onClick={() => setHideSensitive((v) => !v)}
         >
-          {hideSensitive ? "🙈 18+ 숨김" : "👁 18+ 표시"}
+          {hideSensitive ? t("step1.hide18") : t("step1.show18")}
         </button>
       </div>
 
@@ -946,13 +944,13 @@ function GalleryScreen({
         />
       ) : prompts.length === 0 ? (
         <div style={S.emptyState}>
-          <div>검색 결과가 없어요</div>
+          <div>{t("step1.empty")}</div>
           {hasFilter && (
             <button
               style={{ ...S.moreBtn, marginTop: 14 }}
               onClick={onResetFilters}
             >
-              필터 초기화
+              {t("step1.resetFilters")}
             </button>
           )}
         </div>
@@ -969,7 +967,7 @@ function GalleryScreen({
               <div style={S.thumb}>
                 <img
                   src={`/thumbs/${p.id}.webp`}
-                  alt={p.title}
+                  alt={localizedTitle(p)}
                   style={S.thumbImg}
                   loading="lazy"
                   onError={(e) => {
@@ -1023,7 +1021,7 @@ function GalleryScreen({
       {totalFiltered > visibleCount && (
         <div style={{ display: "flex", justifyContent: "center", marginTop: 18 }}>
           <button style={S.moreBtn} onClick={onShowMore}>
-            더 보기 ({totalFiltered - visibleCount}개 남음)
+            {t("step1.more", { n: totalFiltered - visibleCount })}
           </button>
         </div>
       )}
@@ -1043,7 +1041,7 @@ function HomeLayout({ data, onPick, onMore }) {
       {data.featured.length > 0 && (
         <div style={S.homeSection}>
           <div style={S.homeRowHead}>
-            <div style={S.homeRowTitle}>🔥 추천</div>
+            <div style={S.homeRowTitle}>{t("step1.featured")}</div>
           </div>
           <div style={S.homeRailFeatured}>
             {data.featured.map((p) => (
@@ -1055,12 +1053,12 @@ function HomeLayout({ data, onPick, onMore }) {
               >
                 <img
                   src={`/thumbs/${p.id}.webp`}
-                  alt={p.title}
+                  alt={localizedTitle(p)}
                   style={S.featuredImg}
                   loading="lazy"
                 />
                 <div style={S.featuredOverlay}>
-                  <div style={S.featuredTitle}>{p.title}</div>
+                  <div style={S.featuredTitle}>{localizedTitle(p)}</div>
                 </div>
                 {p.sensitive && <div style={S.sensitiveTag}>18+</div>}
                 {p.hidden && <div style={{ ...S.hiddenTag, top: p.sensitive ? 36 : 8 }}>🔒 비공개</div>}
@@ -1075,11 +1073,11 @@ function HomeLayout({ data, onPick, onMore }) {
         <div key={row.name} style={S.homeSection}>
           <div style={S.homeRowHead}>
             <div style={S.homeRowTitle}>
-              {row.name}
+              {localizedCategory(row.name)}
               <span style={S.homeRowCount}>{row.count}</span>
             </div>
             <button style={S.homeRowMore} onClick={() => onMore(row.name)}>
-              더보기 →
+              {t("step1.rowMore")}
             </button>
           </div>
           <div style={S.homeRail}>
@@ -1092,7 +1090,7 @@ function HomeLayout({ data, onPick, onMore }) {
               >
                 <img
                   src={`/thumbs/${p.id}.webp`}
-                  alt={p.title}
+                  alt={localizedTitle(p)}
                   style={S.railImg}
                   loading="lazy"
                 />
@@ -1144,8 +1142,8 @@ function ProfileScreen({
       <div style={S.navRow}>
         <button style={S.backBtn} onClick={onBack}>←</button>
         <div>
-          <div style={S.screenKicker}>내 정보</div>
-          <div style={S.screenTitle}>프로필</div>
+          <div style={S.screenKicker}>{t("profile.kicker")}</div>
+          <div style={S.screenTitle}>{t("profile.title")}</div>
         </div>
       </div>
 
@@ -1153,7 +1151,7 @@ function ProfileScreen({
       <div style={S.profileCard}>
         <div style={S.profileAvatar}>
           {photo ? (
-            <img src={photo} alt="내 사진" style={S.profileAvatarImg} />
+            <img src={photo} alt={t("profile.kicker")} style={S.profileAvatarImg} />
           ) : (
             <div style={S.profileAvatarEmpty}>📷</div>
           )}
@@ -1163,48 +1161,51 @@ function ProfileScreen({
 
         <div style={S.profilePhotoActions}>
           <button style={S.secondaryBtn} onClick={onPickPhoto}>
-            {photo ? "사진 변경" : "사진 등록"}
+            {photo ? t("profile.photo.change") : t("profile.photo.register")}
           </button>
           {photo && (
             <button
               style={{ ...S.secondaryBtn, color: ACCENT, borderColor: ACCENT + "44" }}
               onClick={onClearPhoto}
             >
-              삭제
+              {t("common.delete")}
             </button>
           )}
         </div>
         <div style={S.profileHint}>
-          이 사진이 컨셉 생성에 자동으로 사용돼요.
+          {t("profile.photo.hint1")}
           <br />
-          기기 안에만 저장되며 서버로 전송되지 않아요.
+          {t("profile.photo.hint2")}
         </div>
       </div>
 
       {/* 사용량 / 크레딧 */}
       <div style={S.statRow}>
         <div style={S.statCard}>
-          <div style={S.statLabel}>오늘 사용</div>
+          <div style={S.statLabel}>{t("profile.stat.todayUsed")}</div>
           <div style={S.statValue}>
             {unlimited ? "∞" : `${freeUsed} / ${FREE_DAILY}`}
           </div>
           <div style={S.statSub}>
-            {unlimited ? "무제한" : blocked ? "베타 전용" : `${freeLeft}장 남음`}
+            {unlimited ? t("profile.stat.unlimited") : blocked ? t("profile.stat.beta") : t("profile.stat.todayLeft", { n: freeLeft })}
           </div>
         </div>
         <div style={S.statCard}>
-          <div style={S.statLabel}>🎟 크레딧</div>
+          <div style={S.statLabel}>{t("profile.stat.credits")}</div>
           <div style={S.statValue}>{credits}</div>
-          <div style={S.statSub}>친구 초대로 적립</div>
+          <div style={S.statSub}>{t("profile.stat.creditsSub")}</div>
         </div>
       </div>
+
+      {/* 언어 선택 */}
+      <LangSelector />
 
       {/* 내 갤러리 */}
       <button style={S.galleryEntry} onClick={onOpenGallery}>
         <div style={S.galleryEntryLeft}>
-          <div style={S.galleryEntryTitle}>🖼 내 갤러리</div>
+          <div style={S.galleryEntryTitle}>{t("profile.gallery.title")}</div>
           <div style={S.galleryEntryDesc}>
-            생성한 이미지는 1시간 동안만 보관돼요. 다운로드 잊지 마세요!
+            {t("profile.gallery.desc")}
           </div>
         </div>
         <div style={S.galleryEntryArrow}>→</div>
@@ -1214,7 +1215,7 @@ function ProfileScreen({
       <button style={S.inviteBanner} onClick={onInvite}>
         <div style={S.inviteBannerLeft}>
           <div style={S.inviteBannerTitle}>
-            {unlimited ? "🎁 친구에게 공유하기" : "🎟 친구 초대하고 크레딧 받기"}
+            {unlimited ? t("invite.adminTitle") : t("invite.testerTitle")}
           </div>
           <div style={S.inviteBannerDesc}>
             {unlimited
@@ -1222,7 +1223,7 @@ function ProfileScreen({
               : `친구 ${untilNext}명만 더 초대하면 크레딧 1개! (현재 ${referralCount}명 초대)`}
           </div>
         </div>
-        <div style={S.inviteBannerBtn}>공유</div>
+        <div style={S.inviteBannerBtn}>{t("common.share")}</div>
       </button>
       {inviteMsg && <div style={S.inviteToast}>{inviteMsg}</div>}
 
@@ -1231,8 +1232,43 @@ function ProfileScreen({
         style={{ ...S.secondaryBtn, marginTop: 18, color: ACCENT + "cc" }}
         onClick={onLogout}
       >
-        로그아웃
+        {t("profile.logout")}
       </button>
+    </div>
+  );
+}
+
+/* ============================================================
+   언어 선택 (프로필 안에 표시)
+   ============================================================ */
+function LangSelector() {
+  const lang = useLang();
+  const pref = getLangPreference();
+  const options = [
+    { value: "auto", label: t("profile.lang.auto") },
+    { value: "ko", label: t("profile.lang.ko") },
+    { value: "en", label: t("profile.lang.en") },
+  ];
+  return (
+    <div style={S.langBox}>
+      <div style={S.langTitle}>{t("profile.lang.title")}</div>
+      <div style={S.langOptions}>
+        {options.map((o) => {
+          const active = pref === o.value;
+          return (
+            <button
+              key={o.value}
+              style={{
+                ...S.langOpt,
+                ...(active ? S.langOptActive : {}),
+              }}
+              onClick={() => setLang(o.value)}
+            >
+              {o.label}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -1271,7 +1307,7 @@ function MyGalleryScreen({ accessToken, onBack }) {
   }, [accessToken]);
 
   async function handleDelete(id) {
-    if (!confirm("이 사진을 삭제할까요?")) return;
+    if (!confirm(t("gallery.deleteConfirm"))) return;
     await fetch("/api/gallery?id=" + id, {
       method: "DELETE",
       headers: { Authorization: "Bearer " + accessToken },
@@ -1281,12 +1317,12 @@ function MyGalleryScreen({ accessToken, onBack }) {
 
   function remainingLabel(expiresAt) {
     const ms = new Date(expiresAt).getTime() - Date.now();
-    if (ms <= 0) return "곧 사라짐";
+    if (ms <= 0) return t("gallery.timer.expiring");
     const totalSec = Math.floor(ms / 1000);
     const min = Math.floor(totalSec / 60);
     const sec = totalSec % 60;
-    if (min >= 1) return `⏰ ${min}분 ${String(sec).padStart(2, "0")}초 남음`;
-    return `⏰ ${sec}초 남음`;
+    if (min >= 1) return t("gallery.timer.minSec", { min, sec: String(sec).padStart(2, "0") });
+    return t("gallery.timer.sec", { sec });
   }
 
   // tick 사용 (eslint 경고 회피 + 의존성)
@@ -1297,18 +1333,18 @@ function MyGalleryScreen({ accessToken, onBack }) {
       <div style={S.navRow}>
         <button style={S.backBtn} onClick={onBack}>←</button>
         <div>
-          <div style={S.screenKicker}>내 정보</div>
-          <div style={S.screenTitle}>내 갤러리</div>
+          <div style={S.screenKicker}>{t("profile.kicker")}</div>
+          <div style={S.screenTitle}>{t("gallery.title")}</div>
         </div>
       </div>
 
       <div style={S.galleryNotice}>
-        🕐 생성된 이미지는 <b>1시간</b>만 보관돼요.<br />
-        오래 보관하려면 <b>저장 버튼</b>으로 앨범에 받아주세요!
+        {t("gallery.notice1")}<br />
+        {t("gallery.notice2")}
       </div>
 
       {items === null && !error && (
-        <div style={S.emptyState}>불러오는 중...</div>
+        <div style={S.emptyState}>{t("common.loading")}</div>
       )}
 
       {error && (
@@ -1317,12 +1353,12 @@ function MyGalleryScreen({ accessToken, onBack }) {
 
       {items && items.length === 0 && (
         <div style={S.emptyState}>
-          <div>아직 생성한 이미지가 없어요</div>
+          <div>{t("gallery.empty")}</div>
           <button
             style={{ ...S.moreBtn, marginTop: 14 }}
             onClick={onBack}
           >
-            컨셉 선택하러 가기
+            {t("gallery.emptyCta")}
           </button>
         </div>
       )}
@@ -1359,13 +1395,13 @@ function MyGalleryScreen({ accessToken, onBack }) {
                       download={`rimikimi_${it.conceptId}.png`}
                       style={S.myGalleryDownload}
                     >
-                      저장
+                      {t("gallery.action.save")}
                     </a>
                     <button
                       style={S.myGalleryDelete}
                       onClick={() => handleDelete(it.id)}
                     >
-                      삭제
+                      {t("gallery.action.delete")}
                     </button>
                   </div>
                 </div>
@@ -1391,18 +1427,18 @@ function ConfirmScreen({
       <div style={S.navRow}>
         <button style={S.backBtn} onClick={onBack}>←</button>
         <div>
-          <div style={S.screenKicker}>STEP 03</div>
-          <div style={S.screenTitle}>생성 확인</div>
+          <div style={S.screenKicker}>{t("step3.kicker")}</div>
+          <div style={S.screenTitle}>{t("step3.title")}</div>
         </div>
       </div>
 
       <div style={S.confirmPreview}>
-        <img src={photo} alt="내 사진" style={S.confirmPhoto} />
+        <img src={photo} alt={t("profile.kicker")} style={S.confirmPhoto} />
         <div style={S.confirmArrow}>♥</div>
         {(prompt.id) ? (
           <img
             src={`/thumbs/${prompt.id}.webp`}
-            alt={prompt.title}
+            alt={localizedTitle(prompt)}
             style={S.confirmPhoto}
           />
         ) : (
@@ -1414,8 +1450,8 @@ function ConfirmScreen({
       </div>
 
       <div style={S.confirmCard}>
-        <div style={S.confirmTitle}>{prompt.title}</div>
-        <div style={S.confirmCat}>{prompt.category}</div>
+        <div style={S.confirmTitle}>{localizedTitle(prompt)}</div>
+        <div style={S.confirmCat}>{localizedCategory(prompt.category)}</div>
         {prompt.sensitive && (
           <div style={S.sensitiveNotice}>
             이 스타일은 노출도가 있는 연출을 포함해요. 본인 사진에 한해
@@ -1428,9 +1464,9 @@ function ConfirmScreen({
       </div>
 
       <div style={S.costRow}>
-        <span style={S.costLabel}>이번 생성</span>
+        <span style={S.costLabel}>{t("step3.use")}</span>
         <span style={S.costValue}>
-          {useFree ? "무료 " + freeLeft + "장 중 1장 사용" : "크레딧 1장 사용"}
+          {useFree ? t("step3.useFree", { n: freeLeft }) : t("step3.useCredit")}
         </span>
       </div>
 
@@ -1466,46 +1502,46 @@ function ResultScreen({
               />
             ))}
           </div>
-          <div style={S.genTitle}>이미지를 만들고 있어요</div>
-          <div style={S.genSub}>#{prompt.id} · {prompt.title}</div>
-          <div style={S.genHint}>최대 30초 정도 걸릴 수 있어요</div>
+          <div style={S.genTitle}>{t("result.generating")}</div>
+          <div style={S.genSub}>#{prompt.id} · {localizedTitle(prompt)}</div>
+          <div style={S.genHint}>{t("result.generatingHint")}</div>
         </div>
       ) : genError ? (
         <div className="fade">
-          <div style={S.screenKicker}>생성 실패</div>
-          <div style={S.screenTitle}>다시 시도해 주세요</div>
+          <div style={S.screenKicker}>{t("result.fail")}</div>
+          <div style={S.screenTitle}>{t("result.failHint")}</div>
           <div style={S.errorCard}>{genError}</div>
           <div style={S.resultActions}>
-            <button style={S.secondaryBtn} onClick={onHome}>처음으로</button>
+            <button style={S.secondaryBtn} onClick={onHome}>{t("result.home")}</button>
             <button style={S.primaryBtn} onClick={onRetry}>다시 시도</button>
           </div>
         </div>
       ) : resultImage ? (
         <div className="fade">
-          <div style={S.screenKicker}>완성!</div>
-          <div style={S.screenTitle}>{prompt.title}</div>
+          <div style={S.screenKicker}>{t("result.done")}</div>
+          <div style={S.screenTitle}>{localizedTitle(prompt)}</div>
           <div style={S.resultImage}>
-            <img src={resultImage} alt={prompt.title} style={S.resultImg} />
+            <img src={resultImage} alt={localizedTitle(prompt)} style={S.resultImg} />
           </div>
           <div style={S.saveNotice}>
-            🔒 보안을 위해 생성된 이미지는
+            {t("result.saveNotice1")}
             <br />
-            앱에 별도 저장되지 않아요.
+            {t("result.saveNotice2")}
             <br />
-            저장 버튼으로
+            {t("result.saveNotice3")}
             <br />
-            앨범에 꼭 별도로 저장해 주세요 😉
+            {t("result.saveNotice4")}
           </div>
           <a
             href={resultImage}
             download={"rimikimi_" + prompt.id + ".png"}
             style={S.downloadBtn}
           >
-            이미지 저장하기
+            {t("result.download")}
           </a>
           <div style={S.resultActions}>
-            <button style={S.secondaryBtn} onClick={onHome}>처음으로</button>
-            <button style={S.primaryBtn} onClick={onAgain}>다른 컨셉으로</button>
+            <button style={S.secondaryBtn} onClick={onHome}>{t("result.home")}</button>
+            <button style={S.primaryBtn} onClick={onAgain}>{t("result.again")}</button>
           </div>
         </div>
       ) : null}
@@ -1670,6 +1706,28 @@ const S = {
     fontFamily: "'Quicksand', sans-serif",
   },
   statSub: { fontSize: 10.5, opacity: 0.5, fontWeight: 500, marginTop: 4 },
+
+  /* === 언어 선택 === */
+  langBox: {
+    background: "#fff", border: "1px solid " + INK + "10",
+    borderRadius: 14, padding: "14px 16px", marginBottom: 14,
+  },
+  langTitle: {
+    fontSize: 12.5, fontWeight: 700, color: INK, marginBottom: 10,
+    fontFamily: "'Quicksand', sans-serif",
+  },
+  langOptions: {
+    display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6,
+  },
+  langOpt: {
+    background: "#fff", color: INK,
+    border: "1.5px solid " + INK + "18", borderRadius: 10,
+    padding: "9px 8px", fontSize: 12, fontWeight: 700,
+    fontFamily: "'Quicksand', sans-serif", cursor: "pointer",
+  },
+  langOptActive: {
+    background: INK, color: "#fff", borderColor: "transparent",
+  },
 
   /* === 내 갤러리 진입 버튼 (프로필 내) === */
   galleryEntry: {
