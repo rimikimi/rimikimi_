@@ -8,10 +8,16 @@
 
 import React, { useState } from "react";
 import { supabase } from "./supabaseClient";
+import {
+  detectInApp,
+  tryEscapeKakaoAndroid,
+  inAppEscapeInstructions,
+} from "./inAppBrowser";
 
 export default function LoginGate({ Logo }) {
   const [busy, setBusy] = useState(null); // 'apple' | 'kakao' | 'naver' | 'google' | null
   const [error, setError] = useState(null);
+  const [inAppNotice, setInAppNotice] = useState(null); // { title, steps }
 
   // URL 에 ?auth_error=... 가 붙어 있으면 표시
   React.useEffect(() => {
@@ -27,6 +33,23 @@ export default function LoginGate({ Logo }) {
   }, []);
 
   async function signInWithSupabase(provider) {
+    // Google + Apple 은 인앱브라우저에서 차단됨 (403 disallowed_useragent).
+    // 카톡 안드는 외부 브라우저로 자동 점프 시도, 안 되면 안내문 표시.
+    const inApp = detectInApp();
+    if (inApp && (provider === "google" || provider === "apple")) {
+      if (tryEscapeKakaoAndroid(window.location.href)) {
+        // 시스템 브라우저로 점프 트리거됨 — 잠시 후 페이지 떠남
+        setBusy(provider);
+        return;
+      }
+      // iOS 카톡 또는 기타 인앱 — 안내문 보여줌
+      const info = inAppEscapeInstructions(inApp);
+      if (info) {
+        setInAppNotice(info);
+        return;
+      }
+    }
+
     setBusy(provider);
     setError(null);
     try {
@@ -35,7 +58,6 @@ export default function LoginGate({ Logo }) {
         options: { redirectTo: window.location.origin + "/" },
       });
       if (error) throw error;
-      // 정상이면 브라우저가 OAuth 페이지로 리다이렉트됨 → 여기 안 돌아옴
     } catch (e) {
       setError(e?.message || "로그인 시작에 실패했어요.");
       setBusy(null);
@@ -96,6 +118,37 @@ export default function LoginGate({ Logo }) {
           <span>{busy === "google" ? "이동 중…" : "Google로 시작하기"}</span>
         </button>
       </div>
+
+      {inAppNotice && (
+        <div style={S.notice}>
+          <div style={S.noticeTitle}>⚠️ {inAppNotice.title}</div>
+          <ol style={S.noticeSteps}>
+            {inAppNotice.steps.map((s, i) => (
+              <li key={i} style={S.noticeStep}>{s}</li>
+            ))}
+          </ol>
+          <button
+            style={S.noticeCopyBtn}
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(window.location.origin + "/");
+                setInAppNotice({
+                  ...inAppNotice,
+                  title: "✅ 주소가 복사됐어요. 외부 브라우저에 붙여넣어 주세요!",
+                });
+              } catch (_) {}
+            }}
+          >
+            📋 사이트 주소 복사하기
+          </button>
+          <button
+            style={S.noticeClose}
+            onClick={() => setInAppNotice(null)}
+          >
+            닫기
+          </button>
+        </div>
+      )}
 
       {error && <p style={S.error}>{error}</p>}
 
@@ -233,6 +286,32 @@ const S = {
     marginTop: 18, fontSize: 12.5, color: ACCENT,
     background: "#fff", border: "1px solid " + ACCENT + "55",
     borderRadius: 12, padding: "10px 14px", lineHeight: 1.5, fontWeight: 600,
+  },
+  notice: {
+    marginTop: 20, padding: "16px 18px",
+    background: "#fef9c3", color: "#713f12",
+    border: "1.5px solid #facc15", borderRadius: 14,
+    fontFamily: "'Quicksand', sans-serif",
+  },
+  noticeTitle: {
+    fontSize: 13.5, fontWeight: 700, lineHeight: 1.45, marginBottom: 8,
+  },
+  noticeSteps: {
+    margin: "0 0 12px", padding: "0 0 0 22px",
+    fontSize: 12.5, lineHeight: 1.7, fontWeight: 500,
+  },
+  noticeStep: { marginBottom: 2 },
+  noticeCopyBtn: {
+    width: "100%", background: "#713f12", color: "#fff",
+    border: "none", borderRadius: 10, padding: "11px 14px",
+    fontSize: 13, fontWeight: 700, cursor: "pointer", marginBottom: 8,
+    fontFamily: "'Quicksand', sans-serif",
+  },
+  noticeClose: {
+    width: "100%", background: "transparent", color: "#713f12",
+    border: "none", padding: "8px", fontSize: 12, fontWeight: 600,
+    cursor: "pointer", fontFamily: "'Quicksand', sans-serif",
+    opacity: 0.7,
   },
   legal: {
     marginTop: 26, fontSize: 11, lineHeight: 1.65, opacity: 0.55,
