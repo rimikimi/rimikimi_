@@ -22,3 +22,11 @@ build
 *.log
 npm-debug.log*
 .vercel
+
+# Capacitor/iOS
+ios/App/Pods
+ios/App/build
+ios/DerivedData
+ios/App/App/public
+ios/App/Podfile.lock
+assets/

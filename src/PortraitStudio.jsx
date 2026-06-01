@@ -1,5 +1,6 @@
 import React, { useState, useRef, useMemo, useEffect } from "react";
 import { supabase } from "./supabaseClient";
+import { isNative, nativePickPhoto, nativeShare } from "./nativeBridge";
 import LoginGate from "./LoginGate";
 
 /* ============================================================
@@ -487,7 +488,7 @@ export default function PortraitStudio() {
     setGenError(null);
   }
 
-  // 친구 초대 — 휴대폰 기본 공유창 (카톡/문자 등 자동 노출)
+  // 친구 초대 — 네이티브 시트 우선, 그 다음 웹 공유, 마지막 클립보드
   async function shareInvite() {
     const uid = session?.user?.id;
     if (!uid) return;
@@ -498,16 +499,30 @@ export default function PortraitStudio() {
       url: link,
     };
     try {
+      // 1) iOS / Android 네이티브 시트
+      if (await nativeShare(shareData)) return;
+      // 2) 웹 공유 API
       if (navigator.share) {
         await navigator.share(shareData);
-      } else {
-        await navigator.clipboard.writeText(link);
-        setInviteMsg("초대 링크가 복사됐어요! 친구에게 붙여넣어 보내주세요 📋");
-        setTimeout(() => setInviteMsg(""), 4000);
+        return;
       }
+      // 3) 클립보드 fallback
+      await navigator.clipboard.writeText(link);
+      setInviteMsg("초대 링크가 복사됐어요! 친구에게 붙여넣어 보내주세요 📋");
+      setTimeout(() => setInviteMsg(""), 4000);
     } catch (_) {
       /* 사용자가 공유 취소 — 무시 */
     }
+  }
+
+  // 사진 선택 — 네이티브에서는 진짜 카메라/앨범 시트, 웹에서는 file input
+  async function pickPhoto() {
+    if (isNative()) {
+      const dataUrl = await nativePickPhoto("prompt");
+      if (dataUrl) setPhoto(dataUrl);
+      return;
+    }
+    fileRef.current?.click();
   }
 
   if (booting) return <Splash />;
@@ -580,7 +595,7 @@ export default function PortraitStudio() {
             photo={photo}
             fileRef={fileRef}
             onFile={handleFile}
-            onPick={() => fileRef.current?.click()}
+            onPick={pickPhoto}
             onClear={() => setPhoto(null)}
             ageConfirmed={ageConfirmed}
             setAgeConfirmed={setAgeConfirmed}
@@ -642,7 +657,7 @@ export default function PortraitStudio() {
           <ProfileScreen
             session={session}
             photo={photo}
-            onPickPhoto={() => fileRef.current?.click()}
+            onPickPhoto={pickPhoto}
             onClearPhoto={() => setPhoto(null)}
             unlimited={unlimited}
             blocked={blocked}
