@@ -2,14 +2,15 @@
 // 로그인 게이트 — 로그인 안 된 사용자에게 보여주는 화면
 //   - 로고
 //   - 태그라인 "상상이 현실이 되는 곳"
-//   - 카카오 / 네이버 / 구글 버튼 3개
+//   - Apple / 카카오 / 네이버 / 구글 버튼 4개
+//   (Apple 은 App Store 정책상 다른 소셜 로그인이 있을 때 필수)
 // ============================================================
 
 import React, { useState } from "react";
 import { supabase } from "./supabaseClient";
 
 export default function LoginGate({ Logo }) {
-  const [busy, setBusy] = useState(null); // 'kakao' | 'naver' | 'google' | null
+  const [busy, setBusy] = useState(null); // 'apple' | 'kakao' | 'naver' | 'google' | null
   const [error, setError] = useState(null);
 
   // URL 에 ?auth_error=... 가 붙어 있으면 표시
@@ -60,6 +61,15 @@ export default function LoginGate({ Logo }) {
 
       <div style={S.buttons}>
         <button
+          style={{ ...S.btnApple, opacity: busy && busy !== "apple" ? 0.5 : 1 }}
+          disabled={!!busy}
+          onClick={() => signInWithSupabase("apple")}
+        >
+          <AppleIcon />
+          <span>{busy === "apple" ? "이동 중…" : "Apple로 시작하기"}</span>
+        </button>
+
+        <button
           style={{ ...S.btnKakao, opacity: busy && busy !== "kakao" ? 0.5 : 1 }}
           disabled={!!busy}
           onClick={() => signInWithSupabase("kakao")}
@@ -98,6 +108,17 @@ export default function LoginGate({ Logo }) {
 }
 
 // ---------- 아이콘 (간단한 SVG) ----------
+
+function AppleIcon() {
+  return (
+    <svg width="16" height="18" viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09M12 7.25C11.85 5 13.69 3.12 15.79 3c.29 2.58-2.34 4.5-3.79 4.25"
+      />
+    </svg>
+  );
+}
 
 function KakaoIcon() {
   return (
@@ -175,6 +196,14 @@ const S = {
     cursor: "pointer", display: "flex", alignItems: "center",
     justifyContent: "center", gap: 10,
     transition: "transform 0.06s ease, opacity 0.15s",
+  },
+  btnApple: {
+    width: "100%", border: "none", borderRadius: 14,
+    padding: "15px 18px", fontSize: 15, fontWeight: 700,
+    fontFamily: "'Quicksand', sans-serif",
+    cursor: "pointer", display: "flex", alignItems: "center",
+    justifyContent: "center", gap: 10,
+    background: "#000", color: "#fff",
   },
   btnKakao: {
     width: "100%", border: "none", borderRadius: 14,
