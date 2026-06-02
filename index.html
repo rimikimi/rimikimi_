@@ -33,11 +33,30 @@
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
     <script>
-      // 서비스 워커 등록 (PWA 핵심)
+      // 서비스 워커: 로컬 개발 환경(localhost / 127.0.0.1)에서는
+      // 등록을 건너뛰고, 이미 등록된 SW + 모든 캐시를 자동으로 해제.
+      // (개발 중 옛 코드 캐싱 때문에 디버깅이 어려워지는 걸 방지)
+      var __isDev =
+        location.hostname === "localhost" ||
+        location.hostname === "127.0.0.1" ||
+        location.hostname.endsWith(".local");
+
       if ("serviceWorker" in navigator) {
-        window.addEventListener("load", () => {
-          navigator.serviceWorker.register("/sw.js").catch(() => {});
-        });
+        if (__isDev) {
+          // 기존 SW 전부 해제 + 캐시 비우기
+          navigator.serviceWorker.getRegistrations().then(function (rs) {
+            rs.forEach(function (r) { r.unregister(); });
+          });
+          if (window.caches) {
+            caches.keys().then(function (ks) {
+              ks.forEach(function (k) { caches.delete(k); });
+            });
+          }
+        } else {
+          window.addEventListener("load", function () {
+            navigator.serviceWorker.register("/sw.js").catch(function () {});
+          });
+        }
       }
     </script>
   </body>
