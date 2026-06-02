@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">rimikimi</string>
+    <string name="title_activity_main">rimikimi</string>
+    <string name="package_name">com.rimikimi.app</string>
+    <string name="custom_url_scheme">com.rimikimi.app</string>
+</resources>
