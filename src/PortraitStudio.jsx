@@ -57,10 +57,12 @@ function _OldLogo({ height = 30, mono = false }) {
    브랜드명은 일반 명사로 치환된 상태입니다.
    ============================================================ */
 
+// id 는 서버 (api/_lib/payments/packages.js) 와 1:1 매칭 필수.
+// usd 는 PayPal 결제용. krw 는 한국 사용자 참고 표시.
 const CREDIT_PACKS = [
-  { id: "s", count: 10, price: 4900, label: null },
-  { id: "m", count: 30, price: 9900, label: "가장 인기" },
-  { id: "l", count: 70, price: 19900, label: null },
+  { id: "credits_10", count: 10, krw: 4900,  usd: "4.90",  label: null },
+  { id: "credits_30", count: 30, krw: 9900,  usd: "9.90",  label: "가장 인기" },
+  { id: "credits_70", count: 70, krw: 19900, usd: "19.90", label: null },
 ];
 
 const FREE_DAILY = 3;
@@ -69,7 +71,10 @@ const FREE_DAILY = 3;
 const HEARTS = ["#e6403c", "#f9c83c", "#60c9de", "#8a5da7"];
 
 const won = (n) => n.toLocaleString("ko-KR") + "원";
-const perImage = (pack) => Math.round(pack.price / pack.count);
+const usd = (s) => "$" + s;
+const perImage = (pack) => Math.round(pack.krw / pack.count);
+const perImageUsd = (pack) =>
+  (parseFloat(pack.usd) / pack.count).toFixed(2);
 
 /* ============================================================
    사진 축소 — API로 보내기 전 용량을 줄임
@@ -345,7 +350,12 @@ export default function PortraitStudio() {
     return () => { cancelled = true; };
   }, []);
 
+  // 결제 후 토스트
+  const [payToast, setPayToast] = useState("");
+
   // 로그인된 사용자의 오늘 사용량을 서버에서 받아옴 (페이지 로드 / 로그인 직후)
+  // refreshTick 이 바뀌면 강제로 다시 fetch (결제 완료 후 잔액 갱신용)
+  const [refreshTick, setRefreshTick] = useState(0);
   useEffect(() => {
     const token = session?.access_token;
     if (!token) {
@@ -372,6 +382,69 @@ export default function PortraitStudio() {
     return () => {
       cancelled = true;
     };
+  }, [session?.access_token, refreshTick]);
+
+  // ─── PayPal 결제 후 처리 ───
+  // PayPal 이 /checkout/success?token=ORDER_ID&PayerID=... 로 돌려보냄.
+  // /checkout/cancel  은 사용자가 취소한 경우.
+  // 둘 다 SPA 라우팅 없이 URL 만 보고 처리.
+  useEffect(() => {
+    const path = window.location.pathname;
+    if (path !== "/checkout/success" && path !== "/checkout/cancel") return;
+
+    const params = new URLSearchParams(window.location.search);
+    const provider = params.get("provider") || "paypal";
+    const externalId = params.get("token"); // PayPal 은 'token' 이라는 이름으로 order id 줌
+
+    // URL 깨끗하게 (브라우저 뒤로가기 시 다시 capture 안 되게)
+    function cleanUrl() {
+      window.history.replaceState({}, "", "/");
+    }
+
+    if (path === "/checkout/cancel") {
+      cleanUrl();
+      setPayToast("결제가 취소되었어요");
+      setScreen("store");
+      setTimeout(() => setPayToast(""), 3500);
+      return;
+    }
+
+    // success 인데 로그인 세션이 아직 안 잡혔으면 다음 렌더에서 다시
+    const token = session?.access_token;
+    if (!token || !externalId) {
+      if (!externalId) cleanUrl();
+      return;
+    }
+
+    cleanUrl();
+    setPayToast("결제 확인 중…");
+    fetch("/api/checkout/capture", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + token,
+      },
+      body: JSON.stringify({ provider, externalId }),
+    })
+      .then((r) => r.json().then((j) => ({ ok: r.ok, j })))
+      .then(({ ok, j }) => {
+        if (!ok) throw new Error(j?.error || "결제 검증 실패");
+        const got = j?.credits || 0;
+        setPayToast(
+          j?.alreadyPaid
+            ? `이미 처리된 결제예요 (+${got} 크레딧 적용 완료)`
+            : `🎉 +${got} 크레딧 충전 완료!`
+        );
+        setScreen("store");
+        setRefreshTick((n) => n + 1); // /api/quota 다시 불러서 잔액 갱신
+      })
+      .catch((e) => {
+        setPayToast("결제 처리 실패: " + (e.message || e));
+        setScreen("store");
+      })
+      .finally(() => {
+        setTimeout(() => setPayToast(""), 4500);
+      });
   }, [session?.access_token]);
 
   async function handleLogout() {
@@ -590,6 +663,12 @@ export default function PortraitStudio() {
         </div>
       </header>
 
+      {payToast && (
+        <div style={S.payToast} onClick={() => setPayToast("")}>
+          {payToast}
+        </div>
+      )}
+
       <main style={S.main}>
         {screen === "home" && (
           <HomeScreen
@@ -684,10 +763,7 @@ export default function PortraitStudio() {
           <StoreScreen
             packs={CREDIT_PACKS}
             credits={credits}
-            onBuy={(pack) => {
-              setCredits((c) => c + pack.count);
-              setScreen(selected ? "confirm" : "gallery");
-            }}
+            session={session}
             onBack={() => setScreen(selected ? "confirm" : "gallery")}
           />
         )}
@@ -1552,8 +1628,43 @@ function ResultScreen({
 /* ============================================================
    상점
    ============================================================ */
-function StoreScreen({ packs, credits, onBuy, onBack }) {
+function StoreScreen({ packs, credits, session, onBack }) {
   const cheapest = Math.max(...packs.map((p) => perImage(p)));
+  const [busyId, setBusyId] = useState(null);
+  const [errMsg, setErrMsg] = useState("");
+
+  async function startPayPal(pack) {
+    setErrMsg("");
+    const token = session?.access_token;
+    if (!token) {
+      setErrMsg("로그인이 필요해요.");
+      return;
+    }
+    setBusyId(pack.id);
+    try {
+      const r = await fetch("/api/checkout/create", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + token,
+        },
+        body: JSON.stringify({
+          provider: "paypal",
+          packageId: pack.id,
+        }),
+      });
+      const j = await r.json();
+      if (!r.ok || !j?.redirectUrl) {
+        throw new Error(j?.error || "결제 시작 실패");
+      }
+      // PayPal 결제창으로 이동 (완료/취소 시 /checkout/success|cancel 로 돌아옴)
+      window.location.assign(j.redirectUrl);
+    } catch (e) {
+      setErrMsg(e.message || String(e));
+      setBusyId(null);
+    }
+  }
+
   return (
     <div className="fade">
       <div style={S.navRow}>
@@ -1573,6 +1684,7 @@ function StoreScreen({ packs, credits, onBuy, onBack }) {
         {packs.map((pack, i) => {
           const per = perImage(pack);
           const save = Math.round((1 - per / cheapest) * 100);
+          const busy = busyId === pack.id;
           return (
             <div
               key={pack.id}
@@ -1583,20 +1695,37 @@ function StoreScreen({ packs, credits, onBuy, onBack }) {
                 <span style={{ color: HEARTS[i % HEARTS.length] }}>♥</span>{" "}
                 {pack.count}장
               </div>
-              <div style={S.packPrice}>{won(pack.price)}</div>
+              <div style={S.packPrice}>
+                {usd(pack.usd)}{" "}
+                <span style={S.packPriceSub}>(≈ {won(pack.krw)})</span>
+              </div>
               <div style={S.packPer}>
-                장당 {won(per)}
+                장당 {usd(perImageUsd(pack))}
                 {save > 0 && <span style={S.packSave}> · {save}% 절약</span>}
               </div>
-              <button style={S.packBtn} onClick={() => onBuy(pack)}>구매</button>
+              <button
+                style={{
+                  ...S.packBtn,
+                  opacity: busy ? 0.6 : 1,
+                  cursor: busy ? "wait" : "pointer",
+                }}
+                disabled={busy || !!busyId}
+                onClick={() => startPayPal(pack)}
+              >
+                {busy ? "이동 중…" : "PayPal로 결제"}
+              </button>
             </div>
           );
         })}
       </div>
 
+      {errMsg && (
+        <p style={{ ...S.storeNote, color: "#c0392b" }}>{errMsg}</p>
+      )}
+
       <p style={S.storeNote}>
-        프로토타입 단계입니다 · 실제 결제는 연동되어 있지 않으며, 버튼을 누르면
-        크레딧이 시뮬레이션으로 충전됩니다.
+        PayPal Sandbox(테스트) 단계입니다. 한국 카드(이니시스)는 곧 추가될
+        예정이에요.
       </p>
     </div>
   );
@@ -1976,6 +2105,18 @@ const S = {
     background: INK, color: "#fff", borderRadius: 12,
     padding: "11px 14px", fontSize: 12, fontWeight: 600,
     marginBottom: 16, textAlign: "center", lineHeight: 1.5,
+  },
+  payToast: {
+    position: "fixed", top: 70, left: "50%",
+    transform: "translateX(-50%)",
+    background: INK, color: "#fff", borderRadius: 999,
+    padding: "11px 22px", fontSize: 13, fontWeight: 700,
+    boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
+    cursor: "pointer", zIndex: 999, maxWidth: "90vw",
+    textAlign: "center",
+  },
+  packPriceSub: {
+    fontSize: 11, fontWeight: 500, opacity: 0.55, marginLeft: 4,
   },
   privacyNote: {
     fontSize: 10.5, lineHeight: 1.6, opacity: 0.45,

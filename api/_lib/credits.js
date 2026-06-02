@@ -18,19 +18,24 @@ export async function getCreditInfo(admin, userId) {
   const referralCount = count || 0;
   const creditsEarned = Math.floor(referralCount / PER_CREDIT);
 
-  // 2) 사용한 크레딧
+  // 2) 사용한 크레딧 + 결제로 적립한 크레딧
   const { data, error: uErr } = await admin
     .from("user_credits")
-    .select("credits_used")
+    .select("credits_used, credits_purchased")
     .eq("user_id", userId)
     .maybeSingle();
   if (uErr) return { error: uErr.message };
   const creditsUsed = data?.credits_used || 0;
+  const creditsPurchased = data?.credits_purchased || 0;
 
-  const creditsAvailable = Math.max(0, creditsEarned - creditsUsed);
+  // 총 적립 = 초대 보상 + 결제 충전
+  const totalEarned = creditsEarned + creditsPurchased;
+  const creditsAvailable = Math.max(0, totalEarned - creditsUsed);
+
   return {
     referralCount,
-    creditsEarned,
+    creditsEarned,        // 초대 보상으로 얻은 누적
+    creditsPurchased,     // 결제로 충전한 누적
     creditsUsed,
     creditsAvailable,
     perCredit: PER_CREDIT,
