@@ -1,5 +1,82 @@
 [
   {
+    "id": 407,
+    "title": "색연필 패션 일러스트",
+    "title_en": "Color Pencil Fashion Illust",
+    "category": "🎨 아트 변환",
+    "categories": [
+      "🎨 아트 변환"
+    ],
+    "text": "Transform the person in the reference photo into a glamorous fashion illustration drawn with colored pencils, in the style of high-end fashion week sketches (think David Downton / Vogue illustration). Exaggerated elegant proportions — slightly elongated body and limbs — but the face must remain recognizable as the same person (same hairstyle, same facial features, same gender). Confident colored pencil strokes, layered hatching, vibrant accent colors on lips/clothing, loose suggestion of background, white space around the figure. Sophisticated, chic, runway-ready.",
+    "sensitive": false
+  },
+  {
+    "id": 406,
+    "title": "거친 목탄 드로잉",
+    "title_en": "Rough Charcoal Drawing",
+    "category": "🎨 아트 변환",
+    "categories": [
+      "🎨 아트 변환"
+    ],
+    "text": "Render the person in the reference photo as an expressive rough charcoal drawing on textured paper. Strong thick black charcoal strokes, gestural sketch energy, dramatic chiaroscuro with deep blacks and luminous paper whites, smudges and finger-blended shadows, visible loose hatching. Preserve the exact face, identity, gender, hairstyle, and pose precisely — capture likeness with confident raw strokes. Monochrome (charcoal black on warm off-white paper). Raw, masterful, alive.",
+    "sensitive": false
+  },
+  {
+    "id": 405,
+    "title": "소프트 클레이 3D",
+    "title_en": "Soft Clay 3D",
+    "category": "🎨 아트 변환",
+    "categories": [
+      "🎨 아트 변환"
+    ],
+    "text": "Re-render the person in the reference photo as a soft-clay 3D character: matte pastel-colored plasticine or polymer clay, gentle rounded shapes, fingerprint texture on the clay surface, miniature handcrafted look (Aardman / Pixar short clay model aesthetic). Keep facial structure, gender, hair shape, and clothing recognizable — clearly the same person, just sculpted in clay. Soft studio lighting, shallow depth of field, subtle clay shine, soft drop shadow. Cute, tactile, charming. No photorealism.",
+    "sensitive": false
+  },
+  {
+    "id": 404,
+    "title": "2D 벡터 일러스트",
+    "title_en": "2D Vector Illustration",
+    "category": "🎨 아트 변환",
+    "categories": [
+      "🎨 아트 변환"
+    ],
+    "text": "Convert the person in the reference photo into a clean flat 2D vector illustration in a modern editorial style (think New Yorker / Behance / contemporary brand illustration). Solid color fills, minimal shading using 2-3 tones per area, crisp clean outlines, simplified facial features that still clearly reflect the subject's gender, hair, and overall look. Limited cohesive palette (4-6 colors). Flat background, no gradients, no photographic detail. Smooth bezier curves, geometric simplification.",
+    "sensitive": false
+  },
+  {
+    "id": 403,
+    "title": "유치원 오일파스텔",
+    "title_en": "Kindergarten Oil Pastel",
+    "category": "🎨 아트 변환",
+    "categories": [
+      "🎨 아트 변환"
+    ],
+    "text": "Re-draw the person in the reference photo as if a 5-year-old kindergarten child drew it with chunky oil pastels on rough sketch paper. Big simple shapes, wonky proportions, crayon-thick lines, wax-like color smudges, deliberately childlike — head bigger than body, dot eyes or simple stars, wide smile. Keep the dominant colors of the hair and clothing recognizable so the person is still identifiable as the same subject (e.g., long brown hair → big brown scribble). Visible paper texture, color smears, slightly off-center composition. Joyful, naive, charming.",
+    "sensitive": false
+  },
+  {
+    "id": 402,
+    "title": "수채화 워시",
+    "title_en": "Watercolor Wash",
+    "category": "🎨 아트 변환",
+    "categories": [
+      "🎨 아트 변환"
+    ],
+    "text": "Re-render the person in the reference photo as a loose wet-on-wet watercolor portrait. Soft pigment bleeds, transparent washes, paper grain visible, gentle color pooling along edges, fine ink line accents in places. Recognizable likeness — keep the same face, hair color, gender, and general pose — but interpret with a painter's freedom typical of watercolor. Light, airy palette; background fades into untouched paper. Hand-painted feel, brush imperfections welcomed.",
+    "sensitive": false
+  },
+  {
+    "id": 401,
+    "title": "임파스토 유화",
+    "title_en": "Impasto Oil Painting",
+    "category": "🎨 아트 변환",
+    "categories": [
+      "🎨 아트 변환"
+    ],
+    "text": "Transform the person in the reference photo into a thickly-painted oil portrait using the impasto technique: bold, visible brush strokes, generous layers of paint, rich textured surface with knife marks, deep saturated colors, classical museum-quality oil painting. Keep the exact same face, identity, gender, age, and facial features clearly recognizable — only the medium changes. Preserve original pose, hair, clothing, and background, rendering each element in the same impasto oil style. Warm gallery lighting, slight canvas texture visible. No photorealism, no smooth blending — celebrate the paint.",
+    "sensitive": false
+  },
+  {
     "id": 306,
     "title": "플로럴 수채화 일러스트",
     "category": "예술 / 클래식",

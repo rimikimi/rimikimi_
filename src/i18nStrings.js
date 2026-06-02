@@ -310,6 +310,7 @@ export const STR = {
       "판타지 / 콘셉트": "Fantasy / Concept",
       "파티 / 이벤트": "Party / Event",
       "비치 / 리조트": "Beach / Resort",
+      "🎨 아트 변환": "🎨 Art Style",
     },
   },
 };
