@@ -750,6 +750,7 @@ export default function PortraitStudio() {
             inviteMsg={inviteMsg}
             onBack={() => setScreen("gallery")}
             onOpenGallery={() => setScreen("mygallery")}
+            onOpenStore={() => setScreen("store")}
             onLogout={handleLogout}
           />
         )}
@@ -1197,7 +1198,7 @@ function ProfileScreen({
   unlimited, blocked, freeUsed, freeLeft, credits,
   referralCount, untilNext,
   onInvite, inviteMsg = "",
-  onBack, onLogout, onOpenGallery,
+  onBack, onLogout, onOpenGallery, onOpenStore,
 }) {
   const u = session?.user || {};
   const meta = u.user_metadata || {};
@@ -1272,6 +1273,19 @@ function ProfileScreen({
           <div style={S.statSub}>{t("profile.stat.creditsSub")}</div>
         </div>
       </div>
+
+      {/* 크레딧 충전 (항상 노출) */}
+      {onOpenStore && (
+        <button style={S.galleryEntry} onClick={onOpenStore}>
+          <div style={S.galleryEntryLeft}>
+            <div style={S.galleryEntryTitle}>💳 크레딧 충전</div>
+            <div style={S.galleryEntryDesc}>
+              PayPal로 결제 · 10/30/70 크레딧 패키지
+            </div>
+          </div>
+          <div style={S.galleryEntryArrow}>→</div>
+        </button>
+      )}
 
       {/* 언어 선택 */}
       <LangSelector />
