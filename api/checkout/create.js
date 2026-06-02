@@ -70,9 +70,11 @@ export default async function handler(req, res) {
     }
 
     return res.status(200).json({
-      redirectUrl: order.redirectUrl,
+      redirectUrl: order.redirectUrl || null,
+      sdkInit: order.sdkInit || null, // 토스/이니시스 같은 SDK 방식
       externalId: order.externalId,
       purchaseId: row?.id || null,
+      provider,
     });
   } catch (e) {
     console.error("checkout/create error", e);

@@ -4,14 +4,16 @@
 // ============================================================
 
 import * as paypal from "./paypal.js";
+import * as toss from "./toss.js";
 import * as inicis from "./inicis.js";
 
 const ADAPTERS = {
   paypal,
+  toss,
   inicis,
 };
 
-export const SUPPORTED_PROVIDERS = ["paypal", "inicis"];
+export const SUPPORTED_PROVIDERS = ["paypal", "toss", "inicis"];
 
 export function getAdapter(provider) {
   const a = ADAPTERS[provider];

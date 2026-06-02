@@ -24,7 +24,16 @@ export default async function handler(req, res) {
   const { user, admin, error, status } = await getAuthedUser(req);
   if (error) return res.status(status).json({ error });
 
-  const { provider, externalId } = req.body || {};
+  const {
+    provider,
+    externalId,
+    // 토스용
+    paymentKey,
+    amount,
+    // 이니시스용
+    authToken,
+    authUrl,
+  } = req.body || {};
   if (!provider || !externalId) {
     return res.status(400).json({ error: "provider, externalId 필수" });
   }
@@ -67,7 +76,14 @@ export default async function handler(req, res) {
   let captured;
   try {
     const adapter = getAdapter(provider);
-    captured = await adapter.captureOrder({ externalId });
+    captured = await adapter.captureOrder({
+      externalId,
+      // 토스 (paymentKey, amount), 이니시스 (authToken, authUrl) 가 필요
+      paymentKey,
+      amount,
+      authToken,
+      authUrl,
+    });
   } catch (e) {
     console.error("adapter capture error", e);
     await admin
