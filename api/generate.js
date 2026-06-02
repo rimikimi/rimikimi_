@@ -65,7 +65,11 @@ export default async function handler(req, res) {
   }
 
   // 3) 요청 본문 확인
-  const { mimeType, base64, prompt, conceptId, conceptTitle } = req.body || {};
+  const {
+    mimeType, base64, prompt, conceptId, conceptTitle,
+    // 아트 변환처럼 풍경/물건 사진을 받는 컨셉은 얼굴 검사 우회
+    skipFacePrecheck,
+  } = req.body || {};
   if (!mimeType || !base64 || !prompt) {
     return res
       .status(400)
@@ -81,24 +85,33 @@ export default async function handler(req, res) {
 
   // 3.5) 사전 얼굴 검사 (Flash Lite, ~$0.002, 1~2초)
   //      얼굴 없으면 본 모델 호출 안 함 → 차감 X
-  const pre = await precheckHasFace(apiKey, mimeType, base64);
-  if (!pre.hasFace) {
-    return res.status(422).json({
-      error:
-        "사진에 얼굴이 인식되지 않아 이미지를 생성할 수 없습니다.\n사진을 다시 선택해 주세요.\n크레딧은 차감되지 않았으니 안심하세요🙂",
-      noFace: true,
-      quotaUsed: unlimited ? 0 : usage.count, // 차감 안 됨
-      quotaLimit: unlimited ? null : FREE_DAILY,
-      unlimited,
-    });
+  //      단, skipFacePrecheck (아트 변환 등) 면 검사 우회
+  if (!skipFacePrecheck) {
+    const pre = await precheckHasFace(apiKey, mimeType, base64);
+    if (!pre.hasFace) {
+      return res.status(422).json({
+        error:
+          "사진에 얼굴이 인식되지 않아 이미지를 생성할 수 없습니다.\n사진을 다시 선택해 주세요.\n크레딧은 차감되지 않았으니 안심하세요🙂",
+        noFace: true,
+        quotaUsed: unlimited ? 0 : usage.count, // 차감 안 됨
+        quotaLimit: unlimited ? null : FREE_DAILY,
+        unlimited,
+      });
+    }
+    // pre.error 있는 경우는 fail-open — 본 모델 호출로 진행
   }
-  // pre.error 있는 경우는 fail-open — 본 모델 호출로 진행
 
   // 4) Gemini 호출
-  const instruction =
-    "Using the person in the provided photo, generate a new portrait. " +
-    "Keep the same face, identity, and facial features clearly recognizable. " +
-    "Apply the following concept:\n" + prompt;
+  // 일반 컨셉: "사진 속 사람으로 인물 사진 만들기"
+  // 아트 변환: "사진을 다른 스타일로 다시 그리기 (인물일 필요 없음)"
+  const instruction = skipFacePrecheck
+    ? "Re-render the provided image in a new artistic style. " +
+      "The subject can be a person, landscape, animal, object, or anything else. " +
+      "Preserve the overall composition, subject identity, and recognizable features " +
+      "while transforming the medium/style. Apply the following style:\n" + prompt
+    : "Using the person in the provided photo, generate a new portrait. " +
+      "Keep the same face, identity, and facial features clearly recognizable. " +
+      "Apply the following concept:\n" + prompt;
 
   const endpoint =
     "https://generativelanguage.googleapis.com/v1beta/models/" +

@@ -76,6 +76,14 @@ const perImage = (pack) => Math.round(pack.krw / pack.count);
 const perImageUsd = (pack) =>
   (parseFloat(pack.usd) / pack.count).toFixed(2);
 
+// 아트 변환 카테고리 = 본인 얼굴이 아닌 임의 사진을 별도로 업로드받는 컨셉.
+const ART_CATEGORY = "🎨 아트 변환";
+function isArtConcept(concept) {
+  if (!concept) return false;
+  const cats = concept.categories || (concept.category ? [concept.category] : []);
+  return cats.includes(ART_CATEGORY);
+}
+
 /* ============================================================
    사진 축소 — API로 보내기 전 용량을 줄임
    - 큰 휴대폰 사진을 그대로 보내면 토큰 한도를 초과할 수 있음
@@ -186,6 +194,7 @@ async function generateImage(accessToken, dataUrl, promptText, conceptMeta = {})
       body: JSON.stringify({
         mimeType, base64, prompt: promptText,
         conceptId: conceptMeta.id, conceptTitle: conceptMeta.title,
+        skipFacePrecheck: !!conceptMeta.skipFacePrecheck,
       }),
     });
   } catch (e) {
@@ -244,6 +253,8 @@ export default function PortraitStudio() {
       return localStorage.getItem("rimikimi_photo") || null;
     } catch { return null; }
   });
+  // 아트 변환 컨셉용 일회용 사진. localStorage 안 함 (휘발성).
+  const [artPhoto, setArtPhoto] = useState(null);
   const [selected, setSelected] = useState(null);
   const [query, setQuery] = useState("");
   const [activeCat, setActiveCat] = useState("전체");
@@ -515,17 +526,25 @@ export default function PortraitStudio() {
   const canGenerateFree = !blocked && freeLeft > 0;
   const canGenerate = !blocked && (unlimited || canGenerateFree || credits > 0);
 
+  // 어느 사진 슬롯에 저장할지를 ref 로 결정 (handleFile 이 한 input 을 공유하기 때문)
+  const photoTargetRef = useRef("profile"); // "profile" | "art"
+
   function handleFile(e) {
     const f = e.target.files?.[0];
     if (!f) return;
     if (!f.type.startsWith("image/")) return;
     const reader = new FileReader();
-    reader.onload = () => setPhoto(reader.result);
+    reader.onload = () => {
+      if (photoTargetRef.current === "art") setArtPhoto(reader.result);
+      else setPhoto(reader.result);
+    };
     reader.readAsDataURL(f);
   }
 
   function pickPrompt(p) {
     setSelected(p);
+    // 아트 변환 컨셉이면 이전 일회용 사진 비우고 들어감 (매번 새로 받음)
+    if (isArtConcept(p)) setArtPhoto(null);
     setScreen("home"); // 컨셉 선택 후 사진 업로드 화면으로
   }
 
@@ -543,8 +562,13 @@ export default function PortraitStudio() {
 
     try {
       const accessToken = session?.access_token;
-      const result = await generateImage(accessToken, photo, selected.text, {
-        id: selected.id, title: selected.title,
+      const art = isArtConcept(selected);
+      const photoToUse = art ? artPhoto : photo;
+      const result = await generateImage(accessToken, photoToUse, selected.text, {
+        id: selected.id,
+        title: selected.title,
+        // 아트 변환은 풍경/물건 등 얼굴 없는 사진도 가능해야 하므로 face precheck 우회
+        skipFacePrecheck: art,
       });
       setResultImage(result.imageDataUrl);
       // 서버가 알려준 진짜 사용량으로 업데이트
@@ -670,19 +694,32 @@ export default function PortraitStudio() {
       )}
 
       <main style={S.main}>
-        {screen === "home" && (
-          <HomeScreen
-            photo={photo}
-            fileRef={fileRef}
-            onFile={handleFile}
-            onPick={pickPhoto}
-            onClear={() => setPhoto(null)}
-            ageConfirmed={ageConfirmed}
-            setAgeConfirmed={setAgeConfirmed}
-            onContinue={() => setScreen("confirm")}
-            onBack={() => setScreen("gallery")}
-          />
-        )}
+        {screen === "home" && (() => {
+          const art = isArtConcept(selected);
+          const currentPhoto = art ? artPhoto : photo;
+          const onPickAny = () => {
+            photoTargetRef.current = art ? "art" : "profile";
+            pickPhoto();
+          };
+          const onClearAny = () => {
+            if (art) setArtPhoto(null);
+            else setPhoto(null);
+          };
+          return (
+            <HomeScreen
+              isArt={art}
+              photo={currentPhoto}
+              fileRef={fileRef}
+              onFile={handleFile}
+              onPick={onPickAny}
+              onClear={onClearAny}
+              ageConfirmed={ageConfirmed}
+              setAgeConfirmed={setAgeConfirmed}
+              onContinue={() => setScreen("confirm")}
+              onBack={() => setScreen("gallery")}
+            />
+          );
+        })()}
         {screen === "gallery" && (
           <GalleryScreen
             categories={categories}
@@ -712,7 +749,7 @@ export default function PortraitStudio() {
         )}
         {screen === "confirm" && selected && (
           <ConfirmScreen
-            photo={photo}
+            photo={isArtConcept(selected) ? artPhoto : photo}
             prompt={selected}
             freeLeft={freeLeft}
             credits={credits}
@@ -806,6 +843,7 @@ function Splash() {
 function HomeScreen({
   photo, fileRef, onFile, onPick, onClear,
   ageConfirmed, setAgeConfirmed, onContinue, onBack,
+  isArt = false,
 }) {
   const ready = photo && ageConfirmed;
   return (
@@ -816,18 +854,34 @@ function HomeScreen({
         )}
         <div>
           <div style={S.screenKicker}>STEP 02</div>
-          <div style={S.screenTitle}>사진 업로드</div>
+          <div style={S.screenTitle}>
+            {isArt ? "변환할 사진 선택" : "사진 업로드"}
+          </div>
         </div>
       </div>
 
       <div style={S.hero}>
-        <h1 style={S.heroTitle}>{t("step2.heroTitle")}</h1>
-        <p style={S.heroDesc}>
-          {t("step2.heroDesc1")}<br />
-          {t("step2.heroDesc2")}<br />
-          {t("step2.heroDesc3")}<br />
-          {t("step2.heroDesc4")}
-        </p>
+        {isArt ? (
+          <>
+            <h1 style={S.heroTitle}>어떤 사진을 아트로 만들까요?</h1>
+            <p style={S.heroDesc}>
+              인물, 풍경, 동물, 정물 무엇이든 좋아요.<br />
+              선택하신 컨셉의 스타일로 다시 그려드려요.<br />
+              사진은 서버에 저장되지 않으며,<br />
+              생성 직후 폐기돼요 🎨
+            </p>
+          </>
+        ) : (
+          <>
+            <h1 style={S.heroTitle}>{t("step2.heroTitle")}</h1>
+            <p style={S.heroDesc}>
+              {t("step2.heroDesc1")}<br />
+              {t("step2.heroDesc2")}<br />
+              {t("step2.heroDesc3")}<br />
+              {t("step2.heroDesc4")}
+            </p>
+          </>
+        )}
       </div>
 
       {!photo ? (
@@ -855,8 +909,9 @@ function HomeScreen({
           style={S.checkbox}
         />
         <span style={S.consentText}>
-          본인 사진이며, 만 18세 이상입니다. 타인의 사진을 동의 없이 사용하지
-          않습니다.
+          {isArt
+            ? "본인이 권리를 가진 사진이거나, 타인 사진의 경우 동의를 받았습니다."
+            : "본인 사진이며, 만 18세 이상입니다. 타인의 사진을 동의 없이 사용하지 않습니다."}
         </span>
       </label>
 
