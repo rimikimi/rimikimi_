@@ -124,11 +124,15 @@ AI profile,headshot,portrait,selfie,photo editor,avatar,AI art,profile picture,L
 
 | 항목 | 값 |
 |---|---|
-| **데모 계정 이메일** | (이메일 로그인 추가 후 발급 예정) |
-| **데모 계정 비밀번호** | (추후) |
+| **데모 계정 이메일** | appreview@rimikimi.com |
+| **데모 계정 비밀번호** | Rimikimi-Review-2026! |
 | **연락처 이름** | (사장님 이름) |
 | **연락처 전화** | (사장님 번호) |
 | **연락처 이메일** | (사장님 이메일) |
+
+> 데모 계정은 Supabase 에 email_confirm 완료 상태로 생성됨 (확인 메일 불필요).
+> 베타 테스터 화이트리스트(TESTER_EMAILS)에도 등록되어 실제 이미지 생성 가능.
+> 로그인 화면 → "이메일로 로그인 / 가입" → 위 이메일/비번 입력.
 
 ### 심사 메모 (Notes) — 영어 예시
 ```

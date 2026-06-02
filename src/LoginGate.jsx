@@ -17,9 +17,16 @@ import { t, useLang } from "./i18n";
 
 export default function LoginGate({ Logo }) {
   useLang(); // 언어 바뀌면 리렌더
-  const [busy, setBusy] = useState(null); // 'apple' | 'kakao' | 'naver' | 'google' | null
+  const [busy, setBusy] = useState(null); // 'apple' | 'kakao' | 'naver' | 'google' | 'email' | null
   const [error, setError] = useState(null);
   const [inAppNotice, setInAppNotice] = useState(null); // { title, steps }
+
+  // 이메일 로그인/가입 (App Store 심사 데모 계정 + 이메일 가입 사용자용)
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [emailMode, setEmailMode] = useState("signin"); // 'signin' | 'signup'
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [notice, setNotice] = useState(null); // 성공 안내 (확인 메일 등)
 
   // URL 에 ?auth_error=... 가 붙어 있으면 표시
   React.useEffect(() => {
@@ -75,6 +82,45 @@ export default function LoginGate({ Logo }) {
       "/api/auth/naver/start?redirectTo=" + encodeURIComponent(back);
   }
 
+  async function handleEmailSubmit(e) {
+    e.preventDefault();
+    setError(null);
+    setNotice(null);
+    const em = email.trim();
+    if (!em || !password) {
+      setError(t("login.email.needFields"));
+      return;
+    }
+    if (password.length < 6) {
+      setError(t("login.email.shortPw"));
+      return;
+    }
+    setBusy("email");
+    try {
+      if (emailMode === "signup") {
+        const { error } = await supabase.auth.signUp({
+          email: em,
+          password,
+          options: { emailRedirectTo: window.location.origin + "/" },
+        });
+        if (error) throw error;
+        // 이메일 확인이 켜져 있으면 세션이 바로 안 생김 → 안내 표시
+        setNotice(t("login.email.checkInbox"));
+        setBusy(null);
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({
+          email: em,
+          password,
+        });
+        if (error) throw error;
+        // 성공 시 onAuthStateChange 가 상위에서 화면 전환 처리
+      }
+    } catch (err) {
+      setError(err?.message || "로그인에 실패했어요.");
+      setBusy(null);
+    }
+  }
+
   return (
     <div style={S.wrap}>
       <div style={S.logoBox}>
@@ -120,6 +166,65 @@ export default function LoginGate({ Logo }) {
           <span>{busy === "google" ? t("login.loading") : t("login.with.google")}</span>
         </button>
       </div>
+
+      {/* 이메일 로그인 / 가입 (접이식) */}
+      {!emailOpen ? (
+        <button
+          style={S.emailToggle}
+          disabled={!!busy}
+          onClick={() => { setEmailOpen(true); setError(null); setNotice(null); }}
+        >
+          {t("login.email.toggle")}
+        </button>
+      ) : (
+        <form style={S.emailForm} onSubmit={handleEmailSubmit}>
+          <div style={S.divider}>
+            <span style={S.dividerLine} />
+            <span style={S.dividerText}>{t("login.or")}</span>
+            <span style={S.dividerLine} />
+          </div>
+          <input
+            style={S.input}
+            type="email"
+            autoComplete="email"
+            inputMode="email"
+            placeholder={t("login.email.emailPlaceholder")}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+          <input
+            style={S.input}
+            type="password"
+            autoComplete={emailMode === "signup" ? "new-password" : "current-password"}
+            placeholder={t("login.email.passwordPlaceholder")}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          <button style={S.emailSubmit} type="submit" disabled={!!busy}>
+            {busy === "email"
+              ? t("login.loading")
+              : emailMode === "signup"
+                ? t("login.email.signUp")
+                : t("login.email.signIn")}
+          </button>
+          <button
+            style={S.emailSwitch}
+            type="button"
+            disabled={!!busy}
+            onClick={() => {
+              setEmailMode(emailMode === "signup" ? "signin" : "signup");
+              setError(null);
+              setNotice(null);
+            }}
+          >
+            {emailMode === "signup"
+              ? t("login.email.toSignIn")
+              : t("login.email.toSignUp")}
+          </button>
+        </form>
+      )}
+
+      {notice && <p style={S.successNotice}>{notice}</p>}
 
       {inAppNotice && (
         <div style={S.notice}>
@@ -315,5 +420,47 @@ const S = {
   legal: {
     marginTop: 26, fontSize: 11, lineHeight: 1.65, opacity: 0.55,
     textAlign: "center", fontWeight: 500,
+  },
+  emailToggle: {
+    marginTop: 18, background: "transparent", border: "none",
+    color: INK, opacity: 0.6, fontSize: 13, fontWeight: 600,
+    cursor: "pointer", textDecoration: "underline",
+    fontFamily: "'Quicksand', sans-serif",
+  },
+  emailForm: {
+    width: "100%", display: "flex", flexDirection: "column", gap: 10,
+    marginTop: 18,
+  },
+  divider: {
+    display: "flex", alignItems: "center", gap: 12, margin: "2px 0 8px",
+  },
+  dividerLine: {
+    flex: 1, height: 1, background: "rgba(35,31,32,0.14)",
+  },
+  dividerText: {
+    fontSize: 12, opacity: 0.5, fontWeight: 600,
+  },
+  input: {
+    width: "100%", boxSizing: "border-box",
+    border: "1.5px solid rgba(35,31,32,0.18)", borderRadius: 12,
+    padding: "13px 15px", fontSize: 15,
+    fontFamily: "'Quicksand', sans-serif", background: "#fff", color: INK,
+    outline: "none",
+  },
+  emailSubmit: {
+    width: "100%", border: "none", borderRadius: 14,
+    padding: "15px 18px", fontSize: 15, fontWeight: 700,
+    fontFamily: "'Quicksand', sans-serif", cursor: "pointer",
+    background: ACCENT, color: "#fff", marginTop: 2,
+  },
+  emailSwitch: {
+    background: "transparent", border: "none", color: INK, opacity: 0.6,
+    fontSize: 12.5, fontWeight: 600, cursor: "pointer", padding: "6px",
+    fontFamily: "'Quicksand', sans-serif",
+  },
+  successNotice: {
+    marginTop: 16, fontSize: 12.5, color: "#166534",
+    background: "#f0fdf4", border: "1px solid #86efac",
+    borderRadius: 12, padding: "11px 14px", lineHeight: 1.5, fontWeight: 600,
   },
 };
