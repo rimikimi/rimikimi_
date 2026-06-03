@@ -162,6 +162,39 @@ export const STR = {
     "error.noLogin": "로그인이 필요해요.",
     "error.serverGeneric": "이미지 응답을 받지 못했어요. 다른 컨셉으로 시도해 주세요.",
 
+    // === 크레딧 충전 (StoreScreen) ===
+    "store.kicker": "크레딧",
+    "store.title": "충전하기",
+    "store.intro": "하루 무료 {n}장을 모두 사용했어요. 크레딧 1장으로 이미지 한 장을 만들 수 있어요.",
+    "store.held": "현재 보유: {credits}크레딧",
+    "store.count": "{n}장",
+    "store.per": "장당 {price}",
+    "store.save": " · {n}% 절약",
+    "store.pay": "PayPal로 결제",
+    "store.paying": "이동 중…",
+    "store.note": "PayPal Sandbox(테스트) 단계입니다. 한국 카드는 곧 추가될 예정이에요.",
+    "store.badge.popular": "가장 인기",
+    "profile.store.title": "💳 크레딧 충전",
+    "profile.store.desc": "PayPal로 결제 · 10/30/70 크레딧 패키지",
+    "step3.topupGenerate": "크레딧 충전하고 생성하기",
+
+    // === 결제 토스트 ===
+    "pay.checking": "결제 확인 중…",
+    "pay.cancelled": "결제가 취소되었어요",
+    "pay.success": "🎉 +{n} 크레딧 충전 완료!",
+    "pay.already": "이미 처리된 결제예요 (+{n} 크레딧 적용 완료)",
+    "pay.fail": "결제 처리 실패: {msg}",
+
+    // === 아트 변환 사진 업로드 ===
+    "art.step.title": "변환할 사진 선택",
+    "art.hero.title": "어떤 사진을 아트로 만들까요?",
+    "art.hero.desc1": "인물, 풍경, 동물, 정물 무엇이든 좋아요.",
+    "art.hero.desc2": "선택하신 컨셉의 스타일로 다시 그려드려요.",
+    "art.hero.desc3": "사진은 서버에 저장되지 않으며,",
+    "art.hero.desc4": "생성 직후 폐기돼요 🎨",
+    "art.consent": "본인이 권리를 가진 사진이거나, 타인 사진의 경우 동의를 받았습니다.",
+    "step2.privacyNote": "업로드한 사진은 서버에 저장되지 않으며, 이미지 생성 직후 폐기됩니다.",
+
     // === 푸터 ===
     "footer.note": "프로토타입 · 사진은 기기 안에서만 처리되며 서버에 저장되지 않습니다",
 
@@ -317,6 +350,36 @@ export const STR = {
     "error.noPhoto": "No photo. Please upload one first.",
     "error.noLogin": "Please sign in.",
     "error.serverGeneric": "Couldn't generate. Please try another concept.",
+
+    "store.kicker": "Credits",
+    "store.title": "Top up",
+    "store.intro": "You've used all {n} free images today. 1 credit = 1 image.",
+    "store.held": "You have {credits} credits",
+    "store.count": "{n} images",
+    "store.per": "{price} each",
+    "store.save": " · save {n}%",
+    "store.pay": "Pay with PayPal",
+    "store.paying": "Redirecting…",
+    "store.note": "PayPal Sandbox (test) mode. Korean cards coming soon.",
+    "store.badge.popular": "Most popular",
+    "profile.store.title": "💳 Buy credits",
+    "profile.store.desc": "Pay with PayPal · 10/30/70 credit packs",
+    "step3.topupGenerate": "Top up & generate",
+
+    "pay.checking": "Verifying payment…",
+    "pay.cancelled": "Payment cancelled",
+    "pay.success": "🎉 +{n} credits added!",
+    "pay.already": "Already processed (+{n} credits applied)",
+    "pay.fail": "Payment failed: {msg}",
+
+    "art.step.title": "Pick a photo to transform",
+    "art.hero.title": "Which photo should we turn into art?",
+    "art.hero.desc1": "People, landscapes, pets, objects — anything works.",
+    "art.hero.desc2": "We'll repaint it in your chosen style.",
+    "art.hero.desc3": "Your photo is never stored on our servers,",
+    "art.hero.desc4": "and is discarded right after generation 🎨",
+    "art.consent": "I own the rights to this photo, or have consent if it's someone else's.",
+    "step2.privacyNote": "Your uploaded photo is never stored on our servers and is discarded right after generation.",
 
     "footer.note": "Prototype · Your photo is processed on-device and not stored on our servers",
 

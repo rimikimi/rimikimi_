@@ -414,7 +414,7 @@ export default function PortraitStudio() {
 
     if (path === "/checkout/cancel") {
       cleanUrl();
-      setPayToast("결제가 취소되었어요");
+      setPayToast(t("pay.cancelled"));
       setScreen("store");
       setTimeout(() => setPayToast(""), 3500);
       return;
@@ -428,7 +428,7 @@ export default function PortraitStudio() {
     }
 
     cleanUrl();
-    setPayToast("결제 확인 중…");
+    setPayToast(t("pay.checking"));
     fetch("/api/checkout/capture", {
       method: "POST",
       headers: {
@@ -439,18 +439,18 @@ export default function PortraitStudio() {
     })
       .then((r) => r.json().then((j) => ({ ok: r.ok, j })))
       .then(({ ok, j }) => {
-        if (!ok) throw new Error(j?.error || "결제 검증 실패");
+        if (!ok) throw new Error(j?.error || "capture failed");
         const got = j?.credits || 0;
         setPayToast(
           j?.alreadyPaid
-            ? `이미 처리된 결제예요 (+${got} 크레딧 적용 완료)`
-            : `🎉 +${got} 크레딧 충전 완료!`
+            ? t("pay.already", { n: got })
+            : t("pay.success", { n: got })
         );
         setScreen("store");
         setRefreshTick((n) => n + 1); // /api/quota 다시 불러서 잔액 갱신
       })
       .catch((e) => {
-        setPayToast("결제 처리 실패: " + (e.message || e));
+        setPayToast(t("pay.fail", { msg: e.message || e }));
         setScreen("store");
       })
       .finally(() => {
@@ -855,7 +855,7 @@ function HomeScreen({
         <div>
           <div style={S.screenKicker}>STEP 02</div>
           <div style={S.screenTitle}>
-            {isArt ? "변환할 사진 선택" : "사진 업로드"}
+            {isArt ? t("art.step.title") : t("step2.title")}
           </div>
         </div>
       </div>
@@ -863,12 +863,12 @@ function HomeScreen({
       <div style={S.hero}>
         {isArt ? (
           <>
-            <h1 style={S.heroTitle}>어떤 사진을 아트로 만들까요?</h1>
+            <h1 style={S.heroTitle}>{t("art.hero.title")}</h1>
             <p style={S.heroDesc}>
-              인물, 풍경, 동물, 정물 무엇이든 좋아요.<br />
-              선택하신 컨셉의 스타일로 다시 그려드려요.<br />
-              사진은 서버에 저장되지 않으며,<br />
-              생성 직후 폐기돼요 🎨
+              {t("art.hero.desc1")}<br />
+              {t("art.hero.desc2")}<br />
+              {t("art.hero.desc3")}<br />
+              {t("art.hero.desc4")}
             </p>
           </>
         ) : (
@@ -909,9 +909,7 @@ function HomeScreen({
           style={S.checkbox}
         />
         <span style={S.consentText}>
-          {isArt
-            ? "본인이 권리를 가진 사진이거나, 타인 사진의 경우 동의를 받았습니다."
-            : "본인 사진이며, 만 18세 이상입니다. 타인의 사진을 동의 없이 사용하지 않습니다."}
+          {isArt ? t("art.consent") : t("step2.consent")}
         </span>
       </label>
 
@@ -923,9 +921,7 @@ function HomeScreen({
         {t("step2.continue")}
       </button>
 
-      <p style={S.privacyNote}>
-        업로드한 사진은 서버에 저장되지 않으며, 이미지 생성 직후 폐기됩니다.
-      </p>
+      <p style={S.privacyNote}>{t("step2.privacyNote")}</p>
     </div>
   );
 }
@@ -1141,7 +1137,7 @@ function GalleryScreen({
                       top: p.sensitive ? (cols === 2 ? 32 : 26) : 8,
                     }}
                   >
-                    🔒 비공개
+                    {t("step1.hiddenBadge")}
                   </div>
                 )}
               </div>
@@ -1193,7 +1189,7 @@ function HomeLayout({ data, onPick, onMore }) {
                   <div style={S.featuredTitle}>{localizedTitle(p)}</div>
                 </div>
                 {p.sensitive && <div style={S.sensitiveTag}>18+</div>}
-                {p.hidden && <div style={{ ...S.hiddenTag, top: p.sensitive ? 36 : 8 }}>🔒 비공개</div>}
+                {p.hidden && <div style={{ ...S.hiddenTag, top: p.sensitive ? 36 : 8 }}>{t("step1.hiddenBadge")}</div>}
               </button>
             ))}
           </div>
@@ -1233,7 +1229,7 @@ function HomeLayout({ data, onPick, onMore }) {
                 )}
                 {p.hidden && (
                   <div style={{ ...S.hiddenTag, fontSize: 8.5, padding: "2px 5px", top: p.sensitive ? 28 : 8 }}>
-                    🔒 비공개
+                    {t("step1.hiddenBadge")}
                   </div>
                 )}
               </button>
@@ -1263,10 +1259,11 @@ function ProfileScreen({
   const email = u.email || "(이메일 없음)";
 
   const providerLabel = {
-    google: "Google",
-    kakao: "카카오",
-    naver: "네이버",
-    email: "이메일",
+    google: t("profile.provider.google"),
+    kakao: t("profile.provider.kakao"),
+    naver: t("profile.provider.naver"),
+    apple: t("profile.provider.apple"),
+    email: t("profile.provider.email"),
   }[provider] || provider;
 
   return (
@@ -1333,9 +1330,9 @@ function ProfileScreen({
       {onOpenStore && (
         <button style={S.galleryEntry} onClick={onOpenStore}>
           <div style={S.galleryEntryLeft}>
-            <div style={S.galleryEntryTitle}>💳 크레딧 충전</div>
+            <div style={S.galleryEntryTitle}>{t("profile.store.title")}</div>
             <div style={S.galleryEntryDesc}>
-              PayPal로 결제 · 10/30/70 크레딧 패키지
+              {t("profile.store.desc")}
             </div>
           </div>
           <div style={S.galleryEntryArrow}>→</div>
@@ -1364,8 +1361,8 @@ function ProfileScreen({
           </div>
           <div style={S.inviteBannerDesc}>
             {unlimited
-              ? "친구에게 rimikimi를 공유해 보세요!"
-              : `친구 ${untilNext}명만 더 초대하면 크레딧 1개! (현재 ${referralCount}명 초대)`}
+              ? t("invite.adminDesc")
+              : t("invite.testerDesc", { n: untilNext, now: referralCount })}
           </div>
         </div>
         <div style={S.inviteBannerBtn}>{t("common.share")}</div>
@@ -1617,11 +1614,11 @@ function ConfirmScreen({
 
       {canGenerate ? (
         <button style={S.primaryBtn} onClick={onGenerate}>
-          이미지 생성하기
+          {t("step3.generate")}
         </button>
       ) : (
         <button style={S.primaryBtn} onClick={onStore}>
-          크레딧 충전하고 생성하기
+          {t("step3.topupGenerate")}
         </button>
       )}
     </div>
@@ -1739,14 +1736,14 @@ function StoreScreen({ packs, credits, session, onBack }) {
       <div style={S.navRow}>
         <button style={S.backBtn} onClick={onBack}>←</button>
         <div>
-          <div style={S.screenKicker}>크레딧</div>
-          <div style={S.screenTitle}>충전하기</div>
+          <div style={S.screenKicker}>{t("store.kicker")}</div>
+          <div style={S.screenTitle}>{t("store.title")}</div>
         </div>
       </div>
 
       <p style={S.storeIntro}>
-        하루 무료 {FREE_DAILY}장을 모두 사용했어요. 크레딧 1장으로 이미지 한
-        장을 만들 수 있어요. 현재 보유: <strong>{credits}크레딧</strong>
+        {t("store.intro", { n: FREE_DAILY })}{" "}
+        <strong>{t("store.held", { credits })}</strong>
       </p>
 
       <div style={S.packList}>
@@ -1759,18 +1756,18 @@ function StoreScreen({ packs, credits, session, onBack }) {
               key={pack.id}
               style={{ ...S.pack, ...(pack.label ? S.packFeatured : {}) }}
             >
-              {pack.label && <div style={S.packBadge}>{pack.label}</div>}
+              {pack.label && <div style={S.packBadge}>{t("store.badge.popular")}</div>}
               <div style={S.packCount}>
                 <span style={{ color: HEARTS[i % HEARTS.length] }}>♥</span>{" "}
-                {pack.count}장
+                {t("store.count", { n: pack.count })}
               </div>
               <div style={S.packPrice}>
                 {usd(pack.usd)}{" "}
                 <span style={S.packPriceSub}>(≈ {won(pack.krw)})</span>
               </div>
               <div style={S.packPer}>
-                장당 {usd(perImageUsd(pack))}
-                {save > 0 && <span style={S.packSave}> · {save}% 절약</span>}
+                {t("store.per", { price: usd(perImageUsd(pack)) })}
+                {save > 0 && <span style={S.packSave}>{t("store.save", { n: save })}</span>}
               </div>
               <button
                 style={{
@@ -1781,7 +1778,7 @@ function StoreScreen({ packs, credits, session, onBack }) {
                 disabled={busy || !!busyId}
                 onClick={() => startPayPal(pack)}
               >
-                {busy ? "이동 중…" : "PayPal로 결제"}
+                {busy ? t("store.paying") : t("store.pay")}
               </button>
             </div>
           );
@@ -1792,10 +1789,7 @@ function StoreScreen({ packs, credits, session, onBack }) {
         <p style={{ ...S.storeNote, color: "#c0392b" }}>{errMsg}</p>
       )}
 
-      <p style={S.storeNote}>
-        PayPal Sandbox(테스트) 단계입니다. 한국 카드(이니시스)는 곧 추가될
-        예정이에요.
-      </p>
+      <p style={S.storeNote}>{t("store.note")}</p>
     </div>
   );
 }
