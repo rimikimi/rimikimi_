@@ -31,3 +31,14 @@ ios/App/App/public
 ios/App/Podfile.lock
 assets/
 scripts/admin.jpeg
+
+# 안드로이드 서명 키 (절대 커밋 금지 — 잃어버리면 앱 업데이트 불가)
+keystore/
+*.jks
+*.keystore
+android/keystore.properties
+
+# 빌드 산출물 (.aab/.apk)
+release/
+*.aab
+*.apk
