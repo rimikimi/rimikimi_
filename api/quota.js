@@ -3,7 +3,7 @@
 // 프론트가 페이지 로드 직후 호출.
 // ============================================================
 
-import { getAuthedUser, countTodayUsage, FREE_DAILY, isUnlimited, isTester } from "./_lib/auth.js";
+import { getAuthedUser, countTodayUsage, dailyLimitFor, isUnlimited, isTester } from "./_lib/auth.js";
 import { getCreditInfo } from "./_lib/credits.js";
 
 export default async function handler(req, res) {
@@ -43,7 +43,8 @@ export default async function handler(req, res) {
     });
   }
 
-  // 테스터 — 오늘 사용량
+  // 테스터(또는 정식오픈 후 일반) — 오늘 사용량 + 역할별 한도
+  const limit = dailyLimitFor(user); // 테스터 3 / 일반 2
   const usage = await countTodayUsage(admin, user.id);
   if (usage.error) {
     return res.status(500).json({ error: usage.error });
@@ -51,8 +52,8 @@ export default async function handler(req, res) {
 
   return res.status(200).json({
     used: usage.count,
-    limit: FREE_DAILY,
-    remaining: Math.max(0, FREE_DAILY - usage.count),
+    limit,
+    remaining: Math.max(0, limit - usage.count),
     unlimited: false,
     blocked: false,
     ...creditFields,

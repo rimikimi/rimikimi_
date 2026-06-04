@@ -12,6 +12,16 @@ import { createClient } from "@supabase/supabase-js";
 
 // 하루 무료 횟수 (한 사람당)
 export const FREE_DAILY = 2;
+// 베타 테스터는 하루 한도를 더 줌 (3장)
+export const TESTER_DAILY = 3;
+
+// 사용자 역할에 따른 하루 무료 한도
+//   - 어드민(무제한)은 이 값과 무관 (별도 처리)
+//   - 베타 테스터: TESTER_DAILY
+//   - 일반 사용자: FREE_DAILY
+export function dailyLimitFor(user) {
+  return isTester(user) ? TESTER_DAILY : FREE_DAILY;
+}
 
 // 무제한 사용자 (관리자/VIP) 화이트리스트
 // 환경변수 ADMIN_EMAILS 에 콤마로 구분된 이메일 목록을 넣어두면

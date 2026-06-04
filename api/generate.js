@@ -8,7 +8,7 @@
 // 5. 결과 + 갱신된 quota 반환
 // ============================================================
 
-import { getAuthedUser, countTodayUsage, FREE_DAILY, isUnlimited, isTester } from "./_lib/auth.js";
+import { getAuthedUser, countTodayUsage, FREE_DAILY, dailyLimitFor, isUnlimited, isTester } from "./_lib/auth.js";
 import { precheckHasFace } from "./_lib/precheck.js";
 import { getCreditInfo, consumeCredit } from "./_lib/credits.js";
 import { saveToGallery } from "./_lib/gallery.js";
@@ -26,6 +26,7 @@ export default async function handler(req, res) {
   const { user, admin } = auth;
   const unlimited = isUnlimited(user);
   const tester = isTester(user);
+  const dailyLimit = dailyLimitFor(user); // 테스터 3 / 일반 2
 
   // 1.5) 어드민/테스터 아니면 베타 차단
   if (!unlimited && !tester) {
@@ -46,7 +47,7 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: "사용 기록 조회 실패: " + usage.error });
     }
 
-    if (usage.count >= FREE_DAILY) {
+    if (usage.count >= dailyLimit) {
       // 하루 한도 소진 → 크레딧 확인
       const credit = await getCreditInfo(admin, user.id);
       creditsLeft = credit.error ? 0 : credit.creditsAvailable;
@@ -57,7 +58,7 @@ export default async function handler(req, res) {
           error:
             "오늘의 무료 한도를 모두 사용했어요.\n친구 2명을 초대하면 크레딧 1개가 생겨요!",
           quotaUsed: usage.count,
-          quotaLimit: FREE_DAILY,
+          quotaLimit: dailyLimit,
           credits: 0,
         });
       }
@@ -94,7 +95,7 @@ export default async function handler(req, res) {
           "사진에 얼굴이 인식되지 않아 이미지를 생성할 수 없습니다.\n사진을 다시 선택해 주세요.\n크레딧은 차감되지 않았으니 안심하세요🙂",
         noFace: true,
         quotaUsed: unlimited ? 0 : usage.count, // 차감 안 됨
-        quotaLimit: unlimited ? null : FREE_DAILY,
+        quotaLimit: unlimited ? null : dailyLimit,
         unlimited,
       });
     }
@@ -163,7 +164,7 @@ export default async function handler(req, res) {
         ? "이미지 생성에 실패했어요: " + textPart.text.slice(0, 120)
         : "이미지를 만들지 못했어요. 다른 컨셉으로 시도해 주세요.",
       quotaUsed: unlimited ? 0 : usage.count,
-      quotaLimit: unlimited ? null : FREE_DAILY,
+      quotaLimit: unlimited ? null : dailyLimit,
       unlimited,
     });
   }
@@ -209,7 +210,7 @@ export default async function handler(req, res) {
     mimeType: outMime,
     base64: inline.data,
     quotaUsed: unlimited ? 0 : useCredit ? usage.count : usage.count + 1,
-    quotaLimit: unlimited ? null : FREE_DAILY,
+    quotaLimit: unlimited ? null : dailyLimit,
     usedCredit: useCredit,
     credits: unlimited ? null : creditsLeft,
     unlimited,

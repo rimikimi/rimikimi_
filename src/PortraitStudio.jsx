@@ -261,6 +261,8 @@ export default function PortraitStudio() {
   const [hideSensitive, setHideSensitive] = useState(false);
   const [ageConfirmed, setAgeConfirmed] = useState(false);
   const [freeUsed, setFreeUsed] = useState(0);
+  // 하루 무료 한도 (서버가 역할 따라 알려줌: 테스터 3 / 일반 2). 기본 FREE_DAILY.
+  const [freeLimit, setFreeLimit] = useState(FREE_DAILY);
   const [unlimited, setUnlimited] = useState(false);
   const [blocked, setBlocked] = useState(false);
   const [concepts, setConcepts] = useState([]);
@@ -385,6 +387,7 @@ export default function PortraitStudio() {
         setUnlimited(!!j?.unlimited);
         setBlocked(!!j?.blocked);
         if (typeof j?.used === "number") setFreeUsed(j.used);
+        if (typeof j?.limit === "number" && !j?.unlimited) setFreeLimit(j.limit);
         if (typeof j?.credits === "number") setCredits(j.credits);
         if (typeof j?.referralCount === "number") setReferralCount(j.referralCount);
         if (typeof j?.untilNext === "number") setUntilNext(j.untilNext);
@@ -522,7 +525,7 @@ export default function PortraitStudio() {
     setHideSensitive(false);
   }
 
-  const freeLeft = unlimited ? Infinity : Math.max(0, FREE_DAILY - freeUsed);
+  const freeLeft = unlimited ? Infinity : Math.max(0, freeLimit - freeUsed);
   const canGenerateFree = !blocked && freeLeft > 0;
   const canGenerate = !blocked && (unlimited || canGenerateFree || credits > 0);
 
@@ -670,7 +673,7 @@ export default function PortraitStudio() {
               ? t("header.unlimited")
               : blocked
               ? t("header.blocked")
-              : t("header.beta", { used: freeLeft, limit: FREE_DAILY }) + (credits > 0 ? t("header.credits", { credits }) : "")}
+              : t("header.beta", { used: freeLeft, limit: freeLimit }) + (credits > 0 ? t("header.credits", { credits }) : "")}
           </button>
           <button
             style={S.profileBtn}
@@ -802,6 +805,7 @@ export default function PortraitStudio() {
             packs={CREDIT_PACKS}
             credits={credits}
             session={session}
+            freeLimit={freeLimit}
             onBack={() => setScreen(selected ? "confirm" : "gallery")}
           />
         )}
@@ -1325,7 +1329,7 @@ function ProfileScreen({
         <div style={S.statCard}>
           <div style={S.statLabel}>{t("profile.stat.todayUsed")}</div>
           <div style={S.statValue}>
-            {unlimited ? "∞" : `${freeUsed} / ${FREE_DAILY}`}
+            {unlimited ? "∞" : `${freeUsed} / ${freeUsed + freeLeft}`}
           </div>
           <div style={S.statSub}>
             {unlimited ? t("profile.stat.unlimited") : blocked ? t("profile.stat.beta") : t("profile.stat.todayLeft", { n: freeLeft })}
@@ -1706,7 +1710,7 @@ function ResultScreen({
 /* ============================================================
    상점
    ============================================================ */
-function StoreScreen({ packs, credits, session, onBack }) {
+function StoreScreen({ packs, credits, session, freeLimit = FREE_DAILY, onBack }) {
   const cheapest = Math.max(...packs.map((p) => perImage(p)));
   // 한국어 = 원화(₩) 주 표시, 그 외 = 달러($) 주 표시
   const ko = getLang() === "ko";
@@ -1756,7 +1760,7 @@ function StoreScreen({ packs, credits, session, onBack }) {
       </div>
 
       <p style={S.storeIntro}>
-        {t("store.intro", { n: FREE_DAILY })}{" "}
+        {t("store.intro", { n: freeLimit })}{" "}
         <strong>{t("store.held", { credits })}</strong>
       </p>
 
