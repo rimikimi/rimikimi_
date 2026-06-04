@@ -1158,7 +1158,7 @@ function GalleryScreen({
         </div>
       )}
 
-      {totalFiltered > visibleCount && (
+      {!showHomeLayout && totalFiltered > visibleCount && (
         <div style={{ display: "flex", justifyContent: "center", marginTop: 18 }}>
           <button style={S.moreBtn} onClick={onShowMore}>
             {t("step1.more", { n: totalFiltered - visibleCount })}
