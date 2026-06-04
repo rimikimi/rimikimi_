@@ -1,7 +1,7 @@
 import React, { useState, useRef, useMemo, useEffect } from "react";
 import { supabase } from "./supabaseClient";
 import { isNative, nativePickPhoto, nativeShare } from "./nativeBridge";
-import { t, useLang, localizedTitle, localizedCategory, getLangPreference, setLang } from "./i18n";
+import { t, useLang, getLang, localizedTitle, localizedCategory, getLangPreference, setLang } from "./i18n";
 import LoginGate from "./LoginGate";
 
 /* ============================================================
@@ -1708,6 +1708,8 @@ function ResultScreen({
    ============================================================ */
 function StoreScreen({ packs, credits, session, onBack }) {
   const cheapest = Math.max(...packs.map((p) => perImage(p)));
+  // 한국어 = 원화(₩) 주 표시, 그 외 = 달러($) 주 표시
+  const ko = getLang() === "ko";
   const [busyId, setBusyId] = useState(null);
   const [errMsg, setErrMsg] = useState("");
 
@@ -1774,11 +1776,13 @@ function StoreScreen({ packs, credits, session, onBack }) {
                 {t("store.count", { n: pack.count })}
               </div>
               <div style={S.packPrice}>
-                {usd(pack.usd)}{" "}
-                <span style={S.packPriceSub}>(≈ {won(pack.krw)})</span>
+                {ko ? won(pack.krw) : usd(pack.usd)}{" "}
+                <span style={S.packPriceSub}>
+                  ({ko ? usd(pack.usd) : "≈ " + won(pack.krw)})
+                </span>
               </div>
               <div style={S.packPer}>
-                {t("store.per", { price: usd(perImageUsd(pack)) })}
+                {t("store.per", { price: ko ? won(perImage(pack)) : usd(perImageUsd(pack)) })}
                 {save > 0 && <span style={S.packSave}>{t("store.save", { n: save })}</span>}
               </div>
               <button
