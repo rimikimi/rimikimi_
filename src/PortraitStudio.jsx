@@ -808,7 +808,19 @@ export default function PortraitStudio() {
       </main>
 
       <footer style={S.footer}>
-        {t("footer.note")}
+        <div style={S.footerLinks}>
+          <a href="/terms" style={S.footerLink}>{t("footer.terms")}</a>
+          <span style={S.footerDot}>·</span>
+          <a href="/privacy" style={S.footerLink}>{t("footer.privacy")}</a>
+          <span style={S.footerDot}>·</span>
+          <a href="/refund" style={S.footerLink}>{t("footer.refund")}</a>
+        </div>
+        <div style={S.footerBiz}>
+          {t("footer.biz.company")}<br />
+          {t("footer.biz.reg")} · {t("footer.biz.sales")}<br />
+          {t("footer.biz.addr")}<br />
+          {t("footer.biz.contact")}
+        </div>
       </footer>
     </div>
   );
@@ -2005,9 +2017,21 @@ const S = {
   },
   main: { flex: 1, padding: "24px 20px 28px" },
   footer: {
-    fontSize: 10, letterSpacing: "0.02em", textAlign: "center",
-    padding: "12px 20px 20px", opacity: 0.45, lineHeight: 1.6,
-    fontFamily: "'Quicksand', sans-serif", fontWeight: 500,
+    textAlign: "center", padding: "16px 20px 28px",
+    fontFamily: "'Quicksand', sans-serif",
+  },
+  footerLinks: {
+    display: "flex", justifyContent: "center", alignItems: "center",
+    gap: 8, marginBottom: 10, flexWrap: "wrap",
+  },
+  footerLink: {
+    fontSize: 11.5, fontWeight: 700, color: INK, opacity: 0.65,
+    textDecoration: "none",
+  },
+  footerDot: { fontSize: 11, opacity: 0.3 },
+  footerBiz: {
+    fontSize: 10, letterSpacing: "0.01em", opacity: 0.4,
+    lineHeight: 1.7, fontWeight: 500,
   },
   hero: { marginBottom: 24 },
   heroKicker: {

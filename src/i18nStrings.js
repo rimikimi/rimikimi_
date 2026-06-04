@@ -197,6 +197,14 @@ export const STR = {
 
     // === 푸터 ===
     "footer.note": "프로토타입 · 사진은 기기 안에서만 처리되며 서버에 저장되지 않습니다",
+    "footer.terms": "이용약관",
+    "footer.privacy": "개인정보처리방침",
+    "footer.refund": "환불정책",
+    "footer.biz.company": "상호: 리미키미 · 대표: 최지훈",
+    "footer.biz.reg": "사업자등록번호: 247-01-03603",
+    "footer.biz.sales": "통신판매업신고: 2026-고양일산동-0326",
+    "footer.biz.addr": "경기도 고양시 일산동구 위시티4로 80",
+    "footer.biz.contact": "문의: enquiry@rimikimi.com",
 
     // === 카테고리 (한국어 그대로) — 영어 매핑은 __categories 에서 ===
 
@@ -382,6 +390,14 @@ export const STR = {
     "step2.privacyNote": "Your uploaded photo is never stored on our servers and is discarded right after generation.",
 
     "footer.note": "Prototype · Your photo is processed on-device and not stored on our servers",
+    "footer.terms": "Terms",
+    "footer.privacy": "Privacy",
+    "footer.refund": "Refund Policy",
+    "footer.biz.company": "rimikimi · CEO: Jee-Hoon Choi",
+    "footer.biz.reg": "Business Reg. No. 247-01-03603",
+    "footer.biz.sales": "Mail-order Sales No. 2026-Goyang-Ilsandong-0326",
+    "footer.biz.addr": "80 Wicity 4-ro, Ilsandong-gu, Goyang-si, Gyeonggi-do, Korea",
+    "footer.biz.contact": "Contact: enquiry@rimikimi.com",
 
     // 카테고리 한국어 → 영어 매핑 (concept.category 필드는 한국어 그대로 유지)
     "__categories": {
