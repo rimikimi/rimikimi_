@@ -204,7 +204,7 @@ export const STR = {
     "footer.biz.reg": "사업자등록번호: 247-01-03603",
     "footer.biz.sales": "통신판매업신고: 2026-고양일산동-0326",
     "footer.biz.addr": "경기도 고양시 일산동구 위시티4로 80",
-    "footer.biz.contact": "문의: enquiry@rimikimi.com",
+    "footer.biz.contact": "문의: enquiry@rimikimi.com · 050-6988-2464",
 
     // === 카테고리 (한국어 그대로) — 영어 매핑은 __categories 에서 ===
 
@@ -397,7 +397,7 @@ export const STR = {
     "footer.biz.reg": "Business Reg. No. 247-01-03603",
     "footer.biz.sales": "Mail-order Sales No. 2026-Goyang-Ilsandong-0326",
     "footer.biz.addr": "80 Wicity 4-ro, Ilsandong-gu, Goyang-si, Gyeonggi-do, Korea",
-    "footer.biz.contact": "Contact: enquiry@rimikimi.com",
+    "footer.biz.contact": "Contact: enquiry@rimikimi.com · +82-50-6988-2464",
 
     // 카테고리 한국어 → 영어 매핑 (concept.category 필드는 한국어 그대로 유지)
     "__categories": {
