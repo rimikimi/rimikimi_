@@ -1,5 +1,71 @@
 [
   {
+    "id": 312,
+    "title": "흑백 펜 드로잉",
+    "title_en": "Ink Pen Sketch",
+    "category": "예술 / 클래식",
+    "categories": [
+      "예술 / 클래식"
+    ],
+    "text": "a chic black-and-white fine pen drawing by a fashion stylist with rough and exaggerated lines of a Korean woman in the reference photo, fine lines varying in stroke lengths, long wavy dark hair in fine black lines falling to one side, facial features in a fine pen style drawing with extremely rough and exaggerated strokes, long slender neck and subtle collarbone indicated by clean lines, sleek white tank top. Her physical specifications are a height of 167cm, weight of 53kg, bust 36 inches, band 32 inches, cup size 70D, waist 24 inches, and hips 33 inches. upper-body portrait framing, three-quarter view, chin slightly tilted down natural confidence, hair sweeping to one side, warm facial expression. flat white papery background, chic and sophisticated.",
+    "sensitive": false
+  },
+  {
+    "id": 311,
+    "title": "블루 필름 프로필",
+    "title_en": "Blue Film Studio",
+    "category": "스튜디오 프로필",
+    "categories": [
+      "스튜디오 프로필"
+    ],
+    "text": "Korean woman, smooth dark hair with soft curtain bangs, natural makeup — feathered brows, subtle luminous highlight on the cheekbones, glossy warm nude lip, clean dewy skin with even tone — wearing a simple fitted cool-toned white top. upper boty portrait framing, head tilted gently to one side, right hand raised and fingers curled softly beneath the chin, direct calm gaze into the camera lens, a slight natural softness at the corners of the mouth. neutral cool studio environment, smooth seamless soft blue studio backdrop paper, controlled clean setting. Kodak Portra 400 film, 35mm studio photography, soft key light from the upper left, muted analog color palette, tones rendered in cool soft mint, editorial portrait photography style. calm introspective editorial mood, quiet confidence, refined beauty, Kodak warmth, analog intimacy. 50mm lens, Kodak Portra 400 film stock, ISO 400, 1/125s shutter speed, f/2.0 aperture, natural film grain, warm analog color grading.",
+    "sensitive": false
+  },
+  {
+    "id": 310,
+    "title": "서점 캐주얼",
+    "title_en": "Bookstore Casual",
+    "category": "일상 스냅",
+    "categories": [
+      "일상 스냅"
+    ],
+    "text": "Asian woman with long flowing dark hair styled with soft curtain bangs parting naturally at the centre and falling in loose face-framing pieces on both sides, small face aesthetic, clean natural skin, naturally shaped soft brow, clear barely-there lip gloss, wearing a minimal casual fitted black tee, thin chain silver necklace and matching bracelet and thin silver rings. off white hair scrunchies on her wrist, half-body casual indoor bookstore portrait with the face oriented naturally and relaxed with black horn glasses, holding a closed book with both hands and covering her face partially with the book in hands, gazing off camera, posture slightly leaning toward a large bookcase of a Korean bookstore, cozy bookstore with no elaborate staging, soft arrow light, dim environment complementing the skin warmth, natural effortless small-face aesthetic, amateur photography taken with iphone, no filter applied.",
+    "sensitive": false
+  },
+  {
+    "id": 309,
+    "title": "머메이드 캐서드럴",
+    "title_en": "Mermaid Cathedral Veil",
+    "category": "웨딩 / 브라이덜",
+    "categories": [
+      "웨딩 / 브라이덜"
+    ],
+    "text": "Korean bride with silky jet-black hair softly pinned updo with a single loose tendril beside the face, porcelain luminous skin in a bridal dewy glass-skin finish, soft romantic smoky eye in champagne and deep-brown tones with feathery full lashes, a muted dusty-rose nude lip, wearing a structured floor- length mermaid silhouette wedding gown, intricate lace bodice, subtle crystal embellishment catching the light, delicate pearl drop earrings, a dramatic floor- sweeping cathedral-length veil in transparent organza with 3D floral appliqué detail. Her physical specifications are a height of 167cm, weight of 53kg, bust 36 inches, band 32 inches, cup size 70D, waist 24 inches, and hips 33 inches. Standing outdoors in a morning time lit garden, body angled gently at three- quarters toward camera, soft warm gaze, peony flower arrangements scattered loosely on the ground surrounding the virgin road, morning outdoor lit garden with the white lace gown and translucent veil luminously glowing in strong contrast, Single spotlight rim-lighting the gown edge and veil from above-right, translucent veil edges catching the 3000k light. quiet emotional solemnity. 85mm f/1.4 portrait lens, ISO 400, 1/160s shutter speed, aperture f/1.8, glowing white highlights in the veil and gown fabric.",
+    "sensitive": false
+  },
+  {
+    "id": 308,
+    "title": "내추럴 크림 스튜디오",
+    "title_en": "Natural Cream Studio",
+    "category": "스튜디오 프로필",
+    "categories": [
+      "스튜디오 프로필"
+    ],
+    "text": "Korean woman with loose soft dark hair falling naturally around the shoulders, warm glowing skin with healthy luminosity, cleanly groomed brows, a soft muted nude-rose lip, minimal makeup, no harsh liner, a simple relaxed warm muted neutral cream colored fitted top, minimal accessories. full three-quarter shot, one hand raised and lightly resting under the chin, direct soft gaze, slight lean forward, shoulders relaxed, beautifully lit face. Neutral warm-toned studio with a taupe seamless backdrop, background dissolving into shallow-focus blur. Warm studio lighting emulating natural window light, shot on Kodak Portra 400 35mm film giving characteristic fine grain, warm golden analogue tones throughout. Intimate editorial mood, understated classic studio portrait, quiet beauty, film photography nostalgia with actress headshot elegance. 85mm f/1.8 portrait lens, ISO 400, 1/125s shutter speed, aperture f/1.8, shallow depth of field, Kodak Portra 400 film grain texture.",
+    "sensitive": false
+  },
+  {
+    "id": 307,
+    "title": "퍼플 톤 웨딩",
+    "title_en": "Purple-toned Wedding",
+    "category": "웨딩 / 브라이덜",
+    "categories": [
+      "웨딩 / 브라이덜"
+    ],
+    "text": "Young East Asian woman, long dark straight hair, delicate rectangular diamond hair clip on one side, serene downward gaze at the matching colored stiletto. Strapless pristine white wedding gown, sweetheart neckline, pleated draped bodice, cinched waist, voluminous flowing tulle A-line skirt, sweeping train. Full-body stand, three-quarter angle, head tilted, hands gently lifting skirt, Minimalist seamless studio background with random gradient #d6b4fc and #ffd1df, subtle floor shadow. Soft diffused studio lighting, delicate side-lights, fashion editorial photography. Ethereal, romantic, graceful, serene mood. 85mm lens, ISO 100, shutter speed 1/160s, f/2.8, sharp focus.",
+    "sensitive": false
+  },
+  {
     "id": 407,
     "title": "색연필 패션 일러스트",
     "title_en": "Color Pencil Fashion Illust",
