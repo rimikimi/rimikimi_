@@ -263,6 +263,8 @@ export default function PortraitStudio() {
   const [freeUsed, setFreeUsed] = useState(0);
   // 하루 무료 한도 (서버가 역할 따라 알려줌: 테스터 3 / 일반 2). 기본 FREE_DAILY.
   const [freeLimit, setFreeLimit] = useState(FREE_DAILY);
+  // quota API 응답 전엔 헤더 사용량 표시를 숨김 (2/2 → ∞ 깜빡임 방지)
+  const [quotaLoaded, setQuotaLoaded] = useState(false);
   const [unlimited, setUnlimited] = useState(false);
   const [blocked, setBlocked] = useState(false);
   const [concepts, setConcepts] = useState([]);
@@ -375,6 +377,7 @@ export default function PortraitStudio() {
       setFreeUsed(0);
       setUnlimited(false);
       setBlocked(false);
+      setQuotaLoaded(false);
       return;
     }
     let cancelled = false;
@@ -391,8 +394,9 @@ export default function PortraitStudio() {
         if (typeof j?.credits === "number") setCredits(j.credits);
         if (typeof j?.referralCount === "number") setReferralCount(j.referralCount);
         if (typeof j?.untilNext === "number") setUntilNext(j.untilNext);
+        setQuotaLoaded(true);
       })
-      .catch(() => {});
+      .catch(() => { if (!cancelled) setQuotaLoaded(true); });
     return () => {
       cancelled = true;
     };
@@ -667,7 +671,10 @@ export default function PortraitStudio() {
           <Logo height={35} />
         </button>
         <div style={S.headerRight}>
-          <button style={S.creditChip} onClick={shareInvite}>
+          <button
+            style={{ ...S.creditChip, visibility: quotaLoaded ? "visible" : "hidden" }}
+            onClick={shareInvite}
+          >
             <span style={S.creditDot} />
             {unlimited
               ? t("header.unlimited")
