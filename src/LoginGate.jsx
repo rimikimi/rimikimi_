@@ -329,8 +329,10 @@ const BG = "#fffdf9";
 
 const S = {
   wrap: {
-    minHeight: "100vh", maxWidth: 440, margin: "0 auto",
-    background: BG, color: INK, padding: "60px 24px 40px",
+    minHeight: "100dvh", maxWidth: 440, margin: "0 auto",
+    background: BG, color: INK,
+    // 노치/홈바 안전영역 반영 (기종 자동 대응)
+    padding: "calc(env(safe-area-inset-top, 0px) + 48px) 24px calc(env(safe-area-inset-bottom, 0px) + 40px)",
     display: "flex", flexDirection: "column", alignItems: "center",
     fontFamily: "'Quicksand', sans-serif",
   },

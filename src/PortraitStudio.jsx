@@ -1830,20 +1830,21 @@ const ACCENT = "#e6403c";
 
 const S = {
   app: {
-    minHeight: "100vh", maxWidth: 440, margin: "0 auto",
+    minHeight: "100dvh", maxWidth: 440, margin: "0 auto",
     background: BG, color: INK,
     fontFamily: "'Quicksand', 'Jua', sans-serif",
     display: "flex", flexDirection: "column", position: "relative",
   },
   splash: {
-    minHeight: "100vh", maxWidth: 440, margin: "0 auto",
+    minHeight: "100dvh", maxWidth: 440, margin: "0 auto",
     background: BG, display: "flex", flexDirection: "column",
     alignItems: "center", justifyContent: "center", gap: 26,
   },
   splashDots: { display: "flex", gap: 9 },
   header: {
     display: "flex", justifyContent: "space-between", alignItems: "center",
-    padding: "15px 20px 13px",
+    // 노치/상태바 안전영역만큼 위 여백 추가 (기종 자동 대응)
+    padding: "calc(env(safe-area-inset-top, 0px) + 15px) 20px 13px",
     borderBottom: "1px solid rgba(35,31,32,0.08)",
   },
   headerRight: { display: "flex", alignItems: "center", gap: 8 },
@@ -2032,7 +2033,9 @@ const S = {
   },
   main: { flex: 1, padding: "24px 20px 28px" },
   footer: {
-    textAlign: "center", padding: "16px 20px 28px",
+    textAlign: "center",
+    // 홈 인디케이터 안전영역만큼 아래 여백 추가
+    padding: "16px 20px calc(env(safe-area-inset-bottom, 0px) + 28px)",
     fontFamily: "'Quicksand', sans-serif",
   },
   footerLinks: {
