@@ -258,7 +258,6 @@ export default function PortraitStudio() {
   const [selected, setSelected] = useState(null);
   const [query, setQuery] = useState("");
   const [activeCat, setActiveCat] = useState("전체");
-  const [hideSensitive, setHideSensitive] = useState(false);
   const [ageConfirmed, setAgeConfirmed] = useState(false);
   const [freeUsed, setFreeUsed] = useState(0);
   // 하루 무료 한도 (서버가 역할 따라 알려줌: 테스터 3 / 일반 2). 기본 FREE_DAILY.
@@ -474,13 +473,10 @@ export default function PortraitStudio() {
     setResultImage(null);
   }
 
-  // 18+ 토글 적용 후 풀(전체 풀에서 자동 제외)
   const visiblePool = useMemo(() => {
     // hidden 컨셉은 어드민(무제한 사용자)에게만 노출 — 일반/테스터는 안 보임
-    let pool = unlimited ? concepts : concepts.filter((p) => !p.hidden);
-    if (hideSensitive) pool = pool.filter((p) => !p.sensitive);
-    return pool;
-  }, [concepts, hideSensitive, unlimited]);
+    return unlimited ? concepts : concepts.filter((p) => !p.hidden);
+  }, [concepts, unlimited]);
 
   // 카테고리에 개수 같이 계산 — [{ name, count }]
   // 컨셉은 categories 배열을 가질 수 있음 (다중 카테고리). 호환을 위해 category(단일)도 fallback.
@@ -513,10 +509,10 @@ export default function PortraitStudio() {
   // 무한 스크롤 흉내 — 처음엔 30개, 스크롤 시 + 30개씩
   const PAGE_SIZE = 30;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
-  // 필터/검색/토글 바뀌면 다시 처음부터
+  // 필터/검색 바뀌면 다시 처음부터
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
-  }, [activeCat, query, hideSensitive]);
+  }, [activeCat, query]);
 
   // 현재 카테고리가 더 이상 존재하지 않으면 "전체" 로 폴백
   useEffect(() => {
@@ -526,7 +522,6 @@ export default function PortraitStudio() {
   function resetFilters() {
     setQuery("");
     setActiveCat("전체");
-    setHideSensitive(false);
   }
 
   const freeLeft = unlimited ? Infinity : Math.max(0, freeLimit - freeUsed);
@@ -737,8 +732,6 @@ export default function PortraitStudio() {
             setActiveCat={setActiveCat}
             query={query}
             setQuery={setQuery}
-            hideSensitive={hideSensitive}
-            setHideSensitive={setHideSensitive}
             onResetFilters={resetFilters}
             prompts={filtered.slice(0, visibleCount)}
             totalFiltered={filtered.length}
@@ -971,7 +964,7 @@ function GridIcon({ cells }) {
    ============================================================ */
 function GalleryScreen({
   categories, activeCat, setActiveCat, query, setQuery,
-  hideSensitive, setHideSensitive, onResetFilters,
+  onResetFilters,
   prompts, total, totalFiltered, visibleCount, onShowMore,
   poolTotal, onPick, onBack,
   credits = 0, referralCount = 0, untilNext = 2,
@@ -980,7 +973,7 @@ function GalleryScreen({
 }) {
   const [cols, setCols] = useState(2);
   const hasFilter =
-    query.trim() !== "" || activeCat !== "전체" || hideSensitive;
+    query.trim() !== "" || activeCat !== "전체";
 
   // G 레이아웃: 추천 + 카테고리별 카로셀
   // 필터 없을 때(=첫 진입) 보여줌. 필터 켜지면 기존 그리드로 폴백.
@@ -1076,15 +1069,6 @@ function GalleryScreen({
             ? t("step1.resultCount", { n: totalFiltered })
             : t("step1.totalCount", { n: poolTotal })}
         </span>
-        <button
-          style={{
-            ...S.sensitiveToggle,
-            ...(hideSensitive ? S.sensitiveToggleOn : {}),
-          }}
-          onClick={() => setHideSensitive((v) => !v)}
-        >
-          {hideSensitive ? t("step1.hide18") : t("step1.show18")}
-        </button>
       </div>
 
       {showHomeLayout && homeData ? (
@@ -1140,24 +1124,13 @@ function GalleryScreen({
                 >
                   <div style={S.thumbGlyph}>♡</div>
                 </div>
-                {p.sensitive && (
-                  <div
-                    style={{
-                      ...S.sensitiveTag,
-                      fontSize: cols === 2 ? 9 : 7.5,
-                      padding: cols === 2 ? "3px 7px" : "2px 5px",
-                    }}
-                  >
-                    18+
-                  </div>
-                )}
                 {p.hidden && (
                   <div
                     style={{
                       ...S.hiddenTag,
                       fontSize: cols === 2 ? 9 : 7.5,
                       padding: cols === 2 ? "3px 7px" : "2px 5px",
-                      top: p.sensitive ? (cols === 2 ? 32 : 26) : 8,
+                      top: 8,
                     }}
                   >
                     {t("step1.hiddenBadge")}
@@ -1211,8 +1184,7 @@ function HomeLayout({ data, onPick, onMore }) {
                 <div style={S.featuredOverlay}>
                   <div style={S.featuredTitle}>{localizedTitle(p)}</div>
                 </div>
-                {p.sensitive && <div style={S.sensitiveTag}>18+</div>}
-                {p.hidden && <div style={{ ...S.hiddenTag, top: p.sensitive ? 36 : 8 }}>{t("step1.hiddenBadge")}</div>}
+                {p.hidden && <div style={{ ...S.hiddenTag, top: 8 }}>{t("step1.hiddenBadge")}</div>}
               </button>
             ))}
           </div>
@@ -1245,13 +1217,8 @@ function HomeLayout({ data, onPick, onMore }) {
                   style={S.railImg}
                   loading="lazy"
                 />
-                {p.sensitive && (
-                  <div style={{ ...S.sensitiveTag, fontSize: 8.5, padding: "2px 5px" }}>
-                    18+
-                  </div>
-                )}
                 {p.hidden && (
-                  <div style={{ ...S.hiddenTag, fontSize: 8.5, padding: "2px 5px", top: p.sensitive ? 28 : 8 }}>
+                  <div style={{ ...S.hiddenTag, fontSize: 8.5, padding: "2px 5px", top: 8 }}>
                     {t("step1.hiddenBadge")}
                   </div>
                 )}
@@ -1617,12 +1584,6 @@ function ConfirmScreen({
       <div style={S.confirmCard}>
         <div style={S.confirmTitle}>{localizedTitle(prompt)}</div>
         <div style={S.confirmCat}>{localizedCategory(prompt.category)}</div>
-        {prompt.sensitive && (
-          <div style={S.sensitiveNotice}>
-            이 스타일은 노출도가 있는 연출을 포함해요. 본인 사진에 한해
-            사용해 주세요.
-          </div>
-        )}
         <div style={S.promptPeek}>
           선택한 컨셉으로 내 얼굴 특징을 살린 이미지를 만들어 드려요.
         </div>
@@ -2307,15 +2268,6 @@ const S = {
     fontSize: 11.5, opacity: 0.55, fontWeight: 600,
     fontFamily: "'Quicksand', sans-serif", letterSpacing: "0.02em",
   },
-  sensitiveToggle: {
-    background: "#fff", border: "1.5px solid " + INK + "16",
-    borderRadius: 999, padding: "6px 12px", fontSize: 11,
-    fontWeight: 600, fontFamily: "'Quicksand', sans-serif",
-    cursor: "pointer", color: INK + "cc",
-  },
-  sensitiveToggleOn: {
-    background: INK, color: "#fff", borderColor: "transparent",
-  },
   grid: { display: "grid" },
   card: {
     background: "#fff", border: "1px solid " + INK + "10",
@@ -2334,11 +2286,6 @@ const S = {
     alignItems: "center", justifyContent: "center",
   },
   thumbGlyph: { fontSize: 32, color: "#fff", opacity: 0.75 },
-  sensitiveTag: {
-    position: "absolute", top: 8, right: 8, fontWeight: 700,
-    letterSpacing: "0.06em", background: ACCENT, color: "#fff",
-    borderRadius: 999,
-  },
   hiddenTag: {
     position: "absolute", right: 8, fontWeight: 700,
     letterSpacing: "0.02em", background: INK, color: "#fff",
@@ -2375,11 +2322,6 @@ const S = {
   confirmCat: {
     fontSize: 11, fontWeight: 700, color: ACCENT,
     marginTop: 4, marginBottom: 11,
-  },
-  sensitiveNotice: {
-    fontSize: 11, lineHeight: 1.55, background: ACCENT + "12",
-    color: ACCENT, padding: "9px 11px", borderRadius: 10,
-    marginBottom: 11, fontWeight: 600,
   },
   promptPeek: {
     fontSize: 11.5, lineHeight: 1.6, opacity: 0.55, fontWeight: 500,

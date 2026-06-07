@@ -6,5 +6,8 @@
     { "source": "/terms", "destination": "/terms.html" },
     { "source": "/refund", "destination": "/refund.html" },
     { "source": "/checkout/(.*)", "destination": "/index.html" }
+  ],
+  "crons": [
+    { "path": "/api/cron/refresh-apple-secret", "schedule": "0 4 1 * *" }
   ]
 }

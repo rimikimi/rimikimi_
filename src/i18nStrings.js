@@ -54,8 +54,6 @@ export const STR = {
     "step1.all": "전체",
     "step1.resultCount": "{n}개 결과",
     "step1.totalCount": "총 {n}개",
-    "step1.hide18": "🙈 18+ 숨김",
-    "step1.show18": "👁 18+ 표시",
     "step1.empty": "검색 결과가 없어요",
     "step1.resetFilters": "필터 초기화",
     "step1.more": "더 보기 ({n}개 남음)",
@@ -85,8 +83,6 @@ export const STR = {
     "step3.useCredit": "크레딧 1장 사용",
     "step3.generate": "✨ 이미지 만들기",
     "step3.buyCredit": "크레딧 충전",
-    "step3.sensitiveNotice":
-      "이 스타일은 노출도가 있는 연출을 포함해요. 본인 사진에 한해 사용해 주세요.",
     "step3.peek": "선택한 컨셉으로 내 얼굴 특징을 살린 이미지를 만들어 드려요.",
 
     // === 생성 결과 ===
@@ -256,8 +252,6 @@ export const STR = {
     "step1.all": "All",
     "step1.resultCount": "{n} results",
     "step1.totalCount": "{n} total",
-    "step1.hide18": "🙈 Hide 18+",
-    "step1.show18": "👁 Show 18+",
     "step1.empty": "No results",
     "step1.resetFilters": "Reset filters",
     "step1.more": "Show more ({n} left)",
@@ -286,8 +280,6 @@ export const STR = {
     "step3.useCredit": "Uses 1 credit",
     "step3.generate": "✨ Generate",
     "step3.buyCredit": "Get credits",
-    "step3.sensitiveNotice":
-      "This style includes revealing visuals. Use only with photos of yourself.",
     "step3.peek":
       "We'll generate a portrait in this concept while keeping your face features.",
 
