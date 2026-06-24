@@ -766,6 +766,18 @@ export default function PortraitStudio() {
     if (!categories.some((c) => c.name === activeCat)) setActiveCat("전체");
   }, [categories, activeCat]);
 
+  // 스크롤 불필요한 화면에서 페이지 스크롤 차단
+  const NO_SCROLL_SCREENS = ["home", "confirm", "store"];
+  useEffect(() => {
+    const el = document.documentElement;
+    if (NO_SCROLL_SCREENS.includes(screen)) {
+      el.style.overflow = "hidden";
+    } else {
+      el.style.overflow = "";
+    }
+    return () => { el.style.overflow = ""; };
+  }, [screen]);
+
   function resetFilters() {
     setQuery("");
     setActiveCat("전체");
@@ -1146,27 +1158,27 @@ export default function PortraitStudio() {
             onBack={() => setScreen(selected ? "confirm" : "gallery")}
           />
         )}
-
-        <footer style={S.footer}>
-          <div style={S.footerLinks}>
-            {/* 절대 URL + 새 창: 웹은 새 탭, 네이티브 앱은 시스템 브라우저로 열림.
-                (네이티브는 번들 모드라 상대경로 /privacy 가 rewrite 없이 404 나므로 절대 URL 필요) */}
-            <a href={`${LEGAL_BASE}/terms`} target="_blank" rel="noopener noreferrer" style={S.footerLink}>{t("footer.terms")}</a>
-            <span style={S.footerDot}>·</span>
-            <a href={`${LEGAL_BASE}/privacy`} target="_blank" rel="noopener noreferrer" style={S.footerLink}>{t("footer.privacy")}</a>
-            <span style={S.footerDot}>·</span>
-            <a href={`${LEGAL_BASE}/refund`} target="_blank" rel="noopener noreferrer" style={S.footerLink}>{t("footer.refund")}</a>
-          </div>
-          {IS_KOREA && (
-            <div style={S.footerBiz}>
-              {t("footer.biz.company")}<br />
-              {t("footer.biz.reg")} · {t("footer.biz.sales")}<br />
-              {t("footer.biz.addr")}<br />
-              {t("footer.biz.contact")}
-            </div>
-          )}
-        </footer>
       </main>
+
+      <footer style={S.footer}>
+        <div style={S.footerLinks}>
+          {/* 절대 URL + 새 창: 웹은 새 탭, 네이티브 앱은 시스템 브라우저로 열림.
+              (네이티브는 번들 모드라 상대경로 /privacy 가 rewrite 없이 404 나므로 절대 URL 필요) */}
+          <a href={`${LEGAL_BASE}/terms`} target="_blank" rel="noopener noreferrer" style={S.footerLink}>{t("footer.terms")}</a>
+          <span style={S.footerDot}>·</span>
+          <a href={`${LEGAL_BASE}/privacy`} target="_blank" rel="noopener noreferrer" style={S.footerLink}>{t("footer.privacy")}</a>
+          <span style={S.footerDot}>·</span>
+          <a href={`${LEGAL_BASE}/refund`} target="_blank" rel="noopener noreferrer" style={S.footerLink}>{t("footer.refund")}</a>
+        </div>
+        {IS_KOREA && (
+          <div style={S.footerBiz}>
+            {t("footer.biz.company")}<br />
+            {t("footer.biz.reg")} · {t("footer.biz.sales")}<br />
+            {t("footer.biz.addr")}<br />
+            {t("footer.biz.contact")}
+          </div>
+        )}
+      </footer>
 
       <BottomNav screen={screen} go={setScreen} />
     </div>
@@ -2352,7 +2364,7 @@ const ACCENT = "#e6403c";
 
 const S = {
   app: {
-    height: "100dvh", maxWidth: 440, margin: "0 auto",
+    minHeight: "100dvh", maxWidth: 440, margin: "0 auto",
     background:
       "radial-gradient(600px 420px at 12% 4%, rgba(255,209,160,.50), transparent 55%)," +
       "radial-gradient(600px 520px at 92% 18%, rgba(255,193,214,.45), transparent 55%)," +
@@ -2361,7 +2373,7 @@ const S = {
     color: INK,
     fontFamily: "'Quicksand', 'Jua', sans-serif",
     display: "flex", flexDirection: "column", position: "relative",
-    overflow: "hidden",
+    paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 88px)",
   },
   splash: {
     minHeight: "100dvh", maxWidth: 440, margin: "0 auto",
@@ -2567,13 +2579,7 @@ const S = {
     width: 7, height: 7, borderRadius: "50%",
     background: "#f9c83c", display: "inline-block",
   },
-  main: {
-    flex: "1 1 0",
-    overflowY: "auto",
-    WebkitOverflowScrolling: "touch",
-    padding: "24px 20px",
-    paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 116px)",
-  },
+  main: { flex: 1, padding: "24px 20px 28px" },
   tabbar: {
     position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 100,
     display: "flex", justifyContent: "center",
