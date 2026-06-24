@@ -1,8 +1,33 @@
 import React, { useState, useRef, useMemo, useEffect } from "react";
 import { supabase } from "./supabaseClient";
 import { isNative, nativePickPhoto, nativeShare } from "./nativeBridge";
+import { initAds, showInterstitial, requestATT } from "./ads";
+import { initIap, loginIap, logoutIap, getIapPacks, purchaseIap, iapAvailable } from "./iap";
+import { FOURCUT_COUNTS, FOURCUT_STYLES, composeStrip, todayStr } from "./fourcut";
 import { t, useLang, getLang, localizedTitle, localizedCategory, getLangPreference, setLang } from "./i18n";
 import LoginGate from "./LoginGate";
+
+/* 약관/방침/환불 정적 페이지의 절대 경로 베이스.
+   웹: 같은 출처라 새 탭으로, 네이티브(번들): 시스템 브라우저로 열림.
+   rimikimi.com 은 별도 홈페이지라 앱은 Vercel 도메인을 사용. */
+const LEGAL_BASE = "https://rimikimi-app.vercel.app";
+
+/* 사업자/통신판매업 고지는 한국 전자상거래법상 한국 접속자에게만 필요.
+   해외 접속자에겐 표시하지 않는다. (판단 불가 시엔 안전하게 표시)
+   국가 추정: 표준시간대 Asia/Seoul 또는 브라우저 언어 ko */
+const IS_KOREA = (() => {
+  try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+    if (tz === "Asia/Seoul") return true;
+    const langs =
+      navigator.languages && navigator.languages.length
+        ? navigator.languages
+        : [navigator.language || ""];
+    return langs.some((l) => String(l).toLowerCase().startsWith("ko"));
+  } catch {
+    return true;
+  }
+})();
 
 /* ============================================================
    rimikimi 로고 — 일러스트레이터 SVG 원본 (투명 배경, 벡터)
@@ -59,13 +84,18 @@ function _OldLogo({ height = 30, mono = false }) {
 
 // id 는 서버 (api/_lib/payments/packages.js) 와 1:1 매칭 필수.
 // usd 는 PayPal 결제용. krw 는 한국 사용자 참고 표시.
+// 결제(크레딧 충전): 네이티브 앱 = 인앱결제(IAP, RevenueCat) 활성. 웹은 숨김.
+// (v1.0은 무료+광고로 통과 → v1.1부터 IAP 켬)
+const PAYMENTS_ENABLED = isNative();
+
 const CREDIT_PACKS = [
-  { id: "credits_10", count: 10, krw: 4900,  usd: "4.90",  label: null },
-  { id: "credits_30", count: 30, krw: 9900,  usd: "9.90",  label: "가장 인기" },
-  { id: "credits_70", count: 70, krw: 19900, usd: "19.90", label: null },
+  { id: "credits_10",  count: 10,  krw: 7900,  usd: "7.90",  label: null },
+  { id: "credits_30",  count: 30,  krw: 22490, usd: "22.49", label: "가장 인기" },
+  { id: "credits_70",  count: 70,  krw: 49900, usd: "49.90", label: null },
+  { id: "credits_120", count: 120, krw: 79900, usd: "79.90", label: "최고 가성비" },
 ];
 
-const FREE_DAILY = 2;
+const FREE_DAILY = 1;
 
 /* 로고에서 추출한 브랜드 컬러 */
 const HEARTS = ["#e6403c", "#f9c83c", "#60c9de", "#8a5da7"];
@@ -77,11 +107,57 @@ const perImageUsd = (pack) =>
   (parseFloat(pack.usd) / pack.count).toFixed(2);
 
 // 아트 변환 카테고리 = 본인 얼굴이 아닌 임의 사진을 별도로 업로드받는 컨셉.
-const ART_CATEGORY = "🎨 아트 변환";
+const ART_CATEGORY = "🪄 매직 부스";
 function isArtConcept(concept) {
   if (!concept) return false;
   const cats = concept.categories || (concept.category ? [concept.category] : []);
   return cats.includes(ART_CATEGORY);
+}
+
+// 증명사진 = 정장색/배경색을 사용자가 고르는 특수 컨셉.
+function isIdPhoto(concept) {
+  if (!concept) return false;
+  return concept.mode === "idphoto" || /증명사진/.test(concept.title || "");
+}
+
+// 인생네컷 = 분할(2/3/4/6/8) + 스타일(5종)을 고르는 특수 컨셉.
+function isFourcut(concept) {
+  if (!concept) return false;
+  return concept.mode === "fourcut" || /인생네컷/.test(concept.title || "");
+}
+const ID_SUITS = [
+  { key: "dark navy", label: "다크 네이비", css: "#1f2a44" },
+  { key: "charcoal dark grey", label: "다크 그레이", css: "#3b3e44" },
+  { key: "light grey", label: "라이트 그레이", css: "#b7bcc4" },
+  { key: "black", label: "블랙", css: "#15171a" },
+];
+const ID_BGS = [
+  { hex: "#FFFFFF", name: "pure white" },
+  { hex: "#f7f4f5", name: "soft warm light grey" },
+  { hex: "#fff9eb", name: "warm ivory cream" },
+  { hex: "#ffeaeb", name: "soft pastel pink" },
+  { hex: "#c4ecf0", name: "light sky blue" },
+  { hex: "#a5d2d8", name: "soft muted teal" },
+  { hex: "#1b3c5a", name: "deep navy blue" },
+  { hex: "#4d3f64", name: "deep muted purple" },
+];
+const ID_DISCLAIMER =
+  "AI로 생성된 증명사진이에요. 공공기관·여권·비자 심사 등 공식 제출용으로는 규격 불일치로 거절될 수 있으니 참고용으로 사용해 주세요.";
+
+function buildIdPhotoPrompt(suitKey, bgHex, bgName) {
+  return (
+    "Create a clean, professional ID / passport-style photograph of the person in the provided photo. " +
+    "Keep their exact face, identity, facial features and natural likeness — do not beautify, slim, or change who they are. " +
+    "Front-facing head-AND-shoulders headshot, looking straight at the camera, neutral relaxed expression with the mouth closed, " +
+    "eyes open and clearly visible, face and both ears visible, hair tidy, no hat and no sunglasses. " +
+    "Framing: do not crop tightly on the face — leave a little space above the hair and include the full shoulder line down to the upper chest (standard ID photo crop); never cut off the shoulders. " +
+    "Dress the person in a formal " + suitKey + " suit jacket over a crisp collared shirt with a BESPOKE, made-to-measure tailored fit precisely tailored to the person's own frame. " +
+    "It must look completely real and natural (realistic fabric texture, natural lapels/folds and shadows, seamless transitions at the neck and shoulders; clean tailored shoulders following the natural shoulder line; never flat, pasted-on, plastic, or costume-like). " +
+    "Replace the background with a solid " + bgName + " (" + bgHex + ") studio backdrop that has a very subtle, smooth gradient — " +
+    "slightly brighter just behind the head and gently darker toward the edges. " +
+    "Soft, even studio lighting with no harsh shadows on the face or the background. " +
+    "Sharp focus, high resolution, true-to-life natural skin tones, vertical portrait composition centered like an official ID photo."
+  );
 }
 
 /* ============================================================
@@ -195,6 +271,10 @@ async function generateImage(accessToken, dataUrl, promptText, conceptMeta = {})
         mimeType, base64, prompt: promptText,
         conceptId: conceptMeta.id, conceptTitle: conceptMeta.title,
         skipFacePrecheck: !!conceptMeta.skipFacePrecheck,
+        // 증명사진: 선택한 정장/배경 (서버가 프롬프트 조립)
+        idSuit: conceptMeta.idSuit, idBg: conceptMeta.idBg, idBgName: conceptMeta.idBgName,
+        // 인생네컷: 스타일 + 컷 인덱스 (서버가 컷별 프롬프트 조립)
+        fourcutStyle: conceptMeta.fourcutStyle, cutIndex: conceptMeta.cutIndex,
       }),
     });
   } catch (e) {
@@ -242,6 +322,60 @@ async function generateImage(accessToken, dataUrl, promptText, conceptMeta = {})
 /* ============================================================
    메인 컴포넌트
    ============================================================ */
+// ── 무료 사용자용 애드센스 광고 슬롯 ──
+// ADSENSE_SLOT 에 애드센스 승인 후 만든 "광고 단위(slot) ID" 를 넣으면 광고가 나옴.
+// 비어 있으면 아무것도 렌더하지 않음(빈 박스 방지) → 승인 전엔 무해.
+const ADSENSE_CLIENT = "ca-pub-9458625554324585";
+const ADSENSE_SLOT = ""; // 예: "1234567890"
+
+function AdSlot() {
+  useEffect(() => {
+    if (!ADSENSE_SLOT) return;
+    try { (window.adsbygoogle = window.adsbygoogle || []).push({}); } catch (_) {}
+  }, []);
+  if (!ADSENSE_SLOT) return null;
+  return (
+    <div style={{ width: "100%", margin: "18px 0", textAlign: "center" }}>
+      <ins
+        className="adsbygoogle"
+        style={{ display: "block" }}
+        data-ad-client={ADSENSE_CLIENT}
+        data-ad-slot={ADSENSE_SLOT}
+        data-ad-format="auto"
+        data-full-width-responsive="true"
+      />
+    </div>
+  );
+}
+
+// ── 하단 글래스 탭바 (아이콘 + 텍스트) ──
+function BottomNav({ screen, go }) {
+  const tabs = [
+    { key: "gallery", label: "갤러리", icon: "✦", match: ["gallery", "home", "confirm", "result"] },
+    { key: "mygallery", label: "내 사진", icon: "♡", match: ["mygallery"] },
+    { key: "profile", label: "프로필", icon: "👤", match: ["profile", "store"] },
+  ];
+  return (
+    <nav style={S.tabbar}>
+      <div style={S.tabbarInner}>
+        {tabs.map((tb) => {
+          const on = tb.match.includes(screen);
+          return (
+            <button
+              key={tb.key}
+              style={{ ...S.tabBtn, ...(on ? S.tabBtnOn : {}) }}
+              onClick={() => go(tb.key)}
+            >
+              <span style={S.tabIcon}>{tb.icon}</span>
+              <span style={S.tabLabel}>{tb.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </nav>
+  );
+}
+
 export default function PortraitStudio() {
   useLang(); // 언어 변경 시 컴포넌트 트리 리렌더
   const [booting, setBooting] = useState(true);
@@ -255,12 +389,19 @@ export default function PortraitStudio() {
   });
   // 아트 변환 컨셉용 일회용 사진. localStorage 안 함 (휘발성).
   const [artPhoto, setArtPhoto] = useState(null);
+  // 증명사진 옵션 (정장색 key / 배경 hex)
+  const [idSuit, setIdSuit] = useState(ID_SUITS[0].key);
+  const [idBg, setIdBg] = useState(ID_BGS[0].hex);
+  // 인생네컷 옵션 (분할 수 / 스타일 key) + 진행 표시
+  const [fourcutCount, setFourcutCount] = useState(4);
+  const [fourcutStyleKey, setFourcutStyleKey] = useState(FOURCUT_STYLES[0].key);
+  const [fourcutProgress, setFourcutProgress] = useState("");
   const [selected, setSelected] = useState(null);
   const [query, setQuery] = useState("");
   const [activeCat, setActiveCat] = useState("전체");
   const [ageConfirmed, setAgeConfirmed] = useState(false);
   const [freeUsed, setFreeUsed] = useState(0);
-  // 하루 무료 한도 (서버가 역할 따라 알려줌: 테스터 3 / 일반 2). 기본 FREE_DAILY.
+  // 하루 무료 한도 (서버가 역할 따라 알려줌: 테스터 3 / 일반 1). 기본 FREE_DAILY.
   const [freeLimit, setFreeLimit] = useState(FREE_DAILY);
   // quota API 응답 전엔 헤더 사용량 표시를 숨김 (2/2 → ∞ 깜빡임 방지)
   const [quotaLoaded, setQuotaLoaded] = useState(false);
@@ -280,6 +421,8 @@ export default function PortraitStudio() {
   // ─── 로그인 세션 ───
   const [session, setSession] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
+  // 세션이 자리잡는 중인지 — 로그인 직후/리다이렉트 복귀 때 로그인 화면이 잠깐 번쩍이는 것 방지
+  const [authSettling, setAuthSettling] = useState(true);
 
   useEffect(() => {
     const t = setTimeout(() => setBooting(false), 2200);
@@ -297,20 +440,85 @@ export default function PortraitStudio() {
   // 페이지 로드 시 현재 세션 확인 + 이후 변경 감지
   useEffect(() => {
     let mounted = true;
+    // OAuth 리다이렉트로 복귀 중인지 (해시/쿼리에 토큰·코드가 있으면 세션이 곧 들어옴)
+    const hasAuthRedirect = /[#&?](access_token|code|provider_token|auth)=/.test(
+      window.location.hash + window.location.search
+    );
     supabase.auth.getSession().then(({ data }) => {
       if (!mounted) return;
       setSession(data.session);
       setAuthChecked(true);
+      // 세션도 없고 리다이렉트 복귀도 아니면 진짜 로그아웃 → 바로 로그인 화면 허용
+      if (!data.session && !hasAuthRedirect) setAuthSettling(false);
     });
     const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
       if (!mounted) return;
       setSession(s);
+      if (s) setAuthSettling(false);
     });
+    // 안전장치: 5초 안에 세션이 안 들어오면 로그인 화면 보여줌 (로그인 실패 대비)
+    const failsafe = setTimeout(() => { if (mounted) setAuthSettling(false); }, 5000);
     return () => {
       mounted = false;
       sub.subscription.unsubscribe();
+      clearTimeout(failsafe);
     };
   }, []);
+
+  // 네이티브 앱: OAuth 시스템 브라우저 → 딥링크(com.rimikimi.app://login-callback) 복귀 처리
+  useEffect(() => {
+    if (!isNative()) return;
+    let listener, attListener;
+    (async () => {
+      const { App } = await import("@capacitor/app");
+
+      // ATT 동의 팝업: 앱이 "활성" 상태일 때만 표시됨 (콜드스타트 중엔 무시됨).
+      // 추적 데이터 수집 전에 띄워야 하므로 ATT → 그다음 광고 초기화 순서.
+      const startTracking = async () => {
+        await requestATT();   // notDetermined 면 팝업, 이미 결정됐으면 no-op
+        await initAds();
+      };
+      const st = await App.getState();
+      if (st?.isActive) setTimeout(startTracking, 600);
+      attListener = await App.addListener("appStateChange", ({ isActive }) => {
+        if (isActive) setTimeout(startTracking, 600);
+      });
+
+      listener = await App.addListener("appUrlOpen", async ({ url }) => {
+        if (!url || !url.includes("login-callback")) return;
+        try {
+          const { Browser } = await import("@capacitor/browser");
+          await Browser.close();
+        } catch (_) {}
+        try {
+          const code = new URL(url).searchParams.get("code");
+          if (code) {
+            await supabase.auth.exchangeCodeForSession(code);
+          } else if (url.includes("#")) {
+            const h = new URLSearchParams(url.split("#")[1]);
+            const at = h.get("access_token");
+            const rt = h.get("refresh_token");
+            if (at && rt) await supabase.auth.setSession({ access_token: at, refresh_token: rt });
+          }
+        } catch (_) {}
+      });
+    })();
+    return () => { if (listener) listener.remove(); if (attListener) attListener.remove(); };
+  }, []);
+
+  // 인앱결제(IAP/RevenueCat) 초기화 — 네이티브에서 앱 시작 시 1회
+  useEffect(() => {
+    if (!iapAvailable()) return;
+    initIap();
+  }, []);
+
+  // 로그인/로그아웃에 맞춰 RevenueCat 식별자(app_user_id = 우리 user.id) 정렬
+  useEffect(() => {
+    if (!iapAvailable()) return;
+    const uid = session?.user?.id;
+    if (uid) loginIap(uid);
+    else logoutIap();
+  }, [session?.user?.id]);
 
   // 초대 링크(?ref=...)로 들어왔으면 기억해뒀다가 로그인 후 처리
   useEffect(() => {
@@ -364,6 +572,19 @@ export default function PortraitStudio() {
     return () => { cancelled = true; };
   }, []);
 
+  // 추천 = 최근 많이 만든 컨셉 TOP5 (서버 집계 /api/popular)
+  const [popular, setPopular] = useState([]);
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/popular")
+      .then((r) => r.json())
+      .then((j) => {
+        if (!cancelled && Array.isArray(j?.popular)) setPopular(j.popular.map((x) => x.id));
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
   // 결제 후 토스트
   const [payToast, setPayToast] = useState("");
 
@@ -395,7 +616,10 @@ export default function PortraitStudio() {
         if (typeof j?.untilNext === "number") setUntilNext(j.untilNext);
         setQuotaLoaded(true);
       })
-      .catch(() => { if (!cancelled) setQuotaLoaded(true); });
+      .catch(() => {
+        // 실패 시 칩을 잘못된 기본값(예: 2/2)으로 드러내지 않음.
+        // 토큰이 자리잡으면(자동 갱신/세션 변경) 이 effect 가 다시 돌며 재시도됨.
+      });
     return () => {
       cancelled = true;
     };
@@ -473,6 +697,29 @@ export default function PortraitStudio() {
     setResultImage(null);
   }
 
+  async function handleDeleteAccount() {
+    if (!window.confirm(t("profile.deleteConfirm"))) return;
+    const token = session?.access_token;
+    try {
+      const r = await fetch("/api/account/delete", {
+        method: "POST",
+        headers: { Authorization: "Bearer " + token },
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j?.error || "삭제 실패");
+      // 로컬 사진/상태 정리 후 로그아웃
+      try { localStorage.clear(); } catch (_) {}
+      await supabase.auth.signOut();
+      setScreen("home");
+      setPhoto(null);
+      setSelected(null);
+      setResultImage(null);
+      window.alert(t("profile.deleteDone"));
+    } catch (e) {
+      window.alert((e && e.message) || "계정 삭제에 실패했어요.");
+    }
+  }
+
   const visiblePool = useMemo(() => {
     // hidden 컨셉은 어드민(무제한 사용자)에게만 노출 — 일반/테스터는 안 보임
     return unlimited ? concepts : concepts.filter((p) => !p.hidden);
@@ -527,6 +774,8 @@ export default function PortraitStudio() {
   const freeLeft = unlimited ? Infinity : Math.max(0, freeLimit - freeUsed);
   const canGenerateFree = !blocked && freeLeft > 0;
   const canGenerate = !blocked && (unlimited || canGenerateFree || credits > 0);
+  // 무료 사용자(관리자·유료크레딧 보유자 제외)에게만 광고 노출
+  const showAds = quotaLoaded && !unlimited && credits === 0;
 
   // 어느 사진 슬롯에 저장할지를 ref 로 결정 (handleFile 이 한 input 을 공유하기 때문)
   const photoTargetRef = useRef("profile"); // "profile" | "art"
@@ -552,7 +801,65 @@ export default function PortraitStudio() {
 
   async function startGenerate() {
     if (!canGenerate) {
-      setScreen("store");
+      if (PAYMENTS_ENABLED) {
+        setScreen("store");
+      } else {
+        setPayToast("오늘 무료 횟수를 다 썼어요. 친구를 초대하면 크레딧을 받을 수 있어요 🙂");
+        setTimeout(() => setPayToast(""), 3500);
+      }
+      return;
+    }
+
+    // ── 인생네컷: N컷 = N장 차감. 잔여 확인 후 N장 병렬 생성 → 코드로 합성 ──
+    if (isFourcut(selected)) {
+      const available = unlimited ? Infinity : freeLeft + credits;
+      if (available < fourcutCount) {
+        setPayToast(
+          `${fourcutCount}컷은 ${fourcutCount}장이 필요해요. 남은 건 ${available === Infinity ? "∞" : available}장이에요 🙂`
+        );
+        setTimeout(() => setPayToast(""), 4000);
+        return;
+      }
+      setGenError(null);
+      setResultImage(null);
+      setGenerating(true);
+      setScreen("result");
+      setFourcutProgress(`0/${fourcutCount}`);
+      try {
+        const accessToken = session?.access_token;
+        let done = 0;
+        const tasks = Array.from({ length: fourcutCount }, (_, i) =>
+          generateImage(accessToken, photo, "인생네컷", {
+            id: selected.id,
+            title: selected.title,
+            fourcutStyle: fourcutStyleKey,
+            cutIndex: i,
+          }).then((r) => {
+            done += 1;
+            setFourcutProgress(`${done}/${fourcutCount}`);
+            return r;
+          })
+        );
+        const results = await Promise.all(tasks);
+        const strip = await composeStrip(
+          results.map((r) => r.imageDataUrl),
+          fourcutStyleKey,
+          fourcutCount,
+          todayStr()
+        );
+        setResultImage(strip);
+        const last = results[results.length - 1];
+        if (typeof last?.unlimited === "boolean") setUnlimited(last.unlimited);
+        if (typeof last?.quotaUsed === "number") setFreeUsed(last.quotaUsed);
+        setRefreshTick((n) => n + 1); // 크레딧/잔여 정확히 재조회
+        if (showAds) showInterstitial();
+      } catch (err) {
+        if (typeof err.quotaUsed === "number") setFreeUsed(err.quotaUsed);
+        setGenError(err.message || "인생네컷 생성에 실패했어요.");
+      } finally {
+        setGenerating(false);
+        setFourcutProgress("");
+      }
       return;
     }
 
@@ -566,16 +873,32 @@ export default function PortraitStudio() {
       const accessToken = session?.access_token;
       const art = isArtConcept(selected);
       const photoToUse = art ? artPhoto : photo;
-      const result = await generateImage(accessToken, photoToUse, selected.text, {
+      // 증명사진이면 선택한 정장색/배경색으로 프롬프트를 동적 생성
+      let promptText = selected.text;
+      const idMeta = {};
+      if (isIdPhoto(selected)) {
+        const bg =
+          ID_BGS.find((b) => b.hex.toLowerCase() === idBg.toLowerCase()) ||
+          { hex: idBg, name: "custom solid" };
+        // 서버가 idSuit/idBg 로 조립하지만, 구버전 호환용 프롬프트도 함께 보냄
+        promptText = buildIdPhotoPrompt(idSuit, bg.hex, bg.name);
+        idMeta.idSuit = idSuit;
+        idMeta.idBg = bg.hex;
+        idMeta.idBgName = bg.name;
+      }
+      const result = await generateImage(accessToken, photoToUse, promptText, {
         id: selected.id,
         title: selected.title,
         // 아트 변환은 풍경/물건 등 얼굴 없는 사진도 가능해야 하므로 face precheck 우회
         skipFacePrecheck: art,
+        ...idMeta,
       });
       setResultImage(result.imageDataUrl);
       // 서버가 알려준 진짜 사용량으로 업데이트
       if (typeof result.unlimited === "boolean") setUnlimited(result.unlimited);
       if (typeof result.quotaUsed === "number") setFreeUsed(result.quotaUsed);
+      // 무료 사용자 → 생성 후 전면광고 (네이티브에서만, 웹은 no-op)
+      if (showAds) showInterstitial();
     } catch (err) {
       // 서버가 한도 정보를 같이 줬으면 화면 카운터도 반영
       if (typeof err.quotaUsed === "number") setFreeUsed(err.quotaUsed);
@@ -629,10 +952,12 @@ export default function PortraitStudio() {
     fileRef.current?.click();
   }
 
-  if (booting) return <Splash />;
+  // 스플래시는 부팅 타이머 + 세션 확인이 끝날 때까지 유지 (빈 화면 깜빡임 방지)
+  if (booting || !authChecked) return <Splash />;
 
-  // 세션 확인 중엔 잠깐 빈 화면 (깜빡임 방지)
-  if (!authChecked) return <div style={{ ...S.app, background: BG }} />;
+  // 로그인 안 됐어도, 세션이 자리잡는 중이면 로그인 화면 대신 스플래시 유지
+  // (로그인 직후/리다이렉트 복귀 때 로그인 화면이 잠깐 번쩍이는 것 방지)
+  if (!session && authSettling) return <Splash />;
 
   // 로그인 안 됐으면 로그인 화면
   if (!session) {
@@ -722,6 +1047,7 @@ export default function PortraitStudio() {
               setAgeConfirmed={setAgeConfirmed}
               onContinue={() => setScreen("confirm")}
               onBack={() => setScreen("gallery")}
+              showAds={showAds}
             />
           );
         })()}
@@ -748,6 +1074,7 @@ export default function PortraitStudio() {
             onInvite={shareInvite}
             inviteMsg={inviteMsg}
             unlimited={unlimited}
+            popular={popular}
           />
         )}
         {screen === "confirm" && selected && (
@@ -757,20 +1084,28 @@ export default function PortraitStudio() {
             freeLeft={freeLeft}
             credits={credits}
             canGenerate={canGenerate}
+            idPhoto={isIdPhoto(selected)}
+            idSuit={idSuit} setIdSuit={setIdSuit}
+            idBg={idBg} setIdBg={setIdBg}
+            fourcut={isFourcut(selected)}
+            fourcutCount={fourcutCount} setFourcutCount={setFourcutCount}
+            fourcutStyleKey={fourcutStyleKey} setFourcutStyleKey={setFourcutStyleKey}
             onBack={() => setScreen("home")}
             onGenerate={startGenerate}
-            onStore={() => setScreen("store")}
+            onStore={PAYMENTS_ENABLED ? () => setScreen("store") : () => { setPayToast("오늘 무료 횟수를 다 썼어요. 친구 초대로 크레딧을 받아보세요 🙂"); setTimeout(() => setPayToast(""), 3500); }}
           />
         )}
         {screen === "result" && selected && (
           <ResultScreen
             generating={generating}
+            fourcutProgress={fourcutProgress}
             prompt={selected}
             resultImage={resultImage}
             genError={genError}
             onRetry={startGenerate}
             onAgain={() => setScreen("gallery")}
             onHome={resetToHome}
+            showAds={showAds}
           />
         )}
         {screen === "profile" && (
@@ -790,8 +1125,9 @@ export default function PortraitStudio() {
             inviteMsg={inviteMsg}
             onBack={() => setScreen("gallery")}
             onOpenGallery={() => setScreen("mygallery")}
-            onOpenStore={() => setScreen("store")}
+            onOpenStore={PAYMENTS_ENABLED ? () => setScreen("store") : null}
             onLogout={handleLogout}
+            onDeleteAccount={handleDeleteAccount}
           />
         )}
         {screen === "mygallery" && (
@@ -800,32 +1136,39 @@ export default function PortraitStudio() {
             onBack={() => setScreen("profile")}
           />
         )}
-        {screen === "store" && (
+        {screen === "store" && PAYMENTS_ENABLED && (
           <StoreScreen
             packs={CREDIT_PACKS}
             credits={credits}
             session={session}
             freeLimit={freeLimit}
+            onCredited={() => setRefreshTick((n) => n + 1)}
             onBack={() => setScreen(selected ? "confirm" : "gallery")}
           />
         )}
+
+        <footer style={S.footer}>
+          <div style={S.footerLinks}>
+            {/* 절대 URL + 새 창: 웹은 새 탭, 네이티브 앱은 시스템 브라우저로 열림.
+                (네이티브는 번들 모드라 상대경로 /privacy 가 rewrite 없이 404 나므로 절대 URL 필요) */}
+            <a href={`${LEGAL_BASE}/terms`} target="_blank" rel="noopener noreferrer" style={S.footerLink}>{t("footer.terms")}</a>
+            <span style={S.footerDot}>·</span>
+            <a href={`${LEGAL_BASE}/privacy`} target="_blank" rel="noopener noreferrer" style={S.footerLink}>{t("footer.privacy")}</a>
+            <span style={S.footerDot}>·</span>
+            <a href={`${LEGAL_BASE}/refund`} target="_blank" rel="noopener noreferrer" style={S.footerLink}>{t("footer.refund")}</a>
+          </div>
+          {IS_KOREA && (
+            <div style={S.footerBiz}>
+              {t("footer.biz.company")}<br />
+              {t("footer.biz.reg")} · {t("footer.biz.sales")}<br />
+              {t("footer.biz.addr")}<br />
+              {t("footer.biz.contact")}
+            </div>
+          )}
+        </footer>
       </main>
 
-      <footer style={S.footer}>
-        <div style={S.footerLinks}>
-          <a href="/terms" style={S.footerLink}>{t("footer.terms")}</a>
-          <span style={S.footerDot}>·</span>
-          <a href="/privacy" style={S.footerLink}>{t("footer.privacy")}</a>
-          <span style={S.footerDot}>·</span>
-          <a href="/refund" style={S.footerLink}>{t("footer.refund")}</a>
-        </div>
-        <div style={S.footerBiz}>
-          {t("footer.biz.company")}<br />
-          {t("footer.biz.reg")} · {t("footer.biz.sales")}<br />
-          {t("footer.biz.addr")}<br />
-          {t("footer.biz.contact")}
-        </div>
-      </footer>
+      <BottomNav screen={screen} go={setScreen} />
     </div>
   );
 }
@@ -859,7 +1202,7 @@ function Splash() {
 function HomeScreen({
   photo, fileRef, onFile, onPick, onClear,
   ageConfirmed, setAgeConfirmed, onContinue, onBack,
-  isArt = false,
+  isArt = false, showAds = false,
 }) {
   const ready = photo && ageConfirmed;
   return (
@@ -938,6 +1281,8 @@ function HomeScreen({
       </button>
 
       <p style={S.privacyNote}>{t("step2.privacyNote")}</p>
+
+      {showAds && <AdSlot />}
     </div>
   );
 }
@@ -969,7 +1314,7 @@ function GalleryScreen({
   poolTotal, onPick, onBack,
   credits = 0, referralCount = 0, untilNext = 2,
   onInvite, inviteMsg = "", unlimited = false,
-  fullPool = [],
+  fullPool = [], popular = [],
 }) {
   const [cols, setCols] = useState(2);
   const hasFilter =
@@ -983,8 +1328,14 @@ function GalleryScreen({
   const homeData = useMemo(() => {
     if (!showHomeLayout) return null;
     const pool = fullPool;
-    // 1) 추천: 가장 큰 ID 8개
-    const featured = [...pool].sort((a, b) => b.id - a.id).slice(0, 8);
+    // 1) 추천: 최근 많이 만든 컨셉 5개 (데이터 부족하면 최신 ID로 채움)
+    const byId = new Map(pool.map((p) => [p.id, p]));
+    let featured = popular.map((id) => byId.get(id)).filter(Boolean).slice(0, 5);
+    if (featured.length < 5) {
+      const have = new Set(featured.map((p) => p.id));
+      const fill = [...pool].sort((a, b) => b.id - a.id).filter((p) => !have.has(p.id));
+      featured = [...featured, ...fill].slice(0, 5);
+    }
     // 2) 카테고리별 컨셉 모음
     const byCat = new Map(); // catName -> { items, latestId }
     for (const p of pool) {
@@ -1006,7 +1357,7 @@ function GalleryScreen({
       }))
       .sort((a, b) => b.latestId - a.latestId);
     return { featured, rows };
-  }, [showHomeLayout, fullPool]);
+  }, [showHomeLayout, fullPool, popular]);
   return (
     <div className="fade">
       <button style={S.inviteBanner} onClick={onInvite}>
@@ -1239,7 +1590,7 @@ function ProfileScreen({
   unlimited, blocked, freeUsed, freeLeft, credits,
   referralCount, untilNext,
   onInvite, inviteMsg = "",
-  onBack, onLogout, onOpenGallery, onOpenStore,
+  onBack, onLogout, onDeleteAccount, onOpenGallery, onOpenStore,
 }) {
   const u = session?.user || {};
   const meta = u.user_metadata || {};
@@ -1365,6 +1716,18 @@ function ProfileScreen({
         onClick={onLogout}
       >
         {t("profile.logout")}
+      </button>
+
+      {/* 계정 삭제 (App Store 요구: 인앱 즉시 삭제) */}
+      <button
+        style={{
+          ...S.secondaryBtn, marginTop: 10,
+          color: "#9aa0a6", borderColor: "#e3e3e3",
+          fontSize: 13,
+        }}
+        onClick={onDeleteAccount}
+      >
+        {t("profile.deleteAccount")}
       </button>
     </div>
   );
@@ -1551,6 +1914,8 @@ function MyGalleryScreen({ accessToken, onBack }) {
    ============================================================ */
 function ConfirmScreen({
   photo, prompt, freeLeft, credits, canGenerate,
+  idPhoto, idSuit, setIdSuit, idBg, setIdBg,
+  fourcut, fourcutCount, setFourcutCount, fourcutStyleKey, setFourcutStyleKey,
   onBack, onGenerate, onStore,
 }) {
   const useFree = freeLeft > 0;
@@ -1589,6 +1954,113 @@ function ConfirmScreen({
         </div>
       </div>
 
+      {fourcut && (
+        <div style={S.idOptCard}>
+          <div style={S.idOptLabel}>컷 수 (선택한 컷 수만큼 차감돼요)</div>
+          <div style={S.idSuitRow}>
+            {FOURCUT_COUNTS.map((n) => (
+              <button
+                key={n}
+                onClick={() => setFourcutCount(n)}
+                style={{
+                  ...S.idSuitChip,
+                  ...(fourcutCount === n ? S.idSuitChipOn : null),
+                }}
+              >
+                {n}컷
+              </button>
+            ))}
+          </div>
+
+          <div style={{ ...S.idOptLabel, marginTop: 14 }}>스타일</div>
+          <div style={S.idSuitRow}>
+            {FOURCUT_STYLES.map((s) => (
+              <button
+                key={s.key}
+                onClick={() => setFourcutStyleKey(s.key)}
+                style={{
+                  ...S.idSuitChip,
+                  ...(fourcutStyleKey === s.key ? S.idSuitChipOn : null),
+                }}
+              >
+                {s.emoji} {s.label}
+              </button>
+            ))}
+          </div>
+          <div style={{ ...S.promptPeek, marginTop: 12 }}>
+            컷마다 포즈·표정이 다양하게 나오고, 프레임·날짜·rimikimi 로고가 자동으로 합성돼요.
+          </div>
+        </div>
+      )}
+
+      {idPhoto && (
+        <div style={S.idOptCard}>
+          <div style={S.idOptLabel}>정장 색상</div>
+          <div style={S.idSuitRow}>
+            {ID_SUITS.map((s) => (
+              <button
+                key={s.key}
+                onClick={() => setIdSuit(s.key)}
+                style={{
+                  ...S.idSuitChip,
+                  ...(idSuit === s.key ? S.idSuitChipOn : null),
+                }}
+              >
+                <span style={{ ...S.idSuitDot, background: s.css }} />
+                {s.label}
+              </button>
+            ))}
+          </div>
+
+          <div style={{ ...S.idOptLabel, marginTop: 14 }}>배경 색상</div>
+          <div style={S.idBgRow}>
+            {ID_BGS.map((b) => (
+              <button
+                key={b.hex}
+                onClick={() => setIdBg(b.hex)}
+                title={b.hex}
+                style={{
+                  ...S.idBgSwatch,
+                  background: `linear-gradient(160deg, ${b.hex} 0%, ${b.hex} 45%, rgba(0,0,0,0.14) 140%)`,
+                  ...(idBg.toLowerCase() === b.hex.toLowerCase() ? S.idBgSwatchOn : null),
+                }}
+              >
+                {idBg.toLowerCase() === b.hex.toLowerCase() ? (
+                  <span style={{ ...S.idBgCheck, color: ["#1b3c5a", "#4d3f64"].includes(b.hex) ? "#fff" : "#333" }}>✓</span>
+                ) : null}
+              </button>
+            ))}
+          </div>
+
+          {(() => {
+            const isCustom = !ID_BGS.some((b) => b.hex.toLowerCase() === idBg.toLowerCase());
+            return (
+              <label style={{ ...S.idCustomRow, ...(isCustom ? S.idCustomRowOn : null) }}>
+                <span
+                  style={{
+                    ...S.idCustomSwatch,
+                    background: isCustom
+                      ? idBg
+                      : "conic-gradient(from 0deg, #ff3b3b, #ffec3b, #4bff3b, #3bffe1, #3b6bff, #c43bff, #ff3bb0, #ff3b3b)",
+                  }}
+                />
+                <span style={S.idCustomText}>
+                  직접 선택{isCustom ? ` · ${idBg.toUpperCase()}` : ""}
+                </span>
+                <input
+                  type="color"
+                  value={isCustom ? idBg : "#cccccc"}
+                  onChange={(e) => setIdBg(e.target.value)}
+                  style={{ position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none" }}
+                />
+              </label>
+            );
+          })()}
+
+          <div style={S.idDisclaimer}>⚠️ {ID_DISCLAIMER}</div>
+        </div>
+      )}
+
       <div style={S.costRow}>
         <span style={S.costLabel}>{t("step3.use")}</span>
         <span style={S.costValue}>
@@ -1602,7 +2074,7 @@ function ConfirmScreen({
         </button>
       ) : (
         <button style={S.primaryBtn} onClick={onStore}>
-          {t("step3.topupGenerate")}
+          {PAYMENTS_ENABLED ? t("step3.topupGenerate") : "오늘 무료 횟수 소진 · 친구 초대로 크레딧 받기"}
         </button>
       )}
     </div>
@@ -1613,7 +2085,7 @@ function ConfirmScreen({
    결과 — 생성 중 / 실패 / 성공
    ============================================================ */
 function ResultScreen({
-  generating, prompt, resultImage, genError, onRetry, onAgain, onHome,
+  generating, fourcutProgress = "", prompt, resultImage, genError, onRetry, onAgain, onHome, showAds = false,
 }) {
   return (
     <div className="fade">
@@ -1629,8 +2101,13 @@ function ResultScreen({
             ))}
           </div>
           <div style={S.genTitle}>{t("result.generating")}</div>
-          <div style={S.genSub}>#{prompt.id} · {localizedTitle(prompt)}</div>
+          <div style={S.genSub}>
+            {fourcutProgress
+              ? `인생네컷 ${fourcutProgress} 컷 생성 중...`
+              : `#${prompt.id} · ${localizedTitle(prompt)}`}
+          </div>
           <div style={S.genHint}>{t("result.generatingHint")}</div>
+          {showAds && <AdSlot />}
         </div>
       ) : genError ? (
         <div className="fade">
@@ -1669,6 +2146,21 @@ function ResultScreen({
             <button style={S.secondaryBtn} onClick={onHome}>{t("result.home")}</button>
             <button style={S.primaryBtn} onClick={onAgain}>{t("result.again")}</button>
           </div>
+          {/* 부적절 콘텐츠 신고 (App Store Guideline 1.2) */}
+          <a
+            href={
+              "mailto:enquiry@rimikimi.com?subject=" +
+              encodeURIComponent("[신고] 부적절한 생성 결과 #" + (prompt?.id ?? "")) +
+              "&body=" +
+              encodeURIComponent(
+                "신고 사유를 적어주세요.\n\n컨셉: " + (prompt?.title || "") +
+                " (#" + (prompt?.id ?? "") + ")\n"
+              )
+            }
+            style={S.reportLink}
+          >
+            {t("result.report")}
+          </a>
         </div>
       ) : null}
     </div>
@@ -1678,13 +2170,70 @@ function ResultScreen({
 /* ============================================================
    상점
    ============================================================ */
-function StoreScreen({ packs, credits, session, freeLimit = FREE_DAILY, onBack }) {
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+function StoreScreen({ packs, credits, session, freeLimit = FREE_DAILY, onCredited, onBack }) {
   const cheapest = Math.max(...packs.map((p) => perImage(p)));
   // 한국어 = 원화(₩) 주 표시, 그 외 = 달러($) 주 표시
   const ko = getLang() === "ko";
+  const native = isNative();
   const [busyId, setBusyId] = useState(null);
   const [errMsg, setErrMsg] = useState("");
+  const [okMsg, setOkMsg] = useState("");
+  // 네이티브: 스토어 실제 상품/가격 (productId → priceString, 결제 객체)
+  const [iapById, setIapById] = useState(null); // null=로딩중, {}=상품없음
 
+  useEffect(() => {
+    if (!native) return;
+    let on = true;
+    (async () => {
+      const list = await getIapPacks();
+      if (!on) return;
+      const map = {};
+      list.forEach((p) => { map[p.id] = p; });
+      setIapById(map);
+    })();
+    return () => { on = false; };
+  }, [native]);
+
+  // 결제 직후 서버 적립 (RevenueCat 반영 지연 대비 재시도)
+  async function grantWithRetry(productId, transactionId) {
+    const token = session?.access_token;
+    for (let i = 0; i < 6; i++) {
+      const r = await fetch("/api/iap/grant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+        body: JSON.stringify({ productId, transactionId }),
+      });
+      if (r.status === 202) { await sleep(1800); continue; }
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j?.error || "적립 실패");
+      return j;
+    }
+    throw new Error("구매 반영이 조금 늦어지고 있어요. 잠시 후 자동으로 들어와요.");
+  }
+
+  // 네이티브 인앱결제
+  async function startIap(pack) {
+    setErrMsg(""); setOkMsg("");
+    if (!session?.access_token) { setErrMsg("로그인이 필요해요."); return; }
+    const rc = iapById?.[pack.id];
+    if (!rc) { setErrMsg("스토어 상품을 불러오지 못했어요. 잠시 후 다시 시도해 주세요."); return; }
+    setBusyId(pack.id);
+    try {
+      const res = await purchaseIap(rc);
+      if (res?.cancelled) { setBusyId(null); return; }
+      const g = await grantWithRetry(pack.id, res?.transactionId);
+      setOkMsg(`크레딧 ${pack.count}개가 충전됐어요! 🎉`);
+      onCredited && onCredited();
+    } catch (e) {
+      setErrMsg(e.message || String(e));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  // 웹 PayPal (현재 라이브 비활성 — 네이티브가 아닐 때만 도달)
   async function startPayPal(pack) {
     setErrMsg("");
     const token = session?.access_token;
@@ -1717,6 +2266,8 @@ function StoreScreen({ packs, credits, session, freeLimit = FREE_DAILY, onBack }
     }
   }
 
+  const onBuy = native ? startIap : startPayPal;
+
   return (
     <div className="fade">
       <div style={S.navRow}>
@@ -1737,6 +2288,9 @@ function StoreScreen({ packs, credits, session, freeLimit = FREE_DAILY, onBack }
           const per = perImage(pack);
           const save = Math.round((1 - per / cheapest) * 100);
           const busy = busyId === pack.id;
+          // 네이티브: 스토어 실제 가격 문자열(현지통화 자동). 로딩 전엔 우리 표시가로 폴백.
+          const rc = native ? iapById?.[pack.id] : null;
+          const storePrice = rc?.priceString;
           return (
             <div
               key={pack.id}
@@ -1748,10 +2302,14 @@ function StoreScreen({ packs, credits, session, freeLimit = FREE_DAILY, onBack }
                 {t("store.count", { n: pack.count })}
               </div>
               <div style={S.packPrice}>
-                {ko ? won(pack.krw) : usd(pack.usd)}{" "}
-                <span style={S.packPriceSub}>
-                  ({ko ? usd(pack.usd) : "≈ " + won(pack.krw)})
-                </span>
+                {storePrice
+                  ? storePrice
+                  : ko ? won(pack.krw) : usd(pack.usd)}
+                {!storePrice && (
+                  <span style={S.packPriceSub}>
+                    ({ko ? usd(pack.usd) : "≈ " + won(pack.krw)})
+                  </span>
+                )}
               </div>
               <div style={S.packPer}>
                 {t("store.per", { price: ko ? won(perImage(pack)) : usd(perImageUsd(pack)) })}
@@ -1763,8 +2321,8 @@ function StoreScreen({ packs, credits, session, freeLimit = FREE_DAILY, onBack }
                   opacity: busy ? 0.6 : 1,
                   cursor: busy ? "wait" : "pointer",
                 }}
-                disabled={busy || !!busyId}
-                onClick={() => startPayPal(pack)}
+                disabled={busy || !!busyId || (native && iapById && !rc)}
+                onClick={() => onBuy(pack)}
               >
                 {busy ? t("store.paying") : t("store.pay")}
               </button>
@@ -1773,6 +2331,9 @@ function StoreScreen({ packs, credits, session, freeLimit = FREE_DAILY, onBack }
         })}
       </div>
 
+      {okMsg && (
+        <p style={{ ...S.storeNote, color: "#1e8e3e", fontWeight: 700 }}>{okMsg}</p>
+      )}
       {errMsg && (
         <p style={{ ...S.storeNote, color: "#c0392b" }}>{errMsg}</p>
       )}
@@ -1791,10 +2352,16 @@ const ACCENT = "#e6403c";
 
 const S = {
   app: {
-    minHeight: "100dvh", maxWidth: 440, margin: "0 auto",
-    background: BG, color: INK,
+    height: "100dvh", maxWidth: 440, margin: "0 auto",
+    background:
+      "radial-gradient(600px 420px at 12% 4%, rgba(255,209,160,.50), transparent 55%)," +
+      "radial-gradient(600px 520px at 92% 18%, rgba(255,193,214,.45), transparent 55%)," +
+      "radial-gradient(640px 620px at 60% 100%, rgba(183,224,255,.45), transparent 60%)," +
+      "linear-gradient(160deg,#fff6ec,#fdeef6 55%,#eef4ff)",
+    color: INK,
     fontFamily: "'Quicksand', 'Jua', sans-serif",
     display: "flex", flexDirection: "column", position: "relative",
+    overflow: "hidden",
   },
   splash: {
     minHeight: "100dvh", maxWidth: 440, margin: "0 auto",
@@ -1806,7 +2373,11 @@ const S = {
     display: "flex", justifyContent: "space-between", alignItems: "center",
     // 노치/상태바 안전영역만큼 위 여백 추가 (기종 자동 대응)
     padding: "calc(env(safe-area-inset-top, 0px) + 15px) 20px 13px",
-    borderBottom: "1px solid rgba(35,31,32,0.08)",
+    position: "sticky", top: 0, zIndex: 60,
+    background: "rgba(255,253,249,0.6)",
+    backdropFilter: "blur(18px) saturate(180%)",
+    WebkitBackdropFilter: "blur(18px) saturate(180%)",
+    borderBottom: "1px solid rgba(255,255,255,0.6)",
   },
   headerRight: { display: "flex", alignItems: "center", gap: 8 },
   logoutBtn: {
@@ -1984,15 +2555,51 @@ const S = {
   },
   creditChip: {
     display: "flex", alignItems: "center", gap: 7,
-    background: INK, color: "#fff", border: "none", borderRadius: 999,
+    background: "rgba(255,255,255,0.55)", color: INK,
+    border: "1px solid rgba(255,255,255,0.7)", borderRadius: 999,
+    backdropFilter: "blur(14px) saturate(180%)",
+    WebkitBackdropFilter: "blur(14px) saturate(180%)",
+    boxShadow: "0 6px 18px -6px rgba(40,30,30,0.25), inset 0 1px 0 rgba(255,255,255,0.85)",
     padding: "9px 15px", fontSize: 12.5, fontFamily: "'Quicksand', sans-serif",
-    fontWeight: 600, letterSpacing: "0.02em", cursor: "pointer",
+    fontWeight: 700, letterSpacing: "0.02em", cursor: "pointer",
   },
   creditDot: {
     width: 7, height: 7, borderRadius: "50%",
     background: "#f9c83c", display: "inline-block",
   },
-  main: { flex: 1, padding: "24px 20px 28px" },
+  main: {
+    flex: "1 1 0",
+    overflowY: "auto",
+    WebkitOverflowScrolling: "touch",
+    padding: "24px 20px",
+    paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 116px)",
+  },
+  tabbar: {
+    position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 100,
+    display: "flex", justifyContent: "center",
+    padding: "0 14px calc(env(safe-area-inset-bottom, 0px) + 12px)",
+    pointerEvents: "none",
+  },
+  tabbarInner: {
+    width: "100%", maxWidth: 412, pointerEvents: "auto",
+    display: "flex", justifyContent: "space-around", alignItems: "center",
+    background: "rgba(255,255,255,0.55)",
+    backdropFilter: "blur(22px) saturate(180%)",
+    WebkitBackdropFilter: "blur(22px) saturate(180%)",
+    border: "1px solid rgba(255,255,255,0.7)",
+    borderRadius: 26,
+    boxShadow: "0 12px 30px -8px rgba(40,30,30,0.32), inset 0 1px 0 rgba(255,255,255,0.85)",
+    padding: "9px 8px",
+  },
+  tabBtn: {
+    flex: 1, background: "transparent", border: "none", cursor: "pointer",
+    display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
+    color: INK, opacity: 0.5, padding: "4px 0",
+    fontFamily: "'Quicksand', sans-serif",
+  },
+  tabBtnOn: { opacity: 1, color: ACCENT },
+  tabIcon: { fontSize: 18, lineHeight: 1 },
+  tabLabel: { fontSize: 10.5, fontWeight: 700, letterSpacing: "0.01em" },
   footer: {
     textAlign: "center",
     // 홈 인디케이터 안전영역만큼 아래 여백 추가
@@ -2032,10 +2639,14 @@ const S = {
     fontWeight: 500,
   },
   uploadBox: {
-    width: "100%", aspectRatio: "4/3", background: "#fff",
-    border: "2.5px dashed " + ACCENT + "55", borderRadius: 22,
+    width: "100%", aspectRatio: "4/3",
+    background: "rgba(255,255,255,0.4)",
+    backdropFilter: "blur(12px) saturate(160%)",
+    WebkitBackdropFilter: "blur(12px) saturate(160%)",
+    border: "2px dashed " + ACCENT + "66", borderRadius: 22,
     display: "flex", flexDirection: "column", alignItems: "center",
     justifyContent: "center", gap: 8, cursor: "pointer",
+    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.7)",
   },
   uploadIcon: { fontSize: 42, color: ACCENT, fontWeight: 300, lineHeight: 1 },
   uploadText: { fontSize: 14.5, fontWeight: 600 },
@@ -2066,16 +2677,22 @@ const S = {
   checkbox: { marginTop: 1, width: 17, height: 17, accentColor: ACCENT },
   consentText: { fontSize: 11.5, lineHeight: 1.6, opacity: 0.7, fontWeight: 500 },
   primaryBtn: {
-    width: "100%", background: ACCENT, color: "#fff", border: "none",
+    width: "100%", color: "#fff", border: "none",
+    background: "linear-gradient(135deg, #ff6b66, " + ACCENT + ")",
     borderRadius: 16, padding: "16px", fontSize: 15, fontWeight: 700,
     fontFamily: "'Quicksand', sans-serif", letterSpacing: "0.02em",
-    cursor: "pointer", boxShadow: "0 6px 18px " + ACCENT + "40",
+    cursor: "pointer",
+    boxShadow: "0 10px 24px -8px " + ACCENT + "b0, inset 0 1px 0 rgba(255,255,255,0.5)",
   },
   secondaryBtn: {
-    width: "100%", background: "#fff", color: INK,
-    border: "2px solid " + INK + "22", borderRadius: 16, padding: "15px",
+    width: "100%", color: INK,
+    background: "rgba(255,255,255,0.55)",
+    backdropFilter: "blur(12px) saturate(170%)",
+    WebkitBackdropFilter: "blur(12px) saturate(170%)",
+    border: "1px solid rgba(255,255,255,0.7)", borderRadius: 16, padding: "15px",
     fontSize: 15, fontWeight: 700, fontFamily: "'Quicksand', sans-serif",
     cursor: "pointer",
+    boxShadow: "0 6px 18px -6px rgba(40,30,30,0.2), inset 0 1px 0 rgba(255,255,255,0.8)",
   },
   moreBtn: {
     background: "#fff", color: INK,
@@ -2249,12 +2866,16 @@ const S = {
     WebkitOverflowScrolling: "touch",
   },
   catChip: {
-    flexShrink: 0, background: "#fff",
-    border: "2px solid " + INK + "16", borderRadius: 999,
-    padding: "8px 15px", fontSize: 12.5, fontWeight: 600,
+    flexShrink: 0,
+    background: "rgba(255,255,255,0.5)",
+    backdropFilter: "blur(12px) saturate(170%)",
+    WebkitBackdropFilter: "blur(12px) saturate(170%)",
+    border: "1px solid rgba(255,255,255,0.7)", borderRadius: 999,
+    padding: "8px 15px", fontSize: 12.5, fontWeight: 700,
     fontFamily: "'Quicksand', sans-serif", cursor: "pointer",
     color: INK, whiteSpace: "nowrap",
     display: "inline-flex", alignItems: "center", gap: 6,
+    boxShadow: "0 4px 12px -4px rgba(40,30,30,0.18), inset 0 1px 0 rgba(255,255,255,0.8)",
   },
   catChipActive: { color: "#fff", borderColor: "transparent" },
   catChipCount: {
@@ -2315,6 +2936,45 @@ const S = {
     borderRadius: 18, padding: "16px 16px 18px", marginBottom: 15,
     boxShadow: "0 3px 12px rgba(35,31,32,0.05)",
   },
+  idOptCard: {
+    background: "#fff", border: "1px solid " + INK + "10",
+    borderRadius: 18, padding: "16px 16px 18px", marginBottom: 15,
+    boxShadow: "0 3px 12px rgba(35,31,32,0.05)",
+  },
+  idOptLabel: { fontSize: 13, fontWeight: 800, color: INK, marginBottom: 9 },
+  idSuitRow: { display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8 },
+  idSuitChip: {
+    flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
+    gap: 7, padding: "10px 8px", borderRadius: 12, cursor: "pointer",
+    border: "1.5px solid " + INK + "18", background: "#fafafa",
+    fontSize: 13, fontWeight: 700, color: INK,
+  },
+  idSuitChipOn: { border: "1.5px solid " + ACCENT, background: ACCENT + "12" },
+  idSuitDot: { width: 16, height: 16, borderRadius: "50%", display: "inline-block", border: "1px solid rgba(0,0,0,0.12)" },
+  idBgRow: { display: "grid", gridTemplateColumns: "repeat(8, 1fr)", gap: 8 },
+  idBgSwatch: {
+    aspectRatio: "1 / 1", borderRadius: 10, cursor: "pointer",
+    border: "1.5px solid " + INK + "1a", display: "flex",
+    alignItems: "center", justifyContent: "center", padding: 0,
+  },
+  idBgSwatchOn: { border: "2.5px solid " + ACCENT, boxShadow: "0 0 0 2px " + ACCENT + "30" },
+  idBgCheck: { fontSize: 13, fontWeight: 900 },
+  idCustomRow: {
+    position: "relative", display: "flex", alignItems: "center", gap: 9,
+    marginTop: 9, padding: "9px 11px", borderRadius: 12, cursor: "pointer",
+    border: "1.5px solid " + INK + "18", background: "#fafafa",
+  },
+  idCustomRowOn: { border: "1.5px solid " + ACCENT, background: ACCENT + "10" },
+  idCustomSwatch: {
+    width: 22, height: 22, borderRadius: "50%", flex: "0 0 auto",
+    border: "1px solid rgba(0,0,0,0.15)",
+  },
+  idCustomText: { fontSize: 13, fontWeight: 700, color: INK },
+  idDisclaimer: {
+    marginTop: 14, fontSize: 11.5, lineHeight: 1.5, color: INK + "99",
+    background: "#fff7ed", border: "1px solid #f6c98a55",
+    borderRadius: 12, padding: "9px 11px",
+  },
   confirmTitle: {
     fontFamily: "'Jua', sans-serif", fontSize: 20, fontWeight: 400,
     lineHeight: 1.2,
@@ -2343,6 +3003,10 @@ const S = {
   },
   genSub: { fontSize: 11.5, fontWeight: 600, opacity: 0.5 },
   genHint: { fontSize: 10.5, fontWeight: 500, opacity: 0.4, marginTop: -8 },
+  reportLink: {
+    display: "block", textAlign: "center", marginTop: 14,
+    fontSize: 12, color: "#9aa0a6", textDecoration: "none",
+  },
   resultImage: { margin: "18px 0" },
   resultImg: {
     width: "100%", aspectRatio: "3/4", objectFit: "cover",
