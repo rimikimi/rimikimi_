@@ -2,8 +2,9 @@ import React, { useState, useRef, useMemo, useEffect } from "react";
 import { supabase } from "./supabaseClient";
 import { isNative, nativePickPhoto, nativeShare } from "./nativeBridge";
 import { initAds, showInterstitial, requestATT } from "./ads";
-import { initIap, loginIap, logoutIap, getIapPacks, purchaseIap, iapAvailable } from "./iap";
+import { initIap, loginIap, logoutIap, getIapPacks, purchaseIap, restoreIap, iapAvailable } from "./iap";
 import { FOURCUT_COUNTS, FOURCUT_STYLES, composeStrip, todayStr } from "./fourcut";
+import { getSavedSet, markSaved, syncExpiryNotifications, cancelExpiryNotice } from "./notify";
 import { t, useLang, getLang, localizedTitle, localizedCategory, getLangPreference, setLang } from "./i18n";
 import LoginGate from "./LoginGate";
 
@@ -90,7 +91,7 @@ const PAYMENTS_ENABLED = isNative();
 
 const CREDIT_PACKS = [
   { id: "credits_10",  count: 10,  krw: 7900,  usd: "7.90",  label: null },
-  { id: "credits_30",  count: 30,  krw: 22490, usd: "22.49", label: "가장 인기" },
+  { id: "credits_30",  count: 30,  krw: 22500, usd: "22.50", label: "가장 인기" },
   { id: "credits_70",  count: 70,  krw: 49900, usd: "49.90", label: null },
   { id: "credits_120", count: 120, krw: 79900, usd: "79.90", label: "최고 가성비" },
 ];
@@ -417,6 +418,7 @@ export default function PortraitStudio() {
   const [resultImage, setResultImage] = useState(null);
   const [genError, setGenError] = useState(null);
   const fileRef = useRef(null);
+  const mainRef = useRef(null);
 
   // ─── 로그인 세션 ───
   const [session, setSession] = useState(null);
@@ -766,16 +768,9 @@ export default function PortraitStudio() {
     if (!categories.some((c) => c.name === activeCat)) setActiveCat("전체");
   }, [categories, activeCat]);
 
-  // 스크롤 불필요한 화면에서 페이지 스크롤 차단
-  const NO_SCROLL_SCREENS = ["home", "confirm", "store"];
+  // 화면 전환 시 내부 스크롤을 맨 위로 (이전 화면 스크롤 위치 잔존 방지)
   useEffect(() => {
-    const el = document.documentElement;
-    if (NO_SCROLL_SCREENS.includes(screen)) {
-      el.style.overflow = "hidden";
-    } else {
-      el.style.overflow = "";
-    }
-    return () => { el.style.overflow = ""; };
+    if (mainRef.current) mainRef.current.scrollTop = 0;
   }, [screen]);
 
   function resetFilters() {
@@ -1035,7 +1030,7 @@ export default function PortraitStudio() {
         </div>
       )}
 
-      <main style={S.main}>
+      <main style={S.main} ref={mainRef}>
         {screen === "home" && (() => {
           const art = isArtConcept(selected);
           const currentPhoto = art ? artPhoto : photo;
@@ -1160,25 +1155,25 @@ export default function PortraitStudio() {
         )}
       </main>
 
-      <footer style={S.footer}>
-        <div style={S.footerLinks}>
-          {/* 절대 URL + 새 창: 웹은 새 탭, 네이티브 앱은 시스템 브라우저로 열림.
-              (네이티브는 번들 모드라 상대경로 /privacy 가 rewrite 없이 404 나므로 절대 URL 필요) */}
-          <a href={`${LEGAL_BASE}/terms`} target="_blank" rel="noopener noreferrer" style={S.footerLink}>{t("footer.terms")}</a>
-          <span style={S.footerDot}>·</span>
-          <a href={`${LEGAL_BASE}/privacy`} target="_blank" rel="noopener noreferrer" style={S.footerLink}>{t("footer.privacy")}</a>
-          <span style={S.footerDot}>·</span>
-          <a href={`${LEGAL_BASE}/refund`} target="_blank" rel="noopener noreferrer" style={S.footerLink}>{t("footer.refund")}</a>
-        </div>
-        {IS_KOREA && (
-          <div style={S.footerBiz}>
-            {t("footer.biz.company")}<br />
-            {t("footer.biz.reg")} · {t("footer.biz.sales")}<br />
-            {t("footer.biz.addr")}<br />
-            {t("footer.biz.contact")}
+      {!isNative() && (
+        <footer style={S.footer}>
+          <div style={S.footerLinks}>
+            <a href={`${LEGAL_BASE}/terms`} target="_blank" rel="noopener noreferrer" style={S.footerLink}>{t("footer.terms")}</a>
+            <span style={S.footerDot}>·</span>
+            <a href={`${LEGAL_BASE}/privacy`} target="_blank" rel="noopener noreferrer" style={S.footerLink}>{t("footer.privacy")}</a>
+            <span style={S.footerDot}>·</span>
+            <a href={`${LEGAL_BASE}/refund`} target="_blank" rel="noopener noreferrer" style={S.footerLink}>{t("footer.refund")}</a>
           </div>
-        )}
-      </footer>
+          {IS_KOREA && (
+            <div style={S.footerBiz}>
+              {t("footer.biz.company")}<br />
+              {t("footer.biz.reg")} · {t("footer.biz.sales")}<br />
+              {t("footer.biz.addr")}<br />
+              {t("footer.biz.contact")}
+            </div>
+          )}
+        </footer>
+      )}
 
       <BottomNav screen={screen} go={setScreen} />
     </div>
@@ -1787,6 +1782,7 @@ function MyGalleryScreen({ accessToken, onBack }) {
   const [items, setItems] = useState(null); // null=로딩, []=빈, [...]=있음
   const [error, setError] = useState(null);
   const [tick, setTick] = useState(0); // 1초마다 남은시간 갱신
+  const [saved, setSaved] = useState(() => getSavedSet()); // 저장한 항목 id 집합
 
   // 1초마다 리렌더 (남은 시간 카운트다운)
   useEffect(() => {
@@ -1804,8 +1800,11 @@ function MyGalleryScreen({ accessToken, onBack }) {
       .then((r) => r.json())
       .then((j) => {
         if (cancelled) return;
-        if (j.items) setItems(j.items);
-        else setError(j.error || "불러오기 실패");
+        if (j.items) {
+          setItems(j.items);
+          // 저장 안 한 항목은 만료 10분 전 푸시 알림 예약 (네이티브)
+          syncExpiryNotifications(j.items, getSavedSet());
+        } else setError(j.error || "불러오기 실패");
       })
       .catch((e) => {
         if (!cancelled) setError(e?.message || "네트워크 오류");
@@ -1813,8 +1812,27 @@ function MyGalleryScreen({ accessToken, onBack }) {
     return () => { cancelled = true; };
   }, [accessToken]);
 
+  // "저장" — 웹은 다운로드, 네이티브는 공유 시트(앨범 저장). 성공 시 저장 표시 + 알림 취소.
+  async function handleSave(it) {
+    if (!it.url) return;
+    if (isNative()) {
+      const ok = await nativeShare({ title: it.conceptTitle || "rimikimi", url: it.url });
+      if (!ok) return; // 사용자가 취소
+    } else {
+      const a = document.createElement("a");
+      a.href = it.url;
+      a.download = `rimikimi_${it.conceptId}.png`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    }
+    setSaved(markSaved(it.id));
+    cancelExpiryNotice(it.id); // 저장했으니 만료 알림 불필요
+  }
+
   async function handleDelete(id) {
     if (!confirm(t("gallery.deleteConfirm"))) return;
+    cancelExpiryNotice(id);
     await fetch("/api/gallery?id=" + id, {
       method: "DELETE",
       headers: { Authorization: "Bearer " + accessToken },
@@ -1875,6 +1893,7 @@ function MyGalleryScreen({ accessToken, onBack }) {
           {items.map((it) => {
             const expMs = new Date(it.expiresAt).getTime() - Date.now();
             const isExpiring = expMs < 10 * 60 * 1000; // 10분 이하면 임박
+            const isSaved = saved.has(it.id);
             return (
               <div key={it.id} style={S.myGalleryCard}>
                 <div style={S.myGalleryImgWrap}>
@@ -1882,6 +1901,9 @@ function MyGalleryScreen({ accessToken, onBack }) {
                     <img src={it.url} alt={it.conceptTitle || ""} style={S.myGalleryImg} />
                   ) : (
                     <div style={S.thumbFallback}>♡</div>
+                  )}
+                  {isSaved && (
+                    <div style={S.myGallerySavedBadge}>{t("gallery.savedBadge")}</div>
                   )}
                   <div
                     style={{
@@ -1897,13 +1919,15 @@ function MyGalleryScreen({ accessToken, onBack }) {
                     {it.conceptTitle || `컨셉 ${it.conceptId}`}
                   </div>
                   <div style={S.myGalleryActions}>
-                    <a
-                      href={it.url}
-                      download={`rimikimi_${it.conceptId}.png`}
-                      style={S.myGalleryDownload}
+                    <button
+                      style={{
+                        ...S.myGalleryDownload,
+                        ...(isSaved ? S.myGalleryDownloadDone : {}),
+                      }}
+                      onClick={() => handleSave(it)}
                     >
-                      {t("gallery.action.save")}
-                    </a>
+                      {isSaved ? t("gallery.action.saved") : t("gallery.action.save")}
+                    </button>
                     <button
                       style={S.myGalleryDelete}
                       onClick={() => handleDelete(it.id)}
@@ -2192,6 +2216,7 @@ function StoreScreen({ packs, credits, session, freeLimit = FREE_DAILY, onCredit
   const [busyId, setBusyId] = useState(null);
   const [errMsg, setErrMsg] = useState("");
   const [okMsg, setOkMsg] = useState("");
+  const [restoring, setRestoring] = useState(false);
   // 네이티브: 스토어 실제 상품/가격 (productId → priceString, 결제 객체)
   const [iapById, setIapById] = useState(null); // null=로딩중, {}=상품없음
 
@@ -2280,6 +2305,21 @@ function StoreScreen({ packs, credits, session, freeLimit = FREE_DAILY, onCredit
 
   const onBuy = native ? startIap : startPayPal;
 
+  // 구매 복원 (App Store 3.1.1)
+  async function startRestore() {
+    setErrMsg(""); setOkMsg("");
+    setRestoring(true);
+    try {
+      await restoreIap();
+      onCredited && onCredited();
+      setOkMsg(t("store.restoreOk"));
+    } catch (e) {
+      setErrMsg(e.message || String(e));
+    } finally {
+      setRestoring(false);
+    }
+  }
+
   return (
     <div className="fade">
       <div style={S.navRow}>
@@ -2336,12 +2376,28 @@ function StoreScreen({ packs, credits, session, freeLimit = FREE_DAILY, onCredit
                 disabled={busy || !!busyId || (native && iapById && !rc)}
                 onClick={() => onBuy(pack)}
               >
-                {busy ? t("store.paying") : t("store.pay")}
+                {busy ? t("store.paying") : (native ? t("store.pay") : t("store.payWeb"))}
               </button>
             </div>
           );
         })}
       </div>
+
+      {native && (
+        <div style={{ textAlign: "center", marginTop: 20 }}>
+          <button
+            style={{
+              ...S.restoreBtn,
+              opacity: restoring || !!busyId ? 0.5 : 1,
+              cursor: restoring || !!busyId ? "wait" : "pointer",
+            }}
+            disabled={restoring || !!busyId}
+            onClick={startRestore}
+          >
+            {restoring ? t("store.restoring") : t("store.restore")}
+          </button>
+        </div>
+      )}
 
       {okMsg && (
         <p style={{ ...S.storeNote, color: "#1e8e3e", fontWeight: 700 }}>{okMsg}</p>
@@ -2350,7 +2406,7 @@ function StoreScreen({ packs, credits, session, freeLimit = FREE_DAILY, onCredit
         <p style={{ ...S.storeNote, color: "#c0392b" }}>{errMsg}</p>
       )}
 
-      <p style={S.storeNote}>{t("store.note")}</p>
+      <p style={S.storeNote}>{native ? t("store.note") : t("store.noteWeb")}</p>
     </div>
   );
 }
@@ -2364,7 +2420,9 @@ const ACCENT = "#e6403c";
 
 const S = {
   app: {
-    minHeight: "100dvh", maxWidth: 440, margin: "0 auto",
+    // 화면 높이로 고정 + overflow hidden → 문서 자체는 스크롤/바운스 안 함.
+    // 내용이 넘치는 화면만 내부(main)에서 스크롤된다. (짧은 화면 = 자동 고정)
+    height: "100dvh", maxWidth: 440, margin: "0 auto",
     background:
       "radial-gradient(600px 420px at 12% 4%, rgba(255,209,160,.50), transparent 55%)," +
       "radial-gradient(600px 520px at 92% 18%, rgba(255,193,214,.45), transparent 55%)," +
@@ -2373,12 +2431,13 @@ const S = {
     color: INK,
     fontFamily: "'Quicksand', 'Jua', sans-serif",
     display: "flex", flexDirection: "column", position: "relative",
-    paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 88px)",
+    overflow: "hidden",
   },
   splash: {
-    minHeight: "100dvh", maxWidth: 440, margin: "0 auto",
+    height: "100dvh", maxWidth: 440, margin: "0 auto",
     background: BG, display: "flex", flexDirection: "column",
     alignItems: "center", justifyContent: "center", gap: 26,
+    overflow: "hidden",
   },
   splashDots: { display: "flex", gap: 9 },
   header: {
@@ -2386,10 +2445,9 @@ const S = {
     // 노치/상태바 안전영역만큼 위 여백 추가 (기종 자동 대응)
     padding: "calc(env(safe-area-inset-top, 0px) + 15px) 20px 13px",
     position: "sticky", top: 0, zIndex: 60,
-    background: "rgba(255,253,249,0.6)",
+    background: "rgba(255,253,249,0.94)",
     backdropFilter: "blur(18px) saturate(180%)",
     WebkitBackdropFilter: "blur(18px) saturate(180%)",
-    borderBottom: "1px solid rgba(255,255,255,0.6)",
   },
   headerRight: { display: "flex", alignItems: "center", gap: 8 },
   logoutBtn: {
@@ -2545,6 +2603,14 @@ const S = {
     letterSpacing: "0.02em",
   },
   myGalleryTimerWarn: { background: ACCENT },
+  myGallerySavedBadge: {
+    position: "absolute", left: 8, top: 8,
+    background: "rgba(46,160,90,0.92)", color: "#fff",
+    borderRadius: 999, padding: "4px 9px",
+    fontSize: 10, fontWeight: 800, fontFamily: "'Quicksand', sans-serif",
+    letterSpacing: "0.02em",
+    boxShadow: "0 2px 6px rgba(35,31,32,0.18)",
+  },
   myGalleryFooter: { padding: "10px 11px 12px" },
   myGalleryTitle: {
     fontSize: 12, fontWeight: 700, color: INK,
@@ -2558,6 +2624,11 @@ const S = {
     background: INK, color: "#fff", textAlign: "center",
     textDecoration: "none", borderRadius: 8, padding: "7px 0",
     fontSize: 11.5, fontWeight: 700, fontFamily: "'Quicksand', sans-serif",
+    border: "none", cursor: "pointer",
+  },
+  myGalleryDownloadDone: {
+    background: "#fff", color: "#2EA05A",
+    border: "1px solid #2EA05A55",
   },
   myGalleryDelete: {
     background: "transparent", color: ACCENT,
@@ -2579,7 +2650,16 @@ const S = {
     width: 7, height: 7, borderRadius: "50%",
     background: "#f9c83c", display: "inline-block",
   },
-  main: { flex: 1, padding: "24px 20px 28px" },
+  main: {
+    flex: 1, minHeight: 0,            // minHeight:0 = flex 자식이 줄어들 수 있어야 내부 스크롤이 동작 (없으면 내용이 잘림)
+    overflowY: "auto", overflowX: "hidden",
+    WebkitOverflowScrolling: "touch",
+    overscrollBehavior: "contain",     // 내부 스크롤 끝에서 문서로 바운스 전파 차단
+    // top 패딩 0 = sticky 카테고리바가 헤더 바로 아래에 딱 붙음(패딩 있으면 WebKit이 그 만큼
+    // 아래에서 sticky 고정 → 헤더와 바 사이로 갤러리가 비쳐 보이는 틈 발생). 위 여백은 .fade 가 담당.
+    // 하단 플로팅 탭바(고정)에 마지막 내용이 가리지 않도록 여백 확보
+    padding: "0 20px calc(env(safe-area-inset-bottom, 0px) + 96px)",
+  },
   tabbar: {
     position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 100,
     display: "flex", justifyContent: "center",
@@ -3077,6 +3157,12 @@ const S = {
     fontSize: 13.5, fontWeight: 700, fontFamily: "'Quicksand', sans-serif",
     cursor: "pointer",
   },
+  restoreBtn: {
+    background: "none", border: "1.5px solid rgba(35,31,32,0.22)",
+    borderRadius: 10, padding: "8px 18px",
+    fontSize: 12.5, fontWeight: 600, fontFamily: "'Quicksand', sans-serif",
+    color: INK, opacity: 0.65, cursor: "pointer",
+  },
   storeNote: {
     fontSize: 10, lineHeight: 1.65, opacity: 0.45,
     marginTop: 18, textAlign: "center", fontWeight: 500,
@@ -3087,7 +3173,7 @@ const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Jua&family=Quicksand:wght@400;500;600;700&display=swap');
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 body { margin: 0; background: ${BG}; }
-.fade { animation: fadeIn .35s ease; }
+.fade { animation: fadeIn .35s ease; padding-top: 18px; }
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
