@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>계정 삭제 — rimikimi</title>
+    <meta name="theme-color" content="#fffdf9" />
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap');
+      :root {
+        --bg: #fffdf9;
+        --ink: #231f20;
+        --accent: #e6403c;
+        --muted: rgba(35, 31, 32, 0.6);
+        --border: rgba(35, 31, 32, 0.12);
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; background: var(--bg); color: var(--ink);
+        font-family: 'Quicksand', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+        line-height: 1.7; font-size: 14.5px;
+      }
+      .wrap { max-width: 720px; margin: 0 auto; padding: 28px 22px 64px; }
+      .back { display: inline-block; color: var(--accent); text-decoration: none; font-size: 12.5px; font-weight: 700; margin-bottom: 16px; }
+      h1 { font-size: 22px; margin: 0 0 6px; font-weight: 700; }
+      .updated { font-size: 11.5px; color: var(--muted); margin-bottom: 28px; }
+      h2 { font-size: 15px; margin: 28px 0 8px; font-weight: 700; }
+      p, li { font-size: 14px; }
+      ul { padding-left: 22px; }
+      hr { border: none; border-top: 1px solid var(--border); margin: 36px 0; }
+      .footer { font-size: 11.5px; color: var(--muted); margin-top: 32px; }
+      .biz { font-size: 12.5px; color: var(--muted); line-height: 1.9; }
+      .box { background: rgba(230,64,60,0.06); border: 1px solid rgba(230,64,60,0.25); border-radius: 12px; padding: 14px 16px; margin: 14px 0; }
+      a { color: var(--accent); }
+
+      /* --- self-service deletion form --- */
+      #delete-form-section { margin-top: 8px; }
+      .form-card {
+        background: #fff;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 22px 20px;
+        margin: 16px 0;
+      }
+      .form-row { margin-bottom: 14px; }
+      .form-row label {
+        display: block;
+        font-size: 12.5px;
+        font-weight: 700;
+        color: var(--muted);
+        margin-bottom: 5px;
+      }
+      .form-row input {
+        width: 100%;
+        padding: 10px 13px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        font-family: inherit;
+        font-size: 14px;
+        background: var(--bg);
+        color: var(--ink);
+        outline: none;
+        transition: border-color 0.15s;
+      }
+      .form-row input:focus { border-color: var(--accent); }
+
+      /* confirm warning box */
+      #confirm-box {
+        display: none;
+        background: rgba(230,64,60,0.08);
+        border: 1.5px solid rgba(230,64,60,0.4);
+        border-radius: 12px;
+        padding: 14px 16px;
+        margin: 14px 0;
+        font-size: 13.5px;
+        line-height: 1.65;
+      }
+      #confirm-box strong { color: var(--accent); }
+
+      .btn {
+        display: inline-block;
+        padding: 11px 22px;
+        border-radius: 9px;
+        font-family: inherit;
+        font-size: 14px;
+        font-weight: 700;
+        cursor: pointer;
+        border: none;
+        transition: opacity 0.15s;
+      }
+      .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+      .btn-danger { background: var(--accent); color: #fff; width: 100%; margin-top: 4px; }
+      .btn-danger:hover:not(:disabled) { opacity: 0.88; }
+      .btn-outline {
+        background: transparent;
+        border: 1.5px solid var(--border);
+        color: var(--ink);
+        margin-right: 8px;
+      }
+
+      #status-msg {
+        display: none;
+        border-radius: 10px;
+        padding: 12px 15px;
+        font-size: 13.5px;
+        margin-top: 14px;
+        line-height: 1.6;
+      }
+      #status-msg.success {
+        display: block;
+        background: rgba(40,167,69,0.08);
+        border: 1px solid rgba(40,167,69,0.3);
+        color: #1a5c2a;
+      }
+      #status-msg.error {
+        display: block;
+        background: rgba(230,64,60,0.08);
+        border: 1px solid rgba(230,64,60,0.3);
+        color: #a52020;
+      }
+      .spinner {
+        display: inline-block;
+        width: 14px; height: 14px;
+        border: 2px solid rgba(255,255,255,0.4);
+        border-top-color: #fff;
+        border-radius: 50%;
+        animation: spin 0.7s linear infinite;
+        vertical-align: middle;
+        margin-right: 6px;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <a class="back" href="/">← 돌아가기</a>
+      <h1>계정 및 데이터 삭제 안내</h1>
+      <div class="updated">시행일: 2026년 6월 17일</div>
+
+      <p>리미키미(rimikimi)는 이용자가 언제든지 계정과 관련 데이터를 직접 삭제할 수 있도록
+      아래 자가 삭제 양식을 제공합니다.</p>
+
+      <!-- ===== SELF-SERVICE DELETION FORM ===== -->
+      <div id="delete-form-section">
+        <h2>계정 직접 삭제 / Delete Your Account</h2>
+        <div class="form-card">
+          <div id="form-step-1">
+            <div class="form-row">
+              <label for="del-email">이메일 주소 / Email</label>
+              <input type="email" id="del-email" autocomplete="email" placeholder="가입 시 사용한 이메일" />
+            </div>
+            <div class="form-row">
+              <label for="del-password">비밀번호 / Password</label>
+              <input type="password" id="del-password" autocomplete="current-password" placeholder="••••••••" />
+            </div>
+            <button class="btn btn-danger" id="btn-verify" onclick="handleVerify()">
+              계속하기 / Continue
+            </button>
+          </div>
+
+          <!-- step 2: confirm -->
+          <div id="form-step-2" style="display:none">
+            <div id="confirm-box">
+              <strong>계정과 모든 데이터가 영구 삭제됩니다.</strong><br />
+              삭제되는 항목: 계정 정보, 저장된 생성 이미지, 사용 기록, 크레딧 및 계정 연결 데이터 전체.<br />
+              이 작업은 되돌릴 수 없습니다.<br /><br />
+              <strong>All account data will be permanently deleted.</strong><br />
+              This includes your profile, generated images, usage history, credits, and all linked data.
+              This cannot be undone.
+            </div>
+            <div style="margin-top:14px">
+              <button class="btn btn-outline" onclick="handleCancel()">취소 / Cancel</button>
+              <button class="btn btn-danger" id="btn-confirm" onclick="handleConfirm()" style="width:auto">
+                영구 삭제 확인 / Confirm Deletion
+              </button>
+            </div>
+          </div>
+
+          <div id="status-msg"></div>
+        </div>
+      </div>
+      <!-- ===== END FORM ===== -->
+
+      <h2>삭제되는 데이터</h2>
+      <ul>
+        <li>계정 정보(이메일, 로그인 식별자)</li>
+        <li>내 갤러리에 저장된 생성 이미지 및 사용 기록</li>
+        <li>크레딧·초대 등 계정에 연결된 모든 데이터</li>
+      </ul>
+      <p>업로드하신 원본 사진은 애초에 서버에 저장되지 않으며, 생성된 이미지도
+      생성 후 1시간 이내에 자동 삭제됩니다.</p>
+
+      <h2>보관되는 데이터 (법령상 의무)</h2>
+      <p>관련 법령(전자상거래법 등)에 따라 보관이 의무화된 결제·거래 기록 등은
+      해당 법정 보관 기간 동안 분리 보관 후 파기됩니다. 그 외 개인정보는 지체 없이 삭제됩니다.</p>
+
+      <h2>이메일로 삭제 요청 (대안)</h2>
+      <div class="box">
+        위 양식을 사용할 수 없는 경우, 아래 이메일로 <strong>가입하신 이메일 주소</strong>와 함께
+        "계정 삭제 요청"이라고 보내주세요.<br />
+        <strong><a href="mailto:enquiry@rimikimi.com?subject=계정 삭제 요청">enquiry@rimikimi.com</a></strong>
+        &nbsp;— 영업일 기준 7일 이내 처리
+      </div>
+
+      <hr />
+
+      <h1 style="font-size:18px">Account &amp; Data Deletion</h1>
+      <p>Use the self-service form above to delete your account immediately. Sign in with your
+      email and password, confirm the deletion, and your account and all associated data will be
+      permanently removed.</p>
+      <p>If you cannot use the form, email
+      <strong><a href="mailto:enquiry@rimikimi.com?subject=Account Deletion Request">enquiry@rimikimi.com</a></strong>
+      from or including your sign-up email, with the subject "Account Deletion Request".
+      We process email requests within 7 business days.</p>
+      <p>Deleted: account info (email, login identifier), saved generated images, usage history,
+      credits and all account-linked data. Uploaded source photos are never stored on our servers,
+      and generated images auto-delete within 1 hour. Records that must be retained by law
+      (e.g., transaction records) are kept only for the legally required period, then destroyed.</p>
+
+      <hr />
+      <div class="biz">
+        <strong>사업자 정보</strong><br />
+        상호: 리미키미<br />
+        문의: enquiry@rimikimi.com &nbsp;|&nbsp; 050-6988-2464
+      </div>
+      <div class="footer">© 2026 리미키미 (rimikimi). All rights reserved.</div>
+    </div>
+
+    <script>
+      // Public anon key — safe to inline in browser (row-level security enforced on server)
+      const SUPABASE_URL = 'https://hedgjzdrivilclmwumoc.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhlZGdqemRyaXZpbGNsbXd1bW9jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2OTk1MjksImV4cCI6MjA5NTI3NTUyOX0.Hp88oUR53x4dEwnfYoxreDHUvZWZHiA4Skm_2nozVa8';
+
+      const { createClient } = supabase; // from CDN global
+      const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+      let _accessToken = null;
+
+      function showStatus(type, html) {
+        const el = document.getElementById('status-msg');
+        el.className = type;
+        el.innerHTML = html;
+      }
+
+      function setLoading(btnId, loading, label) {
+        const btn = document.getElementById(btnId);
+        btn.disabled = loading;
+        btn.innerHTML = loading
+          ? '<span class="spinner"></span>' + label
+          : label;
+      }
+
+      async function handleVerify() {
+        const email = document.getElementById('del-email').value.trim();
+        const password = document.getElementById('del-password').value;
+        if (!email || !password) {
+          showStatus('error', '이메일과 비밀번호를 입력해 주세요. / Please enter your email and password.');
+          return;
+        }
+        setLoading('btn-verify', true, '확인 중…');
+        document.getElementById('status-msg').className = '';
+        document.getElementById('status-msg').innerHTML = '';
+
+        const { data, error } = await sb.auth.signInWithPassword({ email, password });
+        setLoading('btn-verify', false, '계속하기 / Continue');
+
+        if (error || !data?.session?.access_token) {
+          showStatus('error',
+            '로그인에 실패했습니다. 이메일 또는 비밀번호를 확인해 주세요.<br />' +
+            'Sign-in failed. Please check your email and password.');
+          return;
+        }
+
+        _accessToken = data.session.access_token;
+
+        // advance to confirm step
+        document.getElementById('form-step-1').style.display = 'none';
+        document.getElementById('form-step-2').style.display = 'block';
+        document.getElementById('confirm-box').style.display = 'block';
+      }
+
+      function handleCancel() {
+        _accessToken = null;
+        document.getElementById('form-step-2').style.display = 'none';
+        document.getElementById('form-step-1').style.display = 'block';
+        document.getElementById('confirm-box').style.display = 'none';
+        document.getElementById('status-msg').className = '';
+        document.getElementById('status-msg').innerHTML = '';
+        document.getElementById('del-password').value = '';
+      }
+
+      async function handleConfirm() {
+        if (!_accessToken) return;
+        setLoading('btn-confirm', true, '삭제 중…');
+
+        try {
+          const res = await fetch('/api/account/delete', {
+            method: 'POST',
+            headers: {
+              'Authorization': 'Bearer ' + _accessToken,
+              'Content-Type': 'application/json',
+            },
+          });
+          const json = await res.json().catch(() => ({}));
+
+          if (res.ok && json.ok) {
+            // success — hide form, show confirmation
+            document.getElementById('delete-form-section').style.display = 'none';
+            showStatus('success',
+              '계정이 성공적으로 삭제되었습니다. 모든 데이터가 영구 삭제됩니다.<br />' +
+              'Your account has been permanently deleted. All associated data has been removed.');
+          } else {
+            const msg = json.error || '알 수 없는 오류';
+            showStatus('error',
+              '삭제에 실패했습니다: ' + msg + '<br />' +
+              'Deletion failed: ' + msg);
+            setLoading('btn-confirm', false, '영구 삭제 확인 / Confirm Deletion');
+          }
+        } catch (e) {
+          showStatus('error',
+            '네트워크 오류가 발생했습니다. 잠시 후 다시 시도하거나 이메일로 문의해 주세요.<br />' +
+            'A network error occurred. Please try again or contact us by email.');
+          setLoading('btn-confirm', false, '영구 삭제 확인 / Confirm Deletion');
+        }
+      }
+    </script>
+  </body>
+</html>

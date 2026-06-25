@@ -1,0 +1,27 @@
+# 웹앱(Vite) 배포에 불필요한 것 — Vercel 업로드 제외
+# (Vercel은 .gitignore를 보지 않으므로 여기서 명시해야 함)
+
+# 네이티브 앱 (Capacitor) — 웹 배포와 무관, 용량 큼
+android
+ios
+
+# 스토어/릴리즈 산출물
+release
+screenshots
+*.aab
+*.apk
+*.apks
+*.ipa
+
+# 비밀키 (절대 업로드 금지)
+keystore
+
+# 빌드 캐시/산출물 (Vercel이 클라우드에서 새로 빌드)
+dist
+.gradle
+
+# 기본 제외(명시)
+node_modules
+.git
+.env
+.env.local

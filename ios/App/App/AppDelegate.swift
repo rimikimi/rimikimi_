@@ -1,10 +1,24 @@
 import UIKit
 import Capacitor
+import AppTrackingTransparency
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
 
     var window: UIWindow?
+    private var attRequested = false
+
+    // ATT(앱추적투명성) 동의 팝업 — 앱이 활성화된 뒤 네이티브에서 직접 요청.
+    // WebView/플러그인 타이밍에 의존하지 않아 심사자에게 확실히 표시됨.
+    private func requestTrackingIfNeeded() {
+        guard #available(iOS 14, *) else { return }
+        if attRequested { return }
+        attRequested = true
+        // 첫 화면이 떠서 active 가 안정된 뒤 호출 (notDetermined 일 때만 팝업 표시됨)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            ATTrackingManager.requestTrackingAuthorization { _ in }
+        }
+    }
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // Override point for customization after application launch.
@@ -27,6 +41,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func applicationDidBecomeActive(_ application: UIApplication) {
         // Restart any tasks that were paused (or not yet started) while the application was inactive. If the application was previously in the background, optionally refresh the user interface.
+        requestTrackingIfNeeded()
     }
 
     func applicationWillTerminate(_ application: UIApplication) {

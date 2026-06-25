@@ -1,7 +1,7 @@
 import React, { useState, useRef, useMemo, useEffect } from "react";
 import { supabase } from "./supabaseClient";
 import { isNative, nativePickPhoto, nativeShare } from "./nativeBridge";
-import { initAds, showInterstitial, requestATT } from "./ads";
+import { initAds, showInterstitial } from "./ads";
 import { initIap, loginIap, logoutIap, getIapPacks, purchaseIap, restoreIap, iapAvailable } from "./iap";
 import { FOURCUT_COUNTS, FOURCUT_STYLES, composeStrip, todayStr } from "./fourcut";
 import { getSavedSet, markSaved, syncExpiryNotifications, cancelExpiryNotice } from "./notify";
@@ -474,10 +474,10 @@ export default function PortraitStudio() {
     (async () => {
       const { App } = await import("@capacitor/app");
 
-      // ATT 동의 팝업: 앱이 "활성" 상태일 때만 표시됨 (콜드스타트 중엔 무시됨).
-      // 추적 데이터 수집 전에 띄워야 하므로 ATT → 그다음 광고 초기화 순서.
+      // ATT is handled natively in AppDelegate.swift — do not call requestATT() from JS
+      // (duplicate JS call caused a first-launch race that suppressed the popup: App Store §11).
+      // Just initialize ads; ATT consent is already obtained by the time this runs.
       const startTracking = async () => {
-        await requestATT();   // notDetermined 면 팝업, 이미 결정됐으면 no-op
         await initAds();
       };
       const st = await App.getState();

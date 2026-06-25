@@ -14,6 +14,10 @@ import {
   inAppEscapeInstructions,
 } from "./inAppBrowser";
 import { t, useLang } from "./i18n";
+import { isNative } from "./nativeBridge";
+
+// 네이티브 앱 OAuth 복귀용 딥링크 (iOS/Android URL scheme + Supabase Redirect URL 에 등록)
+const NATIVE_REDIRECT = "com.rimikimi.app://login-callback";
 
 export default function LoginGate({ Logo }) {
   useLang(); // 언어 바뀌면 리렌더
@@ -28,20 +32,102 @@ export default function LoginGate({ Logo }) {
   const [password, setPassword] = useState("");
   const [notice, setNotice] = useState(null); // 성공 안내 (확인 메일 등)
 
-  // URL 에 ?auth_error=... 가 붙어 있으면 표시
+  // URL 에 로그인 에러가 붙어 있으면 표시
+  //  - 우리 백엔드(네이버): ?auth_error=...
+  //  - Supabase OAuth(구글/카카오/애플): ?error=...&error_description=... 또는 #error=...
   React.useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const err = params.get("auth_error");
-    if (err) {
-      setError(decodeURIComponent(err));
-      // 깔끔하게 URL 정리
+    const search = new URLSearchParams(window.location.search);
+    const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    const authErr = search.get("auth_error");
+    const oErr = search.get("error") || hash.get("error");
+    const oDesc =
+      search.get("error_description") || hash.get("error_description") || "";
+    const oCode = search.get("error_code") || hash.get("error_code") || "";
+
+    if (authErr || oErr) {
+      const blob = `${authErr || ""} ${oErr || ""} ${oCode} ${decodeURIComponent(
+        oDesc
+      )}`.toLowerCase();
+      // 사용자가 직접 취소한 경우는 조용히 넘어감
+      const cancelled =
+        /access_denied|cancel|consent_required|user_denied/.test(blob) &&
+        !/exist|already|registered|duplicate/.test(blob);
+      if (!cancelled) {
+        // 같은 이메일이 다른 provider 로 이미 가입된 충돌 → 친절 안내
+        const collision =
+          /exist|already|registered|duplicate|server_error|database error|saving new user/.test(
+            blob
+          );
+        if (collision) {
+          setError(
+            "이 이메일은 이미 다른 방법(구글·카카오·네이버·애플 중 하나)으로 가입돼 있어요.\n처음 가입할 때 쓴 방법으로 로그인해 주세요 🙂"
+          );
+        } else if (authErr) {
+          setError(decodeURIComponent(authErr));
+        } else {
+          setError(
+            decodeURIComponent(oDesc) || "로그인에 실패했어요. 다시 시도해 주세요."
+          );
+        }
+      }
+      // URL 정리 (쿼리 + 해시 둘 다)
       const url = new URL(window.location.href);
-      url.searchParams.delete("auth_error");
+      ["auth_error", "error", "error_description", "error_code", "provider"].forEach(
+        (k) => url.searchParams.delete(k)
+      );
+      url.hash = "";
       window.history.replaceState({}, "", url.toString());
     }
   }, []);
 
+  // 로그인 시도 후 인앱 브라우저를 닫거나(취소) 앱으로 복귀하면
+  // "이동 중…" 로딩 상태가 멈춰있던 문제 → 복귀 시 busy 해제
+  React.useEffect(() => {
+    if (!isNative()) {
+      // 웹: 탭 복귀(뒤로가기) 시 멈춘 로딩 해제
+      const onVis = () => {
+        if (document.visibilityState === "visible") setBusy(null);
+      };
+      document.addEventListener("visibilitychange", onVis);
+      return () => document.removeEventListener("visibilitychange", onVis);
+    }
+    // 네이티브: 인앱 브라우저가 닫히거나(취소/완료) 앱이 다시 활성화되면 해제
+    let cleanup = () => {};
+    (async () => {
+      try {
+        const { Browser } = await import("@capacitor/browser");
+        const { App } = await import("@capacitor/app");
+        const h1 = await Browser.addListener("browserFinished", () => setBusy(null));
+        const h2 = await App.addListener("appStateChange", ({ isActive }) => {
+          if (isActive) setBusy(null);
+        });
+        cleanup = () => { h1.remove(); h2.remove(); };
+      } catch (_) {}
+    })();
+    return () => cleanup();
+  }, []);
+
   async function signInWithSupabase(provider) {
+    // 네이티브 앱: 시스템 브라우저로 OAuth (웹뷰 안에선 구글/애플이 차단됨).
+    // skipBrowserRedirect 로 URL 만 받아 시스템 브라우저로 열고, 딥링크로 복귀.
+    if (isNative()) {
+      setBusy(provider);
+      setError(null);
+      try {
+        const { data, error } = await supabase.auth.signInWithOAuth({
+          provider,
+          options: { redirectTo: NATIVE_REDIRECT, skipBrowserRedirect: true },
+        });
+        if (error) throw error;
+        const { Browser } = await import("@capacitor/browser");
+        await Browser.open({ url: data.url });
+      } catch (e) {
+        setError(e?.message || "로그인 시작에 실패했어요.");
+        setBusy(null);
+      }
+      return;
+    }
+
     // Google + Apple 은 인앱브라우저에서 차단됨 (403 disallowed_useragent).
     // 카톡 안드는 외부 브라우저로 자동 점프 시도, 안 되면 안내문 표시.
     const inApp = detectInApp();
@@ -76,7 +162,20 @@ export default function LoginGate({ Logo }) {
   function signInWithNaver() {
     setBusy("naver");
     setError(null);
-    // 우리 백엔드가 처리. redirectTo 로 돌아갈 곳 알려줌.
+    // 네이티브: 시스템 브라우저로 네이버 시작 → 딥링크로 복귀
+    if (isNative()) {
+      const startUrl =
+        "https://rimikimi-app.vercel.app/api/auth/naver/start?redirectTo=" +
+        encodeURIComponent(NATIVE_REDIRECT);
+      import("@capacitor/browser")
+        .then(({ Browser }) => Browser.open({ url: startUrl }))
+        .catch(() => {
+          setError("로그인 시작에 실패했어요.");
+          setBusy(null);
+        });
+      return;
+    }
+    // 웹: 우리 백엔드가 처리. redirectTo 로 돌아갈 곳 알려줌.
     const back = window.location.origin + "/";
     window.location.href =
       "/api/auth/naver/start?redirectTo=" + encodeURIComponent(back);
@@ -329,12 +428,16 @@ const BG = "#fffdf9";
 
 const S = {
   wrap: {
-    minHeight: "100dvh", maxWidth: 440, margin: "0 auto",
+    height: "100dvh", maxWidth: 440, margin: "0 auto",
+    boxSizing: "border-box",
     background: BG, color: INK,
     // 노치/홈바 안전영역 반영 (기종 자동 대응)
     padding: "calc(env(safe-area-inset-top, 0px) + 48px) 24px calc(env(safe-area-inset-bottom, 0px) + 40px)",
     display: "flex", flexDirection: "column", alignItems: "center",
     fontFamily: "'Quicksand', sans-serif",
+    // 내용(이메일 폼 펼침 등)이 길어지면 화면 안에서만 스크롤, 문서 바운스 없음
+    overflowY: "auto", overflowX: "hidden", overscrollBehavior: "contain",
+    WebkitOverflowScrolling: "touch",
   },
   logoBox: { marginTop: 48, marginBottom: 18 },
   fallback: {
@@ -392,6 +495,7 @@ const S = {
     marginTop: 18, fontSize: 12.5, color: ACCENT,
     background: "#fff", border: "1px solid " + ACCENT + "55",
     borderRadius: 12, padding: "10px 14px", lineHeight: 1.5, fontWeight: 600,
+    whiteSpace: "pre-line",
   },
   notice: {
     marginTop: 20, padding: "16px 18px",

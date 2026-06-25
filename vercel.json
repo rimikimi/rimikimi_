@@ -5,6 +5,7 @@
     { "source": "/privacy", "destination": "/privacy.html" },
     { "source": "/terms", "destination": "/terms.html" },
     { "source": "/refund", "destination": "/refund.html" },
+    { "source": "/delete-account", "destination": "/delete-account.html" },
     { "source": "/checkout/(.*)", "destination": "/index.html" }
   ],
   "crons": [

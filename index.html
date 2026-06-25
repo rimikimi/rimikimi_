@@ -11,8 +11,31 @@
 
     <!-- 안전영역/오버스크롤 시 흰 테두리 방지 + 기종 자동 대응 -->
     <style>
-      html, body { margin: 0; background: #fffdf9; min-height: 100%; }
-      body { overscroll-behavior: none; }
+      /* 문서 자체는 절대 스크롤/바운스하지 않음 (스플래시·로그인 포함 모든 화면 공통).
+         실제 스크롤은 각 화면 내부 컨테이너가 담당 → 바운스 시 검은 배경 노출 방지 */
+      html, body, #root {
+        margin: 0; height: 100%;
+        background: #fffdf9;
+        overflow: hidden;
+        overscroll-behavior: none;
+      }
+
+      /* 스플래시 애니메이션 — JS 번들 로드 전 첫 페인트부터 적용되도록 여기에 둠
+         (없으면 로고가 맨 모습으로 떴다가 pop 이 걸리며 깜빡임 = FOUC) */
+      .splashLogo { animation: pop .6s cubic-bezier(.34,1.56,.64,1); }
+      @keyframes pop {
+        0% { opacity: 0; transform: scale(.7); }
+        100% { opacity: 1; transform: scale(1); }
+      }
+      .splashDot {
+        width: 11px; height: 11px; border-radius: 3px 11px 11px 11px;
+        transform: rotate(45deg); display: inline-block;
+        animation: bounce 1s ease-in-out infinite;
+      }
+      @keyframes bounce {
+        0%, 100% { transform: rotate(45deg) translateY(0); opacity: .55; }
+        50% { transform: rotate(45deg) translateY(-9px); opacity: 1; }
+      }
     </style>
 
     <!-- PWA -->

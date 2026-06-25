@@ -11,7 +11,7 @@
 import { createClient } from "@supabase/supabase-js";
 
 // 하루 무료 횟수 (한 사람당)
-export const FREE_DAILY = 2;
+export const FREE_DAILY = 1;
 // 베타 테스터는 하루 한도를 더 줌 (3장)
 export const TESTER_DAILY = 3;
 

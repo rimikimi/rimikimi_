@@ -64,6 +64,7 @@
           <tr><td>이용자가 업로드한 사진 (얼굴 포함 가능)</td><td>이미지 생성 요청 시</td><td>이용자 직접 업로드</td></tr>
           <tr><td>이미지 생성 기록 (생성 시각, 사용한 컨셉, 횟수)</td><td>이미지 생성 시</td><td>자동 생성</td></tr>
           <tr><td>친구 초대 관계 (초대한 사람 ↔ 가입한 사람)</td><td>초대 링크로 가입 시</td><td>자동 생성</td></tr>
+          <tr><td>광고 식별자(IDFA/ADID), 기기·앱 정보, 대략적 위치(IP 기반)</td><td>앱·웹에서 광고 노출 시</td><td>Google AdMob / AdSense</td></tr>
         </tbody>
       </table>
 
@@ -71,8 +72,9 @@
       <ul>
         <li>회원 식별 및 로그인 유지</li>
         <li>AI 이미지 생성 서비스 제공 (사용자가 올린 사진을 기반으로 새 이미지를 생성)</li>
-        <li>하루 사용 한도(베타 기준 3회) 관리</li>
+        <li>하루 무료 사용 한도 관리</li>
         <li>친구 초대 보상 크레딧 적립 처리</li>
+        <li>무료 이용자 대상 광고 게재 및 광고 성과 측정</li>
         <li>부정 이용 방지 및 서비스 운영 통계</li>
       </ul>
 
@@ -93,9 +95,11 @@
           <tr><td>Supabase Inc.</td><td>회원 인증, 사용 기록, 갤러리 임시 저장</td><td>싱가포르 / 미국</td></tr>
           <tr><td>Vercel Inc.</td><td>웹 호스팅 및 서버리스 함수 실행</td><td>미국</td></tr>
           <tr><td>Kakao, Naver, Google</td><td>소셜 로그인 인증</td><td>한국 / 미국</td></tr>
+          <tr><td>Google LLC (AdMob / AdSense)</td><td>앱·웹 광고 게재 및 성과 측정 (광고 식별자·쿠키 사용)</td><td>미국</td></tr>
         </tbody>
       </table>
       <p>위 업체들은 위탁 목적 외 다른 용도로 개인정보를 사용할 수 없으며, 각 사의 보안 정책에 따라 보호됩니다.</p>
+      <p>광고는 Google의 광고 기술을 통해 게재되며, 맞춤형 광고를 위해 광고 식별자·쿠키가 사용될 수 있습니다. 이용자는 기기 설정(iOS: 추적 허용 끄기, Android: 광고 ID 재설정/삭제) 또는 <a href="https://adssettings.google.com">Google 광고 설정</a>에서 맞춤형 광고를 거부할 수 있습니다.</p>
 
       <h2>5. 이용자가 직접 관리하는 정보</h2>
       <p>
@@ -122,13 +126,15 @@
 
       <h2>8. 만 14세 미만 아동에 대한 안내</h2>
       <p>
-        rimikimi는 만 14세 미만 아동의 가입을 제한합니다. 회원 가입 시 본인 사진 사용에
-        대한 동의를 받으며, 만 18세 미만은 일부 컨셉(18+ 표시) 이용이 제한됩니다.
+        rimikimi는 만 14세 미만 아동의 가입을 제한합니다. 회원 가입 시 본인 사진 사용 및
+        개인정보 처리에 대한 동의를 받습니다.
       </p>
 
       <h2>9. 개인정보 보호책임자 / 연락처</h2>
       <ul>
-        <li>이메일: <a href="mailto:rimikimi.app@gmail.com">rimikimi.app@gmail.com</a></li>
+        <li>개인정보 보호책임자: 최지훈 (리미키미 대표)</li>
+        <li>이메일: <a href="mailto:enquiry@rimikimi.com">enquiry@rimikimi.com</a></li>
+        <li>전화: 050-6988-2464</li>
       </ul>
 
       <h2>10. 정책 변경</h2>
@@ -154,6 +160,7 @@
         <li><strong>Photos you upload</strong>: only sent to our image-generation service in memory, never stored on our servers.</li>
         <li><strong>Generation history</strong>: time of generation, concept used, daily count (for free-tier limits).</li>
         <li><strong>Referral relationships</strong>: who invited whom, for credit rewards.</li>
+        <li><strong>Advertising identifiers</strong> (IDFA/ADID), device/app info, and approximate (IP-based) location, used by Google AdMob / AdSense when ads are shown.</li>
       </ul>
 
       <h2>2. How We Use Your Information</h2>
@@ -182,8 +189,10 @@
           <tr><td>Supabase Inc.</td><td>Authentication, usage logs, temporary gallery storage</td><td>Singapore / US</td></tr>
           <tr><td>Vercel Inc.</td><td>Web hosting and serverless functions</td><td>United States</td></tr>
           <tr><td>Kakao, Naver, Google</td><td>Social login</td><td>Korea / US</td></tr>
+          <tr><td>Google LLC (AdMob / AdSense)</td><td>Serving and measuring ads (uses ad identifiers / cookies)</td><td>United States</td></tr>
         </tbody>
       </table>
+      <p>Ads are served via Google. Advertising identifiers and cookies may be used for personalized ads. You can opt out via your device settings (iOS: turn off tracking; Android: reset/delete advertising ID) or at <a href="https://adssettings.google.com">Google Ads Settings</a>.</p>
 
       <h2>5. Locally Stored Data</h2>
       <p>
@@ -208,13 +217,15 @@
 
       <h2>8. Children</h2>
       <p>
-        rimikimi is not intended for children under 14. Adult-only concepts (marked
-        18+) require user confirmation of age.
+        rimikimi is not intended for children under 14. At sign-up we obtain consent
+        for the use of your photo and the processing of your personal data.
       </p>
 
       <h2>9. Contact</h2>
       <ul>
-        <li>Email: <a href="mailto:rimikimi.app@gmail.com">rimikimi.app@gmail.com</a></li>
+        <li>Data Protection Officer: Jeehoon Choi (rimikimi)</li>
+        <li>Email: <a href="mailto:enquiry@rimikimi.com">enquiry@rimikimi.com</a></li>
+        <li>Phone: +82-50-6988-2464</li>
       </ul>
 
       <h2>10. Changes</h2>

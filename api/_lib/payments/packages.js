@@ -13,8 +13,8 @@ export const PACKAGES = [
   {
     id: "credits_10",
     credits: 10,
-    usd: "4.90",
-    krw: 4900,
+    usd: "7.90",
+    krw: 7900,
     label_ko: "10 크레딧",
     label_en: "10 Credits",
     badge_ko: null,
@@ -23,8 +23,8 @@ export const PACKAGES = [
   {
     id: "credits_30",
     credits: 30,
-    usd: "9.90",
-    krw: 9900,
+    usd: "22.50",
+    krw: 22500,
     label_ko: "30 크레딧",
     label_en: "30 Credits",
     badge_ko: "인기",
@@ -33,12 +33,22 @@ export const PACKAGES = [
   {
     id: "credits_70",
     credits: 70,
-    usd: "19.90",
-    krw: 19900,
+    usd: "49.90",
+    krw: 49900,
     label_ko: "70 크레딧",
     label_en: "70 Credits",
     badge_ko: "이득",
     badge_en: "Best Value",
+  },
+  {
+    id: "credits_120",
+    credits: 120,
+    usd: "79.90",
+    krw: 79900,
+    label_ko: "120 크레딧",
+    label_en: "120 Credits",
+    badge_ko: "최고 가성비",
+    badge_en: "Best Deal",
   },
 ];
 

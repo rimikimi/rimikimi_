@@ -8,6 +8,10 @@ import { getAuthedUser } from "./_lib/auth.js";
 import { listGallery, deleteItem } from "./_lib/gallery.js";
 
 export default async function handler(req, res) {
+  res.setHeader("Access-Control-Allow-Origin","*");
+  res.setHeader("Access-Control-Allow-Methods","GET,POST,DELETE,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers","authorization,content-type");
+  if (req.method === "OPTIONS") return res.status(204).end();
   const auth = await getAuthedUser(req);
   if (auth.error) return res.status(auth.status).json({ error: auth.error });
   const { user, admin } = auth;
