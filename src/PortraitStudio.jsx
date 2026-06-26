@@ -317,6 +317,9 @@ async function generateImage(accessToken, dataUrl, promptText, conceptMeta = {})
     quotaUsed: json.quotaUsed,
     quotaLimit: json.quotaLimit,
     unlimited: json.unlimited,
+    // 갤러리 보관 정보 — 만료 10분 전 리마인드 푸시 예약에 사용
+    galleryId: json.galleryId,
+    galleryExpiresAt: json.galleryExpiresAt,
   };
 }
 
@@ -855,6 +858,11 @@ export default function PortraitStudio() {
           todayStr()
         );
         setResultImage(strip);
+        // 각 컷도 갤러리에 개별 보관 → 만료 10분 전 리마인드 푸시 예약
+        const cutItems = results
+          .filter((r) => r?.galleryId && r?.galleryExpiresAt)
+          .map((r) => ({ id: r.galleryId, expiresAt: r.galleryExpiresAt, conceptTitle: selected.title }));
+        if (cutItems.length) syncExpiryNotifications(cutItems, getSavedSet());
         const last = results[results.length - 1];
         if (typeof last?.unlimited === "boolean") setUnlimited(last.unlimited);
         if (typeof last?.quotaUsed === "number") setFreeUsed(last.quotaUsed);
@@ -901,6 +909,13 @@ export default function PortraitStudio() {
         ...idMeta,
       });
       setResultImage(result.imageDataUrl);
+      // 생성 직후 만료 10분 전 리마인드 푸시 예약 (갤러리를 안 열어도 동작)
+      if (result.galleryId && result.galleryExpiresAt) {
+        syncExpiryNotifications(
+          [{ id: result.galleryId, expiresAt: result.galleryExpiresAt, conceptTitle: selected.title }],
+          getSavedSet()
+        );
+      }
       // 서버가 알려준 진짜 사용량으로 업데이트
       if (typeof result.unlimited === "boolean") setUnlimited(result.unlimited);
       if (typeof result.quotaUsed === "number") setFreeUsed(result.quotaUsed);
