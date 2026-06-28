@@ -941,7 +941,10 @@ export default function PortraitStudio() {
   async function shareInvite() {
     const uid = session?.user?.id;
     if (!uid) return;
-    const link = window.location.origin + "/?ref=" + uid;
+    // 네이티브 앱에선 origin이 capacitor://localhost(iOS)·http://localhost(안드) 라
+    // 초대 링크가 localhost로 나가는 버그가 있음 → 정식 도메인(LEGAL_BASE) 사용
+    const base = isNative() ? LEGAL_BASE : window.location.origin;
+    const link = base + "/?ref=" + uid;
     const shareData = {
       title: t("invite.shareTitle"),
       text: t("invite.shareText"),
