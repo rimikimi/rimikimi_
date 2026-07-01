@@ -10,6 +10,13 @@ import { isNative, platform } from "./nativeBridge";
 const IOS_INTERSTITIAL = "ca-app-pub-9458625554324585/8078673280";
 const ANDROID_INTERSTITIAL = "ca-app-pub-9458625554324585/2330989758";
 
+// 전면광고 킬스위치.
+// Android(특히 targetSdk 35/36 edge-to-edge)에서 전면광고 종료 후 네이티브 뷰가
+// WebView 위 터치를 먹어 결과화면 버튼이 전부 안 눌리는 프리즈가 보고됨.
+// 실기기 검증 전까지 전면광고를 꺼서 "앱이 확실히 동작"하도록 한다.
+// (웹 AdSense 는 별도이며 영향 없음.) 재활성화 시 true 로.
+const INTERSTITIAL_ENABLED = false;
+
 let inited = false;
 
 async function load() {
@@ -42,7 +49,7 @@ export async function requestATT() {
 }
 
 export async function showInterstitial() {
-  if (!isNative()) return;
+  if (!isNative() || !INTERSTITIAL_ENABLED) return; // 킬스위치: 프리즈 방지
   const adId = platform() === "ios" ? IOS_INTERSTITIAL : ANDROID_INTERSTITIAL;
   if (!adId) return; // 해당 플랫폼 광고단위 미설정 → 표시 안 함
   try {

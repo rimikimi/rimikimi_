@@ -63,6 +63,26 @@ export async function nativeSaveImage(dataUrl, filename = "rimikimi.png") {
   }
 }
 
+// 생성 결과(data URL)를 파일로 쓴 뒤 시스템 공유 시트로 저장/공유.
+// data URL 은 Share 에 바로 못 넘기므로 Cache 에 파일로 쓰고 그 file:// URI 를 공유한다.
+// 사용자는 시트에서 "이미지 저장"(사진 앱) 등을 고를 수 있음.
+// 반환: true(성공/시트 표시) | false(실패 → 호출측에서 폴백)
+export async function nativeShareImage(dataUrl, filename = "rimikimi.png") {
+  if (!isNative()) return false;
+  try {
+    const { Filesystem, Directory } = await import("@capacitor/filesystem");
+    const { Share } = await import("@capacitor/share");
+    const m = (dataUrl || "").match(/^data:[^;]+;base64,(.+)$/);
+    if (!m) return false;
+    await Filesystem.writeFile({ path: filename, data: m[1], directory: Directory.Cache });
+    const { uri } = await Filesystem.getUri({ path: filename, directory: Directory.Cache });
+    await Share.share({ title: "rimikimi", url: uri, dialogTitle: "이미지 저장/공유" });
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
 // 네이티브 공유 시트 (카톡/메시지/저장 등 시스템 시트)
 export async function nativeShare({ title, text, url }) {
   if (!isNative()) return false;

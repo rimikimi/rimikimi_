@@ -1,6 +1,6 @@
 import React, { useState, useRef, useMemo, useEffect } from "react";
 import { supabase } from "./supabaseClient";
-import { isNative, nativePickPhoto, nativeShare } from "./nativeBridge";
+import { isNative, nativePickPhoto, nativeShare, nativeShareImage, nativeSaveImage } from "./nativeBridge";
 import { initAds, showInterstitial } from "./ads";
 import { initIap, loginIap, logoutIap, getIapPacks, purchaseIap, restoreIap, iapAvailable } from "./iap";
 import { FOURCUT_COUNTS, FOURCUT_STYLES, composeStrip, todayStr } from "./fourcut";
@@ -2141,6 +2141,35 @@ function ConfirmScreen({
 function ResultScreen({
   generating, fourcutProgress = "", prompt, resultImage, genError, onRetry, onAgain, onHome, showAds = false,
 }) {
+  const [saving, setSaving] = useState(false);
+
+  async function handleSaveResult() {
+    if (!resultImage || saving) return;
+    const filename = "rimikimi_" + (prompt?.id ?? "art") + ".png";
+    if (isNative()) {
+      setSaving(true);
+      try {
+        // 시스템 공유 시트로 사진 저장 (data URL → 파일 → 공유)
+        const shared = await nativeShareImage(resultImage, filename);
+        if (!shared) {
+          // 폴백: 파일(문서 폴더)로 직접 저장
+          const r = await nativeSaveImage(resultImage, filename);
+          alert(r?.ok ? t("result.download") + " ✓" : (r?.error || "저장 실패"));
+        }
+      } finally {
+        setSaving(false);
+      }
+    } else {
+      // 웹: 앵커 다운로드
+      const a = document.createElement("a");
+      a.href = resultImage;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    }
+  }
+
   return (
     <div className="fade">
       {generating ? (
@@ -2189,13 +2218,14 @@ function ResultScreen({
             <br />
             {t("result.saveNotice4")}
           </div>
-          <a
-            href={resultImage}
-            download={"rimikimi_" + prompt.id + ".png"}
-            style={S.downloadBtn}
+          <button
+            type="button"
+            onClick={handleSaveResult}
+            disabled={saving}
+            style={{ ...S.downloadBtn, ...(saving ? { opacity: 0.6 } : {}) }}
           >
-            {t("result.download")}
-          </a>
+            {saving ? t("common.loading") : t("result.download")}
+          </button>
           <div style={S.resultActions}>
             <button style={S.secondaryBtn} onClick={onHome}>{t("result.home")}</button>
             <button style={S.primaryBtn} onClick={onAgain}>{t("result.again")}</button>
@@ -2463,9 +2493,11 @@ const S = {
     // 노치/상태바 안전영역만큼 위 여백 추가 (기종 자동 대응)
     padding: "calc(env(safe-area-inset-top, 0px) + 15px) 20px 13px",
     position: "sticky", top: 0, zIndex: 60,
-    background: "rgba(255,253,249,0.94)",
-    backdropFilter: "blur(18px) saturate(180%)",
-    WebkitBackdropFilter: "blur(18px) saturate(180%)",
+    background: "rgba(255,253,249,0.82)",
+    backdropFilter: "blur(22px) saturate(180%)",
+    WebkitBackdropFilter: "blur(22px) saturate(180%)",
+    borderBottom: "0.5px solid rgba(35,31,32,0.08)",
+    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.6)",
   },
   headerRight: { display: "flex", alignItems: "center", gap: 8 },
   logoutBtn: {
@@ -2486,11 +2518,12 @@ const S = {
     cursor: "pointer", display: "flex", alignItems: "center",
   },
   profileBtn: {
-    width: 38, height: 38, borderRadius: "50%",
+    width: 44, height: 44, borderRadius: "50%",
     border: "2px solid " + INK + "18", background: "#fff",
     padding: 0, cursor: "pointer", overflow: "hidden",
     display: "flex", alignItems: "center", justifyContent: "center",
     flexShrink: 0,
+    boxShadow: "0 4px 12px -6px rgba(35,31,32,0.25)",
   },
   profileBtnImg: {
     width: "100%", height: "100%", objectFit: "cover", display: "block",
@@ -2517,11 +2550,11 @@ const S = {
   },
   profileAvatarEmpty: { fontSize: 32, opacity: 0.4 },
   profileName: {
-    fontSize: 18, fontWeight: 700, color: INK, marginBottom: 4,
+    fontSize: 19, fontWeight: 700, color: INK, marginBottom: 4,
     fontFamily: "'Quicksand', sans-serif",
   },
   profileMeta: {
-    fontSize: 11.5, opacity: 0.55, fontWeight: 500, marginBottom: 16,
+    fontSize: 12.5, opacity: 0.55, fontWeight: 500, marginBottom: 16,
   },
   profilePhotoActions: {
     display: "flex", gap: 8, width: "100%", marginBottom: 12,
@@ -2535,14 +2568,15 @@ const S = {
   },
   statCard: {
     background: "#fff", border: "1px solid " + INK + "10",
-    borderRadius: 14, padding: "14px 12px", textAlign: "center",
+    borderRadius: 18, padding: "18px 12px", textAlign: "center",
+    boxShadow: "0 8px 20px -14px rgba(35,31,32,0.22)",
   },
   statLabel: {
-    fontSize: 11, opacity: 0.6, fontWeight: 600, marginBottom: 6,
+    fontSize: 12, opacity: 0.6, fontWeight: 600, marginBottom: 7,
     fontFamily: "'Quicksand', sans-serif",
   },
   statValue: {
-    fontSize: 22, fontWeight: 700, color: INK, lineHeight: 1.1,
+    fontSize: 26, fontWeight: 700, color: INK, lineHeight: 1.1,
     fontFamily: "'Quicksand', sans-serif",
   },
   statSub: { fontSize: 10.5, opacity: 0.5, fontWeight: 500, marginTop: 4 },
@@ -2574,20 +2608,20 @@ const S = {
     width: "100%", display: "flex", alignItems: "center",
     justifyContent: "space-between", gap: 12,
     background: "#fff", border: "1px solid " + INK + "10",
-    borderRadius: 14, padding: "14px 16px", marginBottom: 14,
+    borderRadius: 18, padding: "16px 16px", marginBottom: 12,
     cursor: "pointer", textAlign: "left",
-    boxShadow: "0 2px 8px rgba(35,31,32,0.03)",
+    boxShadow: "0 8px 20px -14px rgba(35,31,32,0.2)",
   },
   galleryEntryLeft: { flex: 1, minWidth: 0 },
   galleryEntryTitle: {
-    fontSize: 14, fontWeight: 700, color: INK, marginBottom: 3,
+    fontSize: 15.5, fontWeight: 700, color: INK, marginBottom: 3,
     fontFamily: "'Quicksand', sans-serif",
   },
   galleryEntryDesc: {
-    fontSize: 11, opacity: 0.6, fontWeight: 500, lineHeight: 1.5,
+    fontSize: 12.5, opacity: 0.6, fontWeight: 500, lineHeight: 1.5,
   },
   galleryEntryArrow: {
-    fontSize: 18, color: INK + "55", flexShrink: 0,
+    fontSize: 20, color: INK + "45", flexShrink: 0,
   },
 
   /* === 내 갤러리 화면 === */
@@ -2660,8 +2694,8 @@ const S = {
     border: "1px solid rgba(255,255,255,0.7)", borderRadius: 999,
     backdropFilter: "blur(14px) saturate(180%)",
     WebkitBackdropFilter: "blur(14px) saturate(180%)",
-    boxShadow: "0 6px 18px -6px rgba(40,30,30,0.25), inset 0 1px 0 rgba(255,255,255,0.85)",
-    padding: "9px 15px", fontSize: 12.5, fontFamily: "'Quicksand', sans-serif",
+    boxShadow: "0 8px 20px -8px rgba(40,30,30,0.28), inset 0 1px 0 rgba(255,255,255,0.9)",
+    padding: "11px 16px", fontSize: 13.5, fontFamily: "'Quicksand', sans-serif",
     fontWeight: 700, letterSpacing: "0.02em", cursor: "pointer",
   },
   creditDot: {
@@ -2688,21 +2722,22 @@ const S = {
     width: "100%", maxWidth: 412, pointerEvents: "auto",
     display: "flex", justifyContent: "space-around", alignItems: "center",
     background: "rgba(255,255,255,0.55)",
-    backdropFilter: "blur(22px) saturate(180%)",
-    WebkitBackdropFilter: "blur(22px) saturate(180%)",
-    border: "1px solid rgba(255,255,255,0.7)",
-    borderRadius: 26,
-    boxShadow: "0 12px 30px -8px rgba(40,30,30,0.32), inset 0 1px 0 rgba(255,255,255,0.85)",
-    padding: "9px 8px",
+    backdropFilter: "blur(28px) saturate(180%)",
+    WebkitBackdropFilter: "blur(28px) saturate(180%)",
+    border: "1px solid rgba(255,255,255,0.8)",
+    borderRadius: 28,
+    boxShadow: "0 16px 36px -10px rgba(40,30,30,0.36), inset 0 1px 0 rgba(255,255,255,0.95), inset 0 -1px 2px rgba(255,255,255,0.4)",
+    padding: "8px 8px",
   },
   tabBtn: {
     flex: 1, background: "transparent", border: "none", cursor: "pointer",
-    display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
-    color: INK, opacity: 0.5, padding: "4px 0",
+    display: "flex", flexDirection: "column", alignItems: "center",
+    justifyContent: "center", gap: 4,
+    color: INK, opacity: 0.5, padding: "4px 0", minHeight: 48,
     fontFamily: "'Quicksand', sans-serif",
   },
   tabBtnOn: { opacity: 1, color: ACCENT },
-  tabIcon: { fontSize: 18, lineHeight: 1 },
+  tabIcon: { fontSize: 20, lineHeight: 1 },
   tabLabel: { fontSize: 10.5, fontWeight: 700, letterSpacing: "0.01em" },
   footer: {
     textAlign: "center",
@@ -2739,7 +2774,7 @@ const S = {
     whiteSpace: "nowrap",
   },
   heroDesc: {
-    fontSize: 13.5, lineHeight: 1.7, opacity: 0.65, marginTop: 12,
+    fontSize: 15, lineHeight: 1.6, opacity: 0.62, marginTop: 12,
     fontWeight: 500,
   },
   uploadBox: {
@@ -2783,20 +2818,20 @@ const S = {
   primaryBtn: {
     width: "100%", color: "#fff", border: "none",
     background: "linear-gradient(135deg, #ff6b66, " + ACCENT + ")",
-    borderRadius: 16, padding: "16px", fontSize: 15, fontWeight: 700,
+    borderRadius: 18, padding: "17px", fontSize: 16, fontWeight: 700,
     fontFamily: "'Quicksand', sans-serif", letterSpacing: "0.02em",
     cursor: "pointer",
-    boxShadow: "0 10px 24px -8px " + ACCENT + "b0, inset 0 1px 0 rgba(255,255,255,0.5)",
+    boxShadow: "0 14px 28px -10px " + ACCENT + "b8, inset 0 1px 0 rgba(255,255,255,0.5)",
   },
   secondaryBtn: {
     width: "100%", color: INK,
-    background: "rgba(255,255,255,0.55)",
-    backdropFilter: "blur(12px) saturate(170%)",
-    WebkitBackdropFilter: "blur(12px) saturate(170%)",
-    border: "1px solid rgba(255,255,255,0.7)", borderRadius: 16, padding: "15px",
-    fontSize: 15, fontWeight: 700, fontFamily: "'Quicksand', sans-serif",
+    background: "rgba(255,255,255,0.6)",
+    backdropFilter: "blur(14px) saturate(180%)",
+    WebkitBackdropFilter: "blur(14px) saturate(180%)",
+    border: "1px solid rgba(255,255,255,0.78)", borderRadius: 18, padding: "16px",
+    fontSize: 16, fontWeight: 700, fontFamily: "'Quicksand', sans-serif",
     cursor: "pointer",
-    boxShadow: "0 6px 18px -6px rgba(40,30,30,0.2), inset 0 1px 0 rgba(255,255,255,0.8)",
+    boxShadow: "0 8px 20px -8px rgba(40,30,30,0.22), inset 0 1px 0 rgba(255,255,255,0.9)",
   },
   moreBtn: {
     background: "#fff", color: INK,
@@ -2813,17 +2848,19 @@ const S = {
     marginBottom: 10, padding: "0 2px",
   },
   homeRowTitle: {
-    fontSize: 15, fontWeight: 700, color: INK,
+    fontSize: 16.5, fontWeight: 700, color: INK,
     fontFamily: "'Quicksand', sans-serif",
     display: "flex", alignItems: "baseline", gap: 7,
   },
   homeRowCount: {
-    fontSize: 11.5, opacity: 0.45, fontWeight: 600,
+    fontSize: 12, opacity: 0.45, fontWeight: 600,
   },
   homeRowMore: {
-    background: "transparent", border: "none", color: ACCENT,
-    fontSize: 12, fontWeight: 700, cursor: "pointer",
+    background: ACCENT + "1a", border: "none", color: ACCENT,
+    fontSize: 12.5, fontWeight: 700, cursor: "pointer",
     fontFamily: "'Quicksand', sans-serif",
+    borderRadius: 999, padding: "7px 13px",
+    display: "inline-flex", alignItems: "center", gap: 3,
   },
   homeRail: {
     display: "flex", gap: 8, overflowX: "auto",
@@ -2911,9 +2948,11 @@ const S = {
   },
   navRow: { display: "flex", alignItems: "center", gap: 13, marginBottom: 20 },
   backBtn: {
-    width: 40, height: 40, borderRadius: "50%",
-    border: "2px solid " + INK + "1f", background: "#fff",
-    fontSize: 17, cursor: "pointer", color: INK,
+    width: 44, height: 44, borderRadius: "50%",
+    border: "1px solid " + INK + "1a", background: "rgba(255,255,255,0.9)",
+    backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)",
+    fontSize: 19, cursor: "pointer", color: INK, flexShrink: 0,
+    boxShadow: "0 5px 14px -7px rgba(35,31,32,0.3)",
   },
   screenKicker: {
     fontSize: 10.5, fontWeight: 700, letterSpacing: "0.2em", color: ACCENT,
@@ -2971,11 +3010,11 @@ const S = {
   },
   catChip: {
     flexShrink: 0,
-    background: "rgba(255,255,255,0.5)",
+    background: "rgba(255,255,255,0.55)",
     backdropFilter: "blur(12px) saturate(170%)",
     WebkitBackdropFilter: "blur(12px) saturate(170%)",
-    border: "1px solid rgba(255,255,255,0.7)", borderRadius: 999,
-    padding: "8px 15px", fontSize: 12.5, fontWeight: 700,
+    border: "1px solid rgba(255,255,255,0.75)", borderRadius: 999,
+    padding: "10px 16px", fontSize: 13.5, fontWeight: 700,
     fontFamily: "'Quicksand', sans-serif", cursor: "pointer",
     color: INK, whiteSpace: "nowrap",
     display: "inline-flex", alignItems: "center", gap: 6,
@@ -2996,8 +3035,8 @@ const S = {
   grid: { display: "grid" },
   card: {
     background: "#fff", border: "1px solid " + INK + "10",
-    borderRadius: 16, overflow: "hidden", padding: 0, cursor: "pointer",
-    textAlign: "left", boxShadow: "0 3px 12px rgba(35,31,32,0.05)",
+    borderRadius: 18, overflow: "hidden", padding: 0, cursor: "pointer",
+    textAlign: "left", boxShadow: "0 8px 20px -12px rgba(35,31,32,0.18)",
   },
   thumb: {
     aspectRatio: "3/4", position: "relative", overflow: "hidden",
@@ -3114,13 +3153,14 @@ const S = {
   resultImage: { margin: "18px 0" },
   resultImg: {
     width: "100%", aspectRatio: "3/4", objectFit: "cover",
-    borderRadius: 20, display: "block",
+    borderRadius: 24, display: "block",
+    boxShadow: "0 22px 46px -18px rgba(35,31,32,0.4)",
   },
   resultActions: { display: "flex", gap: 10 },
   downloadBtn: {
     display: "block", width: "100%", boxSizing: "border-box",
     background: "#fff", color: INK, border: "2px solid " + INK + "22",
-    borderRadius: 16, padding: "14px", fontSize: 14, fontWeight: 700,
+    borderRadius: 18, padding: "16px", fontSize: 16, fontWeight: 700,
     fontFamily: "'Quicksand', sans-serif", cursor: "pointer",
     textAlign: "center", textDecoration: "none", marginBottom: 10,
   },
@@ -3216,6 +3256,15 @@ body { margin: 0; background: ${BG}; }
   animation: bounce 1s ease-in-out infinite;
 }
 input[type=checkbox] { cursor: pointer; }
-button:active { transform: scale(0.98); }
+button {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none; user-select: none;
+  transition: transform .12s ease, opacity .12s ease, box-shadow .12s ease;
+}
+button:active { transform: scale(0.965); opacity: 0.92; }
 ::-webkit-scrollbar { height: 0; width: 0; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+  button:active { transform: none; }
+}
 `;
