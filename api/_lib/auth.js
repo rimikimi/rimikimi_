@@ -14,13 +14,25 @@ import { createClient } from "@supabase/supabase-js";
 export const FREE_DAILY = 1;
 // 베타 테스터는 하루 한도를 더 줌 (3장)
 export const TESTER_DAILY = 3;
+// 광고 테스트 계정: 사실상 무제한이지만 unlimited(어드민) 은 아님.
+// 어드민/크레딧 사용자는 광고가 안 뜨므로(광고 조건: !unlimited && credits===0),
+// "광고가 실제로 뜨는지" 검증하려면 무제한이 아닌 "무료 사용자 + 높은 한도" 가 필요.
+export const AD_TEST_DAILY = 100000;
 
 // 사용자 역할에 따른 하루 무료 한도
 //   - 어드민(무제한)은 이 값과 무관 (별도 처리)
+//   - 광고 테스터: AD_TEST_DAILY (사실상 무제한, 단 광고는 계속 노출)
 //   - 베타 테스터: TESTER_DAILY
 //   - 일반 사용자: FREE_DAILY
 export function dailyLimitFor(user) {
+  if (isAdTester(user)) return AD_TEST_DAILY;
   return isTester(user) ? TESTER_DAILY : FREE_DAILY;
+}
+
+// 광고 테스트 계정 화이트리스트 (env AD_TEST_EMAILS, 콤마 구분)
+// 무료 경로(광고 노출) 를 유지한 채 하루 한도만 사실상 무제한으로 열어줌.
+export function isAdTester(user) {
+  return matchEmailList(user, process.env.AD_TEST_EMAILS);
 }
 
 // 무제한 사용자 (관리자/VIP) 화이트리스트

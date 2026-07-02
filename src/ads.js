@@ -10,18 +10,47 @@ import { isNative, platform } from "./nativeBridge";
 const IOS_INTERSTITIAL = "ca-app-pub-9458625554324585/8078673280";
 const ANDROID_INTERSTITIAL = "ca-app-pub-9458625554324585/2330989758";
 
-// 전면광고 킬스위치.
-// Android(특히 targetSdk 35/36 edge-to-edge)에서 전면광고 종료 후 네이티브 뷰가
-// WebView 위 터치를 먹어 결과화면 버튼이 전부 안 눌리는 프리즈가 보고됨.
-// 실기기 검증 전까지 전면광고를 꺼서 "앱이 확실히 동작"하도록 한다.
-// (웹 AdSense 는 별도이며 영향 없음.) 재활성화 시 true 로.
-const INTERSTITIAL_ENABLED = false;
+// 전면광고 스위치. (웹 AdSense 는 별도이며 영향 없음.)
+const INTERSTITIAL_ENABLED = true;
 
 let inited = false;
+let listenersReady = false;
 
 async function load() {
   const mod = await import("@capacitor-community/admob");
   return mod.AdMob;
+}
+
+// 전면광고 종료 후 WebView 터치 복구.
+// Android(targetSdk 35/36 edge-to-edge)에서 풀스크린 광고 액티비티가 닫히고
+// WebView 로 복귀할 때, WebView 가 터치 이벤트를 못 받아 결과화면 버튼이
+// 전부 안 눌리는 프리즈가 있었음. 아래로 강제 리레이아웃/포커스 회수해서 복구.
+// (네이티브 MainActivity.onResume 의 requestFocus 와 이중 방어)
+function restoreWebViewTouch() {
+  try {
+    // 브라우저 리레이아웃 유도 → 레이아웃/히트테스트 갱신
+    window.dispatchEvent(new Event("resize"));
+    if (document.body) {
+      document.body.style.pointerEvents = "none";
+      requestAnimationFrame(() => {
+        try {
+          document.body.style.pointerEvents = "";
+          window.focus && window.focus();
+        } catch (_) {}
+      });
+    }
+  } catch (_) {}
+}
+
+// 전면광고 생명주기 리스너는 한 번만 등록 (종료/실패 시 터치 복구).
+async function ensureListeners(AdMob) {
+  if (listenersReady) return;
+  try {
+    const { InterstitialAdPluginEvents } = await import("@capacitor-community/admob");
+    await AdMob.addListener(InterstitialAdPluginEvents.Dismissed, restoreWebViewTouch);
+    await AdMob.addListener(InterstitialAdPluginEvents.FailedToShow, restoreWebViewTouch);
+    listenersReady = true;
+  } catch (_) {}
 }
 
 export async function initAds() {
@@ -55,7 +84,11 @@ export async function showInterstitial() {
   try {
     const AdMob = await load();
     if (!inited) { await AdMob.initialize({}); inited = true; }
+    await ensureListeners(AdMob);
     await AdMob.prepareInterstitial({ adId });
     await AdMob.showInterstitial();
-  } catch (_) {}
+  } catch (_) {
+    // 준비/표시 중 예외가 나도 혹시 남았을 수 있는 잠금 상태 복구
+    restoreWebViewTouch();
+  }
 }
