@@ -13,6 +13,30 @@ import LoginGate from "./LoginGate";
    rimikimi.com 은 별도 홈페이지라 앱은 Vercel 도메인을 사용. */
 const LEGAL_BASE = "https://rimikimi-app.vercel.app";
 
+/* ── 백그라운드 생성 복구 ──────────────────────────────────
+   이미지 생성은 서버(/api/generate)에서 돌아가고 완성되면 갤러리에 저장됨.
+   근데 생성 중 앱을 백그라운드로 보내면 iOS 가 WebView(JS/fetch)를 얼려서,
+   돌아왔을 때 요청이 끊겨 "실패"처럼 보임 (실제론 서버가 끝내서 갤러리에 있음).
+   → 생성 시작 시 마커를 남겨두고, 실패하거나 앱 복귀 시 갤러리에서 방금 만든
+     결과를 찾아 결과화면에 자동으로 띄운다. (localStorage 라 앱 재시작에도 생존) */
+const PENDING_GEN_KEY = "rimikimi_pending_gen";
+const PENDING_GEN_MAX_AGE = 10 * 60 * 1000; // 10분 지난 마커는 무효
+
+function writePendingGen(p) {
+  try { localStorage.setItem(PENDING_GEN_KEY, JSON.stringify(p)); } catch (_) {}
+}
+function readPendingGen() {
+  try {
+    const p = JSON.parse(localStorage.getItem(PENDING_GEN_KEY) || "null");
+    if (!p || !p.startedAt) return null;
+    if (Date.now() - p.startedAt > PENDING_GEN_MAX_AGE) { clearPendingGen(); return null; }
+    return p;
+  } catch (_) { return null; }
+}
+function clearPendingGen() {
+  try { localStorage.removeItem(PENDING_GEN_KEY); } catch (_) {}
+}
+
 /* 사업자/통신판매업 고지는 한국 전자상거래법상 한국 접속자에게만 필요.
    해외 접속자에겐 표시하지 않는다. (판단 불가 시엔 안전하게 표시)
    국가 추정: 표준시간대 Asia/Seoul 또는 브라우저 언어 ko */
@@ -486,7 +510,11 @@ export default function PortraitStudio() {
       const st = await App.getState();
       if (st?.isActive) setTimeout(startTracking, 600);
       attListener = await App.addListener("appStateChange", ({ isActive }) => {
-        if (isActive) setTimeout(startTracking, 600);
+        if (isActive) {
+          setTimeout(startTracking, 600);
+          // 백그라운드 갔다 돌아오면 생성 중이던 결과를 갤러리에서 자동 복구
+          recoverRef.current();
+        }
       });
 
       listener = await App.addListener("appUrlOpen", async ({ url }) => {
@@ -790,6 +818,47 @@ export default function PortraitStudio() {
   // 어느 사진 슬롯에 저장할지를 ref 로 결정 (handleFile 이 한 input 을 공유하기 때문)
   const photoTargetRef = useRef("profile"); // "profile" | "art"
 
+  // 백그라운드 생성 복구: 생성 중 앱이 백그라운드로 갔다 돌아오거나 요청이 끊겨도,
+  // 서버가 갤러리에 저장해 둔 방금 만든 결과를 찾아 결과화면에 자동으로 띄운다.
+  // 리스너(한 번 등록)의 stale-closure 를 피하려고 최신 함수를 ref 로 들고 있는다.
+  const recoverRef = useRef(() => {});
+  async function tryRecoverGeneration() {
+    const p = readPendingGen();
+    if (!p) return false;
+    const accessToken = session?.access_token;
+    if (!accessToken) return false;
+    try {
+      const r = await fetch("/api/gallery", {
+        headers: { Authorization: "Bearer " + accessToken },
+      });
+      const j = await r.json();
+      const items = j?.items || [];
+      // 생성 시작 시점 이후에 만들어진, 같은 컨셉의 최신 결과
+      const hit = items.find(
+        (it) =>
+          it.url &&
+          String(it.conceptId) === String(p.conceptId) &&
+          new Date(it.createdAt).getTime() >= p.startedAt - 5000
+      );
+      if (hit) {
+        setResultImage(hit.url);
+        setGenError(null);
+        setGenerating(false);
+        setScreen("result");
+        if (hit.id && hit.expiresAt) {
+          syncExpiryNotifications(
+            [{ id: hit.id, expiresAt: hit.expiresAt, conceptTitle: p.conceptTitle }],
+            getSavedSet()
+          );
+        }
+        clearPendingGen();
+        return true;
+      }
+    } catch (_) {}
+    return false;
+  }
+  recoverRef.current = tryRecoverGeneration;
+
   function handleFile(e) {
     const f = e.target.files?.[0];
     if (!f) return;
@@ -883,6 +952,8 @@ export default function PortraitStudio() {
     setResultImage(null);
     setGenerating(true);
     setScreen("result");
+    // 백그라운드 복구용 마커 (생성 중 앱이 얼거나 요청이 끊겨도 결과를 되찾음)
+    writePendingGen({ startedAt: Date.now(), conceptId: selected.id, conceptTitle: selected.title });
 
     try {
       const accessToken = session?.access_token;
@@ -916,15 +987,21 @@ export default function PortraitStudio() {
           getSavedSet()
         );
       }
+      // 정상 완료 → 복구 마커 제거
+      clearPendingGen();
       // 서버가 알려준 진짜 사용량으로 업데이트
       if (typeof result.unlimited === "boolean") setUnlimited(result.unlimited);
       if (typeof result.quotaUsed === "number") setFreeUsed(result.quotaUsed);
       // 무료 사용자 → 생성 후 전면광고 (네이티브에서만, 웹은 no-op)
       if (showAds) showInterstitial();
     } catch (err) {
-      // 서버가 한도 정보를 같이 줬으면 화면 카운터도 반영
-      if (typeof err.quotaUsed === "number") setFreeUsed(err.quotaUsed);
-      setGenError(err.message || "이미지 생성에 실패했어요.");
+      // 요청이 끊겼어도 서버는 끝냈을 수 있음 → 갤러리에서 방금 결과를 되찾아 표시
+      const recovered = await tryRecoverGeneration();
+      if (!recovered) {
+        // 서버가 한도 정보를 같이 줬으면 화면 카운터도 반영
+        if (typeof err.quotaUsed === "number") setFreeUsed(err.quotaUsed);
+        setGenError(err.message || "이미지 생성에 실패했어요.");
+      }
     } finally {
       setGenerating(false);
     }
