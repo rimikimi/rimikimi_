@@ -1,8 +1,8 @@
 import React, { useState, useRef, useMemo, useEffect } from "react";
 import { supabase } from "./supabaseClient";
-import { isNative, nativePickPhoto, nativeShare, nativeShareImage, nativeSaveImage } from "./nativeBridge";
+import { isNative, platform, nativePickPhoto, nativeShare, nativeShareImage, nativeSaveImage } from "./nativeBridge";
 import { initAds, showInterstitial } from "./ads";
-import { initIap, loginIap, logoutIap, getIapPacks, purchaseIap, restoreIap, iapAvailable } from "./iap";
+import { initIap, loginIap, logoutIap, getIapPacks, purchaseIap, restoreIap, iapAvailable, isSubscription, getIapDiag } from "./iap";
 import { FOURCUT_COUNTS, FOURCUT_STYLES, composeStrip, todayStr } from "./fourcut";
 import { getSavedSet, markSaved, syncExpiryNotifications, cancelExpiryNotice } from "./notify";
 import { t, useLang, getLang, localizedTitle, localizedCategory, getLangPreference, setLang } from "./i18n";
@@ -114,11 +114,18 @@ function _OldLogo({ height = 30, mono = false }) {
 const PAYMENTS_ENABLED = isNative();
 
 const CREDIT_PACKS = [
-  { id: "credits_10",  count: 10,  krw: 7900,  usd: "7.90",  label: null },
-  { id: "credits_30",  count: 30,  krw: 22500, usd: "22.50", label: "가장 인기" },
-  { id: "credits_70",  count: 70,  krw: 49900, usd: "49.90", label: null },
-  { id: "credits_120", count: 120, krw: 79900, usd: "79.90", label: "최고 가성비" },
+  { id: "credits_10",  count: 10,  krw: 4900,  usd: "3.99",  label: null },
+  { id: "credits_30",  count: 30,  krw: 12900, usd: "9.99",  label: "가장 인기" },
+  { id: "credits_70",  count: 70,  krw: 24900, usd: "18.99", label: null },
+  { id: "credits_120", count: 120, krw: 39000, usd: "29.99", label: "최고 가성비" },
 ];
+
+// 구독 rimikimi+ (자동갱신) — 광고·워터마크 제거 + 크레딧 자동충전(월 60 / 연 720)
+const SUB_PLANS = [
+  { id: "rimikimi_plus_monthly", period: "month", credits: 60,  krw: 9900,  usd: "7.99",  label_ko: "월간", label_en: "Monthly", badge: null },
+  { id: "rimikimi_plus_annual",  period: "year",  credits: 720, krw: 79000, usd: "59.99", label_ko: "연간", label_en: "Annual", badge: "33% 할인" },
+];
+const SUB_IDS = SUB_PLANS.map((p) => p.id);
 
 const FREE_DAILY = 1;
 
@@ -377,11 +384,42 @@ function AdSlot() {
 }
 
 // ── 하단 글래스 탭바 (아이콘 + 텍스트) ──
+// 하단 탭 아이콘 — 라인 SVG. 선택 시 채움(fill), 비선택 시 아웃라인(stroke).
+function TabIcon({ name, active }) {
+  const mode = active
+    ? { fill: "currentColor", stroke: "none" }
+    : { fill: "none", stroke: "currentColor", strokeWidth: 1.7, strokeLinejoin: "round", strokeLinecap: "round" };
+  const svg = { width: 25, height: 25, viewBox: "0 0 24 24", display: "block", ...mode };
+  if (name === "gallery") {
+    return (
+      <svg {...svg}>
+        <rect x="3.4" y="3.4" width="7.4" height="7.4" rx="2.3" />
+        <rect x="13.2" y="3.4" width="7.4" height="7.4" rx="2.3" />
+        <rect x="3.4" y="13.2" width="7.4" height="7.4" rx="2.3" />
+        <rect x="13.2" y="13.2" width="7.4" height="7.4" rx="2.3" />
+      </svg>
+    );
+  }
+  if (name === "mygallery") {
+    return (
+      <svg {...svg}>
+        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+      </svg>
+    );
+  }
+  return (
+    <svg {...svg}>
+      <path d="M12 12.4a4.2 4.2 0 1 0 0-8.4 4.2 4.2 0 0 0 0 8.4z" />
+      <path d="M12 14.2c-4.2 0-7.6 2.15-7.6 5.5v.5h15.2v-.5c0-3.35-3.4-5.5-7.6-5.5z" />
+    </svg>
+  );
+}
+
 function BottomNav({ screen, go }) {
   const tabs = [
-    { key: "gallery", label: "갤러리", icon: "✦", match: ["gallery", "home", "confirm", "result"] },
-    { key: "mygallery", label: "내 사진", icon: "♡", match: ["mygallery"] },
-    { key: "profile", label: "프로필", icon: "👤", match: ["profile", "store"] },
+    { key: "gallery", label: "갤러리", match: ["gallery", "home", "confirm", "result"] },
+    { key: "mygallery", label: "내 사진", match: ["mygallery"] },
+    { key: "profile", label: "프로필", match: ["profile", "store"] },
   ];
   return (
     <nav style={S.tabbar}>
@@ -393,8 +431,9 @@ function BottomNav({ screen, go }) {
               key={tb.key}
               style={{ ...S.tabBtn, ...(on ? S.tabBtnOn : {}) }}
               onClick={() => go(tb.key)}
+              aria-current={on ? "page" : undefined}
             >
-              <span style={S.tabIcon}>{tb.icon}</span>
+              <TabIcon name={tb.key} active={on} />
               <span style={S.tabLabel}>{tb.label}</span>
             </button>
           );
@@ -425,6 +464,9 @@ export default function PortraitStudio() {
   const [fourcutStyleKey, setFourcutStyleKey] = useState(FOURCUT_STYLES[0].key);
   const [fourcutProgress, setFourcutProgress] = useState("");
   const [selected, setSelected] = useState(null);
+  const [navDir, setNavDir] = useState("fwd"); // 화면 전환 방향 (뒤로가기 애니메이션용)
+  const [showBrooklyn, setShowBrooklyn] = useState(false); // 증명사진 → Brooklyn 유도 모달
+  const swipeRef = useRef(null); // 왼쪽 엣지 스와이프 추적
   const [query, setQuery] = useState("");
   const [activeCat, setActiveCat] = useState("전체");
   const [ageConfirmed, setAgeConfirmed] = useState(false);
@@ -872,11 +914,70 @@ export default function PortraitStudio() {
   }
 
   function pickPrompt(p) {
+    // 증명사진은 전문앱 Brooklyn 으로 유도 (rimikimi 는 화보/프로필 집중)
+    if (isIdPhoto(p)) { setShowBrooklyn(true); return; }
+    setNavDir("fwd");
     setSelected(p);
     // 아트 변환 컨셉이면 이전 일회용 사진 비우고 들어감 (매번 새로 받음)
     if (isArtConcept(p)) setArtPhoto(null);
     setScreen("home"); // 컨셉 선택 후 사진 업로드 화면으로
   }
+
+  // ── 증명사진 → Brooklyn(picbox) 스토어로 유도 ──
+  async function openBrooklyn() {
+    const ua = navigator.userAgent || "";
+    const plat = platform();
+    let url = "https://picbox-app.vercel.app";
+    if (plat === "ios" || /iPad|iPhone|iPod/.test(ua)) url = "https://apps.apple.com/app/id6784226620";
+    else if (plat === "android" || /android/i.test(ua)) url = "https://play.google.com/store/apps/details?id=com.picbox.app";
+    try {
+      if (isNative()) {
+        const { Browser } = await import("@capacitor/browser");
+        await Browser.open({ url });
+      } else {
+        window.open(url, "_blank");
+      }
+    } catch (_) {
+      window.open(url, "_blank");
+    }
+    setShowBrooklyn(false);
+  }
+
+  // ── 화면별 뒤로가기 목적지 (뒤로가기 애니메이션 방향도 설정) ──
+  function goBack() {
+    setNavDir("back");
+    if (screen === "confirm") setScreen("home");
+    else if (screen === "home") { setSelected(null); setScreen("gallery"); }
+    else if (screen === "result") { setSelected(null); setScreen("gallery"); }
+    else if (screen === "profile") setScreen("gallery");
+    else if (screen === "mygallery") setScreen("profile");
+    else if (screen === "store") setScreen(selected ? "confirm" : "gallery");
+    else { setNavDir("fwd"); return false; } // gallery = 최상위, 뒤로 없음
+    return true;
+  }
+
+  // ── 왼쪽 엣지 스와이프 → 뒤로가기 (iOS 네이티브 제스처 느낌) ──
+  function onTouchStartRoot(e) {
+    const tt = e.touches && e.touches[0];
+    swipeRef.current = tt && tt.clientX <= 28 ? { x: tt.clientX, y: tt.clientY } : null;
+  }
+  function onTouchEndRoot(e) {
+    const s = swipeRef.current;
+    swipeRef.current = null;
+    if (!s) return;
+    const tt = e.changedTouches && e.changedTouches[0];
+    if (!tt) return;
+    const dx = tt.clientX - s.x;
+    const dy = tt.clientY - s.y;
+    if (dx > 70 && Math.abs(dy) < 55) goBack();
+  }
+
+  // 뒤로가기 애니메이션이 재생될 시간을 준 뒤 방향을 정방향으로 리셋
+  useEffect(() => {
+    if (navDir !== "back") return;
+    const id = setTimeout(() => setNavDir("fwd"), 460);
+    return () => clearTimeout(id);
+  }, [screen, navDir]);
 
   async function startGenerate() {
     if (!canGenerate) {
@@ -1072,7 +1173,12 @@ export default function PortraitStudio() {
   }
 
   return (
-    <div style={S.app}>
+    <div
+      style={S.app}
+      data-navdir={navDir}
+      onTouchStart={onTouchStartRoot}
+      onTouchEnd={onTouchEndRoot}
+    >
       <style>{CSS}</style>
 
       {/* 사진 업로드 input — 어느 화면에서든 fileRef.current?.click() 으로 호출 가능 */}
@@ -1271,6 +1377,25 @@ export default function PortraitStudio() {
       )}
 
       <BottomNav screen={screen} go={setScreen} />
+
+      {showBrooklyn && (
+        <div style={S.bkBackdrop} onClick={() => setShowBrooklyn(false)}>
+          <div style={S.bkCard} onClick={(e) => e.stopPropagation()}>
+            <div style={S.bkBadge}>🪪</div>
+            <div style={S.bkTitle}>증명사진은 Brooklyn에서</div>
+            <div style={S.bkDesc}>
+              규격·배경·복장까지 심사 통과용으로 정확히 만들어 주는 전용 앱이에요.
+              rimikimi는 화보·프로필 사진에 집중하고 있어요.
+            </div>
+            <button style={S.bkPrimary} onClick={openBrooklyn}>
+              Brooklyn에서 만들기
+            </button>
+            <button style={S.bkClose} onClick={() => setShowBrooklyn(false)}>
+              다음에
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1551,7 +1676,7 @@ function GalleryScreen({
           }}
         >
           {prompts.map((p, i) => (
-            <button key={p.id} style={S.card} onClick={() => onPick(p)}>
+            <button key={p.id} className="cardIn" style={{ ...S.card, animationDelay: (i < 12 ? i * 0.035 : 0) + "s" }} onClick={() => onPick(p)}>
               <div style={S.thumb}>
                 <img
                   src={`/thumbs/${p.id}.webp`}
@@ -1911,8 +2036,27 @@ function MyGalleryScreen({ accessToken, onBack }) {
   async function handleSave(it) {
     if (!it.url) return;
     if (isNative()) {
-      const ok = await nativeShare({ title: it.conceptTitle || "rimikimi", url: it.url });
-      if (!ok) return; // 사용자가 취소
+      // 원격 URL 을 그대로 공유하면 iOS 가 "링크"로 취급해 사진첩 "이미지 저장"이 안 뜬다.
+      // → 이미지를 받아 파일(dataURL)로 만들어 공유해야 "Save Image" 가 나온다. (결과화면과 동일)
+      let ok = false;
+      try {
+        const resp = await fetch(it.url);
+        const blob = await resp.blob();
+        const dataUrl = await new Promise((res, rej) => {
+          const fr = new FileReader();
+          fr.onloadend = () => res(fr.result);
+          fr.onerror = rej;
+          fr.readAsDataURL(blob);
+        });
+        ok = await nativeShareImage(dataUrl, `rimikimi_${it.conceptId || it.id}.png`);
+      } catch (e) {
+        ok = false;
+      }
+      if (!ok) {
+        // 폴백: 최소한 링크 공유(카톡/메시지)라도
+        const shared = await nativeShare({ title: it.conceptTitle || "rimikimi", url: it.url });
+        if (!shared) return; // 사용자가 취소
+      }
     } else {
       const a = document.createElement("a");
       a.href = it.url;
@@ -2284,7 +2428,7 @@ function ResultScreen({
           <div style={S.screenKicker}>{t("result.done")}</div>
           <div style={S.screenTitle}>{localizedTitle(prompt)}</div>
           <div style={S.resultImage}>
-            <img src={resultImage} alt={localizedTitle(prompt)} style={S.resultImg} />
+            <img src={resultImage} alt={localizedTitle(prompt)} style={S.resultImg} className="resultReveal" />
           </div>
           <div style={S.saveNotice}>
             {t("result.saveNotice1")}
@@ -2382,12 +2526,20 @@ function StoreScreen({ packs, credits, session, freeLimit = FREE_DAILY, onCredit
     const rc = iapById?.[pack.id];
     if (!rc) { setErrMsg("스토어 상품을 불러오지 못했어요. 잠시 후 다시 시도해 주세요."); return; }
     setBusyId(pack.id);
+    const sub = isSubscription(pack.id);
     try {
       const res = await purchaseIap(rc);
       if (res?.cancelled) { setBusyId(null); return; }
-      const g = await grantWithRetry(pack.id, res?.transactionId);
-      setOkMsg(`크레딧 ${pack.count}개가 충전됐어요! 🎉`);
+      try {
+        await grantWithRetry(pack.id, res?.transactionId);
+      } catch (e) {
+        // 구독은 웹훅(INITIAL_PURCHASE)이 적립 → 즉시 반영 안 돼도 실패 아님
+        if (!sub) throw e;
+      }
       onCredited && onCredited();
+      setOkMsg(sub
+        ? "rimikimi+ 구독 완료! 크레딧이 곧 충전되고 광고가 사라져요 ✨"
+        : `크레딧 ${pack.count}개가 충전됐어요! 🎉`);
     } catch (e) {
       setErrMsg(e.message || String(e));
     } finally {
@@ -2509,6 +2661,47 @@ function StoreScreen({ packs, credits, session, freeLimit = FREE_DAILY, onCredit
       </div>
 
       {native && (
+        <div style={S.subSection}>
+          <div style={S.subTitle}>rimikimi+ 구독</div>
+          <div style={S.subDesc}>광고·워터마크 제거 + 크레딧 자동 충전</div>
+          {SUB_PLANS.map((sp) => {
+            const rc = iapById?.[sp.id];
+            const storePrice = rc?.priceString;
+            const busy = busyId === sp.id;
+            const per = sp.period === "year" ? "연 720크레딧 상당" : "월 60크레딧";
+            return (
+              <div key={sp.id} style={{ ...S.subCard, ...(sp.badge ? S.subCardHi : {}) }}>
+                <div style={S.subCardInfo}>
+                  <div style={S.subCardName}>
+                    rimikimi+ {ko ? sp.label_ko : sp.label_en}
+                    {sp.badge && <span style={S.subCardBadge}>{sp.badge}</span>}
+                  </div>
+                  <div style={S.subCardMeta}>{per} · {sp.period === "year" ? "1년" : "1개월"} 자동 갱신</div>
+                </div>
+                <button
+                  style={{ ...S.subCardBtn, opacity: busy ? 0.6 : 1, cursor: busy ? "wait" : "pointer" }}
+                  disabled={busy || !!busyId || (iapById && !rc)}
+                  onClick={() => onBuy(sp)}
+                >
+                  {busy ? "처리 중…" : (storePrice || (ko ? won(sp.krw) : usd(sp.usd)))}
+                </button>
+              </div>
+            );
+          })}
+          <p style={S.subLegal}>
+            {ko
+              ? "구독은 표시된 기간마다 자동으로 갱신되며, 결제는 App Store 계정에 청구됩니다. 현재 기간 종료 최소 24시간 전에 해지하지 않으면 자동 갱신되고, 구독 관리·해지는 기기의 App Store 설정에서 언제든 가능합니다."
+              : "Subscriptions auto-renew for the period shown and are billed to your App Store account. They renew unless canceled at least 24 hours before the current period ends. Manage or cancel anytime in your device's App Store settings."}
+          </p>
+          <div style={S.subLegalLinks}>
+            <a href={`${LEGAL_BASE}/terms`} target="_blank" rel="noopener noreferrer" style={S.subLegalLink}>{ko ? "이용약관(EULA)" : "Terms of Use (EULA)"}</a>
+            <span style={S.subLegalDot}>·</span>
+            <a href={`${LEGAL_BASE}/privacy`} target="_blank" rel="noopener noreferrer" style={S.subLegalLink}>{ko ? "개인정보처리방침" : "Privacy Policy"}</a>
+          </div>
+        </div>
+      )}
+
+      {native && (
         <div style={{ textAlign: "center", marginTop: 20 }}>
           <button
             style={{
@@ -2532,6 +2725,9 @@ function StoreScreen({ packs, credits, session, freeLimit = FREE_DAILY, onCredit
       )}
 
       <p style={S.storeNote}>{native ? t("store.note") : t("store.noteWeb")}</p>
+      {native && iapById && Object.keys(iapById).length === 0 && getIapDiag() && (
+        <p style={{ ...S.storeNote, color: "#c0392b", opacity: 0.7 }}>iap: {getIapDiag()}</p>
+      )}
     </div>
   );
 }
@@ -2792,30 +2988,33 @@ const S = {
   tabbar: {
     position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 100,
     display: "flex", justifyContent: "center",
-    padding: "0 14px calc(env(safe-area-inset-bottom, 0px) + 12px)",
+    padding: "0 16px calc(env(safe-area-inset-bottom, 0px) + 10px)",
     pointerEvents: "none",
   },
   tabbarInner: {
-    width: "100%", maxWidth: 412, pointerEvents: "auto",
-    display: "flex", justifyContent: "space-around", alignItems: "center",
-    background: "rgba(255,255,255,0.55)",
-    backdropFilter: "blur(28px) saturate(180%)",
-    WebkitBackdropFilter: "blur(28px) saturate(180%)",
-    border: "1px solid rgba(255,255,255,0.8)",
-    borderRadius: 28,
-    boxShadow: "0 16px 36px -10px rgba(40,30,30,0.36), inset 0 1px 0 rgba(255,255,255,0.95), inset 0 -1px 2px rgba(255,255,255,0.4)",
-    padding: "8px 8px",
+    pointerEvents: "auto",
+    width: "100%", maxWidth: 460,
+    display: "flex", alignItems: "center",
+    padding: "7px 10px",
+    borderRadius: 30,
+    background: "rgba(255,255,255,0.40)",
+    backdropFilter: "blur(32px) saturate(200%)",
+    WebkitBackdropFilter: "blur(32px) saturate(200%)",
+    border: "1px solid rgba(255,255,255,0.6)",
+    boxShadow:
+      "0 10px 34px -8px rgba(35,31,32,0.26), 0 2px 8px -2px rgba(35,31,32,0.14), inset 0 1px 1px rgba(255,255,255,0.9), inset 0 -6px 12px -6px rgba(255,255,255,0.5)",
   },
   tabBtn: {
-    flex: 1, background: "transparent", border: "none", cursor: "pointer",
+    flex: 1,
+    background: "transparent", border: "none", cursor: "pointer",
     display: "flex", flexDirection: "column", alignItems: "center",
-    justifyContent: "center", gap: 4,
-    color: INK, opacity: 0.5, padding: "4px 0", minHeight: 48,
+    justifyContent: "center", gap: 3,
+    color: "#8a827b", padding: "6px 0", borderRadius: 20, minHeight: 44,
     fontFamily: "'Quicksand', sans-serif",
+    transition: "color .18s ease",
   },
-  tabBtnOn: { opacity: 1, color: ACCENT },
-  tabIcon: { fontSize: 20, lineHeight: 1 },
-  tabLabel: { fontSize: 10.5, fontWeight: 700, letterSpacing: "0.01em" },
+  tabBtnOn: { color: ACCENT },
+  tabLabel: { fontSize: 10.5, fontWeight: 600, letterSpacing: "0.02em" },
   footer: {
     textAlign: "center",
     // 홈 인디케이터 안전영역만큼 아래 여백 추가
@@ -3010,11 +3209,40 @@ const S = {
   payToast: {
     position: "fixed", top: 70, left: "50%",
     transform: "translateX(-50%)",
+    animation: "toastIn .22s cubic-bezier(0.16,1,0.3,1)",
     background: INK, color: "#fff", borderRadius: 999,
     padding: "11px 22px", fontSize: 13, fontWeight: 700,
     boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
     cursor: "pointer", zIndex: 999, maxWidth: "90vw",
     textAlign: "center",
+  },
+  bkBackdrop: {
+    position: "fixed", inset: 0, zIndex: 1000,
+    background: "rgba(20,16,16,0.44)",
+    backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    padding: 24, animation: "fadeIn .2s ease",
+  },
+  bkCard: {
+    width: "100%", maxWidth: 340, background: "#fff",
+    borderRadius: 24, padding: "30px 24px 20px", textAlign: "center",
+    boxShadow: "0 24px 60px -12px rgba(20,16,16,0.5)",
+    animation: "bkPop .3s cubic-bezier(.34,1.3,.5,1) both",
+  },
+  bkBadge: { fontSize: 40, marginBottom: 12, lineHeight: 1 },
+  bkTitle: { fontFamily: "'Jua', sans-serif", fontSize: 21, color: INK, marginBottom: 10 },
+  bkDesc: { fontSize: 13.5, lineHeight: 1.6, color: "#6f665e", marginBottom: 22 },
+  bkPrimary: {
+    width: "100%", border: "none", borderRadius: 15, padding: "15px",
+    fontSize: 15, fontWeight: 700, color: "#fff",
+    background: "linear-gradient(180deg,#2c2723," + INK + ")",
+    fontFamily: "'Quicksand', sans-serif", cursor: "pointer",
+    boxShadow: "0 10px 22px -8px rgba(35,31,32,0.5)",
+  },
+  bkClose: {
+    marginTop: 10, background: "transparent", border: "none",
+    color: "#9a938c", fontSize: 13.5, fontWeight: 600,
+    fontFamily: "'Quicksand', sans-serif", cursor: "pointer", padding: 8,
   },
   packPriceSub: {
     fontSize: 11, fontWeight: 500, opacity: 0.55, marginLeft: 4,
@@ -3302,16 +3530,66 @@ const S = {
     fontSize: 10, lineHeight: 1.65, opacity: 0.45,
     marginTop: 18, textAlign: "center", fontWeight: 500,
   },
+  subSection: {
+    marginTop: 26, padding: "18px 16px", borderRadius: 20,
+    background: "rgba(255,255,255,0.6)", border: "1px solid rgba(35,31,32,0.07)",
+  },
+  subTitle: { fontFamily: "'Jua', sans-serif", fontSize: 17, color: INK, marginBottom: 3 },
+  subDesc: { fontSize: 12, color: "#8a7f6e", marginBottom: 14 },
+  subCard: {
+    display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+    padding: "12px 14px", borderRadius: 14, background: "#fff",
+    border: "1px solid rgba(35,31,32,0.08)", marginBottom: 10,
+  },
+  subCardHi: { border: "1.5px solid " + ACCENT },
+  subCardInfo: { flex: 1, minWidth: 0 },
+  subCardName: { fontSize: 14, fontWeight: 700, color: INK, display: "flex", alignItems: "center", gap: 6 },
+  subCardBadge: { fontSize: 10, fontWeight: 700, color: "#fff", background: ACCENT, borderRadius: 6, padding: "2px 6px" },
+  subCardMeta: { fontSize: 11.5, color: "#8a7f6e", marginTop: 2 },
+  subLegal: { fontSize: 10.5, lineHeight: 1.5, color: "#9a8f7e", marginTop: 12 },
+  subLegalLinks: { display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 8 },
+  subLegalLink: { fontSize: 11.5, fontWeight: 600, color: INK, opacity: 0.75, textDecoration: "underline" },
+  subLegalDot: { color: "#c8bda9", fontSize: 11 },
+  subCardBtn: {
+    flex: "0 0 auto", border: "none", borderRadius: 11, padding: "11px 16px",
+    fontSize: 14, fontWeight: 700, color: "#fff",
+    background: "linear-gradient(180deg,#2c2723," + INK + ")", fontFamily: "'Quicksand', sans-serif",
+  },
 };
 
 const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Jua&family=Quicksand:wght@400;500;600;700&display=swap');
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 body { margin: 0; background: ${BG}; }
-.fade { animation: fadeIn .35s ease; padding-top: 18px; }
+.fade { animation: fadeIn .4s cubic-bezier(0.16,1,0.3,1) both; padding-top: 18px; }
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(18px) scale(.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.resultReveal { animation: resultReveal .65s cubic-bezier(.34,1.28,.5,1) both; }
+@keyframes resultReveal {
+  0% { opacity: 0; transform: scale(.82); filter: blur(12px); }
+  60% { filter: blur(0); }
+  100% { opacity: 1; transform: scale(1); filter: blur(0); }
+}
+.cardIn { animation: cardIn .5s cubic-bezier(0.16,1,0.3,1) both; }
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(16px) scale(.93); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+/* 뒤로가기(엣지 스와이프) — 이전 화면이 왼쪽에서 들어옴 */
+[data-navdir="back"] .fade { animation: slideBack .4s cubic-bezier(0.16,1,0.3,1) both; }
+@keyframes slideBack {
+  from { opacity: 0; transform: translateX(-26px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes bkPop {
+  from { opacity: 0; transform: scale(.9) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+@keyframes toastIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(-8px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 .splashLogo { animation: pop .6s cubic-bezier(.34,1.56,.64,1); }
 @keyframes pop {
@@ -3336,7 +3614,7 @@ input[type=checkbox] { cursor: pointer; }
 button {
   -webkit-touch-callout: none;
   -webkit-user-select: none; user-select: none;
-  transition: transform .12s ease, opacity .12s ease, box-shadow .12s ease;
+  transition: transform .1s ease-out, opacity .12s ease-out, box-shadow .12s ease-out;
 }
 button:active { transform: scale(0.965); opacity: 0.92; }
 ::-webkit-scrollbar { height: 0; width: 0; }

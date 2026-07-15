@@ -7,7 +7,7 @@
 //   1) 앱 시작 시 initIap()  → RevenueCat 설정 (익명)
 //   2) 로그인 후 loginIap(userId) → RevenueCat app_user_id = 우리 Supabase user.id
 //   3) StoreScreen 에서 getIapPacks() 로 스토어 실제 가격 받아 표시
-//   4) purchaseIap(productId) 로 결제 → 성공 시 거래정보 반환
+//   4) purchaseIap(pack) 로 결제 → 성공 시 거래정보 반환
 //   5) 호출측에서 /api/iap/grant 로 거래ID 전송 → 서버가 RevenueCat 재검증 후 크레딧 지급
 //
 // 환경변수 (Vite, 빌드 시 주입):
@@ -16,28 +16,56 @@
 // ============================================================
 
 import { isNative, platform } from "./nativeBridge";
+// ⚠️ 정적 임포트 필수 — 네이티브 WKWebView 에서 lazy chunk 동적 import() 가 영원히
+// pending 되는 버그(josephine 시뮬레이터 재현). configure 가 실행되지 않아 IAP 전체가
+// 죽고(무한 Processing / 상품 0개), RC 백엔드에 고객 0명이 되던 근본 원인.
+import { Purchases as _PurchasesStatic } from "@revenuecat/purchases-capacitor";
 
 // 우리 팩 정의 (서버 packages.js 와 productId 1:1 매칭 필수)
+// 소비형(크레딧) + 구독(rimikimi+). 구독은 1갱신당 지급 크레딧.
 export const IAP_PRODUCTS = {
   credits_10: 10,
   credits_30: 30,
   credits_70: 70,
   credits_120: 120,
+  rimikimi_plus_monthly: 60,
+  rimikimi_plus_annual: 720,
 };
+export const SUBSCRIPTION_IDS = ["rimikimi_plus_monthly", "rimikimi_plus_annual"];
+export const isSubscription = (id) => SUBSCRIPTION_IDS.includes(id);
 export const PRODUCT_IDS = Object.keys(IAP_PRODUCTS);
 
 const RC_IOS_KEY = import.meta.env.VITE_RC_IOS_KEY || "";
 const RC_ANDROID_KEY = import.meta.env.VITE_RC_ANDROID_KEY || "";
 
-let _Purchases = null;
 let _configured = false;
-
-async function getPurchases() {
-  if (_Purchases) return _Purchases;
-  const mod = await import("@revenuecat/purchases-capacitor");
-  _Purchases = mod.Purchases;
-  return _Purchases;
+// TestFlight 진단용: 마지막 실패 지점/메시지 (paywall 하단에 노출)
+let _lastError = null;
+export function getIapDiag() {
+  return _lastError ? String(_lastError).slice(0, 200) : null;
 }
+function setDiag(stage, e) {
+  _lastError = `[${stage}] ${e?.code ? e.code + ": " : ""}${e?.message || String(e)}`;
+  console.warn("[iap]", _lastError);
+}
+
+// 네이티브 호출이 영원히 안 돌아오는 것 방지 (리뷰어 '무한 스피너' 재발 차단)
+function withTimeout(promise, ms, label) {
+  return Promise.race([
+    promise,
+    new Promise((_, rej) =>
+      setTimeout(() => {
+        const e = new Error(`${label} 응답이 없어요. 네트워크 확인 후 다시 시도해 주세요.`);
+        e.code = "TIMEOUT";
+        rej(e);
+      }, ms)
+    ),
+  ]);
+}
+
+// 🔴 절대 async 로 프록시를 return/await 하지 말 것 — Capacitor 프록시는 .then 접근을
+// 네이티브 호출로 해석해 "Purchases.then() is not implemented" + await 영구 정지 유발.
+const getPurchases = () => _PurchasesStatic;
 
 function apiKey() {
   return platform() === "ios" ? RC_IOS_KEY : RC_ANDROID_KEY;
@@ -48,19 +76,22 @@ export function iapAvailable() {
   return isNative() && !!apiKey();
 }
 
-// 앱 시작 시 1회 호출
+// 앱 시작 시 1회 호출 (실패해도 이후 getIapPacks/purchase 에서 재시도됨)
 export async function initIap(userId) {
-  if (!iapAvailable() || _configured) return;
+  if (!iapAvailable() || _configured) return _configured;
   try {
-    const Purchases = await getPurchases();
-    await Purchases.configure({
-      apiKey: apiKey(),
-      appUserID: userId || undefined,
-    });
+    const Purchases = getPurchases();
+    await withTimeout(
+      Purchases.configure({ apiKey: apiKey(), appUserID: userId || undefined }),
+      15000,
+      "결제 초기화"
+    );
     _configured = true;
+    _lastError = null;
   } catch (e) {
-    console.warn("[iap] configure 실패", e);
+    setDiag("configure", e);
   }
+  return _configured;
 }
 
 // 로그인 후 (우리 user.id 로 RevenueCat 식별자 정렬)
@@ -68,7 +99,7 @@ export async function loginIap(userId) {
   if (!iapAvailable() || !userId) return;
   try {
     if (!_configured) await initIap(userId);
-    const Purchases = await getPurchases();
+    const Purchases = getPurchases();
     await Purchases.logIn({ appUserID: String(userId) });
   } catch (e) {
     console.warn("[iap] logIn 실패", e);
@@ -78,52 +109,42 @@ export async function loginIap(userId) {
 export async function logoutIap() {
   if (!iapAvailable() || !_configured) return;
   try {
-    const Purchases = await getPurchases();
+    const Purchases = getPurchases();
     await Purchases.logOut();
   } catch {}
 }
 
 // 스토어에서 실제 상품/가격 받아오기
-// 반환: [{ id, count, priceString, _pkg|_product }]
+// 반환: [{ id, count, priceString, isSub, _product }]
+// getProducts 직접 조회 (Offerings 스킵 — 빈 오퍼링이 error23 + 로딩지연만 냈음).
 export async function getIapPacks() {
   if (!iapAvailable()) return [];
-  const Purchases = await getPurchases();
-  // 1) Offerings 우선 (RevenueCat 권장)
-  try {
-    const { current } = await Purchases.getOfferings();
-    const pkgs = current?.availablePackages || [];
-    const mapped = pkgs
-      .map((p) => {
-        const pid = p.product?.identifier;
-        if (!pid || !(pid in IAP_PRODUCTS)) return null;
-        return {
-          id: pid,
-          count: IAP_PRODUCTS[pid],
-          priceString: p.product?.priceString || "",
-          _pkg: p,
-        };
-      })
-      .filter(Boolean);
-    if (mapped.length) return sortPacks(mapped);
-  } catch (e) {
-    console.warn("[iap] getOfferings 실패, getProducts 로 폴백", e);
+  // configure 안 됐으면 여기서 재시도 (앱 시작 시 일시 실패해도 paywall 열 때 복구)
+  if (!_configured) {
+    const ok = await initIap();
+    if (!ok) return [];
   }
-  // 2) 폴백: 상품 직접 조회
+  const Purchases = getPurchases();
   try {
-    const { products } = await Purchases.getProducts({
-      productIdentifiers: PRODUCT_IDS,
-    });
+    const { products } = await withTimeout(
+      Purchases.getProducts({ productIdentifiers: PRODUCT_IDS }),
+      15000,
+      "상품 조회"
+    );
     const mapped = (products || [])
       .filter((pr) => pr.identifier in IAP_PRODUCTS)
       .map((pr) => ({
         id: pr.identifier,
         count: IAP_PRODUCTS[pr.identifier],
         priceString: pr.priceString || "",
+        isSub: isSubscription(pr.identifier),
         _product: pr,
       }));
+    if (mapped.length) _lastError = null;
+    else if (!_lastError) setDiag("getProducts", new Error("스토어가 상품 0개를 반환"));
     return sortPacks(mapped);
   } catch (e) {
-    console.warn("[iap] getProducts 실패", e);
+    setDiag("getProducts", e);
     return [];
   }
 }
@@ -133,19 +154,27 @@ function sortPacks(arr) {
 }
 
 // 결제 실행. 성공 시 { transactionId, productId } 반환, 취소 시 { cancelled:true }
+// _product 가 없으면(스토어 상품 미로드) 명확히 실패시켜 UI 가 무한 스피너에 빠지지 않게.
 export async function purchaseIap(pack) {
   if (!iapAvailable()) throw new Error("결제를 사용할 수 없어요.");
-  const Purchases = await getPurchases();
+  if (!pack._pkg && !pack._product) {
+    const e = new Error(
+      "상품 정보를 불러오지 못했어요. 네트워크 확인 후 다시 시도해 주세요." +
+        (_lastError ? ` (${_lastError})` : "")
+    );
+    e.code = "NO_PRODUCT";
+    throw e;
+  }
+  const Purchases = getPurchases();
   try {
     let info;
+    // 결제 시트는 사용자가 오래 붙잡을 수 있으니 타임아웃을 길게(3분).
     if (pack._pkg) {
-      const r = await Purchases.purchasePackage({ aPackage: pack._pkg });
-      info = r.customerInfo;
-    } else if (pack._product) {
-      const r = await Purchases.purchaseStoreProduct({ product: pack._product });
+      const r = await withTimeout(Purchases.purchasePackage({ aPackage: pack._pkg }), 180000, "결제");
       info = r.customerInfo;
     } else {
-      throw new Error("상품 정보가 없어요.");
+      const r = await withTimeout(Purchases.purchaseStoreProduct({ product: pack._product }), 180000, "결제");
+      info = r.customerInfo;
     }
     const txId = latestTxId(info, pack.id);
     return { transactionId: txId, productId: pack.id };
@@ -153,20 +182,21 @@ export async function purchaseIap(pack) {
     if (e?.code === "1" || e?.userCancelled || e?.message?.includes("cancel")) {
       return { cancelled: true };
     }
+    setDiag("purchase", e);
     throw e;
   }
 }
 
-// 구매 복원 (App Store 3.1.1 필수). 성공 시 customerInfo 반환, 웹은 no-op.
+// 구매 복원 (App Store 3.1.1). { restored, customerInfo } 반환, 웹은 no-op.
 export async function restoreIap() {
-  if (!iapAvailable()) return null;
-  const Purchases = await getPurchases();
+  if (!iapAvailable()) return { restored: false };
   try {
+    const Purchases = getPurchases();
     const { customerInfo } = await Purchases.restorePurchases();
-    return customerInfo;
+    return { restored: true, customerInfo };
   } catch (e) {
     console.warn("[iap] restorePurchases 실패", e);
-    throw e;
+    return { restored: false, error: e?.message || String(e) };
   }
 }
 

@@ -98,7 +98,10 @@ async function handleWebhook(req, res) {
 
   const ev = req.body?.event || {};
   const type = ev.type;
-  if (type !== "NON_RENEWING_PURCHASE") {
+  // 소비형(NON_RENEWING) + 구독 최초/갱신(INITIAL/RENEWAL) 모두 크레딧 지급.
+  // 구독 갱신은 매 주기 새 store_transaction_id → iap_events UNIQUE 로 주기당 1회만 적립.
+  const GRANT_TYPES = ["NON_RENEWING_PURCHASE", "INITIAL_PURCHASE", "RENEWAL"];
+  if (!GRANT_TYPES.includes(type)) {
     return res.status(200).json({ ok: true, ignored: type || "unknown" });
   }
 
