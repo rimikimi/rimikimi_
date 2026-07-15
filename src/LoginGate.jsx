@@ -457,7 +457,7 @@ const S = {
     fontFamily: "'Quicksand', sans-serif",
     cursor: "pointer", display: "flex", alignItems: "center",
     justifyContent: "center", gap: 10,
-    transition: "transform 0.06s ease, opacity 0.15s",
+    transition: "transform .1s ease-out, opacity .12s ease-out",
   },
   btnApple: {
     width: "100%", border: "none", borderRadius: 14,
