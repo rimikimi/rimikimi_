@@ -10,7 +10,7 @@
 
 import { getAuthedUser, countTodayUsage, FREE_DAILY, dailyLimitFor, isUnlimited, isTester } from "./_lib/auth.js";
 import { precheckHasFace } from "./_lib/precheck.js";
-import { getCreditInfo, consumeCredit } from "./_lib/credits.js";
+import { getCreditInfo, consumeCredit, getProSampleUsed, markProSampleUsed } from "./_lib/credits.js";
 import { saveToGallery } from "./_lib/gallery.js";
 
 // Gemini 원본 이미지는 클 수 있음(>4.5MB → Vercel 응답 한도 초과로 본문 잘림 = 클라 "오류 200").
@@ -102,18 +102,33 @@ export default async function handler(req, res) {
 
   // (정식 오픈: 베타 차단 제거 — 모든 로그인 사용자가 하루 무료 1장 + 크레딧 사용 가능)
 
+  // 무료 Pro 체험(계정당 1회): 결과화면에서 "같은 사진 Pro로 무료 1회" 버튼이 보냄.
+  //  → 하루한도/크레딧 게이트를 우회하고, 차감 없이 Pro 엔진으로 1장 생성 후 소진 기록.
+  const wantProSample = !!(req.body && req.body.proSample);
+
   // 2) 오늘 사용량 + 크레딧 (무제한 사용자는 건너뜀)
   //    하루 한도 남으면 그걸 쓰고, 다 썼으면 크레딧으로 대체.
   let usage = { count: 0 };
   let useCredit = false;
   let creditsLeft = 0;
+  let freeProSample = false;
   if (!unlimited) {
     usage = await countTodayUsage(admin, user.id);
     if (usage.error) {
       return res.status(500).json({ error: "사용 기록 조회 실패: " + usage.error });
     }
 
-    if (usage.count >= dailyLimit) {
+    if (wantProSample) {
+      // 무료 Pro 체험 경로: 계정당 1회만
+      const already = await getProSampleUsed(admin, user.id);
+      if (already) {
+        return res.status(403).json({
+          error: "무료 Pro 체험은 이미 사용했어요. 크레딧을 충전하면 계속 Pro로 만들 수 있어요.",
+          proSampleUsed: true,
+        });
+      }
+      freeProSample = true; // 게이트 우회 (아래 한도 체크 스킵)
+    } else if (usage.count >= dailyLimit) {
       // 하루 한도 소진 → 크레딧 확인
       const credit = await getCreditInfo(admin, user.id);
       creditsLeft = credit.error ? 0 : credit.creditsAvailable;
@@ -272,9 +287,14 @@ export default async function handler(req, res) {
       "Keep the same face, identity, and facial features clearly recognizable. " +
       "Apply the following concept:\n" + prompt;
 
+  // 엔진 선택:
+  //   - 유료(크레딧 사용) / 무제한(어드민) / 무료 Pro 체험 → Pro (gemini-3-pro-image, 2K)
+  //   - 무료 일일 생성 → 기본 (gemini-2.5-flash-image)
+  const usePro = unlimited || useCredit || freeProSample;
+  const model = usePro ? "gemini-3-pro-image" : "gemini-2.5-flash-image";
   const endpoint =
     "https://generativelanguage.googleapis.com/v1beta/models/" +
-    "gemini-2.5-flash-image:generateContent";
+    model + ":generateContent";
 
   // 편집(image-to-image) 모드에선 Gemini가 generationConfig.imageConfig.aspectRatio 를 무시하고
   // 오히려 출력을 세로로 크롭하는 정황 → 설정을 빼고 편집 기본동작(입력 비율 유지)에 맡긴다.
@@ -295,6 +315,8 @@ export default async function handler(req, res) {
             ],
           },
         ],
+        // Pro 는 2K 고해상도로. (기본 모델은 편집모드 비율보존 위해 설정 생략 — 기존 동작 유지)
+        ...(usePro ? { generationConfig: { imageConfig: { imageSize: "2K" } } } : {}),
       }),
     });
   } catch (e) {
@@ -331,7 +353,10 @@ export default async function handler(req, res) {
 
   // 6) 성공 → 사용 기록 (크레딧 사용 시 크레딧 차감, 아니면 오늘 한도 차감)
   if (!unlimited) {
-    if (useCredit) {
+    if (freeProSample) {
+      // 무료 Pro 체험: 차감·한도기록 없이 "1회 소진"만 표시
+      await markProSampleUsed(admin, user.id);
+    } else if (useCredit) {
       await consumeCredit(admin, user.id);
       creditsLeft = Math.max(0, creditsLeft - 1);
     } else {
@@ -373,14 +398,24 @@ export default async function handler(req, res) {
     console.error("[gallery save throw]", e?.message || e);
   }
 
+  // 무료 유저가 아직 무료 Pro 체험을 쓸 수 있는지 (결과화면 CTA 노출용).
+  //  - 방금 생성이 기본 엔진(무료)일 때만 의미. Pro였으면 자동 false.
+  let proSampleAvailable = false;
+  if (!unlimited && !usePro) {
+    proSampleAvailable = !(await getProSampleUsed(admin, user.id));
+  }
+
   return res.status(200).json({
     mimeType: outMime,
     base64: outData,
-    quotaUsed: unlimited ? 0 : useCredit ? usage.count : usage.count + 1,
+    quotaUsed: unlimited ? 0 : (useCredit || freeProSample) ? usage.count : usage.count + 1,
     quotaLimit: unlimited ? null : dailyLimit,
     usedCredit: useCredit,
     credits: unlimited ? null : creditsLeft,
     unlimited,
+    engine: usePro ? "pro" : "base",
+    proSample: freeProSample,
+    proSampleAvailable,
     galleryId,
     galleryExpiresAt,
   });

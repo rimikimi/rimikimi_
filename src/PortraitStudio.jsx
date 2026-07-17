@@ -307,6 +307,8 @@ async function generateImage(accessToken, dataUrl, promptText, conceptMeta = {})
         idSuit: conceptMeta.idSuit, idBg: conceptMeta.idBg, idBgName: conceptMeta.idBgName,
         // 인생네컷: 스타일 + 컷 인덱스 (서버가 컷별 프롬프트 조립)
         fourcutStyle: conceptMeta.fourcutStyle, cutIndex: conceptMeta.cutIndex,
+        // 무료 Pro 체험(계정당 1회) — 결과화면 비교 슬라이더용
+        proSample: !!conceptMeta.proSample,
       }),
     });
   } catch (e) {
@@ -348,6 +350,10 @@ async function generateImage(accessToken, dataUrl, promptText, conceptMeta = {})
     quotaUsed: json.quotaUsed,
     quotaLimit: json.quotaLimit,
     unlimited: json.unlimited,
+    // 엔진(기본/Pro) + 무료 Pro 체험 가능 여부 (결과화면 비교 CTA용)
+    engine: json.engine,
+    proSample: json.proSample,
+    proSampleAvailable: json.proSampleAvailable,
     // 갤러리 보관 정보 — 만료 10분 전 리마인드 푸시 예약에 사용
     galleryId: json.galleryId,
     galleryExpiresAt: json.galleryExpiresAt,
@@ -486,6 +492,11 @@ export default function PortraitStudio() {
   const [generating, setGenerating] = useState(false);
   const [resultImage, setResultImage] = useState(null);
   const [genError, setGenError] = useState(null);
+  // 결과화면 "기본 vs Pro" 비교: 무료 Pro 체험 결과 + 진행상태
+  const [proSampleImg, setProSampleImg] = useState(null);
+  const [proSampleBusy, setProSampleBusy] = useState(false);
+  const [canTryPro, setCanTryPro] = useState(false);
+  const lastGenRef = useRef(null); // { photo, promptText, meta } — 무료 Pro 체험 재호출용
   const fileRef = useRef(null);
   const mainRef = useRef(null);
 
@@ -1002,6 +1013,8 @@ export default function PortraitStudio() {
       }
       setGenError(null);
       setResultImage(null);
+      setProSampleImg(null);
+      setCanTryPro(false); // 인생네컷은 Pro 비교 미제공 (스트립이라)
       setGenerating(true);
       setScreen("result");
       setFourcutProgress(`0/${fourcutCount}`);
@@ -1051,6 +1064,8 @@ export default function PortraitStudio() {
     // 인증 + 횟수 체크는 서버(/api/generate)가 처리
     setGenError(null);
     setResultImage(null);
+    setProSampleImg(null);
+    setCanTryPro(false);
     setGenerating(true);
     setScreen("result");
     // 백그라운드 복구용 마커 (생성 중 앱이 얼거나 요청이 끊겨도 결과를 되찾음)
@@ -1073,14 +1088,19 @@ export default function PortraitStudio() {
         idMeta.idBg = bg.hex;
         idMeta.idBgName = bg.name;
       }
-      const result = await generateImage(accessToken, photoToUse, promptText, {
+      const genMeta = {
         id: selected.id,
         title: selected.title,
         // 아트 변환은 풍경/물건 등 얼굴 없는 사진도 가능해야 하므로 face precheck 우회
         skipFacePrecheck: art,
         ...idMeta,
-      });
+      };
+      // 무료 Pro 체험 재호출용 입력 보관 (인생네컷 제외 — 단일 컷만 비교)
+      lastGenRef.current = { photo: photoToUse, promptText, meta: genMeta };
+      const result = await generateImage(accessToken, photoToUse, promptText, genMeta);
       setResultImage(result.imageDataUrl);
+      // 방금 생성이 무료(기본 엔진)이고 무료 Pro 체험이 남아있으면 비교 CTA 노출
+      setCanTryPro(result.engine === "base" && !!result.proSampleAvailable);
       // 생성 직후 만료 10분 전 리마인드 푸시 예약 (갤러리를 안 열어도 동작)
       if (result.galleryId && result.galleryExpiresAt) {
         syncExpiryNotifications(
@@ -1108,10 +1128,33 @@ export default function PortraitStudio() {
     }
   }
 
+  // 결과화면: "같은 사진을 Pro로 무료 1회" — 동일 입력을 Pro 엔진으로 재생성해 비교.
+  async function tryProSample() {
+    const lg = lastGenRef.current;
+    if (!lg || proSampleBusy) return;
+    setProSampleBusy(true);
+    try {
+      const r = await generateImage(session?.access_token, lg.photo, lg.promptText, {
+        ...lg.meta,
+        proSample: true,
+      });
+      setProSampleImg(r.imageDataUrl);
+      setCanTryPro(false); // 1회 소진
+    } catch (err) {
+      setCanTryPro(false);
+      setPayToast(err?.message || "지금은 Pro 체험을 사용할 수 없어요.");
+      setTimeout(() => setPayToast(""), 3500);
+    } finally {
+      setProSampleBusy(false);
+    }
+  }
+
   function resetToHome() {
     setScreen("gallery"); // 첫 화면 = 컨셉 선택
     setSelected(null);
     setResultImage(null);
+    setProSampleImg(null);
+    setCanTryPro(false);
     setGenError(null);
   }
 
@@ -1314,6 +1357,15 @@ export default function PortraitStudio() {
             onAgain={() => setScreen("gallery")}
             onHome={resetToHome}
             showAds={showAds}
+            canTryPro={canTryPro}
+            proSampleImg={proSampleImg}
+            proSampleBusy={proSampleBusy}
+            onTryPro={tryProSample}
+            onUpgrade={
+              PAYMENTS_ENABLED
+                ? () => setScreen("store")
+                : () => { setPayToast("크레딧을 충전하면 Pro 화질로 계속 만들 수 있어요 🙂"); setTimeout(() => setPayToast(""), 3500); }
+            }
           />
         )}
         {screen === "profile" && (
@@ -2359,8 +2411,61 @@ function ConfirmScreen({
 /* ============================================================
    결과 — 생성 중 / 실패 / 성공
    ============================================================ */
+// 기본↔Pro before/after 드래그 비교 슬라이더 (포인터 이벤트, 터치·마우스 겸용)
+function CompareSlider({ before, after }) {
+  const [pos, setPos] = useState(52);
+  const [w, setW] = useState(0);
+  const boxRef = useRef(null);
+  const dragging = useRef(false);
+  useEffect(() => {
+    const el = boxRef.current;
+    if (!el) return;
+    const measure = () => setW(el.getBoundingClientRect().width);
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
+  const setFromX = (clientX) => {
+    const el = boxRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    let p = ((clientX - r.left) / r.width) * 100;
+    setPos(Math.max(0, Math.min(100, p)));
+  };
+  const down = (e) => {
+    dragging.current = true;
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {}
+    setFromX(e.clientX);
+  };
+  const move = (e) => { if (dragging.current) setFromX(e.clientX); };
+  const up = () => { dragging.current = false; };
+  return (
+    <div
+      ref={boxRef}
+      style={S.csBox}
+      onPointerDown={down}
+      onPointerMove={move}
+      onPointerUp={up}
+      onPointerCancel={up}
+    >
+      {/* Pro (뒤 레이어, 전체) */}
+      <img src={after} alt="Pro" style={S.csImg} draggable={false} />
+      {/* 기본 (앞 레이어, pos% 까지만 노출) */}
+      <div style={{ ...S.csClip, width: pos + "%" }}>
+        <img src={before} alt="기본" style={{ ...S.csImg, width: w ? w + "px" : "100%" }} draggable={false} />
+      </div>
+      <div style={{ ...S.csDivider, left: pos + "%" }}>
+        <div style={S.csHandle}>⟺</div>
+      </div>
+      <span style={{ ...S.csLabel, left: 10 }}>기본</span>
+      <span style={{ ...S.csLabel, right: 10 }}>Pro</span>
+    </div>
+  );
+}
+
 function ResultScreen({
   generating, fourcutProgress = "", prompt, resultImage, genError, onRetry, onAgain, onHome, showAds = false,
+  canTryPro = false, proSampleImg = null, proSampleBusy = false, onTryPro, onUpgrade,
 }) {
   const [saving, setSaving] = useState(false);
 
@@ -2430,6 +2535,32 @@ function ResultScreen({
           <div style={S.resultImage}>
             <img src={resultImage} alt={localizedTitle(prompt)} style={S.resultImg} className="resultReveal" />
           </div>
+
+          {/* 기본 vs Pro 비교 (무료 Pro 체험) */}
+          {proSampleImg ? (
+            <div style={S.proWrap}>
+              <div style={S.proWrapTitle}>✨ 기본 vs Pro — 손잡이를 드래그해 비교해보세요</div>
+              <CompareSlider before={resultImage} after={proSampleImg} />
+              <button type="button" style={S.proUpgradeBtn} onClick={onUpgrade}>
+                Pro 화질로 계속 만들기
+              </button>
+              <div style={S.proWrapHint}>Pro는 저장 시 2K 고해상도로 받아져요.</div>
+            </div>
+          ) : canTryPro ? (
+            <div style={S.proTeaser}>
+              <div style={S.proTeaserTitle}>같은 사진을 <b>Pro 화질</b>로 무료 1회 체험</div>
+              <div style={S.proTeaserSub}>더 선명한 디테일 · 자연스러운 피부와 조명. 계정당 딱 한 번이에요.</div>
+              <button
+                type="button"
+                style={{ ...S.proTeaserBtn, ...(proSampleBusy ? { opacity: 0.7, cursor: "wait" } : {}) }}
+                disabled={proSampleBusy}
+                onClick={onTryPro}
+              >
+                {proSampleBusy ? "Pro로 만드는 중… (약 10초)" : "✨ Pro로 무료로 만들어보기"}
+              </button>
+            </div>
+          ) : null}
+
           <div style={S.saveNotice}>
             {t("result.saveNotice1")}
             <br />
@@ -3462,6 +3593,63 @@ const S = {
     boxShadow: "0 22px 46px -18px rgba(35,31,32,0.4)",
   },
   resultActions: { display: "flex", gap: 10 },
+
+  // ── 기본 vs Pro 비교 ──
+  proWrap: {
+    margin: "18px 0 6px", padding: "14px", borderRadius: 20,
+    background: "rgba(255,255,255,0.62)", border: "1px solid rgba(35,31,32,0.08)",
+  },
+  proWrapTitle: { fontSize: 12.5, fontWeight: 700, color: INK, textAlign: "center", marginBottom: 10 },
+  proWrapHint: { fontSize: 11, color: "#8a7f6e", textAlign: "center", marginTop: 8 },
+  proUpgradeBtn: {
+    display: "block", width: "100%", boxSizing: "border-box", marginTop: 12,
+    border: "none", borderRadius: 14, padding: "13px", fontSize: 14.5, fontWeight: 800,
+    color: "#fff", background: "linear-gradient(180deg,#2c2723," + INK + ")",
+    fontFamily: "'Quicksand', sans-serif", cursor: "pointer",
+  },
+  proTeaser: {
+    margin: "18px 0 6px", padding: "16px", borderRadius: 20, textAlign: "center",
+    background: "linear-gradient(180deg, rgba(255,244,232,0.9), rgba(255,236,246,0.9))",
+    border: "1px solid rgba(230,64,60,0.18)",
+  },
+  proTeaserTitle: { fontSize: 15, fontWeight: 700, color: INK },
+  proTeaserSub: { fontSize: 12, color: "#8a7f6e", marginTop: 5, lineHeight: 1.5 },
+  proTeaserBtn: {
+    marginTop: 12, width: "100%", boxSizing: "border-box",
+    border: "none", borderRadius: 14, padding: "14px", fontSize: 15, fontWeight: 800,
+    color: "#fff", background: "linear-gradient(90deg,#ff8a3d,#e6403c)",
+    fontFamily: "'Quicksand', sans-serif", cursor: "pointer",
+    boxShadow: "0 10px 22px -10px rgba(230,64,60,0.6)",
+  },
+  csBox: {
+    position: "relative", width: "100%", aspectRatio: "3/4",
+    borderRadius: 18, overflow: "hidden", background: "#eceae6",
+    touchAction: "none", userSelect: "none", WebkitUserSelect: "none",
+    cursor: "ew-resize",
+  },
+  csImg: {
+    position: "absolute", top: 0, left: 0, width: "100%", height: "100%",
+    objectFit: "cover", display: "block", pointerEvents: "none",
+  },
+  csClip: { position: "absolute", top: 0, left: 0, height: "100%", overflow: "hidden" },
+  csDivider: {
+    position: "absolute", top: 0, width: 2, height: "100%",
+    background: "#fff", transform: "translateX(-1px)",
+    boxShadow: "0 0 0 1px rgba(0,0,0,0.12)", pointerEvents: "none",
+  },
+  csHandle: {
+    position: "absolute", top: "50%", left: "50%",
+    transform: "translate(-50%,-50%)", width: 34, height: 34, borderRadius: 999,
+    background: "#fff", color: INK, fontSize: 14,
+    display: "flex", alignItems: "center", justifyContent: "center",
+    boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
+  },
+  csLabel: {
+    position: "absolute", bottom: 10, fontSize: 11, fontWeight: 800, color: "#fff",
+    background: "rgba(0,0,0,0.45)", borderRadius: 999, padding: "3px 9px",
+    pointerEvents: "none",
+  },
+
   downloadBtn: {
     display: "block", width: "100%", boxSizing: "border-box",
     background: "#fff", color: INK, border: "2px solid " + INK + "22",

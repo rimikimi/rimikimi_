@@ -44,6 +44,27 @@ export async function getCreditInfo(admin, userId) {
   };
 }
 
+// 무료 Pro 체험(계정당 1회) 사용 여부
+export async function getProSampleUsed(admin, userId) {
+  const { data } = await admin
+    .from("user_credits")
+    .select("pro_sample_used")
+    .eq("user_id", userId)
+    .maybeSingle();
+  return !!data?.pro_sample_used;
+}
+
+// 무료 Pro 체험 1회 소진 기록 (멱등)
+export async function markProSampleUsed(admin, userId) {
+  const { error } = await admin
+    .from("user_credits")
+    .upsert(
+      { user_id: userId, pro_sample_used: true },
+      { onConflict: "user_id" }
+    );
+  return !error;
+}
+
 // 크레딧 1개 사용 (credits_used += 1). 성공 시 true.
 export async function consumeCredit(admin, userId) {
   // 현재 사용량 읽기
