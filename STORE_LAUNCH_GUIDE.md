@@ -1,6 +1,11 @@
-# rimikimi 출시 가이드 (v1 = 무료 + 광고)
+# rimikimi 출시 가이드 (무료 다운로드 + 인앱구입/구독 + 광고)
 
-마지막 업데이트: 2026-06-16. 코드/네이티브 설정은 끝난 상태. 아래는 **회원님이 콘솔에서 해야 하는 일**과 그때 제가 코드에 넣어드릴 부분 정리.
+> **2026-07-18 현행화** — v1 "무료+광고, 인앱구입 없음" 시절 문서를 현행 코드 기준으로 갱신.
+> 현재 모델: 무료 1장/일(KST 리셋, 자정 기준) + 크레딧 팩 4종(인앱구입) + rimikimi+ 구독 2종.
+> 무료 사용자에게만 AdMob 전면광고 노출(크레딧/구독/관리자 계정은 광고 없음).
+> 상세 상품 스펙은 `APPSTORE_METADATA.md` / `PLAYSTORE_METADATA.md` 참고.
+
+마지막 업데이트: 2026-06-16 (콘솔 설정 절차 자체는 그대로). 코드/네이티브 설정은 끝난 상태. 아래는 **회원님이 콘솔에서 해야 하는 일**과 그때 제가 코드에 넣어드릴 부분 정리.
 
 ---
 
@@ -65,29 +70,36 @@ npx cap sync         # dist + 네이티브 플러그인을 ios/android에 반영
 
 1. https://appstoreconnect.apple.com → **앱 추가** (번들 ID `com.rimikimi.app`)
 2. **앱 정보**: 이름 rimikimi, 카테고리(사진/비디오), 개인정보처리방침 URL `https://rimikimi-app.vercel.app/privacy` (rimikimi.com은 별도 홈페이지라 미사용)
-3. **가격**: 무료
-4. **앱 개인정보(App Privacy)**: 데이터 수집 항목 신고
+3. **가격**: 무료 다운로드 (앱 내 인앱구입 4종 + 자동갱신 구독 2종 — `APPSTORE_METADATA.md` §1-2 참고)
+4. **앱 내 구입(In-App Purchases)** 등록: 소모성(consumable) 4종 `credits_10/30/70/120` + 자동갱신 구독(auto-renewable) 2종 `rimikimi_plus_monthly/annual` → 상품ID·가격·설명은 `APPSTORE_METADATA.md` §1-2
+5. **앱 개인정보(App Privacy)**: 데이터 수집 항목 신고
    - 식별자(광고용 ID), 사용 데이터, 사진(앱 기능용) → `APPSTORE_METADATA.md` 참고
-   - 추적(Tracking) "예" (AdMob 맞춤 광고 → ATT)
-5. 스크린샷 + 아이콘 + 설명/키워드(`APPSTORE_METADATA.md`)
-6. 빌드 선택(Xcode에서 업로드한 것) → **심사 제출**
+   - 추적(Tracking) "예" (AdMob 맞춤 광고 → ATT) — 무료 사용자에게만 노출, 크레딧/구독 사용자는 광고 없음
+6. 스크린샷 + 아이콘 + 설명/키워드(`APPSTORE_METADATA.md`)
+7. 빌드 선택(Xcode에서 업로드한 것) → **심사 제출**
 
 ## ④ Google Play Console 제출
 
-1. https://play.google.com/console → **앱 만들기** (무료, 앱)
+1. https://play.google.com/console → **앱 만들기** (무료 다운로드, 앱)
 2. **스토어 등록정보**: 제목/간단설명/자세한설명(`PLAYSTORE_METADATA.md`), 아이콘 512, 피처 그래픽, 스크린샷
-3. **앱 콘텐츠**:
+3. **인앱 상품(In-app products)**: 소모성 4종 `credits_10/30/70/120` 등록 → `PLAYSTORE_METADATA.md` §1-2
+4. **구독(Subscriptions)**: `rimikimi_plus_monthly` / `rimikimi_plus_annual` 등록(자동갱신) → `PLAYSTORE_METADATA.md` §1-2
+5. **앱 콘텐츠**:
    - 개인정보처리방침 URL `https://rimikimi-app.vercel.app/privacy` (rimikimi.com은 별도 홈페이지라 미사용)
    - **데이터 안전성** 양식 (광고 ID 수집 = 예) → `PLAYSTORE_METADATA.md` 참고
    - 콘텐츠 등급 설문
-   - 광고 포함 = **예**
+   - 광고 포함 = **예** (무료 사용자에게만 노출)
    - 타깃층/뉴스 앱 여부 등
-4. **프로덕션 트랙**에 서명된 AAB 업로드 → 출시 검토 제출
+6. **프로덕션 트랙**에 서명된 AAB 업로드 → 출시 검토 제출
 
 ---
 
-## 현재 상태 요약 (코드/설정 — 완료)
-- ✅ v1 무료 1회/일 + 광고, 결제 숨김(`PAYMENTS_ENABLED=false`)
+## 현재 상태 요약 (코드/설정 — 완료, 2026-07-18 기준)
+- ✅ 무료 1장/일(KST 자정 리셋) + 무료 Pro체험 1회 + 친구초대 2명당 1크레딧
+- ✅ 크레딧 팩 4종(소모성 IAP): `credits_10`(₩7,900/$5.99) · `credits_30`(₩19,800/$14.99) · `credits_70`(₩39,800/$29.99) · `credits_120`(₩59,800/$44.99)
+- ✅ 구독 2종(자동갱신): `rimikimi_plus_monthly`(₩9,900/월, 20크레딧+광고제거) · `rimikimi_plus_annual`(₩99,000/년, 240크레딧+광고제거)
+- ✅ 엔진: 무료 생성=`gemini-2.5-flash-image`, 유료(크레딧/구독/체험)=`gemini-3-pro-image` 2K 고화질
+- ✅ 광고: AdMob 전면광고 — 무료 사용자에게만 노출, 크레딧 보유/구독/관리자 계정은 광고 없음
 - ✅ 네이티브 소셜 로그인(딥링크 `com.rimikimi.app://login-callback`) — iOS Info.plist / Android intent-filter 반영
 - ✅ AdMob: iOS 실제 ID 반영 / 안드로이드 테스트 ID(→ ①에서 교체)
 - ✅ 웹 AdSense 스크립트 제거 (콘텐츠 없는 화면 경고 해소), ads.txt 유지
