@@ -114,16 +114,16 @@ function _OldLogo({ height = 30, mono = false }) {
 const PAYMENTS_ENABLED = isNative();
 
 const CREDIT_PACKS = [
-  { id: "credits_10",  count: 10,  krw: 4900,  usd: "3.99",  label: null },
-  { id: "credits_30",  count: 30,  krw: 12900, usd: "9.99",  label: "가장 인기" },
-  { id: "credits_70",  count: 70,  krw: 24900, usd: "18.99", label: null },
-  { id: "credits_120", count: 120, krw: 39000, usd: "29.99", label: "최고 가성비" },
+  { id: "credits_10",  count: 10,  krw: 7900,  usd: "5.99",  label: null },
+  { id: "credits_30",  count: 30,  krw: 19800, usd: "14.99", label: "가장 인기" },
+  { id: "credits_70",  count: 70,  krw: 39800, usd: "29.99", label: null },
+  { id: "credits_120", count: 120, krw: 59800, usd: "44.99", label: "최고 가성비" },
 ];
 
-// 구독 rimikimi+ (자동갱신) — 광고·워터마크 제거 + 크레딧 자동충전(월 60 / 연 720)
+// 구독 rimikimi+ (자동갱신) — 광고·워터마크 제거 + 크레딧 자동충전(월 20 / 연 240)
 const SUB_PLANS = [
-  { id: "rimikimi_plus_monthly", period: "month", credits: 60,  krw: 9900,  usd: "7.99",  label_ko: "월간", label_en: "Monthly", badge: null },
-  { id: "rimikimi_plus_annual",  period: "year",  credits: 720, krw: 79000, usd: "59.99", label_ko: "연간", label_en: "Annual", badge: "33% 할인" },
+  { id: "rimikimi_plus_monthly", period: "month", credits: 20,  krw: 9900,  usd: "7.99",  label_ko: "월간", label_en: "Monthly", badge: null },
+  { id: "rimikimi_plus_annual",  period: "year",  credits: 240, krw: 99000, usd: "74.99", label_ko: "연간", label_en: "Annual", badge: "2개월 무료" },
 ];
 const SUB_IDS = SUB_PLANS.map((p) => p.id);
 
@@ -2799,7 +2799,7 @@ function StoreScreen({ packs, credits, session, freeLimit = FREE_DAILY, onCredit
             const rc = iapById?.[sp.id];
             const storePrice = rc?.priceString;
             const busy = busyId === sp.id;
-            const per = sp.period === "year" ? "연 720크레딧 상당" : "월 60크레딧";
+            const per = sp.period === "year" ? `연 ${sp.credits}크레딧` : `월 ${sp.credits}크레딧`;
             return (
               <div key={sp.id} style={{ ...S.subCard, ...(sp.badge ? S.subCardHi : {}) }}>
                 <div style={S.subCardInfo}>

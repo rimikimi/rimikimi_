@@ -28,8 +28,8 @@ export const IAP_PRODUCTS = {
   credits_30: 30,
   credits_70: 70,
   credits_120: 120,
-  rimikimi_plus_monthly: 60,
-  rimikimi_plus_annual: 720,
+  rimikimi_plus_monthly: 20,
+  rimikimi_plus_annual: 240,
 };
 export const SUBSCRIPTION_IDS = ["rimikimi_plus_monthly", "rimikimi_plus_annual"];
 export const isSubscription = (id) => SUBSCRIPTION_IDS.includes(id);
