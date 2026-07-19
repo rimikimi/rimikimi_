@@ -1244,7 +1244,7 @@ export default function PortraitStudio() {
         <div style={S.headerRight}>
           <button
             style={{ ...S.creditChip, visibility: quotaLoaded ? "visible" : "hidden" }}
-            onClick={shareInvite}
+            onClick={PAYMENTS_ENABLED ? () => setScreen("store") : shareInvite}
           >
             <span style={S.creditDot} />
             {unlimited
