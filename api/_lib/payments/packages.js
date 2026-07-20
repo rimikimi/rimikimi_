@@ -13,25 +13,25 @@
 export const PACKAGES = [
   // ── 소비형 크레딧 팩 (2026-07 Pro 엔진 반영 재가격, 10장=₩790/장 기준) ──
   {
-    id: "credits_10", kind: "consumable", credits: 10,
+    id: "credits10", kind: "consumable", credits: 10,
     usd: "5.99", krw: 7900,
     label_ko: "10 크레딧", label_en: "10 Credits",
     badge_ko: null, badge_en: null,
   },
   {
-    id: "credits_30", kind: "consumable", credits: 30,
+    id: "credits30", kind: "consumable", credits: 30,
     usd: "14.99", krw: 19800,
     label_ko: "30 크레딧", label_en: "30 Credits",
     badge_ko: "인기", badge_en: "Popular",
   },
   {
-    id: "credits_70", kind: "consumable", credits: 70,
+    id: "credits70", kind: "consumable", credits: 70,
     usd: "29.99", krw: 39800,
     label_ko: "70 크레딧", label_en: "70 Credits",
     badge_ko: "이득", badge_en: "Best Value",
   },
   {
-    id: "credits_120", kind: "consumable", credits: 120,
+    id: "credits120", kind: "consumable", credits: 120,
     usd: "44.99", krw: 59800,
     label_ko: "120 크레딧", label_en: "120 Credits",
     badge_ko: "최고 가성비", badge_en: "Best Deal",
@@ -40,13 +40,13 @@ export const PACKAGES = [
   // ── 구독 rimikimi+ (광고·워터마크 제거 + 크레딧 자동 충전) ──
   // Pro 엔진(원가↑) 반영: 장당 실효 ~₩412~495. 월간 20크레딧, 연간 240(=월 20×12, 2개월 무료).
   {
-    id: "rimikimi_plus_monthly", kind: "subscription", period: "month", credits: 20,
+    id: "plus_monthly", kind: "subscription", period: "month", credits: 20,
     usd: "7.99", krw: 9900,
     label_ko: "rimikimi+ 월간", label_en: "rimikimi+ Monthly",
     badge_ko: "광고 제거", badge_en: "Ad-free",
   },
   {
-    id: "rimikimi_plus_annual", kind: "subscription", period: "year", credits: 240,
+    id: "plus_annual", kind: "subscription", period: "year", credits: 240,
     usd: "74.99", krw: 99000,
     label_ko: "rimikimi+ 연간", label_en: "rimikimi+ Annual",
     badge_ko: "2개월 무료", badge_en: "2 Months Free",

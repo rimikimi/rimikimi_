@@ -114,16 +114,16 @@ function _OldLogo({ height = 30, mono = false }) {
 const PAYMENTS_ENABLED = isNative();
 
 const CREDIT_PACKS = [
-  { id: "credits_10",  count: 10,  krw: 7900,  usd: "5.99",  label: null },
-  { id: "credits_30",  count: 30,  krw: 19800, usd: "14.99", label: "가장 인기" },
-  { id: "credits_70",  count: 70,  krw: 39800, usd: "29.99", label: null },
-  { id: "credits_120", count: 120, krw: 59800, usd: "44.99", label: "최고 가성비" },
+  { id: "credits10",  count: 10,  krw: 7900,  usd: "5.99",  label: null },
+  { id: "credits30",  count: 30,  krw: 19800, usd: "14.99", label: "가장 인기" },
+  { id: "credits70",  count: 70,  krw: 39800, usd: "29.99", label: null },
+  { id: "credits120", count: 120, krw: 59800, usd: "44.99", label: "최고 가성비" },
 ];
 
 // 구독 rimikimi+ (자동갱신) — 광고·워터마크 제거 + 크레딧 자동충전(월 20 / 연 240)
 const SUB_PLANS = [
-  { id: "rimikimi_plus_monthly", period: "month", credits: 20,  krw: 9900,  usd: "7.99",  label_ko: "월간", label_en: "Monthly", badge: null },
-  { id: "rimikimi_plus_annual",  period: "year",  credits: 240, krw: 99000, usd: "74.99", label_ko: "연간", label_en: "Annual", badge: "2개월 무료" },
+  { id: "plus_monthly", period: "month", credits: 20,  krw: 9900,  usd: "7.99",  label_ko: "월간", label_en: "Monthly", badge: null },
+  { id: "plus_annual",  period: "year",  credits: 240, krw: 99000, usd: "74.99", label_ko: "연간", label_en: "Annual", badge: "2개월 무료" },
 ];
 const SUB_IDS = SUB_PLANS.map((p) => p.id);
 

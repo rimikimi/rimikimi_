@@ -24,14 +24,14 @@ import { Purchases as _PurchasesStatic } from "@revenuecat/purchases-capacitor";
 // 우리 팩 정의 (서버 packages.js 와 productId 1:1 매칭 필수)
 // 소비형(크레딧) + 구독(rimikimi+). 구독은 1갱신당 지급 크레딧.
 export const IAP_PRODUCTS = {
-  credits_10: 10,
-  credits_30: 30,
-  credits_70: 70,
-  credits_120: 120,
-  rimikimi_plus_monthly: 20,
-  rimikimi_plus_annual: 240,
+  credits10: 10,
+  credits30: 30,
+  credits70: 70,
+  credits120: 120,
+  plus_monthly: 20,
+  plus_annual: 240,
 };
-export const SUBSCRIPTION_IDS = ["rimikimi_plus_monthly", "rimikimi_plus_annual"];
+export const SUBSCRIPTION_IDS = ["plus_monthly", "plus_annual"];
 export const isSubscription = (id) => SUBSCRIPTION_IDS.includes(id);
 export const PRODUCT_IDS = Object.keys(IAP_PRODUCTS);
 
