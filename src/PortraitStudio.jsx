@@ -496,6 +496,8 @@ export default function PortraitStudio() {
   const [proSampleImg, setProSampleImg] = useState(null);
   const [proSampleBusy, setProSampleBusy] = useState(false);
   const [canTryPro, setCanTryPro] = useState(false);
+  // 결과화면 "저장" 시 원본(2K) 다운로드용 — 방금 생성물의 갤러리 id
+  const [resultGalleryId, setResultGalleryId] = useState(null);
   const lastGenRef = useRef(null); // { photo, promptText, meta } — 무료 Pro 체험 재호출용
   const fileRef = useRef(null);
   const mainRef = useRef(null);
@@ -1066,6 +1068,7 @@ export default function PortraitStudio() {
     setResultImage(null);
     setProSampleImg(null);
     setCanTryPro(false);
+    setResultGalleryId(null);
     setGenerating(true);
     setScreen("result");
     // 백그라운드 복구용 마커 (생성 중 앱이 얼거나 요청이 끊겨도 결과를 되찾음)
@@ -1099,6 +1102,7 @@ export default function PortraitStudio() {
       lastGenRef.current = { photo: photoToUse, promptText, meta: genMeta };
       const result = await generateImage(accessToken, photoToUse, promptText, genMeta);
       setResultImage(result.imageDataUrl);
+      setResultGalleryId(result.galleryId || null); // 저장 시 원본(2K) 받으려고 보관
       // 방금 생성이 무료(기본 엔진)이고 무료 Pro 체험이 남아있으면 비교 CTA 노출
       setCanTryPro(result.engine === "base" && !!result.proSampleAvailable);
       // 생성 직후 만료 10분 전 리마인드 푸시 예약 (갤러리를 안 열어도 동작)
@@ -1352,6 +1356,8 @@ export default function PortraitStudio() {
             fourcutProgress={fourcutProgress}
             prompt={selected}
             resultImage={resultImage}
+            galleryId={resultGalleryId}
+            accessToken={session?.access_token}
             genError={genError}
             onRetry={startGenerate}
             onAgain={() => setScreen("gallery")}
@@ -2464,35 +2470,60 @@ function CompareSlider({ before, after }) {
 }
 
 function ResultScreen({
-  generating, fourcutProgress = "", prompt, resultImage, genError, onRetry, onAgain, onHome, showAds = false,
+  generating, fourcutProgress = "", prompt, resultImage, galleryId = null, accessToken = null,
+  genError, onRetry, onAgain, onHome, showAds = false,
   canTryPro = false, proSampleImg = null, proSampleBusy = false, onTryPro, onUpgrade,
 }) {
   const [saving, setSaving] = useState(false);
 
+  // 저장은 "원본 화질(2K)"로. 화면 resultImage 는 빠른표시용 축소본(768)이라,
+  // 갤러리에 보관된 원본을 서명URL로 받아 저장한다. 실패 시 축소본으로 폴백.
+  async function fetchHiResDataUrl() {
+    if (!galleryId || !accessToken) return null;
+    try {
+      const r = await fetch("/api/gallery", { headers: { Authorization: "Bearer " + accessToken } });
+      const j = await r.json();
+      const url = (j.items || []).find((it) => it.id === galleryId)?.url;
+      if (!url) return null;
+      const resp = await fetch(url);
+      const blob = await resp.blob();
+      return await new Promise((res, rej) => {
+        const fr = new FileReader();
+        fr.onloadend = () => res(fr.result);
+        fr.onerror = rej;
+        fr.readAsDataURL(blob);
+      });
+    } catch (_) {
+      return null;
+    }
+  }
+
   async function handleSaveResult() {
     if (!resultImage || saving) return;
     const filename = "rimikimi_" + (prompt?.id ?? "art") + ".png";
-    if (isNative()) {
-      setSaving(true);
-      try {
+    setSaving(true);
+    try {
+      const hiRes = await fetchHiResDataUrl(); // 원본 2K (없으면 null)
+      const toSave = hiRes || resultImage;     // 폴백: 화면 축소본
+      if (isNative()) {
         // 시스템 공유 시트로 사진 저장 (data URL → 파일 → 공유)
-        const shared = await nativeShareImage(resultImage, filename);
+        const shared = await nativeShareImage(toSave, filename);
         if (!shared) {
           // 폴백: 파일(문서 폴더)로 직접 저장
-          const r = await nativeSaveImage(resultImage, filename);
+          const r = await nativeSaveImage(toSave, filename);
           alert(r?.ok ? t("result.download") + " ✓" : (r?.error || "저장 실패"));
         }
-      } finally {
-        setSaving(false);
+      } else {
+        // 웹: 앵커 다운로드
+        const a = document.createElement("a");
+        a.href = toSave;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
       }
-    } else {
-      // 웹: 앵커 다운로드
-      const a = document.createElement("a");
-      a.href = resultImage;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
+    } finally {
+      setSaving(false);
     }
   }
 
