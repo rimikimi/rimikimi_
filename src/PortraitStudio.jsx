@@ -1,6 +1,6 @@
 import React, { useState, useRef, useMemo, useEffect } from "react";
 import { supabase } from "./supabaseClient";
-import { isNative, platform, nativePickPhoto, nativeShare, nativeShareImage, nativeSaveImage } from "./nativeBridge";
+import { isNative, platform, nativePickPhoto, nativeShare, nativeSaveToAlbum } from "./nativeBridge";
 import { initAds, showInterstitial } from "./ads";
 import { initIap, loginIap, logoutIap, getIapPacks, purchaseIap, restoreIap, iapAvailable, isSubscription, getIapDiag } from "./iap";
 import { FOURCUT_COUNTS, FOURCUT_STYLES, composeStrip, todayStr } from "./fourcut";
@@ -357,6 +357,8 @@ async function generateImage(accessToken, dataUrl, promptText, conceptMeta = {})
     // 갤러리 보관 정보 — 만료 10분 전 리마인드 푸시 예약에 사용
     galleryId: json.galleryId,
     galleryExpiresAt: json.galleryExpiresAt,
+    // Pro가 혼잡해서 base로 대체된 요청이면 true (크레딧 무과금 — 결과화면 고지용)
+    busyFallback: !!json.busyFallback,
   };
 }
 
@@ -1017,6 +1019,9 @@ export default function PortraitStudio() {
       setResultImage(null);
       setProSampleImg(null);
       setCanTryPro(false); // 인생네컷은 Pro 비교 미제공 (스트립이라)
+      // 스트립은 클라 합성이라 서버 갤러리 원본이 없음 — 이전 단일생성의 galleryId가
+      // 남아있으면 저장 시 엉뚱한 사진의 2K를 받아오게 되므로 반드시 초기화.
+      setResultGalleryId(null);
       setGenerating(true);
       setScreen("result");
       setFourcutProgress(`0/${fourcutCount}`);
@@ -1052,6 +1057,11 @@ export default function PortraitStudio() {
         if (typeof last?.unlimited === "boolean") setUnlimited(last.unlimited);
         if (typeof last?.quotaUsed === "number") setFreeUsed(last.quotaUsed);
         setRefreshTick((n) => n + 1); // 크레딧/잔여 정확히 재조회
+        // 컷 중 하나라도 Pro 혼잡으로 base 폴백됐으면 고지 (무과금)
+        if (results.some((r) => r?.busyFallback)) {
+          setPayToast(t("engine.busyFallback"));
+          setTimeout(() => setPayToast(""), 4500);
+        }
         if (showAds) showInterstitial();
       } catch (err) {
         if (typeof err.quotaUsed === "number") setFreeUsed(err.quotaUsed);
@@ -1117,6 +1127,11 @@ export default function PortraitStudio() {
       // 서버가 알려준 진짜 사용량으로 업데이트
       if (typeof result.unlimited === "boolean") setUnlimited(result.unlimited);
       if (typeof result.quotaUsed === "number") setFreeUsed(result.quotaUsed);
+      // Pro 혼잡으로 base 폴백됐으면 고지 (무과금)
+      if (result.busyFallback) {
+        setPayToast(t("engine.busyFallback"));
+        setTimeout(() => setPayToast(""), 4500);
+      }
       // 무료 사용자 → 생성 후 전면광고 (네이티브에서만, 웹은 no-op)
       if (showAds) showInterstitial();
     } catch (err) {
@@ -1143,7 +1158,13 @@ export default function PortraitStudio() {
         proSample: true,
       });
       setProSampleImg(r.imageDataUrl);
-      setCanTryPro(false); // 1회 소진
+      if (r.busyFallback) {
+        // Pro가 혼잡해서 base로 나갔음 — 서버가 체험을 소진 처리하지 않았으니 CTA 유지, 무과금 고지만.
+        setPayToast(t("engine.busyFallback"));
+        setTimeout(() => setPayToast(""), 4500);
+      } else {
+        setCanTryPro(false); // 1회 소진
+      }
     } catch (err) {
       setCanTryPro(false);
       setPayToast(err?.message || "지금은 Pro 체험을 사용할 수 없어요.");
@@ -2061,6 +2082,14 @@ function MyGalleryScreen({ accessToken, onBack }) {
   const [error, setError] = useState(null);
   const [tick, setTick] = useState(0); // 1초마다 남은시간 갱신
   const [saved, setSaved] = useState(() => getSavedSet()); // 저장한 항목 id 집합
+  const [toast, setToast] = useState("");
+  const toastTimer = useRef(null);
+
+  function flashToast(msg, ms = 2200) {
+    setToast(msg);
+    window.clearTimeout(toastTimer.current);
+    toastTimer.current = window.setTimeout(() => setToast(""), ms);
+  }
 
   // 1초마다 리렌더 (남은 시간 카운트다운)
   useEffect(() => {
@@ -2090,31 +2119,38 @@ function MyGalleryScreen({ accessToken, onBack }) {
     return () => { cancelled = true; };
   }, [accessToken]);
 
-  // "저장" — 웹은 다운로드, 네이티브는 공유 시트(앨범 저장). 성공 시 저장 표시 + 알림 취소.
+  // "저장" — 공유 시트 없이 바로 사진첩에 저장(네이티브) / 앵커 다운로드(웹).
+  // 성공 시에만 저장 표시 + 만료 알림 취소.
   async function handleSave(it) {
     if (!it.url) return;
     if (isNative()) {
-      // 원격 URL 을 그대로 공유하면 iOS 가 "링크"로 취급해 사진첩 "이미지 저장"이 안 뜬다.
-      // → 이미지를 받아 파일(dataURL)로 만들어 공유해야 "Save Image" 가 나온다. (결과화면과 동일)
-      let ok = false;
+      // 원격 URL 을 그대로 넘기면 다운로드 실패 케이스를 우리가 못 잡으므로,
+      // 이미지를 먼저 받아 data URL 로 만들어 사진첩에 직접 저장한다.
+      let dataUrl = null;
       try {
         const resp = await fetch(it.url);
-        const blob = await resp.blob();
-        const dataUrl = await new Promise((res, rej) => {
-          const fr = new FileReader();
-          fr.onloadend = () => res(fr.result);
-          fr.onerror = rej;
-          fr.readAsDataURL(blob);
-        });
-        ok = await nativeShareImage(dataUrl, `rimikimi_${it.conceptId || it.id}.png`);
-      } catch (e) {
-        ok = false;
+        if (resp.ok) {
+          const blob = await resp.blob();
+          dataUrl = await new Promise((res, rej) => {
+            const fr = new FileReader();
+            fr.onloadend = () => res(fr.result);
+            fr.onerror = rej;
+            fr.readAsDataURL(blob);
+          });
+        }
+      } catch (_) {
+        dataUrl = null;
       }
-      if (!ok) {
-        // 폴백: 최소한 링크 공유(카톡/메시지)라도
-        const shared = await nativeShare({ title: it.conceptTitle || "rimikimi", url: it.url });
-        if (!shared) return; // 사용자가 취소
+      if (!dataUrl) {
+        flashToast(t("save.toast.fail"));
+        return;
       }
+      const r = await nativeSaveToAlbum(dataUrl, `rimikimi_${it.conceptId || it.id}`);
+      if (!r?.ok) {
+        flashToast(t("save.toast.fail"));
+        return;
+      }
+      flashToast(t("save.toast.done"));
     } else {
       const a = document.createElement("a");
       a.href = it.url;
@@ -2152,6 +2188,11 @@ function MyGalleryScreen({ accessToken, onBack }) {
 
   return (
     <div className="fade">
+      {toast && (
+        <div style={S.payToast} onClick={() => setToast("")}>
+          {toast}
+        </div>
+      )}
       <div style={S.navRow}>
         <button style={S.backBtn} onClick={onBack}>←</button>
         <div>
@@ -2475,52 +2516,78 @@ function ResultScreen({
   canTryPro = false, proSampleImg = null, proSampleBusy = false, onTryPro, onUpgrade,
 }) {
   const [saving, setSaving] = useState(false);
+  const [toast, setToast] = useState("");
+  const toastTimer = useRef(null);
+
+  function flashToast(msg, ms = 2200) {
+    setToast(msg);
+    window.clearTimeout(toastTimer.current);
+    toastTimer.current = window.setTimeout(() => setToast(""), ms);
+  }
 
   // 저장은 "원본 화질(2K)"로. 화면 resultImage 는 빠른표시용 축소본(768)이라,
-  // 갤러리에 보관된 원본을 서명URL로 받아 저장한다. 실패 시 축소본으로 폴백.
+  // 갤러리에 보관된 원본을 서명URL로 받아 저장한다.
+  // ⚠️ 실패해도 축소본으로 조용히 폴백하지 않는다 — 1회 재시도 후에도 실패하면 null
+  // (호출측이 저장을 중단하고 안내). 축소본을 원본인 척 저장하는 건 금지.
   async function fetchHiResDataUrl() {
     if (!galleryId || !accessToken) return null;
-    try {
-      const r = await fetch("/api/gallery", { headers: { Authorization: "Bearer " + accessToken } });
-      const j = await r.json();
-      const url = (j.items || []).find((it) => it.id === galleryId)?.url;
-      if (!url) return null;
-      const resp = await fetch(url);
-      const blob = await resp.blob();
-      return await new Promise((res, rej) => {
-        const fr = new FileReader();
-        fr.onloadend = () => res(fr.result);
-        fr.onerror = rej;
-        fr.readAsDataURL(blob);
-      });
-    } catch (_) {
-      return null;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const r = await fetch("/api/gallery", { headers: { Authorization: "Bearer " + accessToken } });
+        const j = await r.json();
+        const url = (j.items || []).find((it) => it.id === galleryId)?.url;
+        if (!url) continue;
+        const resp = await fetch(url);
+        if (!resp.ok) continue;
+        const blob = await resp.blob();
+        return await new Promise((res, rej) => {
+          const fr = new FileReader();
+          fr.onloadend = () => res(fr.result);
+          fr.onerror = rej;
+          fr.readAsDataURL(blob);
+        });
+      } catch (_) {
+        // 재시도
+      }
     }
+    return null;
   }
 
   async function handleSaveResult() {
     if (!resultImage || saving) return;
-    const filename = "rimikimi_" + (prompt?.id ?? "art") + ".png";
+    const filename = "rimikimi_" + (prompt?.id ?? "art");
     setSaving(true);
     try {
-      const hiRes = await fetchHiResDataUrl(); // 원본 2K (없으면 null)
-      const toSave = hiRes || resultImage;     // 폴백: 화면 축소본
-      if (isNative()) {
-        // 시스템 공유 시트로 사진 저장 (data URL → 파일 → 공유)
-        const shared = await nativeShareImage(toSave, filename);
-        if (!shared) {
-          // 폴백: 파일(문서 폴더)로 직접 저장
-          const r = await nativeSaveImage(toSave, filename);
-          alert(r?.ok ? t("result.download") + " ✓" : (r?.error || "저장 실패"));
+      let toSave = resultImage;
+      if (galleryId) {
+        // 유료 결과는 원본(2K)이 서버 갤러리에 있음 — 반드시 그걸 저장.
+        const hiRes = await fetchHiResDataUrl();
+        if (!hiRes) {
+          flashToast(t("save.toast.hiResFail"), 3000);
+          return; // 축소본을 원본인 척 저장하지 않음
         }
+        toSave = hiRes;
+      }
+      // galleryId가 없는 경우(예: 인생네컷 스트립처럼 서버 원본이 애초에 없는 클라 합성물)는
+      // resultImage 그대로가 정상 결과물 — 폴백이 아니라 정상 저장.
+      let ok = true;
+      if (isNative()) {
+        const r = await nativeSaveToAlbum(toSave, filename);
+        ok = !!r?.ok;
+        flashToast(ok ? t("save.toast.done") : t("save.toast.fail"));
       } else {
         // 웹: 앵커 다운로드
         const a = document.createElement("a");
         a.href = toSave;
-        a.download = filename;
+        a.download = filename + ".png";
         document.body.appendChild(a);
         a.click();
         a.remove();
+      }
+      // 저장 성공 시 배지 표시 + 만료 10분 전 알림 취소 (내 갤러리 화면과 동일 규칙)
+      if (ok && galleryId) {
+        markSaved(galleryId);
+        cancelExpiryNotice(galleryId);
       }
     } finally {
       setSaving(false);
@@ -2529,6 +2596,11 @@ function ResultScreen({
 
   return (
     <div className="fade">
+      {toast && (
+        <div style={S.payToast} onClick={() => setToast("")}>
+          {toast}
+        </div>
+      )}
       {generating ? (
         <div style={S.genWrap}>
           <div style={S.genHearts}>

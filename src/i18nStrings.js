@@ -158,6 +158,14 @@ export const STR = {
     "gallery.savedBadge": "✓ 저장됨",
     "gallery.action.delete": "삭제",
 
+    // === 저장 토스트 (결과화면·내 갤러리 공용) ===
+    "save.toast.done": "사진첩에 저장됐어요",
+    "save.toast.fail": "저장에 실패했어요. 잠시 후 다시 시도해 주세요.",
+    "save.toast.hiResFail": "원본 화질을 준비하지 못했어요. 잠시 후 다시 시도해 주세요.",
+
+    // === 엔진 혼잡 폴백 고지 ===
+    "engine.busyFallback": "지금 Pro 서버가 붐벼서 일반 화질로 만들었어요. 크레딧은 차감되지 않았어요.",
+
     // === 에러 ===
     "error.network": "네트워크 요청에 실패했어요. 잠시 후 다시 시도해 주세요.",
     "error.noPhoto": "사진이 없어요. 먼저 사진을 올려주세요.",
@@ -362,6 +370,14 @@ export const STR = {
     "gallery.action.saved": "Saved",
     "gallery.savedBadge": "✓ Saved",
     "gallery.action.delete": "Delete",
+
+    // === Save toast (result screen + my gallery) ===
+    "save.toast.done": "Saved to your photos",
+    "save.toast.fail": "Couldn't save. Please try again in a moment.",
+    "save.toast.hiResFail": "Couldn't prepare the full-quality image. Please try again in a moment.",
+
+    // === Engine busy fallback notice ===
+    "engine.busyFallback": "Pro is busy right now, so this was made in standard quality — no credit was used.",
 
     "error.network": "Network request failed. Please try again shortly.",
     "error.noPhoto": "No photo. Please upload one first.",

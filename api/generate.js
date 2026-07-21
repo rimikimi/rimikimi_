@@ -294,42 +294,83 @@ export default async function handler(req, res) {
   // 엔진 선택:
   //   - 유료(크레딧 사용) / 무제한(어드민) / 무료 Pro 체험 → Pro (gemini-3-pro-image, 2K)
   //   - 무료 일일 생성 → 기본 (gemini-2.5-flash-image)
-  // (2026-07-21 gemini-3-pro-image Google 장애 복구 확인 → Pro 원복. 함수 maxDuration 60s로 상향해
-  //  Pro 지연(~25s)도 타임아웃 안 걸리게 함.)
   const usePro = unlimited || useCredit || freeProSample;
-  const model = usePro ? "gemini-3-pro-image" : "gemini-2.5-flash-image";
-  const endpoint =
-    "https://generativelanguage.googleapis.com/v1beta/models/" +
-    model + ":generateContent";
 
   // 편집(image-to-image) 모드에선 Gemini가 generationConfig.imageConfig.aspectRatio 를 무시하고
   // 오히려 출력을 세로로 크롭하는 정황 → 설정을 빼고 편집 기본동작(입력 비율 유지)에 맡긴다.
-  let upstream;
-  try {
-    upstream = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": apiKey,
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              { text: instruction },
-              { inline_data: { mime_type: mimeType, data: base64 } },
-            ],
-          },
+  const bodyFor = (isPro) => ({
+    contents: [
+      {
+        parts: [
+          { text: instruction },
+          { inline_data: { mime_type: mimeType, data: base64 } },
         ],
-        // Pro 는 2K 고해상도로. (기본 모델은 편집모드 비율보존 위해 설정 생략 — 기존 동작 유지)
-        ...(usePro ? { generationConfig: { imageConfig: { imageSize: "2K" } } } : {}),
-      }),
-    });
-  } catch (e) {
-    return res
-      .status(502)
-      .json({ error: "Gemini 호출 실패: " + (e?.message || String(e)) });
+      },
+    ],
+    // Pro 는 2K 고해상도로. (기본 모델은 편집모드 비율보존 위해 설정 생략 — 기존 동작 유지)
+    ...(isPro ? { generationConfig: { imageConfig: { imageSize: "2K" } } } : {}),
+  });
+
+  // Gemini 한 번 호출(타임아웃 포함). 네트워크 예외(hang/AbortError 포함)는 upstream 없이 반환.
+  async function callGemini(model, isPro, timeoutMs) {
+    const endpoint =
+      "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent";
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const upstream = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+        body: JSON.stringify(bodyFor(isPro)),
+        signal: controller.signal,
+      });
+      return { upstream };
+    } catch (e) {
+      return { networkError: e };
+    } finally {
+      clearTimeout(timer);
+    }
   }
+
+  // Pro 서버 혼잡 판정: 네트워크 예외(타임아웃/hang 포함) · 404(빈 응답) · 5xx.
+  // (2026-07-21 실측: 같은 키로 8/8 404 → 몇 분 뒤 15/15 성공 — 일시적 혼잡이지 우리 요청 문제가 아님.)
+  function isBusyFailure({ networkError, upstream: up }) {
+    if (networkError) return true;
+    return up.status === 404 || (up.status >= 500 && up.status <= 599);
+  }
+
+  // Vercel Hobby maxDuration 60s 안에서 (Pro 시도 + 폴백 재시도 + precheck/갤러리저장 여유)가
+  // 모두 끝나야 하므로 각 시도에 짧은 타임아웃을 건다. Pro 단독 성공 시엔 보통 ~25s.
+  const PRO_TIMEOUT_MS = 28000;
+  const FALLBACK_TIMEOUT_MS = 22000;
+  const SOLO_TIMEOUT_MS = 45000; // Pro 대상이 아닌 무료 경로(base 단일 시도)
+
+  let engineUsed = usePro ? "pro" : "base";
+  let busyFallback = false;
+  let result = await callGemini(
+    usePro ? "gemini-3-pro-image" : "gemini-2.5-flash-image",
+    usePro,
+    usePro ? PRO_TIMEOUT_MS : SOLO_TIMEOUT_MS
+  );
+
+  // Pro가 혼잡(404/타임아웃/5xx)이면 base로 1회 자동 재시도 — 유저는 에러를 안 본다.
+  // 폴백이 발생한 요청은 크레딧/무료체험/하루한도를 전혀 차감하지 않는다(아래 6번 참고).
+  if (usePro && isBusyFailure(result)) {
+    console.error(
+      "[generate] Pro 혼잡 → base 폴백:",
+      result.networkError?.message || `HTTP ${result.upstream?.status}`
+    );
+    engineUsed = "base";
+    busyFallback = true;
+    result = await callGemini("gemini-2.5-flash-image", false, FALLBACK_TIMEOUT_MS);
+  }
+
+  if (result.networkError) {
+    return res.status(502).json({
+      error: "Gemini 호출 실패: " + (result.networkError?.message || String(result.networkError)),
+    });
+  }
+  const upstream = result.upstream;
 
   if (!upstream.ok) {
     const raw = await upstream.text().catch(() => "");
@@ -358,7 +399,8 @@ export default async function handler(req, res) {
   }
 
   // 6) 성공 → 사용 기록 (크레딧 사용 시 크레딧 차감, 아니면 오늘 한도 차감)
-  if (!unlimited) {
+  //    Pro 혼잡 폴백(busyFallback)이면 무과금 — 크레딧/무료체험/하루한도 아무 것도 차감하지 않는다.
+  if (!unlimited && !busyFallback) {
     if (freeProSample) {
       // 무료 Pro 체험: 차감·한도기록 없이 "1회 소진"만 표시
       await markProSampleUsed(admin, user.id);
@@ -405,9 +447,9 @@ export default async function handler(req, res) {
   }
 
   // 무료 유저가 아직 무료 Pro 체험을 쓸 수 있는지 (결과화면 CTA 노출용).
-  //  - 방금 생성이 기본 엔진(무료)일 때만 의미. Pro였으면 자동 false.
+  //  - 방금 생성이 Pro로 실제로 완료된 게 아닐 때만 의미(폴백으로 base가 나간 경우도 포함 — 안 썼으니 여전히 가능).
   let proSampleAvailable = false;
-  if (!unlimited && !usePro) {
+  if (!unlimited && engineUsed !== "pro") {
     proSampleAvailable = !(await getProSampleUsed(admin, user.id));
   }
 
@@ -419,7 +461,9 @@ export default async function handler(req, res) {
     usedCredit: useCredit,
     credits: unlimited ? null : creditsLeft,
     unlimited,
-    engine: usePro ? "pro" : "base",
+    engine: engineUsed,
+    // Pro 혼잡으로 base 로 대체된 경우만 true — 클라가 "크레딧 안 썼어요" 고지에 사용.
+    busyFallback,
     proSample: freeProSample,
     proSampleAvailable,
     galleryId,

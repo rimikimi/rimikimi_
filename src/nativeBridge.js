@@ -6,9 +6,22 @@
 // ============================================================
 
 import { Capacitor } from "@capacitor/core";
+// ⚠️ 정적 import 필수 (ads.js/iap.js 와 동일한 이유) — 네이티브 WKWebView 에서 동적
+// import() 가 영원히 pending 되는 버그가 있었음. registerPlugin 은 동기이고 native
+// 메서드는 호출 전까지 아무 것도 안 하므로 앱 시작 시 같이 로드해도 안전
+// (웹에서도 isNative 가드로 no-op).
+import { Media } from "@capacitor-community/media";
 
 export const isNative = () => Capacitor.isNativePlatform();
 export const platform = () => Capacitor.getPlatform(); // "web" | "ios" | "android"
+
+// 네이티브 호출이 응답 없이 멈추는 것 방지 (ads.js/iap.js 와 동일 패턴)
+function withTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), ms)),
+  ]);
+}
 
 // 네이티브 카메라/앨범 picker — Photos data URL 반환
 // source: "camera" | "photos" | "prompt"(사용자 선택)
@@ -38,48 +51,46 @@ export async function nativePickPhoto(source = "prompt") {
   }
 }
 
-// 생성된 이미지를 사진 앨범에 저장 (iOS / Android)
-// dataUrl: "data:image/png;base64,..."
-// 반환: { ok } 또는 { error }
-export async function nativeSaveImage(dataUrl, filename = "rimikimi.png") {
+// 안드로이드 전용: 우리 앱 전용 앨범 폴더("rimikimi")를 준비하고 식별자(경로)를 돌려준다.
+// Media.savePhoto 는 Android 에서 albumIdentifier 가 필수(없으면 거절)라 세션당 1회 확인/생성해 캐시.
+// (androidGalleryMode 를 켜지 않은 기본 모드라 별도 권한/팝업 없이 앱 전용 폴더에만 접근.)
+const ANDROID_ALBUM_NAME = "rimikimi";
+let androidAlbumIdentifier = null;
+async function ensureAndroidAlbum() {
+  if (androidAlbumIdentifier) return androidAlbumIdentifier;
+  try {
+    await withTimeout(Media.createAlbum({ name: ANDROID_ALBUM_NAME }), 8000);
+  } catch (_) {
+    // 이미 있으면 "Album already exists" 로 거절됨 — 정상, 무시
+  }
+  try {
+    const { path } = await withTimeout(Media.getAlbumsPath(), 8000);
+    androidAlbumIdentifier = path + "/" + ANDROID_ALBUM_NAME;
+  } catch (_) {
+    androidAlbumIdentifier = null;
+  }
+  return androidAlbumIdentifier;
+}
+
+// 생성 결과(data URL)를 시스템 사진첩(카메라롤)에 곧바로 저장한다.
+// 공유 시트/중간 다이얼로그 없음 — @capacitor-community/media 로 무팝업 직접 저장.
+//   iOS: 앨범 없이 바로 카메라롤에 추가(add-only 권한, NSPhotoLibraryAddUsageDescription).
+//   Android: 앱 전용 "rimikimi" 앨범 폴더에 저장 + MediaStore 스캔으로 사진첩에 노출.
+// filename 은 확장자 없이 넘길 것(Android 요구사항, iOS는 무시함).
+// 반환: { ok: true } | { error }
+export async function nativeSaveToAlbum(dataUrl, filename = "rimikimi") {
   if (!isNative()) return { error: "web only" };
   try {
-    const { Filesystem, Directory } = await import("@capacitor/filesystem");
-
-    // data: prefix 제거하고 base64 만 추출
-    const m = dataUrl.match(/^data:[^;]+;base64,(.+)$/);
-    if (!m) return { error: "invalid data url" };
-    const base64 = m[1];
-
-    // 임시 폴더에 저장 (iOS Photos 접근은 별도 권한 필요해 우선 Documents 로)
-    await Filesystem.writeFile({
-      path: filename,
-      data: base64,
-      directory: Directory.Documents,
-    });
+    const opts = { path: dataUrl, fileName: filename };
+    if (platform() === "android") {
+      const albumIdentifier = await ensureAndroidAlbum();
+      if (!albumIdentifier) return { error: "album unavailable" };
+      opts.albumIdentifier = albumIdentifier;
+    }
+    await withTimeout(Media.savePhoto(opts), 20000);
     return { ok: true };
   } catch (e) {
     return { error: e?.message || String(e) };
-  }
-}
-
-// 생성 결과(data URL)를 파일로 쓴 뒤 시스템 공유 시트로 저장/공유.
-// data URL 은 Share 에 바로 못 넘기므로 Cache 에 파일로 쓰고 그 file:// URI 를 공유한다.
-// 사용자는 시트에서 "이미지 저장"(사진 앱) 등을 고를 수 있음.
-// 반환: true(성공/시트 표시) | false(실패 → 호출측에서 폴백)
-export async function nativeShareImage(dataUrl, filename = "rimikimi.png") {
-  if (!isNative()) return false;
-  try {
-    const { Filesystem, Directory } = await import("@capacitor/filesystem");
-    const { Share } = await import("@capacitor/share");
-    const m = (dataUrl || "").match(/^data:[^;]+;base64,(.+)$/);
-    if (!m) return false;
-    await Filesystem.writeFile({ path: filename, data: m[1], directory: Directory.Cache });
-    const { uri } = await Filesystem.getUri({ path: filename, directory: Directory.Cache });
-    await Share.share({ title: "rimikimi", url: uri, dialogTitle: "이미지 저장/공유" });
-    return true;
-  } catch (e) {
-    return false;
   }
 }
 
