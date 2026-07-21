@@ -290,7 +290,10 @@ export default async function handler(req, res) {
   // 엔진 선택:
   //   - 유료(크레딧 사용) / 무제한(어드민) / 무료 Pro 체험 → Pro (gemini-3-pro-image, 2K)
   //   - 무료 일일 생성 → 기본 (gemini-2.5-flash-image)
-  const usePro = unlimited || useCredit || freeProSample;
+  // 🔧 임시 핫픽스(2026-07-21): Google gemini-3-pro-image 장애(응답 hang→fetch failed).
+  //    전 유저를 정상 동작하는 base(gemini-2.5-flash-image)로 폴백한다.
+  //    Pro 모델 복구되면 아래 줄을 `unlimited || useCredit || freeProSample` 로 원복.
+  const usePro = false && (unlimited || useCredit || freeProSample);
   const model = usePro ? "gemini-3-pro-image" : "gemini-2.5-flash-image";
   const endpoint =
     "https://generativelanguage.googleapis.com/v1beta/models/" +
