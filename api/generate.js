@@ -13,6 +13,10 @@ import { precheckHasFace } from "./_lib/precheck.js";
 import { getCreditInfo, consumeCredit, getProSampleUsed, markProSampleUsed } from "./_lib/credits.js";
 import { saveToGallery } from "./_lib/gallery.js";
 
+// Pro 모델(gemini-3-pro-image)이 느릴 때(~25s) 함수가 타임아웃되지 않도록 상향.
+// (Vercel Hobby 최대 60s)
+export const config = { maxDuration: 60 };
+
 // Gemini 원본 이미지는 클 수 있음(>4.5MB → Vercel 응답 한도 초과로 본문 잘림 = 클라 "오류 200").
 // 응답 전에 최대 1024×1365, JPEG q82 로 줄여서 항상 작고 빠르게.
 // sharp 동적 로드 + try/catch → 로드/처리 실패해도 원본 그대로 반환(생성 자체는 안 깨짐).
@@ -290,10 +294,9 @@ export default async function handler(req, res) {
   // 엔진 선택:
   //   - 유료(크레딧 사용) / 무제한(어드민) / 무료 Pro 체험 → Pro (gemini-3-pro-image, 2K)
   //   - 무료 일일 생성 → 기본 (gemini-2.5-flash-image)
-  // 🔧 임시 핫픽스(2026-07-21): Google gemini-3-pro-image 장애(응답 hang→fetch failed).
-  //    전 유저를 정상 동작하는 base(gemini-2.5-flash-image)로 폴백한다.
-  //    Pro 모델 복구되면 아래 줄을 `unlimited || useCredit || freeProSample` 로 원복.
-  const usePro = false && (unlimited || useCredit || freeProSample);
+  // (2026-07-21 gemini-3-pro-image Google 장애 복구 확인 → Pro 원복. 함수 maxDuration 60s로 상향해
+  //  Pro 지연(~25s)도 타임아웃 안 걸리게 함.)
+  const usePro = unlimited || useCredit || freeProSample;
   const model = usePro ? "gemini-3-pro-image" : "gemini-2.5-flash-image";
   const endpoint =
     "https://generativelanguage.googleapis.com/v1beta/models/" +
