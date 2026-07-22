@@ -7,6 +7,26 @@ import { FOURCUT_COUNTS, FOURCUT_STYLES, composeStrip, todayStr } from "./fourcu
 import { getSavedSet, markSaved, syncExpiryNotifications, cancelExpiryNotice } from "./notify";
 import { t, useLang, getLang, localizedTitle, localizedCategory, getLangPreference, setLang } from "./i18n";
 import LoginGate from "./LoginGate";
+import { shareImage, claimShareRewardApi } from "./share";
+import { track, setTrackUser } from "./track";
+
+// ── 퍼널 계측: signup 은 로그인 이벤트만으로 구분 불가(OAuth 도 최초 1회는 SIGNED_IN) —
+// user.created_at 과 last_sign_in_at 이 아주 가까우면(첫 로그인) signup 으로 판정한다.
+// 계정당 1회만 기록(localStorage 플래그로 중복 방지 — 토큰 리프레시 등으로 onAuthStateChange
+// 가 재호출돼도 재전송하지 않는다).
+const SIGNUP_TRACKED_KEY = "rimikimi_signup_tracked_v1";
+function trackSignupIfNew(user) {
+  if (!user?.id) return;
+  try {
+    if (localStorage.getItem(SIGNUP_TRACKED_KEY) === user.id) return;
+  } catch (_) { /* localStorage 불가 환경 — 계측만 스킵, 앱 동작엔 영향 없음 */ }
+  const created = user.created_at ? new Date(user.created_at).getTime() : 0;
+  const lastSignIn = user.last_sign_in_at ? new Date(user.last_sign_in_at).getTime() : 0;
+  const isFirstSignIn = created && lastSignIn && Math.abs(lastSignIn - created) < 5000;
+  if (!isFirstSignIn) return;
+  track("signup");
+  try { localStorage.setItem(SIGNUP_TRACKED_KEY, user.id); } catch (_) { /* 무시 */ }
+}
 
 /* 약관/방침/환불 정적 페이지의 절대 경로 베이스.
    웹: 같은 출처라 새 탭으로, 네이티브(번들): 시스템 브라우저로 열림.
@@ -515,6 +535,11 @@ export default function PortraitStudio() {
     return () => clearTimeout(t);
   }, []);
 
+  // 퍼널 계측: 앱(웹뷰) 실행 1회 (§C — 로그인 여부와 무관한 최상단 퍼널)
+  useEffect(() => {
+    track("app_open");
+  }, []);
+
   // photo 가 바뀌면 localStorage 에 자동 저장 (없으면 키 삭제)
   useEffect(() => {
     try {
@@ -534,13 +559,16 @@ export default function PortraitStudio() {
       if (!mounted) return;
       setSession(data.session);
       setAuthChecked(true);
+      setTrackUser(data.session?.user?.id || null);
       // 세션도 없고 리다이렉트 복귀도 아니면 진짜 로그아웃 → 바로 로그인 화면 허용
       if (!data.session && !hasAuthRedirect) setAuthSettling(false);
     });
     const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
       if (!mounted) return;
       setSession(s);
+      setTrackUser(s?.user?.id || null);
       if (s) setAuthSettling(false);
+      if (_event === "SIGNED_IN" && s?.user) trackSignupIfNew(s.user);
     });
     // 안전장치: 5초 안에 세션이 안 들어오면 로그인 화면 보여줌 (로그인 실패 대비)
     const failsafe = setTimeout(() => { if (mounted) setAuthSettling(false); }, 5000);
@@ -766,6 +794,7 @@ export default function PortraitStudio() {
             ? t("pay.already", { n: got })
             : t("pay.success", { n: got })
         );
+        if (!j?.alreadyPaid) track("purchase", { product: j?.productId || provider });
         setScreen("store");
         setRefreshTick((n) => n + 1); // /api/quota 다시 불러서 잔액 갱신
       })
@@ -1057,6 +1086,7 @@ export default function PortraitStudio() {
         if (typeof last?.unlimited === "boolean") setUnlimited(last.unlimited);
         if (typeof last?.quotaUsed === "number") setFreeUsed(last.quotaUsed);
         setRefreshTick((n) => n + 1); // 크레딧/잔여 정확히 재조회
+        track("generate", { engine: last?.engine || null, concept: selected?.id ?? null });
         // 컷 중 하나라도 Pro 혼잡으로 base 폴백됐으면 고지 (무과금)
         if (results.some((r) => r?.busyFallback)) {
           setPayToast(t("engine.busyFallback"));
@@ -1113,6 +1143,7 @@ export default function PortraitStudio() {
       const result = await generateImage(accessToken, photoToUse, promptText, genMeta);
       setResultImage(result.imageDataUrl);
       setResultGalleryId(result.galleryId || null); // 저장 시 원본(2K) 받으려고 보관
+      track("generate", { engine: result.engine || null, concept: selected?.id ?? null });
       // 방금 생성이 무료(기본 엔진)이고 무료 Pro 체험이 남아있으면 비교 CTA 노출
       setCanTryPro(result.engine === "base" && !!result.proSampleAvailable);
       // 생성 직후 만료 10분 전 리마인드 푸시 예약 (갤러리를 안 열어도 동작)
@@ -1198,16 +1229,18 @@ export default function PortraitStudio() {
     };
     try {
       // 1) iOS / Android 네이티브 시트
-      if (await nativeShare(shareData)) return;
+      if (await nativeShare(shareData)) { track("invite_sent"); return; }
       // 2) 웹 공유 API
       if (navigator.share) {
         await navigator.share(shareData);
+        track("invite_sent");
         return;
       }
       // 3) 클립보드 fallback
       await navigator.clipboard.writeText(link);
       setInviteMsg(t("invite.copied"));
       setTimeout(() => setInviteMsg(""), 4000);
+      track("invite_sent", { via: "clipboard" });
     } catch (_) {
       /* 사용자가 공유 취소 — 무시 */
     }
@@ -1393,6 +1426,7 @@ export default function PortraitStudio() {
                 ? () => setScreen("store")
                 : () => { setPayToast("크레딧을 충전하면 Pro 화질로 계속 만들 수 있어요 🙂"); setTimeout(() => setPayToast(""), 3500); }
             }
+            onShared={() => setRefreshTick((n) => n + 1)}
           />
         )}
         {screen === "profile" && (
@@ -1421,6 +1455,7 @@ export default function PortraitStudio() {
           <MyGalleryScreen
             accessToken={session?.access_token}
             onBack={() => setScreen("profile")}
+            onShared={() => setRefreshTick((n) => n + 1)}
           />
         )}
         {screen === "store" && PAYMENTS_ENABLED && (
@@ -2077,11 +2112,12 @@ function LangSelector() {
 /* ============================================================
    내 갤러리 (1시간 보관)
    ============================================================ */
-function MyGalleryScreen({ accessToken, onBack }) {
+function MyGalleryScreen({ accessToken, onBack, onShared }) {
   const [items, setItems] = useState(null); // null=로딩, []=빈, [...]=있음
   const [error, setError] = useState(null);
   const [tick, setTick] = useState(0); // 1초마다 남은시간 갱신
   const [saved, setSaved] = useState(() => getSavedSet()); // 저장한 항목 id 집합
+  const [sharingId, setSharingId] = useState(null);
   const [toast, setToast] = useState("");
   const toastTimer = useRef(null);
 
@@ -2171,6 +2207,34 @@ function MyGalleryScreen({ accessToken, onBack }) {
       headers: { Authorization: "Bearer " + accessToken },
     });
     setItems((prev) => (prev || []).filter((it) => it.id !== id));
+  }
+
+  // [공유] 버튼 — 저장(handleSave)과 완전히 별개 경로 (§A). 공유 시트가 실제로
+  // "완료"(취소/미지원 아님)됐을 때만 서버에 리워드를 클레임한다.
+  async function handleShare(it) {
+    if (!it.url || sharingId) return;
+    setSharingId(it.id);
+    try {
+      const r = await shareImage({
+        src: it.url,
+        filename: `rimikimi_${it.conceptId || it.id}.png`,
+        title: t("invite.shareTitle"),
+        text: t("share.caption"),
+      });
+      if (!r.ok) return; // 취소/미지원 — 조용히 종료(토스트 없음)
+      track("share_done", { itemId: it.id });
+
+      const claim = await claimShareRewardApi({ accessToken, itemId: it.id });
+      if (claim.ok && !claim.alreadyClaimed) {
+        flashToast(t("share.rewardToast"));
+        onShared && onShared();
+      } else {
+        // 이미 지급된 항목이거나 일일 상한 도달 — 조용히 무보상(공유 자체는 성공)
+        flashToast(t("share.doneToast"));
+      }
+    } finally {
+      setSharingId(null);
+    }
   }
 
   function remainingLabel(expiresAt) {
@@ -2265,6 +2329,13 @@ function MyGalleryScreen({ accessToken, onBack }) {
                       onClick={() => handleSave(it)}
                     >
                       {isSaved ? t("gallery.action.saved") : t("gallery.action.save")}
+                    </button>
+                    <button
+                      style={S.myGalleryShare}
+                      disabled={sharingId === it.id}
+                      onClick={() => handleShare(it)}
+                    >
+                      {t("gallery.action.share")}
                     </button>
                     <button
                       style={S.myGalleryDelete}
@@ -2514,8 +2585,10 @@ function ResultScreen({
   generating, fourcutProgress = "", prompt, resultImage, galleryId = null, accessToken = null,
   genError, onRetry, onAgain, onHome, showAds = false,
   canTryPro = false, proSampleImg = null, proSampleBusy = false, onTryPro, onUpgrade,
+  onShared,
 }) {
   const [saving, setSaving] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const [toast, setToast] = useState("");
   const toastTimer = useRef(null);
 
@@ -2591,6 +2664,43 @@ function ResultScreen({
       }
     } finally {
       setSaving(false);
+    }
+  }
+
+  // [공유] 버튼 — 저장(handleSaveResult)과 완전히 별개 경로 (§A). 화면에 보이는
+  // resultImage(썸네일 크기)를 그대로 공유한다 — 저장의 "2K 원본 강제" 규칙은
+  // 이 경로에 적용되지 않는다(공유 시트에서 흔히 리사이즈되므로 굳이 원본을
+  // 다시 받아올 필요가 없고, 실패 지점을 늘리지 않기 위함).
+  // 공유 시트가 실제로 "완료"(취소/미지원 아님)됐을 때만 서버에 리워드를 클레임한다.
+  async function handleShareResult() {
+    if (!resultImage || sharing) return;
+    setSharing(true);
+    try {
+      const filename = "rimikimi_" + (prompt?.id ?? "art") + ".png";
+      const r = await shareImage({
+        src: resultImage,
+        filename,
+        title: t("invite.shareTitle"),
+        text: t("share.caption"),
+      });
+      if (!r.ok) return; // 취소/미지원 — 조용히 종료(토스트 없음)
+      track("share_done", { itemId: galleryId || null });
+
+      if (!galleryId || !accessToken) {
+        // 갤러리 원본이 없거나(예: 인생네컷 스트립) 로그인 세션이 없음 — 보상 없이 안내만.
+        flashToast(t("share.doneToast"));
+        return;
+      }
+      const claim = await claimShareRewardApi({ accessToken, itemId: galleryId });
+      if (claim.ok && !claim.alreadyClaimed) {
+        flashToast(t("share.rewardToast"));
+        onShared && onShared();
+      } else {
+        // 이미 지급된 항목이거나 일일 상한 도달 — 조용히 무보상(공유 자체는 성공)
+        flashToast(t("share.doneToast"));
+      }
+    } finally {
+      setSharing(false);
     }
   }
 
@@ -2680,6 +2790,14 @@ function ResultScreen({
             style={{ ...S.downloadBtn, ...(saving ? { opacity: 0.6 } : {}) }}
           >
             {saving ? t("common.loading") : t("result.download")}
+          </button>
+          <button
+            type="button"
+            onClick={handleShareResult}
+            disabled={sharing}
+            style={{ ...S.shareResultBtn, ...(sharing ? { opacity: 0.6 } : {}) }}
+          >
+            {sharing ? t("common.loading") : t("result.share")}
           </button>
           <div style={S.resultActions}>
             <button style={S.secondaryBtn} onClick={onHome}>{t("result.home")}</button>
@@ -2771,6 +2889,7 @@ function StoreScreen({ packs, credits, session, freeLimit = FREE_DAILY, onCredit
         if (!sub) throw e;
       }
       onCredited && onCredited();
+      track("purchase", { product: pack.id });
       setOkMsg(sub
         ? "rimikimi+ 구독 완료! 크레딧이 곧 충전되고 광고가 사라져요 ✨"
         : `크레딧 ${pack.count}개가 충전됐어요! 🎉`);
@@ -3177,7 +3296,7 @@ const S = {
     marginBottom: 8,
   },
   myGalleryActions: {
-    display: "grid", gridTemplateColumns: "1fr auto", gap: 6,
+    display: "grid", gridTemplateColumns: "1fr auto auto", gap: 6,
   },
   myGalleryDownload: {
     background: INK, color: "#fff", textAlign: "center",
@@ -3188,6 +3307,13 @@ const S = {
   myGalleryDownloadDone: {
     background: "#fff", color: "#2EA05A",
     border: "1px solid #2EA05A55",
+  },
+  // [공유] 버튼 — 저장/삭제와 별개 (viral-loop-and-funnel-standard.md §A)
+  myGalleryShare: {
+    background: "transparent", color: INK,
+    border: "1px solid " + INK + "33", borderRadius: 8,
+    padding: "7px 10px", fontSize: 11.5, fontWeight: 700,
+    fontFamily: "'Quicksand', sans-serif", cursor: "pointer",
   },
   myGalleryDelete: {
     background: "transparent", color: ACCENT,
@@ -3759,6 +3885,14 @@ const S = {
     borderRadius: 18, padding: "16px", fontSize: 16, fontWeight: 700,
     fontFamily: "'Quicksand', sans-serif", cursor: "pointer",
     textAlign: "center", textDecoration: "none", marginBottom: 10,
+  },
+  // [공유] 버튼 — 저장(downloadBtn)과 별개 경로 (viral-loop-and-funnel-standard.md §A)
+  shareResultBtn: {
+    display: "block", width: "100%", boxSizing: "border-box",
+    background: "transparent", color: ACCENT, border: "2px solid " + ACCENT + "33",
+    borderRadius: 18, padding: "14px", fontSize: 15, fontWeight: 700,
+    fontFamily: "'Quicksand', sans-serif", cursor: "pointer",
+    textAlign: "center", marginBottom: 14,
   },
   saveNotice: {
     background: "#f9c83c22", color: "#8a6a16",

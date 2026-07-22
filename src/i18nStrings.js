@@ -96,6 +96,7 @@ export const STR = {
     "result.saveNotice3": "저장 버튼으로",
     "result.saveNotice4": "앨범에 꼭 별도로 저장해 주세요 😉",
     "result.download": "이미지 저장하기",
+    "result.share": "공유하고 크레딧 받기",
     "result.home": "처음으로",
     "result.again": "다른 컨셉으로",
 
@@ -156,12 +157,18 @@ export const STR = {
     "gallery.action.save": "저장",
     "gallery.action.saved": "저장됨",
     "gallery.savedBadge": "✓ 저장됨",
+    "gallery.action.share": "공유",
     "gallery.action.delete": "삭제",
 
     // === 저장 토스트 (결과화면·내 갤러리 공용) ===
     "save.toast.done": "사진첩에 저장됐어요",
     "save.toast.fail": "저장에 실패했어요. 잠시 후 다시 시도해 주세요.",
     "save.toast.hiResFail": "원본 화질을 준비하지 못했어요. 잠시 후 다시 시도해 주세요.",
+
+    // === 공유 리워드 (결과화면·내 갤러리 공용) ===
+    "share.caption": "내 얼굴로 만든 인생 프로필 ✨ rimikimi로 만들어봐요!",
+    "share.doneToast": "공유 완료!",
+    "share.rewardToast": "공유 완료! 크레딧 +1 🎉",
 
     // === 엔진 혼잡 폴백 고지 ===
     "engine.busyFallback": "지금 Pro 서버가 붐벼서 일반 화질로 만들었어요. 크레딧은 차감되지 않았어요.",
@@ -312,6 +319,7 @@ export const STR = {
     "result.saveNotice3": "Use the Save button to",
     "result.saveNotice4": "keep them in your photo album 😉",
     "result.download": "Save image",
+    "result.share": "Share for a credit",
     "result.home": "Home",
     "result.again": "Try another concept",
 
@@ -369,12 +377,18 @@ export const STR = {
     "gallery.action.save": "Save",
     "gallery.action.saved": "Saved",
     "gallery.savedBadge": "✓ Saved",
+    "gallery.action.share": "Share",
     "gallery.action.delete": "Delete",
 
     // === Save toast (result screen + my gallery) ===
     "save.toast.done": "Saved to your photos",
     "save.toast.fail": "Couldn't save. Please try again in a moment.",
     "save.toast.hiResFail": "Couldn't prepare the full-quality image. Please try again in a moment.",
+
+    // === Share reward (result screen + my gallery) ===
+    "share.caption": "My AI portrait made with rimikimi ✨ Try it yourself!",
+    "share.doneToast": "Shared!",
+    "share.rewardToast": "Shared! +1 credit 🎉",
 
     // === Engine busy fallback notice ===
     "engine.busyFallback": "Pro is busy right now, so this was made in standard quality — no credit was used.",

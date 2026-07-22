@@ -8,6 +8,9 @@
 
 const PER_CREDIT = 2; // 초대 N명당 크레딧 1개
 
+// 공유 리워드 일일 상한 (viral-loop-and-funnel-standard.md §A) — 어뷰즈 캡.
+export const SHARE_DAILY_CAP = 3;
+
 export async function getCreditInfo(admin, userId) {
   // 1) 내가 초대한 사람 수
   const { count, error: cErr } = await admin
@@ -18,24 +21,26 @@ export async function getCreditInfo(admin, userId) {
   const referralCount = count || 0;
   const creditsEarned = Math.floor(referralCount / PER_CREDIT);
 
-  // 2) 사용한 크레딧 + 결제로 적립한 크레딧
+  // 2) 사용한 크레딧 + 결제로 적립한 크레딧 + 공유 리워드로 적립한 크레딧
   const { data, error: uErr } = await admin
     .from("user_credits")
-    .select("credits_used, credits_purchased")
+    .select("credits_used, credits_purchased, credits_shared")
     .eq("user_id", userId)
     .maybeSingle();
   if (uErr) return { error: uErr.message };
   const creditsUsed = data?.credits_used || 0;
   const creditsPurchased = data?.credits_purchased || 0;
+  const creditsShared = data?.credits_shared || 0; // 공유 리워드(§A) — 구매/초대와 분리된 버킷
 
-  // 총 적립 = 초대 보상 + 결제 충전
-  const totalEarned = creditsEarned + creditsPurchased;
+  // 총 적립 = 초대 보상 + 결제 충전 + 공유 리워드
+  const totalEarned = creditsEarned + creditsPurchased + creditsShared;
   const creditsAvailable = Math.max(0, totalEarned - creditsUsed);
 
   return {
     referralCount,
     creditsEarned,        // 초대 보상으로 얻은 누적
     creditsPurchased,     // 결제로 충전한 누적
+    creditsShared,        // 공유 리워드로 얻은 누적
     creditsUsed,
     creditsAvailable,
     perCredit: PER_CREDIT,

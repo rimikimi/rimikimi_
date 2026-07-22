@@ -105,3 +105,60 @@ export async function nativeShare({ title, text, url }) {
     return false;
   }
 }
+
+// ============================================================
+// 결과 이미지 파일 공유 (viral-loop-and-funnel-standard.md §A) — 저장(nativeSaveToAlbum)과
+// 완전히 별개 경로. @capacitor/share 의 files 옵션은 Android 에서 file:// URI 만 받으므로
+// (원격 https 서명 URL 은 거부됨), data URL 이든 원격 URL 이든 먼저 로컬 캐시 파일로 써서
+// file:// URI 를 만든 뒤 공유한다.
+//
+// 완료 판정: 네이티브 Share 플러그인은 "사용자가 취소"하면 reject 하고(iOS 는
+// completionWithItemsHandler 의 completed=false 일 때 바로 reject, Android 는
+// RESULT_CANCELED 일 때 reject), 실제로 대상 앱을 골랐을 때만 resolve 한다 — 그래서
+// 이 함수는 resolve=완료, reject/에러=미완료(호출부가 크레딧 클레임을 스킵)로 처리하면
+// §A 표준의 "iOS activityType 확인 / Android resolve 기준" 판정과 실질적으로 동일하다.
+export async function nativeShareImage({ src, filename = "rimikimi.png", title, text }) {
+  if (!isNative()) return { ok: false, reason: "web only" };
+  if (!src) return { ok: false, reason: "no src" };
+  try {
+    const base64 = await toBase64Payload(src);
+    const { Filesystem, Directory } = await import("@capacitor/filesystem");
+    const path = `share-cache/${filename}`;
+    await Filesystem.writeFile({
+      path,
+      data: base64,
+      directory: Directory.Cache,
+      recursive: true,
+    });
+    const { uri } = await Filesystem.getUri({ path, directory: Directory.Cache });
+    const { Share } = await import("@capacitor/share");
+    const result = await Share.share({ title, text, files: [uri], dialogTitle: "공유하기" });
+    return { ok: true, activityType: result?.activityType || "" };
+  } catch (e) {
+    // 사용자 취소(reject) 또는 파일 변환/쓰기 실패 — 어느 쪽이든 미완료로 처리(크레딧 미지급)
+    return { ok: false, reason: e?.message || "cancelled" };
+  }
+}
+
+// data: URL 또는 http(s) URL → base64 페이로드 (Filesystem.writeFile 용)
+async function toBase64Payload(src) {
+  if (/^data:/.test(src)) {
+    const b64 = String(src).split(",")[1];
+    if (!b64) throw new Error("invalid data url");
+    return b64;
+  }
+  const res = await fetch(src);
+  if (!res.ok) throw new Error("fetch failed: " + res.status);
+  const blob = await res.blob();
+  return await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = String(reader.result || "");
+      const b64 = result.split(",")[1] || "";
+      if (!b64) reject(new Error("blob read failed"));
+      else resolve(b64);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
