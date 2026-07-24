@@ -71,7 +71,7 @@ function imageSize(buf, mime) {
   return null;
 }
 
-// gemini-2.5-flash-image 가 지원하는 비율 중 입력에 가장 가까운 것 선택.
+// gemini-3.1-flash-image 가 지원하는 비율 중 입력에 가장 가까운 것 선택.
 function nearestAspect(w, h) {
   const presets = [
     ["1:1", 1], ["2:3", 2 / 3], ["3:2", 3 / 2], ["3:4", 3 / 4], ["4:3", 4 / 3],
@@ -293,7 +293,7 @@ export default async function handler(req, res) {
 
   // 엔진 선택:
   //   - 유료(크레딧 사용) / 무제한(어드민) / 무료 Pro 체험 → Pro (gemini-3-pro-image, 2K)
-  //   - 무료 일일 생성 → 기본 (gemini-2.5-flash-image)
+  //   - 무료 일일 생성 → 기본 (gemini-3.1-flash-image)
   const usePro = unlimited || useCredit || freeProSample;
 
   // 편집(image-to-image) 모드에선 Gemini가 generationConfig.imageConfig.aspectRatio 를 무시하고
@@ -348,7 +348,7 @@ export default async function handler(req, res) {
   let engineUsed = usePro ? "pro" : "base";
   let busyFallback = false;
   let result = await callGemini(
-    usePro ? "gemini-3-pro-image" : "gemini-2.5-flash-image",
+    usePro ? "gemini-3-pro-image" : "gemini-3.1-flash-image",
     usePro,
     usePro ? PRO_TIMEOUT_MS : SOLO_TIMEOUT_MS
   );
@@ -362,7 +362,7 @@ export default async function handler(req, res) {
     );
     engineUsed = "base";
     busyFallback = true;
-    result = await callGemini("gemini-2.5-flash-image", false, FALLBACK_TIMEOUT_MS);
+    result = await callGemini("gemini-3.1-flash-image", false, FALLBACK_TIMEOUT_MS);
   }
 
   if (result.networkError) {
