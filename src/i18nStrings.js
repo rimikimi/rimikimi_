@@ -58,6 +58,10 @@ export const STR = {
     "step1.resetFilters": "필터 초기화",
     "step1.more": "더 보기 ({n}개 남음)",
     "step1.featured": "🔥 추천",
+    "step1.newest": "✨ 새로 나왔어요",
+    "ad.brooklyn.title": "증명사진이 필요하다면, Brooklyn",
+    "ad.brooklyn.desc": "여권·이력서·배우 프로필까지\n셀카 한 장이면 스튜디오급으로",
+    "ad.brooklyn.cta": "받기",
     "step1.rowMore": "더보기 →",
     "step1.hiddenBadge": "🔒 비공개",
 
@@ -282,6 +286,10 @@ export const STR = {
     "step1.resetFilters": "Reset filters",
     "step1.more": "Show more ({n} left)",
     "step1.featured": "🔥 Featured",
+    "step1.newest": "✨ New Arrivals",
+    "ad.brooklyn.title": "Need an ID photo? Try Brooklyn",
+    "ad.brooklyn.desc": "Passport, resume, actor headshots\nStudio quality from one selfie",
+    "ad.brooklyn.cta": "Get",
     "step1.rowMore": "More →",
     "step1.hiddenBadge": "🔒 Private",
 

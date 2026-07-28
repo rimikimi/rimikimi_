@@ -841,7 +841,9 @@ export default function PortraitStudio() {
 
   const visiblePool = useMemo(() => {
     // hidden 컨셉은 어드민(무제한 사용자)에게만 노출 — 일반/테스터는 안 보임
-    return unlimited ? concepts : concepts.filter((p) => !p.hidden);
+    const base = unlimited ? concepts : concepts.filter((p) => !p.hidden);
+    // 증명사진은 전문앱 Brooklyn 으로 분리 → 목록/카테고리에서 제외하고 배너로만 유도
+    return base.filter((p) => !isIdPhoto(p));
   }, [concepts, unlimited]);
 
   // 카테고리에 개수 같이 계산 — [{ name, count }]
@@ -859,17 +861,20 @@ export default function PortraitStudio() {
   }, [visiblePool]);
 
   const filtered = useMemo(() => {
-    return visiblePool.filter((p) => {
-      const cats = p.categories || (p.category ? [p.category] : []);
-      const catOk = (activeCat === "전체" || activeCat === t("step1.all")) || cats.includes(activeCat);
-      const q = query.trim().toLowerCase();
-      const qOk =
-        !q ||
-        p.title.toLowerCase().includes(q) ||
-        cats.some((c) => c.toLowerCase().includes(q)) ||
-        p.text.toLowerCase().includes(q);
-      return catOk && qOk;
-    });
+    return visiblePool
+      .filter((p) => {
+        const cats = p.categories || (p.category ? [p.category] : []);
+        const catOk = (activeCat === "전체" || activeCat === t("step1.all")) || cats.includes(activeCat);
+        const q = query.trim().toLowerCase();
+        const qOk =
+          !q ||
+          p.title.toLowerCase().includes(q) ||
+          cats.some((c) => c.toLowerCase().includes(q)) ||
+          p.text.toLowerCase().includes(q);
+        return catOk && qOk;
+      })
+      // 새로 들어온 컨셉이 먼저 보이게 (id 큰 순 = 최신순)
+      .sort((a, b) => b.id - a.id);
   }, [visiblePool, query, activeCat]);
 
   // 무한 스크롤 흉내 — 처음엔 30개, 스크롤 시 + 30개씩
@@ -1384,6 +1389,7 @@ export default function PortraitStudio() {
             inviteMsg={inviteMsg}
             unlimited={unlimited}
             popular={popular}
+            onBrooklyn={openBrooklyn}
           />
         )}
         {screen === "confirm" && selected && (
@@ -1655,7 +1661,7 @@ function GalleryScreen({
   poolTotal, onPick, onBack,
   credits = 0, referralCount = 0, untilNext = 2,
   onInvite, inviteMsg = "", unlimited = false,
-  fullPool = [], popular = [],
+  fullPool = [], popular = [], onBrooklyn,
 }) {
   const [cols, setCols] = useState(2);
   const hasFilter =
@@ -1677,6 +1683,9 @@ function GalleryScreen({
       const fill = [...pool].sort((a, b) => b.id - a.id).filter((p) => !have.has(p.id));
       featured = [...featured, ...fill].slice(0, 5);
     }
+    // 1.5) NEW: 최근 추가된 컨셉 (id 큰 순) — 추천과 같은 크기의 큰 카드 줄
+    const newest = [...pool].sort((a, b) => b.id - a.id).slice(0, 10);
+
     // 2) 카테고리별 컨셉 모음
     const byCat = new Map(); // catName -> { items, latestId }
     for (const p of pool) {
@@ -1697,7 +1706,7 @@ function GalleryScreen({
         items: g.items.sort((a, b) => b.id - a.id).slice(0, 10), // 각 줄에 최신 10개
       }))
       .sort((a, b) => b.latestId - a.latestId);
-    return { featured, rows };
+    return { featured, newest, rows };
   }, [showHomeLayout, fullPool, popular]);
   return (
     <div className="fade">
@@ -1768,6 +1777,7 @@ function GalleryScreen({
           data={homeData}
           onPick={onPick}
           onMore={(catName) => setActiveCat(catName)}
+          onBrooklyn={onBrooklyn}
         />
       ) : prompts.length === 0 ? (
         <div style={S.emptyState}>
@@ -1850,7 +1860,7 @@ function GalleryScreen({
    - 추천 영역 (가장 큰 ID 8개, 큰 카드 가로 스크롤)
    - 카테고리별 1줄씩 (최근 업데이트 카테고리 먼저)
    ============================================================ */
-function HomeLayout({ data, onPick, onMore }) {
+function HomeLayout({ data, onPick, onMore, onBrooklyn }) {
   return (
     <div>
       {/* 추천 */}
@@ -1880,6 +1890,56 @@ function HomeLayout({ data, onPick, onMore }) {
               </button>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* NEW — 최근 추가된 컨셉 (추천과 동일한 큰 카드) */}
+      {data.newest && data.newest.length > 0 && (
+        <div style={S.homeSection}>
+          <div style={S.homeRowHead}>
+            <div style={S.homeRowTitle}>
+              {t("step1.newest")}
+              <span style={S.newBadge}>NEW</span>
+            </div>
+          </div>
+          <div style={S.homeRailFeatured}>
+            {data.newest.map((p) => (
+              <button
+                key={p.id}
+                style={S.featuredCard}
+                onClick={() => onPick(p)}
+                aria-label={p.title}
+              >
+                <img
+                  src={`/thumbs/${p.id}.webp`}
+                  alt={localizedTitle(p)}
+                  style={S.featuredImg}
+                  loading="lazy"
+                />
+                <div style={S.featuredOverlay}>
+                  <div style={S.featuredTitle}>{localizedTitle(p)}</div>
+                </div>
+                {p.hidden && <div style={{ ...S.hiddenTag, top: 8 }}>{t("step1.hiddenBadge")}</div>}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Brooklyn (증명사진 전문앱) 광고 배너 */}
+      {onBrooklyn && (
+        <div style={S.homeSection}>
+          <div style={S.adTag}>AD</div>
+          <button style={S.bkAd} onClick={onBrooklyn}>
+            <span style={S.bkAdIcon}>
+              <img src="/brooklyn-icon.png" alt="Brooklyn" style={S.bkAdIconImg} />
+            </span>
+            <span style={S.bkAdText}>
+              <span style={S.bkAdTitle}>{t("ad.brooklyn.title")}</span>
+              <span style={S.bkAdDesc}>{t("ad.brooklyn.desc")}</span>
+            </span>
+            <span style={S.bkAdGo}>{t("ad.brooklyn.cta")}</span>
+          </button>
         </div>
       )}
 
@@ -3479,6 +3539,43 @@ const S = {
 
   /* === 홈 레이아웃 (G) === */
   homeSection: { marginBottom: 24 },
+
+  // NEW 배지 (새로 나왔어요 섹션)
+  newBadge: {
+    marginLeft: 7, fontSize: 9.5, fontWeight: 800, letterSpacing: 0.4,
+    color: "#fff", background: ACCENT, borderRadius: 6, padding: "2px 6px",
+    verticalAlign: "middle",
+  },
+
+  // ── Brooklyn 광고 배너 (시안 A · 미니멀 카드) ──
+  adTag: {
+    display: "inline-block", fontSize: 9, fontWeight: 700, letterSpacing: 0.4,
+    color: "#8a7f6e", background: "rgba(35,31,32,0.06)",
+    padding: "2px 6px", borderRadius: 5, marginBottom: 6,
+  },
+  bkAd: {
+    display: "flex", alignItems: "center", gap: 12, width: "100%",
+    boxSizing: "border-box", padding: 14, borderRadius: 20, textAlign: "left",
+    background: "rgba(255,255,255,0.75)", border: "1px solid rgba(35,31,32,0.08)",
+    boxShadow: "0 6px 18px -12px rgba(35,31,32,0.35)",
+    cursor: "pointer", fontFamily: "'Quicksand', sans-serif",
+  },
+  bkAdIcon: {
+    width: 46, height: 46, borderRadius: 13, flex: "0 0 auto",
+    overflow: "hidden", background: "#111", display: "block",
+  },
+  bkAdIconImg: { width: "100%", height: "100%", objectFit: "cover", display: "block" },
+  bkAdText: { flex: 1, minWidth: 0, display: "block" },
+  bkAdTitle: { display: "block", fontSize: 14, fontWeight: 700, color: INK },
+  bkAdDesc: {
+    display: "block", fontSize: 11.5, color: "#8a7f6e", marginTop: 2,
+    lineHeight: 1.45, whiteSpace: "pre-line",
+  },
+  bkAdGo: {
+    flex: "0 0 auto", fontSize: 12, fontWeight: 700, color: "#fff",
+    background: "linear-gradient(180deg,#2c2723," + INK + ")",
+    padding: "9px 14px", borderRadius: 11,
+  },
   homeRowHead: {
     display: "flex", justifyContent: "space-between", alignItems: "baseline",
     marginBottom: 10, padding: "0 2px",

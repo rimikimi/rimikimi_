@@ -14,6 +14,9 @@ export const FOURCUT_STYLES = [
   { key: "funky",    label: "펑키",     emoji: "⚡", bg: "#171327", cell: "#ffffff", accent: "#1fe3c8", text: "#ffe14d", stickers: ["★", "☻", "✺", "✿"] },
   { key: "playful",  label: "플레이풀", emoji: "🎉", bg: "#fff2c2", cell: "#ffffff", accent: "#ff5d5d", text: "#ef4d6b", stickers: ["🎉", "✨", "🌈", "😆"] },
   { key: "birthday", label: "버스데이", emoji: "🎂", bg: "#fde4ee", cell: "#ffffff", accent: "#ff7aa8", text: "#e0578c", stickers: ["🎂", "🎈", "🎉", "🥳"] },
+  { key: "film",     label: "필름",     emoji: "🎞", bg: "#efe9dc", cell: "#fffdf7", accent: "#a89272", text: "#7b6a4f", stickers: ["✶", "◦", "❍", "✧"] },
+  { key: "summer",   label: "썸머",     emoji: "🌊", bg: "#dff1fb", cell: "#ffffff", accent: "#4bb8e8", text: "#2b86b5", stickers: ["🌊", "🐚", "🌴", "☀"] },
+  { key: "mono",     label: "모노",     emoji: "◻️", bg: "#f2f2f2", cell: "#ffffff", accent: "#8a8a8a", text: "#3a3a3a", stickers: ["◦", "◻", "✕", "／"] },
 ];
 
 export function fourcutStyle(key) {

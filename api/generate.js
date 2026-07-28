@@ -86,6 +86,32 @@ function nearestAspect(w, h) {
   return best;
 }
 
+// 2026-07-28: picbox 커밋 c80f986 이식 — 사진 같은 결과를 위한 공통 문구 ("AI 티" 억제).
+//   원인: 매끈한 피부/완벽한 대칭/과한 샤프닝이 전형적인 생성형 룩을 만든다.
+//   → 피부 질감(모공·잔주름·점·주근깨)과 자연스러운 비대칭을 "보존"하라고 명시하고,
+//     실제 카메라 특성(85mm, 얕은 심도, 미세 그레인)을 요구한다. 전 모드 공통 적용.
+const PHOTOREALISM =
+  "CRITICAL — the output must look like a REAL PHOTOGRAPH taken by a professional photographer, " +
+  "not an AI image, not a 3D render, not an illustration, not a digital painting. " +
+  "PRESERVE the person's real skin texture: visible pores, fine lines, natural skin tone variation, " +
+  "freckles, moles and small blemishes exactly as they are — skin must read as real human skin, not retouched. " +
+  "Keep natural facial asymmetry (eyes, brows and mouth are never perfectly symmetrical on a real face). " +
+  "Keep real hair detail: individual strands, natural flyaways, a real hairline that is not painted-on. " +
+  "STRICTLY AVOID the typical AI/CGI look: waxy or plastic skin, airbrushed or over-smoothed faces, " +
+  "doll-like or beautified features, exaggerated symmetry, glassy or over-bright eyes, over-sharpened edges, " +
+  "halo outlines, unnatural glow or bloom, oversaturated colors, and a too-perfect flawless appearance. " +
+  "Camera: full-frame DSLR with an 85mm lens at around f/2.8 — natural, believable depth of field, " +
+  "true-to-life color, natural micro-contrast and a faint, fine sensor grain like a real photograph. ";
+
+// 사실적 의상 렌더링 공통 문구 (플라스틱/붙인 듯한 느낌 방지) — 의상이 관여하는 모드에만 적용.
+const REALISTIC_GARMENT =
+  "The clothing must look like REAL, photographed garments with a bespoke, made-to-measure " +
+  "tailored fit precisely following the person's own frame — natural fabric texture and weave, " +
+  "subtle natural creases and soft fabric shadows, collars and lapels that lie flat and sit " +
+  "naturally and symmetrically. STRICTLY AVOID any artificial look: no plastic/glossy/rubbery " +
+  "fabric, no painted or illustrated appearance, no stiff cardboard collar, no floating or " +
+  "pasted-on garment, no costume-like styling, no AI artifacts. ";
+
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin","*");
   res.setHeader("Access-Control-Allow-Methods","GET,POST,DELETE,OPTIONS");
@@ -209,11 +235,11 @@ export default async function handler(req, res) {
     "FRAMING (important): zoom OUT a little — do NOT crop tightly on the face/head. Frame it like a standard ID/passport photo so that the whole head with a small margin of empty space above the hair AND the entire shoulder line down to roughly the upper chest are clearly visible. Both shoulders and the top of the suit must be fully in frame; never cut off the shoulders. " +
     "Dress the person in a business-formal " + (idSuit || "dark navy") + " suit jacket and a clean white collared shirt, styled appropriately for the person's apparent gender and build (a women's blazer for women, a men's suit for men). " +
     "The suit must have a BESPOKE, made-to-measure tailored fit — precisely tailored to the person's own frame: clean tailored shoulders that follow their natural shoulder line, a trim but comfortable body, smooth lapels with no bunching or gaping, the look of a high-end custom-tailored garment. " +
-    "The clothing must look like REAL, photographed garments — natural wool/cotton fabric with realistic weave and matte texture, subtle natural creases and soft fabric shadows, lapels and shirt collar that lie flat and sit naturally and symmetrically around the neck and chest. " +
+    REALISTIC_GARMENT +
     "Keep the person's real shoulder width, neck and posture — do NOT broaden, square off, or enlarge the shoulders, and do NOT widen the neck. The jacket should follow the body's actual contour and connect to the neck and shoulders with seamless, anatomically-correct, photorealistic transitions. " +
-    "STRICTLY AVOID any artificial look: no plastic/glossy/rubbery fabric, no painted or illustrated appearance, no stiff cardboard-like collar, no floating or pasted-on jacket, no exaggerated or costume-like styling, no AI-generated artifacts. It must look exactly like normal business attire captured in a real studio photograph, with the suit's lighting and color temperature matched to the face. " +
+    "It must look exactly like normal business attire captured in a real studio photograph, with the suit's lighting and color temperature matched to the face. " +
     "Background: a clean, BRIGHT, light solid " + (idBgName || "neutral") + " (" + (idBg || "#FFFFFF") + ") studio backdrop with a very subtle, smooth gradient (slightly brighter just behind the head). Keep the background light, fresh and airy — never dark, muddy, or heavy. " +
-    "LIGHTING: bright, clean, evenly diffused HIGH-KEY studio lighting exactly like a professional Korean ID-photo studio — the face, clothing and background are all brightly and evenly lit and well-exposed, giving a bright, fresh, crisp, airy look with smooth even skin. ABSOLUTELY NO dark, dim, moody, underexposed, gloomy, or dramatic/heavy shadows anywhere. " +
+    "LIGHTING: bright, clean, evenly diffused HIGH-KEY studio lighting exactly like a professional Korean ID-photo studio — the face, clothing and background are all brightly and evenly lit and well-exposed, giving a bright, fresh, crisp, airy look, while KEEPING natural skin texture (do not smooth or airbrush the skin). ABSOLUTELY NO dark, dim, moody, underexposed, gloomy, or dramatic/heavy shadows anywhere. " +
     "Sharp focus, high resolution, photorealistic and true-to-life — like a bright official ID photo taken at a professional photo studio.";
 
   // 인생네컷: 스타일별 무드/악세서리 + 컷별 포즈로 단일 컷 포트레이트 생성
@@ -224,6 +250,9 @@ export default async function handler(req, res) {
     funky:    { mood: "FUNKY Y2K retro aesthetic, bold saturated neon colors, high-contrast on-camera flash look, edgy playful vibe", acc: "fun colorful hair clips" },
     playful:  { mood: "PLAYFUL vibrant party aesthetic, bright cheerful colors, joyful energetic vibe", acc: "a fun colorful party headband" },
     birthday: { mood: "festive BIRTHDAY party aesthetic, warm celebratory tones with balloon and confetti accents, happy celebratory vibe", acc: "a cute party-hat headband" },
+    film:     { mood: "nostalgic 90s FILM photography aesthetic, warm faded beige tones, soft grain and gentle halation, timeless analog vibe", acc: "a simple thin hair ribbon" },
+    summer:   { mood: "fresh SUMMER vacation aesthetic, bright aqua and sky-blue tones, sunlit airy highlights, breezy cheerful vibe", acc: "a woven straw sun visor" },
+    mono:     { mood: "clean MONOCHROME editorial aesthetic, crisp black-and-white tones with soft gray gradients, minimal timeless vibe", acc: "a sleek minimal hair clip" },
   };
   const FC_POSES = [
     "looking at the camera with a bright natural smile",
@@ -247,7 +276,7 @@ export default async function handler(req, res) {
     "Background: a simple, clean, fairly uniform studio-style background that fits the theme, so the cut composites cleanly into a photo strip. " +
     "Bright, clean, flattering lighting. Sharp focus, photorealistic, true-to-life skin. Exactly one person in frame.";
 
-  const instruction = isFourcut
+  const conceptInstruction = isFourcut
     ? fourcutInstruction
     : isIdPhoto
     ? idInstruction
@@ -291,10 +320,24 @@ export default async function handler(req, res) {
       "Keep the same face, identity, and facial features clearly recognizable. " +
       "Apply the following concept:\n" + prompt;
 
-  // 엔진 선택:
-  //   - 유료(크레딧 사용) / 무제한(어드민) / 무료 Pro 체험 → Pro (gemini-3-pro-image, 2K)
-  //   - 무료 일일 생성 → 기본 (gemini-3.1-flash-image)
+  // PHOTOREALISM(AI 티 억제)은 아트 스타일 변환 모드(skipFacePrecheck)만 제외하고 전 모드에 적용.
+  //   제외 이유: 그 모드는 "일러스트/회화 등 다른 매체로 재해석"이 목적이라 "반드시 실제 사진처럼
+  //   보여야 한다(not an illustration, not a digital painting)"는 지시와 정면 충돌한다.
+  const instruction = skipFacePrecheck ? conceptInstruction : PHOTOREALISM + conceptInstruction;
+
+  // usePro: 과금/쿼터/CTA 판정 전용 플래그(그대로 유지) — 유료(크레딧 사용) / 무제한(어드민) /
+  //   무료 Pro 체험일 때 true. ⚠️ 아래 로직에서 참조하지 않는다(과금 3경로 불변 유지) — "어떤
+  //   모델로 호출할지"는 useProEngine 으로 완전히 분리한다.
   const usePro = unlimited || useCredit || freeProSample;
+
+  // 엔진 정책 (2026-07-28 오너 지시): 현재는 전 티어 Pro 2K 통일.
+  //   무료·유료 화질 차별을 없애는 대신 첫 결과물 품질을 올리는 실험.
+  //   규모가 커져 원가가 부담되면 티어별 분기로 되돌린다 — 그때는 Vercel 환경변수
+  //   ENGINE_POLICY=tiered 만 설정하면 코드 수정 없이 기존(무료=base / 유료=Pro) 동작으로 복귀.
+  // 값: "all_pro"(기본) | "tiered"
+  // 과금·체험 CTA 판정은 어느 정책이든 기존 usePro(= 유료 경로 여부)를 그대로 쓴다 — 위 참조.
+  const ENGINE_POLICY = process.env.ENGINE_POLICY || "all_pro";
+  const useProEngine = ENGINE_POLICY === "tiered" ? usePro : true;
 
   // 편집(image-to-image) 모드에선 Gemini가 generationConfig.imageConfig.aspectRatio 를 무시하고
   // 오히려 출력을 세로로 크롭하는 정황 → 설정을 빼고 편집 기본동작(입력 비율 유지)에 맡긴다.
@@ -345,17 +388,17 @@ export default async function handler(req, res) {
   const FALLBACK_TIMEOUT_MS = 22000;
   const SOLO_TIMEOUT_MS = 45000; // Pro 대상이 아닌 무료 경로(base 단일 시도)
 
-  let engineUsed = usePro ? "pro" : "base";
+  let engineUsed = useProEngine ? "pro" : "base";
   let busyFallback = false;
   let result = await callGemini(
-    usePro ? "gemini-3-pro-image" : "gemini-3.1-flash-image",
-    usePro,
-    usePro ? PRO_TIMEOUT_MS : SOLO_TIMEOUT_MS
+    useProEngine ? "gemini-3-pro-image" : "gemini-3.1-flash-image",
+    useProEngine,
+    useProEngine ? PRO_TIMEOUT_MS : SOLO_TIMEOUT_MS
   );
 
   // Pro가 혼잡(404/타임아웃/5xx)이면 base로 1회 자동 재시도 — 유저는 에러를 안 본다.
   // 폴백이 발생한 요청은 크레딧/무료체험/하루한도를 전혀 차감하지 않는다(아래 6번 참고).
-  if (usePro && isBusyFailure(result)) {
+  if (useProEngine && isBusyFailure(result)) {
     console.error(
       "[generate] Pro 혼잡 → base 폴백:",
       result.networkError?.message || `HTTP ${result.upstream?.status}`
