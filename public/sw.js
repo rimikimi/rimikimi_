@@ -10,7 +10,7 @@
 // 새 버전 배포 시: 아래 VERSION 만 올리면 됨.
 // ============================================================
 
-const VERSION = "v29";
+const VERSION = "v30";
 const STATIC_CACHE = `rimikimi-static-${VERSION}`;
 const THUMB_CACHE = `rimikimi-thumbs-${VERSION}`;
 const DATA_CACHE = `rimikimi-data-${VERSION}`;
