@@ -33,6 +33,11 @@ function trackSignupIfNew(user) {
    rimikimi.com 은 별도 홈페이지라 앱은 Vercel 도메인을 사용. */
 const LEGAL_BASE = "https://rimikimi-app.vercel.app";
 
+// 정적 자산(컨셉 썸네일) 베이스.
+//  네이티브는 앱에 번들된 사본이 오래됐을 수 있으므로 서버(vercel)에서 직접 읽는다.
+//  → 새 컨셉을 올리면 재제출 없이 썸네일까지 바로 보인다.
+const ASSET_BASE = isNative() ? LEGAL_BASE : "";
+
 /* ── 백그라운드 생성 복구 ──────────────────────────────────
    이미지 생성은 서버(/api/generate)에서 돌아가고 완성되면 갤러리에 저장됨.
    근데 생성 중 앱을 백그라운드로 보내면 iOS 가 WebView(JS/fetch)를 얼려서,
@@ -674,19 +679,30 @@ export default function PortraitStudio() {
       .catch(() => {});
   }, [session?.access_token]);
 
-  // 컨셉 목록을 public/concepts.json 에서 불러옴 (앱 시작 시 1회)
+  // 컨셉 목록 로드 (앱 시작 시 1회)
+  //  네이티브는 "원격 우선" — 서버(vercel)의 최신 concepts.json 을 먼저 읽는다.
+  //  → 컨셉을 새로 올리면 앱 스토어 재제출 없이 즉시 반영됨(예전 server.url 모드와 동일 효과).
+  //  실패(오프라인 등)하면 앱에 번들된 사본으로 폴백.
   useEffect(() => {
     let cancelled = false;
-    fetch("/concepts.json", { cache: "no-cache" })
-      .then((r) => r.json())
-      .then((data) => {
-        if (cancelled) return;
-        if (Array.isArray(data)) setConcepts(data);
-        setConceptsLoading(false);
-      })
-      .catch(() => {
-        if (!cancelled) setConceptsLoading(false);
-      });
+    (async () => {
+      const urls = isNative()
+        ? [`${LEGAL_BASE}/concepts.json`, "/concepts.json"]
+        : ["/concepts.json"];
+      for (const url of urls) {
+        try {
+          const r = await fetch(url, { cache: "no-cache" });
+          const data = await r.json();
+          if (cancelled) return;
+          if (Array.isArray(data) && data.length) {
+            setConcepts(data);
+            setConceptsLoading(false);
+            return;
+          }
+        } catch (_) { /* 다음 후보로 폴백 */ }
+      }
+      if (!cancelled) setConceptsLoading(false);
+    })();
     return () => { cancelled = true; };
   }, []);
 
@@ -1803,7 +1819,7 @@ function GalleryScreen({
             <button key={p.id} className="cardIn" style={{ ...S.card, animationDelay: (i < 12 ? i * 0.035 : 0) + "s" }} onClick={() => onPick(p)}>
               <div style={S.thumb}>
                 <img
-                  src={`/thumbs/${p.id}.webp`}
+                  src={`${ASSET_BASE}/thumbs/${p.id}.webp`}
                   alt={localizedTitle(p)}
                   style={S.thumbImg}
                   loading="lazy"
@@ -1878,7 +1894,7 @@ function HomeLayout({ data, onPick, onMore, onBrooklyn }) {
                 aria-label={p.title}
               >
                 <img
-                  src={`/thumbs/${p.id}.webp`}
+                  src={`${ASSET_BASE}/thumbs/${p.id}.webp`}
                   alt={localizedTitle(p)}
                   style={S.featuredImg}
                   loading="lazy"
@@ -1911,7 +1927,7 @@ function HomeLayout({ data, onPick, onMore, onBrooklyn }) {
                 aria-label={p.title}
               >
                 <img
-                  src={`/thumbs/${p.id}.webp`}
+                  src={`${ASSET_BASE}/thumbs/${p.id}.webp`}
                   alt={localizedTitle(p)}
                   style={S.featuredImg}
                   loading="lazy"
@@ -1964,7 +1980,7 @@ function HomeLayout({ data, onPick, onMore, onBrooklyn }) {
                 aria-label={p.title}
               >
                 <img
-                  src={`/thumbs/${p.id}.webp`}
+                  src={`${ASSET_BASE}/thumbs/${p.id}.webp`}
                   alt={localizedTitle(p)}
                   style={S.railImg}
                   loading="lazy"
@@ -2439,7 +2455,7 @@ function ConfirmScreen({
         <div style={S.confirmArrow}>♥</div>
         {(prompt.id) ? (
           <img
-            src={`/thumbs/${prompt.id}.webp`}
+            src={`${ASSET_BASE}/thumbs/${prompt.id}.webp`}
             alt={localizedTitle(prompt)}
             style={S.confirmPhoto}
           />
