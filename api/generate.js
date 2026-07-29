@@ -301,36 +301,30 @@ export default async function handler(req, res) {
     : isIdPhoto
     ? idInstruction
     : isRestore
-    ? "Photographic restoration of a vintage photograph to modern quality.\n\n" +
-      "PRESERVE ABSOLUTELY EVERYTHING in the original image:\n" +
-      "- All subjects' faces, expressions, skin tones, and facial features\n" +
-      "- All clothing, accessories, and fabric details exactly as they appear\n" +
-      "- The exact composition, framing, and spatial layout\n" +
-      "- All subjects' poses, body language, and positioning\n" +
-      "- The background environment, setting, and all objects within it\n" +
-      "- The time period aesthetic of the scene itself\n\n" +
-      "ONLY UPDATE the following:\n" +
-      "- Image resolution and sharpness upgraded to 8K ultra-high definition\n" +
-      "- Grain, noise, and analog film artifacts fully removed\n" +
-      "- Faded or discolored tones restored to accurate, vivid natural colors\n" +
-      "- Dynamic range expanded — lifted shadows, recovered highlights\n" +
-      "- Rendered as if captured on a Sony A7R V mirrorless camera with a 85mm f/1.4 G Master lens, " +
-      "natural ambient lighting, zero digital noise\n\n" +
-      "The result must look like the exact same moment was photographed by a professional photographer " +
-      "using a top-tier 2024 full-frame mirrorless camera. No creative reinterpretation. No style " +
-      "changes. No subject alterations. A faithful, documentary-grade restoration — same scene, same " +
-      "people, same clothes, same background — simply brought into the modern era through photographic " +
-      "quality alone.\n\n" +
-      "If the original photograph is black and white, restore it with historically accurate, natural " +
-      "color. Do not oversaturate. Skin tones must appear lifelike and warm. Clothing colors should " +
-      "reflect the era's typical palette. Color as a documentary colorist would, not as an artist.\n\n" +
-      "If the original photograph contains physical damage such as scratches, tears, stains, or water " +
-      "marks, remove all damage artifacts completely. Reconstruct any missing areas using contextual " +
-      "inference to match the surrounding scene seamlessly. No trace of damage should remain.\n\n" +
-      "If this is a group or family photograph, every individual's identity must be preserved with " +
-      "equal fidelity. No face may be altered, smoothed beyond natural restoration, or changed in any " +
-      "way. Restore each person with the same level of detail and sharpness.\n\n" +
-      "Photorealistic. Hyper-detailed. True-to-life color accuracy."
+    ? "Re-photograph this old photo as if the very same person, in the very same pose and outfit, " +
+      "were photographed TODAY with a professional modern digital camera. The output must look like a " +
+      "brand-new photograph taken this year — NOT like a repaired old photo.\n\n" +
+      "KEEP EXACTLY THE SAME (identity must be unmistakable):\n" +
+      "- The person's face, bone structure, eyes, nose, mouth, facial proportions and age\n" +
+      "- Hairstyle, clothing, accessories and how they are worn\n" +
+      "- Pose, head angle, gaze direction, expression\n" +
+      "- Composition, crop and framing\n\n" +
+      "MAKE IT A MODERN PHOTOGRAPH:\n" +
+      "- Full natural color. If the original is black-and-white or sepia, render it in true, lifelike " +
+      "color with healthy warm skin tones — absolutely NO sepia cast, NO yellow/brown tint, NO faded look.\n" +
+      "- Clean neutral white balance and modern color grading, like a current studio portrait.\n" +
+      "- Crisp modern studio or soft daylight lighting with gentle falloff; bright, clean exposure.\n" +
+      "- Ultra-sharp focus with fine real detail: individual hair strands, natural skin texture with " +
+      "visible pores, fabric weave. Realistic depth of field with a smoothly rendered background.\n" +
+      "- Remove ALL age artifacts completely: film grain, noise, blur, scratches, creases, folds, tears, " +
+      "stains, dust, halation, vignetting, paper texture, borders and any print edges. None may remain.\n" +
+      "- Reconstruct damaged or missing areas naturally from context.\n\n" +
+      "STRICTLY AVOID anything that reads as 'old': no vintage filter, no film emulation, no muted or " +
+      "washed-out palette, no low resolution, no soft focus, no paper/print artifacts, no antique framing.\n\n" +
+      "If several people are in the photo, every person must be restored with equal fidelity and keep " +
+      "their own identity.\n\n" +
+      "Result: a high-resolution, photorealistic portrait indistinguishable from one shot today on a " +
+      "full-frame mirrorless camera with an 85mm f/1.4 lens — same person, same moment, modern photo."
     : skipFacePrecheck
     ? "Re-render the provided image in a new artistic style. " +
       "The subject can be a person, landscape, animal, object, or anything else. " +
