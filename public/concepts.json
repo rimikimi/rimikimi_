@@ -1,5 +1,16 @@
 [
 {
+"id": 408,
+"title": "옛날 사진 복원",
+"title_en": "Photo Restoration",
+"category": "🪄 매직 부스",
+"categories": [
+"🪄 매직 부스"
+],
+"text": "Restore this vintage photograph to modern quality while preserving everything exactly as it is.",
+"sensitive": false
+},
+{
 "id": 411,
 "title": "인생네컷 · 교복",
 "title_en": "Life Cut · School",
