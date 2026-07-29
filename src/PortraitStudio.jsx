@@ -9,6 +9,7 @@ import { t, useLang, getLang, localizedTitle, localizedCategory, getLangPreferen
 import LoginGate from "./LoginGate";
 import { shareImage, claimShareRewardApi } from "./share";
 import { track, setTrackUser } from "./track";
+import { noteGeneration, maybeRequestReview } from "./appReview";
 
 // ── 퍼널 계측: signup 은 로그인 이벤트만으로 구분 불가(OAuth 도 최초 1회는 SIGNED_IN) —
 // user.created_at 과 last_sign_in_at 이 아주 가까우면(첫 로그인) signup 으로 판정한다.
@@ -164,6 +165,10 @@ const perImageUsd = (pack) =>
   (parseFloat(pack.usd) / pack.count).toFixed(2);
 
 // 아트 변환 카테고리 = 본인 얼굴이 아닌 임의 사진을 별도로 업로드받는 컨셉.
+// 400번 이상 = 일반 화보 컨셉이 아니라 "기능" 컨셉(매직부스/복원/증명사진/인생네컷 프리셋).
+// 신규(NEW) 줄과 최신순 정렬에서 이들을 구분하는 기준.
+const FEATURE_ID_MIN = 400;
+
 const ART_CATEGORY = "🪄 매직 부스";
 function isArtConcept(concept) {
   if (!concept) return false;
@@ -889,8 +894,14 @@ export default function PortraitStudio() {
           p.text.toLowerCase().includes(q);
         return catOk && qOk;
       })
-      // 새로 들어온 컨셉이 먼저 보이게 (id 큰 순 = 최신순)
-      .sort((a, b) => b.id - a.id);
+      // 새로 들어온 컨셉이 먼저 보이게 (id 큰 순 = 최신순).
+      // 단 기능 컨셉(400번대)은 항상 id 가 커서 맨 앞을 차지하므로 뒤로 보낸다.
+      .sort((a, b) => {
+        const fa = a.id >= FEATURE_ID_MIN ? 1 : 0;
+        const fb = b.id >= FEATURE_ID_MIN ? 1 : 0;
+        if (fa !== fb) return fa - fb;
+        return b.id - a.id;
+      });
   }, [visiblePool, query, activeCat]);
 
   // 무한 스크롤 흉내 — 처음엔 30개, 스크롤 시 + 30개씩
@@ -983,6 +994,10 @@ export default function PortraitStudio() {
     if (isIdPhoto(p)) { setShowBrooklyn(true); return; }
     setNavDir("fwd");
     setSelected(p);
+    // 인생네컷 프리셋 카드(스타일이 지정된 컨셉)면 그 스타일을 미리 선택해 준다
+    if (p.fourcutStyle && FOURCUT_STYLES.some((s) => s.key === p.fourcutStyle)) {
+      setFourcutStyleKey(p.fourcutStyle);
+    }
     // 아트 변환 컨셉이면 이전 일회용 사진 비우고 들어감 (매번 새로 받음)
     if (isArtConcept(p)) setArtPhoto(null);
     setScreen("home"); // 컨셉 선택 후 사진 업로드 화면으로
@@ -1108,6 +1123,7 @@ export default function PortraitStudio() {
         if (typeof last?.quotaUsed === "number") setFreeUsed(last.quotaUsed);
         setRefreshTick((n) => n + 1); // 크레딧/잔여 정확히 재조회
         track("generate", { engine: last?.engine || null, concept: selected?.id ?? null });
+        noteGeneration(); // 리뷰 요청 조건(생성 2장 이상) 카운트만 올림 — 여기선 묻지 않음
         // 컷 중 하나라도 Pro 혼잡으로 base 폴백됐으면 고지 (무과금)
         if (results.some((r) => r?.busyFallback)) {
           setPayToast(t("engine.busyFallback"));
@@ -1165,6 +1181,7 @@ export default function PortraitStudio() {
       setResultImage(result.imageDataUrl);
       setResultGalleryId(result.galleryId || null); // 저장 시 원본(2K) 받으려고 보관
       track("generate", { engine: result.engine || null, concept: selected?.id ?? null });
+      noteGeneration(); // 리뷰 요청 조건(생성 2장 이상) 카운트만 올림 — 여기선 묻지 않음
       // 방금 생성이 무료(기본 엔진)이고 무료 Pro 체험이 남아있으면 비교 CTA 노출
       setCanTryPro(result.engine === "base" && !!result.proSampleAvailable);
       // 생성 직후 만료 10분 전 리마인드 푸시 예약 (갤러리를 안 열어도 동작)
@@ -1700,7 +1717,12 @@ function GalleryScreen({
       featured = [...featured, ...fill].slice(0, 5);
     }
     // 1.5) NEW: 최근 추가된 컨셉 (id 큰 순) — 추천과 같은 크기의 큰 카드 줄
-    const newest = [...pool].sort((a, b) => b.id - a.id).slice(0, 10);
+    //  ⚠️ 400번대는 "기능" 컨셉(매직부스/인생네컷/증명사진 등)이라 id 가 항상 커서 NEW 를 점령한다.
+    //     실제 신규 화보 컨셉만 보여주려고 기능 컨셉은 제외.
+    const newest = [...pool]
+      .filter((p) => p.id < FEATURE_ID_MIN)
+      .sort((a, b) => b.id - a.id)
+      .slice(0, 10);
 
     // 2) 카테고리별 컨셉 모음
     const byCat = new Map(); // catName -> { items, latestId }
@@ -2273,6 +2295,9 @@ function MyGalleryScreen({ accessToken, onBack, onShared }) {
     }
     setSaved(markSaved(it.id));
     cancelExpiryNotice(it.id); // 저장했으니 만료 알림 불필요
+    // 저장 = 결과가 마음에 들었다는 신호. 조건·쿨다운은 appReview.js 가 판단하므로
+    // 중복 요청되지 않는다. 토스트가 사라진 뒤 떠야 시트가 토스트를 가리지 않는다.
+    setTimeout(() => { maybeRequestReview(); }, 2600);
   }
 
   async function handleDelete(id) {
@@ -2737,6 +2762,12 @@ function ResultScreen({
       if (ok && galleryId) {
         markSaved(galleryId);
         cancelExpiryNotice(galleryId);
+      }
+      if (ok) {
+        // 저장 = 결과가 마음에 들었다는 신호. 이 타이밍에만 리뷰를 1회 요청한다.
+        // (조건·쿨다운은 appReview.js 가 판단. 실패해도 저장 흐름엔 영향 없음.)
+        // 토스트가 사라진 뒤 떠야 시트가 토스트를 가리지 않는다.
+        setTimeout(() => { maybeRequestReview(); }, 2600);
       }
     } finally {
       setSaving(false);
