@@ -272,15 +272,17 @@ export default async function handler(req, res) {
     newtro:    { mood: "bold NEWTRO 90s Korean photo-booth aesthetic, saturated primary colors with grainy flash, playful retro-modern vibe",
                  acc: "colorful retro hair clips", extra: "wearing bold 90s-style streetwear with color-blocking" },
   };
+  // 컷별 포즈 — 과장된 연출(V사인·윙크·놀란표정)은 뺐다. 실제로 연속 촬영한 것처럼
+  // 표정·시선·각도만 미묘하게 다른 자연스러운 프레임들.
   const FC_POSES = [
-    "looking at the camera with a bright natural smile",
-    "a playful candid pose with a cheerful expression",
-    "a cute V-sign (peace) hand gesture near the face",
-    "a soft gentle smile with the head slightly tilted",
-    "a fun, surprised, happy expression",
-    "a relaxed confident pose looking slightly off-camera",
-    "both hands lightly framing the face with a big joyful smile",
-    "a sweet wink with a warm expression",
+    "looking straight into the lens with a soft, relaxed closed-lip smile, shoulders at ease",
+    "caught mid-laugh in a natural unposed moment, eyes softly crinkled, looking slightly off to the side",
+    "head tilted just a little, calm gentle smile, chin lowered a touch",
+    "looking softly away from the camera with a faint, easy smile, as if glancing at something nearby",
+    "a quiet natural expression with soft eyes and lips barely parted, no forced smile",
+    "one hand resting lightly near the collarbone or jaw, unforced warm smile",
+    "shoulders turned slightly away with the face brought back toward the lens, natural relaxed smile",
+    "a warm genuine smile straight to camera, eyes bright and calm",
   ];
   const fc = FC_STYLE[fourcutStyle] || FC_STYLE.cute;
   const fcPose = FC_POSES[(Number(cutIndex) || 0) % FC_POSES.length];
@@ -289,6 +291,9 @@ export default async function handler(req, res) {
     "Keep their exact face, identity, facial features and natural likeness — clearly recognizable; do not change who they are or beautify them unnaturally. " +
     "Framing: a head-and-shoulders / upper-body portrait, the person centered and photogenic, filling the frame nicely for a photo-strip cut. " +
     "Pose & expression for THIS cut: " + fcPose + ". " +
+    "The expression and posture must look NATURAL and unforced — like a candid frame from a real " +
+    "photo session, not a posed studio shot. No exaggerated grins, no stiff or theatrical posing, " +
+    "no cheesy hand gestures unless explicitly described above. Subtle, believable, everyday. " +
     "The person is naturally wearing " + fc.acc + ", tastefully styled to suit them and matching the theme (it must look like a real worn accessory, not a sticker). " +
     // 테마 프리셋(교복/웨딩/파티 등)은 의상까지 바뀐다 — 프레임 색이 아니라 사진 자체가 달라지는 지점.
     (fc.extra ? "Wardrobe & styling for this theme: " + fc.extra + ". " : "") +
