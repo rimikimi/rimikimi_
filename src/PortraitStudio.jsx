@@ -3,7 +3,7 @@ import { supabase } from "./supabaseClient";
 import { isNative, platform, nativePickPhoto, nativeShare, nativeSaveToAlbum } from "./nativeBridge";
 import { initAds, showInterstitial } from "./ads";
 import { initIap, loginIap, logoutIap, getIapPacks, purchaseIap, restoreIap, iapAvailable, isSubscription, getIapDiag } from "./iap";
-import { FOURCUT_COUNTS, FOURCUT_STYLES, composeStrip, todayStr } from "./fourcut";
+import { FOURCUT_COUNTS, FOURCUT_STYLES, composeStrip, todayStr, fourcutStyle } from "./fourcut";
 import { getSavedSet, markSaved, syncExpiryNotifications, cancelExpiryNotice } from "./notify";
 import { t, useLang, getLang, localizedTitle, localizedCategory, getLangPreference, setLang } from "./i18n";
 import LoginGate from "./LoginGate";
@@ -1113,11 +1113,35 @@ export default function PortraitStudio() {
           todayStr()
         );
         setResultImage(strip);
-        // 각 컷도 갤러리에 개별 보관 → 만료 10분 전 리마인드 푸시 예약
-        const cutItems = results
-          .filter((r) => r?.galleryId && r?.galleryExpiresAt)
-          .map((r) => ({ id: r.galleryId, expiresAt: r.galleryExpiresAt, conceptTitle: selected.title }));
-        if (cutItems.length) syncExpiryNotifications(cutItems, getSavedSet());
+        // ⚠️ 인생네컷의 결과물은 "스트립 1장"이다. 컷 N장은 합성 재료일 뿐이라
+        //    갤러리(내 사진)에 개별로 남기면 안 된다 → 스트립을 올리고 컷은 서버에서 정리.
+        const cutIds = results.map((r) => r?.galleryId).filter(Boolean);
+        try {
+          const up = await fetch("/api/gallery", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: "Bearer " + accessToken },
+            body: JSON.stringify({
+              base64: strip.split(",")[1],
+              mimeType: "image/jpeg",
+              conceptId: selected.id,
+              // 410(일반 인생네컷)은 제목에 스타일이 없으니 붙여준다. 411~418은 이미 포함.
+              conceptTitle: selected.fourcutStyle
+                ? selected.title
+                : `${selected.title} · ${fourcutStyle(fourcutStyleKey).label}`,
+              replaceIds: cutIds,
+            }),
+          });
+          const uj = await up.json();
+          if (uj?.id && uj?.expiresAt) {
+            // 만료 10분 전 리마인드 푸시는 스트립 1건에만
+            syncExpiryNotifications(
+              [{ id: uj.id, expiresAt: uj.expiresAt, conceptTitle: selected.title }],
+              getSavedSet()
+            );
+          }
+        } catch (_) {
+          // 스트립 보관 실패해도 화면의 결과물은 그대로 저장 가능 (컷은 서버에 남아 만료로 사라짐)
+        }
         const last = results[results.length - 1];
         if (typeof last?.unlimited === "boolean") setUnlimited(last.unlimited);
         if (typeof last?.quotaUsed === "number") setFreeUsed(last.quotaUsed);
@@ -2753,7 +2777,7 @@ function ResultScreen({
         // 웹: 앵커 다운로드
         const a = document.createElement("a");
         a.href = toSave;
-        a.download = filename + ".png";
+        a.download = filename + (/^data:image\/jpe?g/i.test(toSave) ? ".jpg" : ".png");
         document.body.appendChild(a);
         a.click();
         a.remove();

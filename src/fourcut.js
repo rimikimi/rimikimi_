@@ -42,15 +42,31 @@ export function todayStr() {
   return `${d.getFullYear()}.${p(d.getMonth() + 1)}.${p(d.getDate())}`;
 }
 
-// images: dataURL[] (length === count). 반환: 합성된 스트립 dataURL(PNG)
+// images: dataURL[] (length === count). 반환: 합성된 스트립 dataURL(JPEG)
+//
+// ⚠️ 인생네컷의 "결과물"은 컷 N장이 아니라 합성된 스트립 1장이다.
+//    그래서 해상도를 최대한 확보한다 — 기본 설계(셀 560px)를 전체 픽셀수가
+//    약 4.2MP(≈2K급)가 되도록 스케일업하되, 원본 컷(1024px)보다 크게 늘려
+//    뿌옇게 만들지 않도록 셀 너비는 1024px 로 캡한다.
+const TARGET_PX = 4.2e6;
+const MAX_CELL_W = 1024;
+
 export async function composeStrip(images, styleKey, count, dateStr) {
   const st = fourcutStyle(styleKey);
   const [cols, rows] = gridFor(count);
-  const CELL_W = 560;
+
+  // 기본(1x) 설계 치수
+  const B_CELL = 560, B_GAP = 16, B_PAD = 28, B_FOOT = 96;
+  const baseW = B_PAD * 2 + cols * B_CELL + (cols - 1) * B_GAP;
+  const baseH = B_PAD + rows * Math.round((B_CELL * 4) / 3) + (rows - 1) * B_GAP + B_FOOT;
+  const k = Math.max(1, Math.min(Math.sqrt(TARGET_PX / (baseW * baseH)), MAX_CELL_W / B_CELL));
+
+  const CELL_W = Math.round(B_CELL * k);
   const CELL_H = Math.round((CELL_W * 4) / 3); // 3:4 컷
-  const GAP = 16;
-  const PAD = 28;
-  const FOOTER = 96;
+  const GAP = Math.round(B_GAP * k);
+  const PAD = Math.round(B_PAD * k);
+  const FOOTER = Math.round(B_FOOT * k);
+  const R = Math.round(12 * k); // 컷 모서리 라운드
   const W = PAD * 2 + cols * CELL_W + (cols - 1) * GAP;
   const H = PAD + rows * CELL_H + (rows - 1) * GAP + FOOTER;
 
@@ -71,16 +87,16 @@ export async function composeStrip(images, styleKey, count, dateStr) {
     const y = PAD + r * (CELL_H + GAP);
     // 컷 배경 + 사진 (cover crop, 라운드)
     g.fillStyle = st.cell;
-    roundRect(g, x, y, CELL_W, CELL_H, 12);
+    roundRect(g, x, y, CELL_W, CELL_H, R);
     g.fill();
     const img = imgs[i % imgs.length];
-    if (img) drawCover(g, img, x, y, CELL_W, CELL_H, 12);
+    if (img) drawCover(g, img, x, y, CELL_W, CELL_H, R);
     // 컷 모서리 스티커
     const s = st.stickers[i % st.stickers.length];
-    g.font = "44px 'Apple Color Emoji','Segoe UI Emoji',sans-serif";
+    g.font = `${Math.round(44 * k)}px 'Apple Color Emoji','Segoe UI Emoji',sans-serif`;
     g.textBaseline = "top";
     g.textAlign = "left";
-    g.fillText(s, x + 12, y + 10);
+    g.fillText(s, x + Math.round(12 * k), y + Math.round(10 * k));
   }
 
   // 하단 푸터: rimikimi + 날짜
@@ -88,13 +104,14 @@ export async function composeStrip(images, styleKey, count, dateStr) {
   g.textBaseline = "middle";
   g.fillStyle = st.text;
   g.textAlign = "left";
-  g.font = "700 40px 'Quicksand','Jua',sans-serif";
-  g.fillText("rimikimi", PAD + 4, fy + FOOTER / 2);
+  g.font = `700 ${Math.round(40 * k)}px 'Quicksand','Jua',sans-serif`;
+  g.fillText("rimikimi", PAD + Math.round(4 * k), fy + FOOTER / 2);
   g.textAlign = "right";
-  g.font = "500 28px 'Quicksand','Jua',sans-serif";
-  g.fillText(dateStr || todayStr(), W - PAD - 4, fy + FOOTER / 2);
+  g.font = `500 ${Math.round(28 * k)}px 'Quicksand','Jua',sans-serif`;
+  g.fillText(dateStr || todayStr(), W - PAD - Math.round(4 * k), fy + FOOTER / 2);
 
-  return c.toDataURL("image/png");
+  // PNG 는 4~5MP 사진 합성물에서 20MB를 넘겨 업로드가 막힌다 → JPEG.
+  return c.toDataURL("image/jpeg", 0.9);
 }
 
 function loadImg(src) {
