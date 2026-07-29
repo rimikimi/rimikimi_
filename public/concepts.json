@@ -1,105 +1,105 @@
 [
 {
 "id": 411,
-"title": "인생네컷 · 큐티",
-"title_en": "Life Cut · Cute",
+"title": "인생네컷 · 교복",
+"title_en": "Life Cut · School",
 "category": "📸 인생네컷",
 "categories": [
 "📸 인생네컷"
 ],
 "mode": "fourcut",
-"fourcutStyle": "cute",
+"fourcutStyle": "school",
 "text": "",
 "sensitive": false
 },
 {
 "id": 412,
-"title": "인생네컷 · 럭셔리",
-"title_en": "Life Cut · Luxury",
+"title": "인생네컷 · 커플",
+"title_en": "Life Cut · Couple",
 "category": "📸 인생네컷",
 "categories": [
 "📸 인생네컷"
 ],
 "mode": "fourcut",
-"fourcutStyle": "luxury",
+"fourcutStyle": "couple",
 "text": "",
 "sensitive": false
 },
 {
 "id": 413,
-"title": "인생네컷 · 펑키",
-"title_en": "Life Cut · Funky",
+"title": "인생네컷 · 웨딩",
+"title_en": "Life Cut · Wedding",
 "category": "📸 인생네컷",
 "categories": [
 "📸 인생네컷"
 ],
 "mode": "fourcut",
-"fourcutStyle": "funky",
+"fourcutStyle": "wedding",
 "text": "",
 "sensitive": false
 },
 {
 "id": 414,
-"title": "인생네컷 · 플레이풀",
-"title_en": "Life Cut · Playful",
+"title": "인생네컷 · 파티",
+"title_en": "Life Cut · Party",
 "category": "📸 인생네컷",
 "categories": [
 "📸 인생네컷"
 ],
 "mode": "fourcut",
-"fourcutStyle": "playful",
+"fourcutStyle": "party",
 "text": "",
 "sensitive": false
 },
 {
 "id": 415,
-"title": "인생네컷 · 버스데이",
-"title_en": "Life Cut · Birthday",
-"category": "📸 인생네컷",
-"categories": [
-"📸 인생네컷"
-],
-"mode": "fourcut",
-"fourcutStyle": "birthday",
-"text": "",
-"sensitive": false
-},
-{
-"id": 416,
-"title": "인생네컷 · 필름",
-"title_en": "Life Cut · Film",
-"category": "📸 인생네컷",
-"categories": [
-"📸 인생네컷"
-],
-"mode": "fourcut",
-"fourcutStyle": "film",
-"text": "",
-"sensitive": false
-},
-{
-"id": 417,
-"title": "인생네컷 · 썸머",
+"title": "인생네컷 · 여름",
 "title_en": "Life Cut · Summer",
 "category": "📸 인생네컷",
 "categories": [
 "📸 인생네컷"
 ],
 "mode": "fourcut",
-"fourcutStyle": "summer",
+"fourcutStyle": "beach",
 "text": "",
 "sensitive": false
 },
 {
-"id": 418,
-"title": "인생네컷 · 모노",
-"title_en": "Life Cut · Mono",
+"id": 416,
+"title": "인생네컷 · 빈티지",
+"title_en": "Life Cut · Vintage",
 "category": "📸 인생네컷",
 "categories": [
 "📸 인생네컷"
 ],
 "mode": "fourcut",
-"fourcutStyle": "mono",
+"fourcutStyle": "vintage",
+"text": "",
+"sensitive": false
+},
+{
+"id": 417,
+"title": "인생네컷 · 크리스마스",
+"title_en": "Life Cut · Christmas",
+"category": "📸 인생네컷",
+"categories": [
+"📸 인생네컷"
+],
+"mode": "fourcut",
+"fourcutStyle": "christmas",
+"text": "",
+"sensitive": false
+},
+{
+"id": 418,
+"title": "인생네컷 · 뉴트로",
+"title_en": "Life Cut · Newtro",
+"category": "📸 인생네컷",
+"categories": [
+"📸 인생네컷"
+],
+"mode": "fourcut",
+"fourcutStyle": "newtro",
 "text": "",
 "sensitive": false
 },

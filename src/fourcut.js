@@ -17,6 +17,15 @@ export const FOURCUT_STYLES = [
   { key: "film",     label: "필름",     emoji: "🎞", bg: "#efe9dc", cell: "#fffdf7", accent: "#a89272", text: "#7b6a4f", stickers: ["✶", "◦", "❍", "✧"] },
   { key: "summer",   label: "썸머",     emoji: "🌊", bg: "#dff1fb", cell: "#ffffff", accent: "#4bb8e8", text: "#2b86b5", stickers: ["🌊", "🐚", "🌴", "☀"] },
   { key: "mono",     label: "모노",     emoji: "◻️", bg: "#f2f2f2", cell: "#ffffff", accent: "#8a8a8a", text: "#3a3a3a", stickers: ["◦", "◻", "✕", "／"] },
+  // ── 테마 프리셋: 프레임뿐 아니라 "찍히는 사진"(의상·배경)이 달라진다 (서버 FC_STYLE 과 key 1:1) ──
+  { key: "school",    label: "교복",       emoji: "🎒", bg: "#e8eefc", cell: "#ffffff", accent: "#3b5fb5", text: "#2b4790", stickers: ["✎", "★", "◦", "✿"] },
+  { key: "couple",    label: "커플",       emoji: "💑", bg: "#ffe9ec", cell: "#ffffff", accent: "#ff7a90", text: "#d64b66", stickers: ["♥", "♡", "✧", "❥"] },
+  { key: "wedding",   label: "웨딩",       emoji: "💍", bg: "#f7f1e6", cell: "#fffdf8", accent: "#c9a227", text: "#9a7b1f", stickers: ["✦", "❀", "◇", "✧"] },
+  { key: "party",     label: "파티",       emoji: "🥂", bg: "#1b1430", cell: "#ffffff", accent: "#c9a7ff", text: "#e6d6ff", stickers: ["✧", "★", "✦", "❉"] },
+  { key: "beach",     label: "여름",       emoji: "🏖", bg: "#d9f2ea", cell: "#ffffff", accent: "#2fb39a", text: "#1e8874", stickers: ["🐚", "☀", "🌊", "✺"] },
+  { key: "vintage",   label: "빈티지",     emoji: "📻", bg: "#f0e2cc", cell: "#fffaf0", accent: "#b07d3a", text: "#8a5f27", stickers: ["✶", "◍", "❖", "✧"] },
+  { key: "christmas", label: "크리스마스", emoji: "🎄", bg: "#f6e2e2", cell: "#ffffff", accent: "#c0392b", text: "#1f6b3a", stickers: ["🎄", "❄", "🎁", "★"] },
+  { key: "newtro",    label: "뉴트로",     emoji: "🕹", bg: "#fff0d6", cell: "#ffffff", accent: "#ff5a3c", text: "#1f4fd8", stickers: ["★", "▲", "●", "■"] },
 ];
 
 export function fourcutStyle(key) {

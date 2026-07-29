@@ -253,6 +253,24 @@ export default async function handler(req, res) {
     film:     { mood: "nostalgic 90s FILM photography aesthetic, warm faded beige tones, soft grain and gentle halation, timeless analog vibe", acc: "a simple thin hair ribbon" },
     summer:   { mood: "fresh SUMMER vacation aesthetic, bright aqua and sky-blue tones, sunlit airy highlights, breezy cheerful vibe", acc: "a woven straw sun visor" },
     mono:     { mood: "clean MONOCHROME editorial aesthetic, crisp black-and-white tones with soft gray gradients, minimal timeless vibe", acc: "a sleek minimal hair clip" },
+
+    // ── 테마 프리셋: 프레임 색이 아니라 "찍히는 사진"(의상·배경·무드)이 달라진다 ──
+    school:    { mood: "youthful SCHOOL-UNIFORM photo-booth aesthetic, clean navy-and-white palette, bright classroom daylight, fresh nostalgic student vibe",
+                 acc: "a neat school uniform with a navy blazer and ribbon tie", extra: "wearing a crisp school uniform, tidy collar and ribbon" },
+    couple:    { mood: "warm ROMANTIC couple photo-booth aesthetic, soft blush and cream tones, cozy intimate lighting, sweet affectionate vibe",
+                 acc: "a delicate heart hairpin", extra: "styled for a romantic date look, soft knit or neat blouse" },
+    wedding:   { mood: "elegant WEDDING photo-booth aesthetic, ivory and champagne tones, luminous soft studio light, graceful bridal vibe",
+                 acc: "a fine pearl-and-crystal hairpiece", extra: "wearing an elegant ivory bridal dress with a clean neckline" },
+    party:     { mood: "glamorous NIGHT PARTY photo-booth aesthetic, deep jewel tones with sparkling bokeh lights, on-camera flash look, lively festive vibe",
+                 acc: "sparkling drop earrings", extra: "wearing a chic sequin or satin party dress" },
+    beach:     { mood: "sunny BEACH VACATION photo-booth aesthetic, turquoise and sand tones, bright sunlit highlights, breezy carefree vibe",
+                 acc: "a woven straw hat", extra: "wearing a light summer dress or resort top, sun-kissed glow" },
+    vintage:   { mood: "retro VINTAGE 70s photo-booth aesthetic, warm amber and mustard tones, soft film grain, nostalgic analog vibe",
+                 acc: "a patterned silk headscarf", extra: "wearing retro-styled clothing with vintage patterns" },
+    christmas: { mood: "cozy CHRISTMAS photo-booth aesthetic, deep red and evergreen tones with warm string-light bokeh, festive holiday vibe",
+                 acc: "a soft red santa-hat headband", extra: "wearing a cozy knit sweater in holiday colors" },
+    newtro:    { mood: "bold NEWTRO 90s Korean photo-booth aesthetic, saturated primary colors with grainy flash, playful retro-modern vibe",
+                 acc: "colorful retro hair clips", extra: "wearing bold 90s-style streetwear with color-blocking" },
   };
   const FC_POSES = [
     "looking at the camera with a bright natural smile",
@@ -272,6 +290,8 @@ export default async function handler(req, res) {
     "Framing: a head-and-shoulders / upper-body portrait, the person centered and photogenic, filling the frame nicely for a photo-strip cut. " +
     "Pose & expression for THIS cut: " + fcPose + ". " +
     "The person is naturally wearing " + fc.acc + ", tastefully styled to suit them and matching the theme (it must look like a real worn accessory, not a sticker). " +
+    // 테마 프리셋(교복/웨딩/파티 등)은 의상까지 바뀐다 — 프레임 색이 아니라 사진 자체가 달라지는 지점.
+    (fc.extra ? "Wardrobe & styling for this theme: " + fc.extra + ". " : "") +
     "Overall aesthetic: " + fc.mood + ". " +
     "Background: a simple, clean, fairly uniform studio-style background that fits the theme, so the cut composites cleanly into a photo strip. " +
     "Bright, clean, flattering lighting. Sharp focus, photorealistic, true-to-life skin. Exactly one person in frame.";
