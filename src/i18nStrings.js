@@ -90,6 +90,8 @@ export const STR = {
     "step3.peek": "선택한 컨셉으로 내 얼굴 특징을 살린 이미지를 만들어 드려요.",
     // 매직 부스는 "내 얼굴"이 아니라 업로드한 임의의 사진을 변환한다
     "step3.peekArt": "업로드하신 사진을 선택한 컨셉으로 변환해 드려요.",
+    // 안드로이드 뒤로가기 — 최상위에서 한 번 더 눌러야 종료
+    "nav.exitHint": "한 번 더 누르면 종료돼요",
 
     // === 생성 결과 ===
     "result.generating": "이미지를 만들고 있어요",
@@ -319,6 +321,7 @@ export const STR = {
     "step3.peek":
       "We'll generate a portrait in this concept while keeping your face features.",
     "step3.peekArt": "We'll transform the photo you uploaded with the selected concept.",
+    "nav.exitHint": "Press back again to exit",
 
     "result.generating": "Creating your image",
     "result.generatingHint": "This may take up to 30 seconds",

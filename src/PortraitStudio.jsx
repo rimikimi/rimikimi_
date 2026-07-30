@@ -1098,6 +1098,37 @@ export default function PortraitStudio() {
     if (dx > 70 && Math.abs(dy) < 55) goBack();
   }
 
+  // ── 안드로이드 하드웨어/제스처 뒤로가기 ──
+  // 리스너를 등록하지 않으면 Capacitor 기본 동작이 그냥 "앱 종료" 라서,
+  // 업로드/생성 화면에서 뒤로 누르면 앱이 꺼지고 일회용 사진도 날아갔다.
+  // 열려 있는 모달 → 화면 스택(goBack) → 최상위에선 한 번 더 눌러야 종료.
+  const backRef = useRef(() => "exit");
+  backRef.current = () => {
+    if (showBrooklyn) { setShowBrooklyn(false); return "handled"; }
+    return goBack() ? "handled" : "exit";
+  };
+  useEffect(() => {
+    if (!isNative() || platform() !== "android") return;
+    let sub, timer;
+    let armed = false; // 종료 확인 대기 중
+    (async () => {
+      const { App } = await import("@capacitor/app");
+      sub = await App.addListener("backButton", () => {
+        if (backRef.current() === "handled") {
+          armed = false;
+          clearTimeout(timer);
+          setPayToast("");
+          return;
+        }
+        if (armed) { App.exitApp(); return; }
+        armed = true;
+        setPayToast(t("nav.exitHint"));
+        timer = setTimeout(() => { armed = false; setPayToast(""); }, 2000);
+      });
+    })();
+    return () => { if (sub) sub.remove(); clearTimeout(timer); };
+  }, []);
+
   // 뒤로가기 애니메이션이 재생될 시간을 준 뒤 방향을 정방향으로 리셋
   useEffect(() => {
     if (navDir !== "back") return;
