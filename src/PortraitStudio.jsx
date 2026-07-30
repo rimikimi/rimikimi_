@@ -196,6 +196,17 @@ function isArtConcept(concept) {
   return cats.includes(ART_CATEGORY);
 }
 
+// 커플 = 참조 사진이 2장(본인 + 상대) 필요한 컨셉.
+// 프롬프트가 "the woman from the first reference image / the man from the second"
+// 형태라 두 장을 순서대로 보내야 한다.
+const COUPLE_CATEGORY = "커플";
+function isCoupleConcept(concept) {
+  if (!concept) return false;
+  if (concept.mode === "couple") return true;
+  const cats = concept.categories || (concept.category ? [concept.category] : []);
+  return cats.includes(COUPLE_CATEGORY);
+}
+
 // 증명사진 = 정장색/배경색을 사용자가 고르는 특수 컨셉.
 function isIdPhoto(concept) {
   if (!concept) return false;
@@ -341,6 +352,21 @@ async function generateImage(accessToken, dataUrl, promptText, conceptMeta = {})
   const mimeType = m[1];
   const base64 = m[2];
 
+  // 커플 컨셉: 두 번째 참조 사진(상대)도 같은 방식으로 축소해서 함께 보냄
+  let mimeType2 = null, base64_2 = null;
+  if (conceptMeta.photo2) {
+    let sendUrl2;
+    try {
+      sendUrl2 = await shrinkImage(conceptMeta.photo2, 1024, 0.85);
+    } catch (_) {
+      sendUrl2 = conceptMeta.photo2;
+    }
+    const m2 = sendUrl2.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
+    if (!m2) throw new Error("상대 사진 형식을 읽을 수 없어요.");
+    mimeType2 = m2[1];
+    base64_2 = m2[2];
+  }
+
   let res;
   try {
     res = await fetch("/api/generate", {
@@ -351,6 +377,8 @@ async function generateImage(accessToken, dataUrl, promptText, conceptMeta = {})
       },
       body: JSON.stringify({
         mimeType, base64, prompt: promptText,
+        // 커플: 두 번째 참조 사진 (없으면 필드 자체를 안 보냄)
+        ...(base64_2 ? { mimeType2, base64_2, couple: true } : {}),
         conceptId: conceptMeta.id, conceptTitle: conceptMeta.title,
         skipFacePrecheck: !!conceptMeta.skipFacePrecheck,
         // 증명사진: 선택한 정장/배경 (서버가 프롬프트 조립)
@@ -514,6 +542,13 @@ export default function PortraitStudio() {
   });
   // 아트 변환 컨셉용 일회용 사진. localStorage 안 함 (휘발성).
   const [artPhoto, setArtPhoto] = useState(null);
+  // 커플 컨셉용 "상대 사진". 본인 사진(photo)과 완전히 분리된 슬롯이라
+  // 절대 프로필을 덮어쓰지 않는다. 매번 새로 올리기 번거로우니 저장은 해둔다.
+  const [partnerPhoto, setPartnerPhoto] = useState(() => {
+    try {
+      return localStorage.getItem("rimikimi_partner_photo") || null;
+    } catch { return null; }
+  });
   // 증명사진 옵션 (정장색 key / 배경 hex)
   const [idSuit, setIdSuit] = useState(ID_SUITS[0].key);
   const [idBg, setIdBg] = useState(ID_BGS[0].hex);
@@ -577,6 +612,14 @@ export default function PortraitStudio() {
       else localStorage.removeItem("rimikimi_photo");
     } catch { /* quota 초과 등은 무시 */ }
   }, [photo]);
+
+  // 상대 사진도 같은 방식으로 보관 (별도 키 — 프로필과 절대 섞이지 않는다)
+  useEffect(() => {
+    try {
+      if (partnerPhoto) localStorage.setItem("rimikimi_partner_photo", partnerPhoto);
+      else localStorage.removeItem("rimikimi_partner_photo");
+    } catch { /* quota 초과 등은 무시 */ }
+  }, [partnerPhoto]);
 
   // 페이지 로드 시 현재 세션 확인 + 이후 변경 감지
   useEffect(() => {
@@ -853,6 +896,7 @@ export default function PortraitStudio() {
     // 메인 화면 상태 초기화
     setScreen("home");
     setPhoto(null);
+    setPartnerPhoto(null); // 상대 사진도 남기지 않는다
     setSelected(null);
     setResultImage(null);
   }
@@ -1025,6 +1069,7 @@ export default function PortraitStudio() {
     const reader = new FileReader();
     reader.onload = () => {
       if (target === "art") setArtPhoto(reader.result);
+      else if (target === "partner") setPartnerPhoto(reader.result);
       else setPhoto(reader.result);
       reset();
     };
@@ -1045,7 +1090,10 @@ export default function PortraitStudio() {
     if (isArtConcept(p)) setArtPhoto(null);
     // 동의 문구가 바뀌면(본인 사진 ↔ 타인 사진 권리) 체크도 다시 받아야 한다.
     // 안 그러면 매직 부스에 들어갔는데 "타인 사진 동의 받았습니다" 가 이미 체크돼 있다.
-    if (isArtConcept(p) !== isArtConcept(selected)) setAgeConfirmed(false);
+    if (
+      isArtConcept(p) !== isArtConcept(selected) ||
+      isCoupleConcept(p) !== isCoupleConcept(selected)
+    ) setAgeConfirmed(false);
     setScreen("home"); // 컨셉 선택 후 사진 업로드 화면으로
   }
 
@@ -1143,6 +1191,13 @@ export default function PortraitStudio() {
     if (!(needArt ? artPhoto : photo)) {
       setScreen("home");
       setPayToast(needArt ? "먼저 변환할 사진을 올려주세요 🙂" : "먼저 사진을 올려주세요 🙂");
+      setTimeout(() => setPayToast(""), 3000);
+      return;
+    }
+    // 커플 컨셉은 두 사람 사진이 다 있어야 생성된다
+    if (isCoupleConcept(selected) && !partnerPhoto) {
+      setScreen("home");
+      setPayToast(t("couple.needPartner"));
       setTimeout(() => setPayToast(""), 3000);
       return;
     }
@@ -1284,6 +1339,8 @@ export default function PortraitStudio() {
         title: selected.title,
         // 아트 변환은 풍경/물건 등 얼굴 없는 사진도 가능해야 하므로 face precheck 우회
         skipFacePrecheck: art,
+        // 커플: 두 번째 참조 사진(상대)
+        ...(isCoupleConcept(selected) && partnerPhoto ? { photo2: partnerPhoto } : {}),
         ...idMeta,
       };
       // 무료 Pro 체험 재호출용 입력 보관 (인생네컷 제외 — 단일 컷만 비교)
@@ -1403,14 +1460,16 @@ export default function PortraitStudio() {
   //   "profile" = 내 사진(프로필). localStorage 에 저장되고 헤더 아바타로도 쓰인다.
   //   "art"     = 매직 부스처럼 "이번 1회 생성"에만 쓰는 휘발성 사진.
   //               프로필을 절대 건드리면 안 된다.
+  //   "partner" = 커플 컨셉의 "상대 사진". 이것도 프로필과 별개 슬롯이다.
   async function pickPhoto(target = "profile") {
-    const slot = target === "art" ? "art" : "profile";
+    const slot = ["art", "partner"].includes(target) ? target : "profile";
     photoTargetRef.current = slot; // 웹 file input(handleFile)이 읽는다
     if (isNative()) {
       const dataUrl = await nativePickPhoto("prompt");
       if (!dataUrl) return;
       // ref 가 아니라 이 호출이 캡처한 slot 을 쓴다 (시트가 열린 사이 ref 가 바뀔 수 있음)
       if (slot === "art") setArtPhoto(dataUrl);
+      else if (slot === "partner") setPartnerPhoto(dataUrl);
       else setPhoto(dataUrl);
       return;
     }
@@ -1496,6 +1555,7 @@ export default function PortraitStudio() {
       <main style={S.main} ref={mainRef}>
         {screen === "home" && (() => {
           const art = isArtConcept(selected);
+          const couple = isCoupleConcept(selected);
           const currentPhoto = art ? artPhoto : photo;
           const onPickAny = () => pickPhoto(art ? "art" : "profile");
           const onClearAny = () => {
@@ -1505,9 +1565,12 @@ export default function PortraitStudio() {
           return (
             <HomeScreen
               isArt={art}
+              isCouple={couple}
               photo={currentPhoto}
               onPick={onPickAny}
               onClear={onClearAny}
+              partnerPhoto={partnerPhoto}
+              onPickPartner={() => pickPhoto("partner")}
               ageConfirmed={ageConfirmed}
               setAgeConfirmed={setAgeConfirmed}
               onContinue={() => setScreen("confirm")}
@@ -1547,6 +1610,7 @@ export default function PortraitStudio() {
           <ConfirmScreen
             photo={isArtConcept(selected) ? artPhoto : photo}
             art={isArtConcept(selected)}
+            partnerPhoto={isCoupleConcept(selected) ? partnerPhoto : null}
             prompt={selected}
             freeLeft={freeLeft}
             credits={credits}
@@ -1702,8 +1766,9 @@ function HomeScreen({
   photo, onPick, onClear,
   ageConfirmed, setAgeConfirmed, onContinue, onBack,
   isArt = false, showAds = false,
+  isCouple = false, partnerPhoto = null, onPickPartner,
 }) {
-  const ready = photo && ageConfirmed;
+  const ready = photo && (!isCouple || partnerPhoto) && ageConfirmed;
   return (
     <div className="fade">
       <div style={S.navRow}>
@@ -1729,6 +1794,15 @@ function HomeScreen({
               {t("art.hero.desc4")}
             </p>
           </>
+        ) : isCouple ? (
+          <>
+            <h1 style={S.heroTitle}>{t("couple.hero.title")}</h1>
+            <p style={S.heroDesc}>
+              {t("couple.hero.desc1")}<br />
+              {t("couple.hero.desc2")}<br />
+              {t("couple.hero.desc3")}
+            </p>
+          </>
         ) : (
           <>
             <h1 style={S.heroTitle}>{t("step2.heroTitle")}</h1>
@@ -1742,7 +1816,23 @@ function HomeScreen({
         )}
       </div>
 
-      {!photo ? (
+      {isCouple ? (
+        <>
+          <div style={S.coupleRow}>
+            <CoupleSlot
+              label={t("couple.slotMe")}
+              photo={photo}
+              onPick={onPick}
+            />
+            <CoupleSlot
+              label={t("couple.slotPartner")}
+              photo={partnerPhoto}
+              onPick={onPickPartner}
+            />
+          </div>
+          <p style={S.coupleHint}>{t("couple.slotHint")}</p>
+        </>
+      ) : !photo ? (
         <button style={S.uploadBox} onClick={onPick}>
           <div style={S.uploadIcon}>＋</div>
           <div style={S.uploadText}>{t("step2.uploadCta")}</div>
@@ -1767,7 +1857,7 @@ function HomeScreen({
           style={S.checkbox}
         />
         <span style={S.consentText}>
-          {isArt ? t("art.consent") : t("step2.consent")}
+          {isArt ? t("art.consent") : isCouple ? t("couple.consent") : t("step2.consent")}
         </span>
       </label>
 
@@ -1783,6 +1873,27 @@ function HomeScreen({
 
       {showAds && <AdSlot />}
     </div>
+  );
+}
+
+/* ============================================================
+   커플 컨셉 사진 슬롯 (내 사진 / 상대 사진)
+   ============================================================ */
+function CoupleSlot({ label, photo, onPick }) {
+  return (
+    <button style={S.coupleSlot} onClick={onPick}>
+      <div style={S.coupleSlotLabel}>{label}</div>
+      <div style={S.coupleSlotBox}>
+        {photo ? (
+          <img src={photo} alt={label} style={S.coupleSlotImg} />
+        ) : (
+          <span style={S.coupleSlotPlus}>＋</span>
+        )}
+      </div>
+      <div style={S.coupleSlotAction}>
+        {photo ? t("step2.changePhoto") : t("step2.uploadCta")}
+      </div>
+    </button>
   );
 }
 
@@ -2581,7 +2692,7 @@ function ConfirmScreen({
   photo, prompt, freeLeft, credits, canGenerate, art,
   idPhoto, idSuit, setIdSuit, idBg, setIdBg,
   fourcut, fourcutCount, setFourcutCount, fourcutStyleKey, setFourcutStyleKey,
-  onBack, onGenerate, onStore,
+  onBack, onGenerate, onStore, partnerPhoto = null,
 }) {
   const useFree = freeLeft > 0;
   return (
@@ -2595,7 +2706,14 @@ function ConfirmScreen({
       </div>
 
       <div style={S.confirmPreview}>
-        <img src={photo} alt={t("profile.kicker")} style={S.confirmPhoto} />
+        {partnerPhoto ? (
+          <div style={S.confirmPair}>
+            <img src={photo} alt={t("couple.slotMe")} style={S.confirmPairImg} />
+            <img src={partnerPhoto} alt={t("couple.slotPartner")} style={S.confirmPairImg} />
+          </div>
+        ) : (
+          <img src={photo} alt={t("profile.kicker")} style={S.confirmPhoto} />
+        )}
         <div style={S.confirmArrow}>♥</div>
         {(prompt.id) ? (
           <img
@@ -3669,6 +3787,32 @@ const S = {
     borderRadius: 14, padding: "13px", fontSize: 13.5, fontWeight: 700,
     fontFamily: "'Quicksand', sans-serif", cursor: "pointer",
   },
+  // ── 커플 컨셉: 사진 두 장 슬롯 ──
+  coupleRow: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 },
+  coupleSlot: {
+    display: "flex", flexDirection: "column", gap: 8,
+    background: "none", border: "none", padding: 0, cursor: "pointer",
+    fontFamily: "'Quicksand', sans-serif", textAlign: "center",
+  },
+  coupleSlotLabel: {
+    fontSize: 12, fontWeight: 700, color: INK, opacity: 0.75,
+  },
+  coupleSlotBox: {
+    width: "100%", aspectRatio: "3/4", borderRadius: 20, overflow: "hidden",
+    background: "rgba(255,255,255,0.4)",
+    backdropFilter: "blur(12px) saturate(160%)",
+    WebkitBackdropFilter: "blur(12px) saturate(160%)",
+    border: "2px dashed " + ACCENT + "66",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.7)",
+  },
+  coupleSlotImg: { width: "100%", height: "100%", objectFit: "cover", display: "block" },
+  coupleSlotPlus: { fontSize: 38, color: ACCENT, fontWeight: 300, lineHeight: 1 },
+  coupleSlotAction: { fontSize: 11.5, fontWeight: 700, color: ACCENT },
+  coupleHint: {
+    fontSize: 11.5, lineHeight: 1.6, opacity: 0.55, fontWeight: 500,
+    margin: "12px 0 0", textAlign: "center",
+  },
   consentRow: {
     display: "flex", gap: 10, alignItems: "flex-start",
     margin: "18px 0", cursor: "pointer",
@@ -3993,6 +4137,10 @@ const S = {
     width: 112, height: 142, objectFit: "cover", borderRadius: 16,
   },
   confirmArrow: { fontSize: 20, color: ACCENT },
+  confirmPair: { display: "flex", gap: 4 },
+  confirmPairImg: {
+    width: 66, height: 142, objectFit: "cover", borderRadius: 12,
+  },
   confirmStyle: {
     width: 112, height: 142,
     background: "linear-gradient(150deg, #f9c83c33, #60c9de44)",

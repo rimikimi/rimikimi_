@@ -185,11 +185,25 @@ export default async function handler(req, res) {
     idSuit, idBg, idBgName,
     // 인생네컷: 스타일 + 컷 인덱스 (서버가 컷별 포즈/악세서리 프롬프트 조립)
     fourcutStyle, cutIndex,
+    // 커플: 두 번째 참조 사진(상대). 프롬프트가 "first/second reference image" 를
+    // 지칭하므로 반드시 base64 → base64_2 순서로 넣는다.
+    mimeType2, base64_2,
   } = req.body || {};
   if (!mimeType || !base64 || !prompt) {
     return res
       .status(400)
       .json({ error: "mimeType, base64, prompt 가 모두 필요합니다." });
+  }
+
+  // 커플 컨셉 가드 — 프롬프트가 "두 번째 참조 이미지"를 지칭하는데 사진이 한 장만 왔으면
+  // 구버전 앱(사진 2장 UI가 없는 빌드)이다. 그대로 생성하면 없는 사람을 지어내므로
+  // 차감 전에 업데이트를 안내한다. (웹은 항상 최신이라 해당 없음)
+  if (!base64_2 && /second reference image/i.test(prompt)) {
+    return res.status(426).json({
+      error:
+        "이 컨셉은 두 사람의 사진이 필요해요.\n앱을 최신 버전으로 업데이트하면 사용할 수 있어요 🙂",
+      needsUpdate: true,
+    });
   }
 
   const apiKey = process.env.GEMINI_API_KEY;
@@ -202,8 +216,15 @@ export default async function handler(req, res) {
   // 3.5) 사전 얼굴 검사 (Flash Lite, ~$0.002, 1~2초)
   //      얼굴 없으면 본 모델 호출 안 함 → 차감 X
   //      단, skipFacePrecheck (아트 변환 등) 면 검사 우회
+  const hasSecond = !!(base64_2 && mimeType2);
   if (!skipFacePrecheck) {
-    const pre = await precheckHasFace(apiKey, mimeType, base64);
+    // 커플이면 두 장 다 검사한다 — 한 장만 통과시키면 상대 얼굴이 없는 채로
+    // 본 모델을 호출해 크레딧만 나간다.
+    const checks = await Promise.all([
+      precheckHasFace(apiKey, mimeType, base64),
+      hasSecond ? precheckHasFace(apiKey, mimeType2, base64_2) : Promise.resolve({ hasFace: true }),
+    ]);
+    const pre = checks.find((c) => !c.hasFace) || checks[0];
     if (!pre.hasFace) {
       return res.status(422).json({
         error:
@@ -335,6 +356,12 @@ export default async function handler(req, res) {
       "The subject can be a person, landscape, animal, object, or anything else. " +
       "Preserve the overall composition, subject identity, and recognizable features " +
       "while transforming the medium/style. Apply the following style:\n" + prompt
+    : hasSecond
+    ? "Using the TWO people in the two provided reference photos, generate a single new photograph " +
+      "containing BOTH of them together. The FIRST reference image is the first person and the " +
+      "SECOND reference image is the second person — keep each person's own face, identity and " +
+      "facial features clearly recognizable, and never merge, swap or blend the two faces. " +
+      "Exactly two people in frame. Apply the following concept:\n" + prompt
     : "Using the person in the provided photo, generate a new portrait. " +
       "Keep the same face, identity, and facial features clearly recognizable. " +
       "Apply the following concept:\n" + prompt;
@@ -366,6 +393,10 @@ export default async function handler(req, res) {
         parts: [
           { text: instruction },
           { inline_data: { mime_type: mimeType, data: base64 } },
+          // 커플: 두 번째 참조 사진 (순서가 곧 "first/second reference image")
+          ...(hasSecond
+            ? [{ inline_data: { mime_type: mimeType2, data: base64_2 } }]
+            : []),
         ],
       },
     ],

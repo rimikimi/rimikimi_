@@ -225,6 +225,17 @@ export const STR = {
     "art.consent": "본인이 권리를 가진 사진이거나, 타인 사진의 경우 동의를 받았습니다.",
     "step2.privacyNote": "업로드한 사진은 서버에 저장되지 않으며, 이미지 생성 직후 폐기됩니다.",
 
+    // === 커플 컨셉 (사진 2장) ===
+    "couple.hero.title": "두 분의 사진을 올려주세요",
+    "couple.hero.desc1": "커플 컨셉은 사진이 두 장 필요해요.",
+    "couple.hero.desc2": "각자 얼굴이 잘 보이는 사진이면 좋아요.",
+    "couple.hero.desc3": "사진은 서버에 저장되지 않고 생성 직후 폐기돼요 💕",
+    "couple.slotMe": "내 사진",
+    "couple.slotPartner": "상대 사진",
+    "couple.slotHint": "두 장 모두 올려야 생성할 수 있어요.",
+    "couple.needPartner": "상대 사진도 올려주세요 🙂",
+    "couple.consent": "두 사람 모두 사진 사용에 동의했습니다.",
+
     // === 푸터 ===
     "footer.note": "프로토타입 · 사진은 기기 안에서만 처리되며 서버에 저장되지 않습니다",
     "footer.terms": "이용약관",
@@ -446,6 +457,16 @@ export const STR = {
     "art.hero.desc4": "and is discarded right after generation 🪄",
     "art.consent": "I own the rights to this photo, or have consent if it's someone else's.",
     "step2.privacyNote": "Your uploaded photo is never stored on our servers and is discarded right after generation.",
+
+    "couple.hero.title": "Upload a photo of each of you",
+    "couple.hero.desc1": "Couple concepts need two photos.",
+    "couple.hero.desc2": "Pick shots where each face is clearly visible.",
+    "couple.hero.desc3": "Photos are never stored and are discarded right after generation 💕",
+    "couple.slotMe": "You",
+    "couple.slotPartner": "Partner",
+    "couple.slotHint": "Both photos are required to generate.",
+    "couple.needPartner": "Please add your partner's photo too 🙂",
+    "couple.consent": "Both people have consented to using their photos.",
 
     "footer.note": "Prototype · Your photo is processed on-device and not stored on our servers",
     "footer.terms": "Terms",
