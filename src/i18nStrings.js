@@ -88,6 +88,8 @@ export const STR = {
     "step3.generate": "✨ 이미지 만들기",
     "step3.buyCredit": "크레딧 충전",
     "step3.peek": "선택한 컨셉으로 내 얼굴 특징을 살린 이미지를 만들어 드려요.",
+    // 매직 부스는 "내 얼굴"이 아니라 업로드한 임의의 사진을 변환한다
+    "step3.peekArt": "업로드하신 사진을 선택한 컨셉으로 변환해 드려요.",
 
     // === 생성 결과 ===
     "result.generating": "이미지를 만들고 있어요",
@@ -316,6 +318,7 @@ export const STR = {
     "step3.buyCredit": "Get credits",
     "step3.peek":
       "We'll generate a portrait in this concept while keeping your face features.",
+    "step3.peekArt": "We'll transform the photo you uploaded with the selected concept.",
 
     "result.generating": "Creating your image",
     "result.generatingHint": "This may take up to 30 seconds",
@@ -463,7 +466,10 @@ export const STR = {
       "판타지 / 콘셉트": "Fantasy / Concept",
       "파티 / 이벤트": "Party / Event",
       "비치 / 리조트": "Beach / Resort",
+      "커플": "Couple",
+      "남성": "Men",
       "🪄 매직 부스": "🪄 Magic Booth",
+      "📸 인생네컷": "📸 Photo Booth",
       "🪪 증명사진": "🪪 ID Photo",
     },
   },

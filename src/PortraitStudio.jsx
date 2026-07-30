@@ -169,6 +169,26 @@ const perImageUsd = (pack) =>
 // 신규(NEW) 줄과 최신순 정렬에서 이들을 구분하는 기준.
 const FEATURE_ID_MIN = 400;
 
+// 카테고리 칩 노출 순서. concepts.json 의 배열 순서에 따라 칩 순서가 들쭉날쭉해지는 걸 막는다.
+// 여기 없는 카테고리는 뒤에 붙는다. 컨셉이 0개인 카테고리는 칩 자체가 안 뜬다(빈 필터 방지) —
+// 즉 "자리"만 잡아두고, 해당 카테고리 컨셉이 올라오는 순간 이 위치에 자동으로 나타난다.
+//  ⚠️ 새 카테고리를 추가할 땐 여기 + i18nStrings.js 의 __categories(영문) 둘 다 넣을 것.
+const CATEGORY_ORDER = [
+  "🪄 매직 부스",
+  "📸 인생네컷",
+  "일상 스냅",
+  "스튜디오 프로필",
+  "하이패션 / 화보",
+  "웨딩 / 브라이덜",
+  "커플", // 예약 — 커플 컨셉 업로드 시 자동 노출
+  "남성", // 예약 — 남성 컨셉 업로드 시 자동 노출
+  "스트릿 패션",
+  "파티 / 이벤트",
+  "비치 / 리조트",
+  "예술 / 클래식",
+  "판타지 / 콘셉트",
+];
+
 const ART_CATEGORY = "🪄 매직 부스";
 function isArtConcept(concept) {
   if (!concept) return false;
@@ -878,7 +898,16 @@ export default function PortraitStudio() {
         counts.set(cat, (counts.get(cat) || 0) + 1);
       }
     }
-    return Array.from(counts.entries()).map(([name, count]) => ({ name, count }));
+    const all = t("step1.all");
+    return Array.from(counts.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => {
+        if (a.name === all) return -1; // "전체" 는 항상 맨 앞
+        if (b.name === all) return 1;
+        const ia = CATEGORY_ORDER.indexOf(a.name);
+        const ib = CATEGORY_ORDER.indexOf(b.name);
+        return (ia < 0 ? 999 : ia) - (ib < 0 ? 999 : ib);
+      });
   }, [visiblePool]);
 
   const filtered = useMemo(() => {
@@ -962,6 +991,12 @@ export default function PortraitStudio() {
         setResultImage(hit.url);
         setGenError(null);
         setGenerating(false);
+        // 결과화면은 selected 가 있어야 렌더된다(앱 재시작 후엔 null). 마커의 컨셉으로 복원.
+        setSelected((cur) => {
+          if (cur) return cur;
+          const found = concepts.find((c) => String(c.id) === String(p.conceptId));
+          return found || { id: p.conceptId, title: p.conceptTitle || "", text: "" };
+        });
         setScreen("result");
         if (hit.id && hit.expiresAt) {
           syncExpiryNotifications(
@@ -978,14 +1013,22 @@ export default function PortraitStudio() {
   recoverRef.current = tryRecoverGeneration;
 
   function handleFile(e) {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    if (!f.type.startsWith("image/")) return;
+    const input = e.target;
+    const f = input.files?.[0];
+    // ⚠️ 같은 파일을 다시 고르면 change 이벤트가 안 뜬다. 매직 부스는 컨셉에 들어갈 때마다
+    //    artPhoto 를 비우므로 "같은 사진으로 다른 스타일" 이 정확히 이 케이스에 걸려
+    //    버튼이 계속 비활성인 것처럼 보였다 → 읽고 나면 무조건 value 를 비운다.
+    const reset = () => { try { input.value = ""; } catch (_) {} };
+    if (!f) { reset(); return; }
+    if (!f.type.startsWith("image/")) { reset(); return; }
+    const target = photoTargetRef.current;
     const reader = new FileReader();
     reader.onload = () => {
-      if (photoTargetRef.current === "art") setArtPhoto(reader.result);
+      if (target === "art") setArtPhoto(reader.result);
       else setPhoto(reader.result);
+      reset();
     };
+    reader.onerror = reset;
     reader.readAsDataURL(f);
   }
 
@@ -1000,6 +1043,9 @@ export default function PortraitStudio() {
     }
     // 아트 변환 컨셉이면 이전 일회용 사진 비우고 들어감 (매번 새로 받음)
     if (isArtConcept(p)) setArtPhoto(null);
+    // 동의 문구가 바뀌면(본인 사진 ↔ 타인 사진 권리) 체크도 다시 받아야 한다.
+    // 안 그러면 매직 부스에 들어갔는데 "타인 사진 동의 받았습니다" 가 이미 체크돼 있다.
+    if (isArtConcept(p) !== isArtConcept(selected)) setAgeConfirmed(false);
     setScreen("home"); // 컨셉 선택 후 사진 업로드 화면으로
   }
 
@@ -1060,6 +1106,16 @@ export default function PortraitStudio() {
   }, [screen, navDir]);
 
   async function startGenerate() {
+    // 사진부터 확인 — 스토어 화면을 거쳐 돌아오면 사진 없이 confirm 에 설 수 있다.
+    // (그대로 두면 스피너 → 네트워크 왕복 → 에러라서 "왜 안 되지" 가 된다)
+    const needArt = isArtConcept(selected);
+    if (!(needArt ? artPhoto : photo)) {
+      setScreen("home");
+      setPayToast(needArt ? "먼저 변환할 사진을 올려주세요 🙂" : "먼저 사진을 올려주세요 🙂");
+      setTimeout(() => setPayToast(""), 3000);
+      return;
+    }
+
     if (!canGenerate) {
       if (PAYMENTS_ENABLED) {
         setScreen("store");
@@ -1234,6 +1290,8 @@ export default function PortraitStudio() {
         // 서버가 한도 정보를 같이 줬으면 화면 카운터도 반영
         if (typeof err.quotaUsed === "number") setFreeUsed(err.quotaUsed);
         setGenError(err.message || "이미지 생성에 실패했어요.");
+        // 실패로 확정 — 마커를 남겨두면 이후 앱 복귀마다 갤러리를 헛되이 조회한다
+        clearPendingGen();
       }
     } finally {
       setGenerating(false);
@@ -1309,10 +1367,20 @@ export default function PortraitStudio() {
   }
 
   // 사진 선택 — 네이티브에서는 진짜 카메라/앨범 시트, 웹에서는 file input
-  async function pickPhoto() {
+  //
+  // ⚠️ target 을 반드시 명시할 것.
+  //   "profile" = 내 사진(프로필). localStorage 에 저장되고 헤더 아바타로도 쓰인다.
+  //   "art"     = 매직 부스처럼 "이번 1회 생성"에만 쓰는 휘발성 사진.
+  //               프로필을 절대 건드리면 안 된다.
+  async function pickPhoto(target = "profile") {
+    const slot = target === "art" ? "art" : "profile";
+    photoTargetRef.current = slot; // 웹 file input(handleFile)이 읽는다
     if (isNative()) {
       const dataUrl = await nativePickPhoto("prompt");
-      if (dataUrl) setPhoto(dataUrl);
+      if (!dataUrl) return;
+      // ref 가 아니라 이 호출이 캡처한 slot 을 쓴다 (시트가 열린 사이 ref 가 바뀔 수 있음)
+      if (slot === "art") setArtPhoto(dataUrl);
+      else setPhoto(dataUrl);
       return;
     }
     fileRef.current?.click();
@@ -1398,10 +1466,7 @@ export default function PortraitStudio() {
         {screen === "home" && (() => {
           const art = isArtConcept(selected);
           const currentPhoto = art ? artPhoto : photo;
-          const onPickAny = () => {
-            photoTargetRef.current = art ? "art" : "profile";
-            pickPhoto();
-          };
+          const onPickAny = () => pickPhoto(art ? "art" : "profile");
           const onClearAny = () => {
             if (art) setArtPhoto(null);
             else setPhoto(null);
@@ -1410,8 +1475,6 @@ export default function PortraitStudio() {
             <HomeScreen
               isArt={art}
               photo={currentPhoto}
-              fileRef={fileRef}
-              onFile={handleFile}
               onPick={onPickAny}
               onClear={onClearAny}
               ageConfirmed={ageConfirmed}
@@ -1452,6 +1515,7 @@ export default function PortraitStudio() {
         {screen === "confirm" && selected && (
           <ConfirmScreen
             photo={isArtConcept(selected) ? artPhoto : photo}
+            art={isArtConcept(selected)}
             prompt={selected}
             freeLeft={freeLeft}
             credits={credits}
@@ -1496,7 +1560,7 @@ export default function PortraitStudio() {
           <ProfileScreen
             session={session}
             photo={photo}
-            onPickPhoto={pickPhoto}
+            onPickPhoto={() => pickPhoto("profile")}
             onClearPhoto={() => setPhoto(null)}
             unlimited={unlimited}
             blocked={blocked}
@@ -1604,7 +1668,7 @@ function Splash() {
    홈
    ============================================================ */
 function HomeScreen({
-  photo, fileRef, onFile, onPick, onClear,
+  photo, onPick, onClear,
   ageConfirmed, setAgeConfirmed, onContinue, onBack,
   isArt = false, showAds = false,
 }) {
@@ -2483,7 +2547,7 @@ function MyGalleryScreen({ accessToken, onBack, onShared }) {
    확인
    ============================================================ */
 function ConfirmScreen({
-  photo, prompt, freeLeft, credits, canGenerate,
+  photo, prompt, freeLeft, credits, canGenerate, art,
   idPhoto, idSuit, setIdSuit, idBg, setIdBg,
   fourcut, fourcutCount, setFourcutCount, fourcutStyleKey, setFourcutStyleKey,
   onBack, onGenerate, onStore,
@@ -2519,9 +2583,7 @@ function ConfirmScreen({
       <div style={S.confirmCard}>
         <div style={S.confirmTitle}>{localizedTitle(prompt)}</div>
         <div style={S.confirmCat}>{localizedCategory(prompt.category)}</div>
-        <div style={S.promptPeek}>
-          선택한 컨셉으로 내 얼굴 특징을 살린 이미지를 만들어 드려요.
-        </div>
+        <div style={S.promptPeek}>{t(art ? "step3.peekArt" : "step3.peek")}</div>
       </div>
 
       {fourcut && (
