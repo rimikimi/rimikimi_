@@ -36,6 +36,45 @@ async function shrinkOutput(base64, mime) {
   }
 }
 
+// 입력 사진의 가로세로 비율(w/h). 헤더 파싱 실패 시 null.
+function srcAspect(base64, mime) {
+  try {
+    const d = imageSize(Buffer.from(base64, "base64"), mime);
+    if (d && d.w > 0 && d.h > 0) return d.w / d.h;
+  } catch (_) {}
+  return null;
+}
+
+// 결과를 지정한 비율로 가운데 크롭 (사진 복원 전용). 실패하면 원본 그대로 반환.
+async function cropToRatio(base64, ratio) {
+  if (!ratio || !isFinite(ratio)) return base64;
+  try {
+    const sharp = (await import("sharp")).default;
+    const buf = Buffer.from(base64, "base64");
+    const img = sharp(buf).rotate();
+    const meta = await img.metadata();
+    const w = meta.width, h = meta.height;
+    if (!w || !h) return base64;
+    // 이미 같은 비율이면 건드리지 않는다 (재인코딩 손실 방지)
+    if (Math.abs(w / h - ratio) < 0.01) return base64;
+    let cw, ch;
+    if (w / h > ratio) { ch = h; cw = Math.round(h * ratio); }
+    else { cw = w; ch = Math.round(w / ratio); }
+    const out = await img
+      .extract({
+        left: Math.max(0, Math.round((w - cw) / 2)),
+        top: Math.max(0, Math.round((h - ch) / 2)),
+        width: Math.min(cw, w),
+        height: Math.min(ch, h),
+      })
+      .toBuffer();
+    return out.toString("base64");
+  } catch (e) {
+    console.error("[cropToRatio failed, using original]", e?.message || e);
+    return base64;
+  }
+}
+
 // 입력 이미지의 픽셀 크기를 헤더에서 파싱 (JPEG/PNG/WebP). 실패 시 null.
 function imageSize(buf, mime) {
   try {
@@ -512,9 +551,18 @@ export default async function handler(req, res) {
   const inline = imgPart.inlineData || imgPart.inline_data;
   const rawMime = inline.mimeType || inline.mime_type || "image/png";
 
+  // 6.4) 사진 복원: 결과를 "올린 사진과 똑같은 비율"로 가운데 크롭.
+  //      Gemini 가 편집 모드에서 입력 비율을 대체로 유지하지만 프리셋으로 스냅되는
+  //      경우가 있어 원본 구도가 틀어진다. 여기서 맞춰 두면 응답·갤러리 원본이
+  //      모두 정확해지고, 구버전 앱에서도 저장본은 제대로 나온다.
+  let rawData = inline.data;
+  if (isRestore) {
+    rawData = await cropToRatio(rawData, srcAspect(base64, mimeType));
+  }
+
   // 6.5) 응답 전 이미지 축소 (Vercel 4.5MB 한도 초과로 본문 잘리는 "오류 200" 방지 + 전송 속도↑)
   //      응답(화면 표시)만 축소. 갤러리/다운로드는 아래에서 원본 그대로 저장.
-  const small = await shrinkOutput(inline.data, rawMime);
+  const small = await shrinkOutput(rawData, rawMime);
   const outMime = small.mime;
   const outData = small.base64;
 
@@ -526,7 +574,7 @@ export default async function handler(req, res) {
     const saved = await saveToGallery(admin, user, {
       conceptId: conceptId || 0,
       conceptTitle: conceptTitle || null,
-      base64: inline.data,
+      base64: rawData,
       mimeType: rawMime,
     });
     if (saved.ok) {

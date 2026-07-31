@@ -196,6 +196,14 @@ function isArtConcept(concept) {
   return cats.includes(ART_CATEGORY);
 }
 
+// 사진 복원 = 스타일을 입히지 않고 원본을 고화질로 되살리는 컨셉.
+// ⚠️ 판정 규칙을 api/generate.js 의 isRestore 와 반드시 똑같이 유지할 것.
+//    (서버는 프롬프트를, 클라는 출력 비율을 이 판정으로 나눈다)
+function isRestoreConcept(concept) {
+  if (!concept) return false;
+  return Number(concept.id) === 408 || /복원|restor/i.test(concept.title || "");
+}
+
 // 커플 = 참조 사진이 2장(본인 + 상대) 필요한 컨셉.
 // 프롬프트가 "the woman from the first reference image / the man from the second"
 // 형태라 두 장을 순서대로 보내야 한다.
@@ -280,6 +288,51 @@ function shrinkImage(dataUrl, maxSize = 1024, quality = 0.85) {
       resolve(canvas.toDataURL("image/jpeg", quality));
     };
     img.onerror = () => reject(new Error("사진을 처리할 수 없어요."));
+    img.src = dataUrl;
+  });
+}
+
+/* ============================================================
+   결과를 "원본 사진과 똑같은 가로세로 비율"로 맞추기
+   - 사진 복원처럼 원본 구도를 그대로 살려야 하는 컨셉용.
+   - 768×1024 고정 크롭(fitToSize)을 쓰면 가로 사진이 세로로 잘려나간다.
+   - 비율만 맞추고 해상도는 모델이 준 것을 최대한 유지 (긴 변 maxLong 로 제한)
+   ============================================================ */
+function imageRatio(dataUrl) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img.naturalWidth / img.naturalHeight);
+    img.onerror = () => reject(new Error("이미지를 읽을 수 없어요."));
+    img.src = dataUrl;
+  });
+}
+
+function fitToRatio(dataUrl, ratio, maxLong = 2048, format = "image/jpeg", quality = 0.95) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const sw = img.naturalWidth;
+      const sh = img.naturalHeight;
+      // 결과에서 목표 비율만큼 가운데를 잘라냄
+      let cw, ch;
+      if (sw / sh > ratio) { ch = sh; cw = Math.round(sh * ratio); }
+      else { cw = sw; ch = Math.round(sw / ratio); }
+      const sx = Math.round((sw - cw) / 2);
+      const sy = Math.round((sh - ch) / 2);
+      // 출력 크기 = 잘라낸 크기 (긴 변만 maxLong 으로 제한, 확대는 안 함)
+      const scale = Math.min(1, maxLong / Math.max(cw, ch));
+      const outW = Math.max(1, Math.round(cw * scale));
+      const outH = Math.max(1, Math.round(ch * scale));
+      const canvas = document.createElement("canvas");
+      canvas.width = outW;
+      canvas.height = outH;
+      const ctx = canvas.getContext("2d");
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(img, sx, sy, cw, ch, 0, 0, outW, outH);
+      resolve(canvas.toDataURL(format, quality));
+    };
+    img.onerror = () => reject(new Error("이미지를 읽을 수 없어요."));
     img.src = dataUrl;
   });
 }
@@ -416,10 +469,16 @@ async function generateImage(accessToken, dataUrl, promptText, conceptMeta = {})
     throw new Error("이미지 응답을 받지 못했어요. 다른 컨셉으로 시도해 주세요.");
   }
   const rawDataUrl = "data:" + json.mimeType + ";base64," + json.base64;
-  // 결과를 정확히 768×1024 PNG 로 맞춤 (중앙 크롭)
+  // 사진 복원은 원본 구도를 그대로 살려야 하므로 "올린 사진과 같은 비율"로 맞춘다.
+  // (그 외 컨셉은 기존대로 768×1024 PNG 중앙 크롭)
   let imageDataUrl;
   try {
-    imageDataUrl = await fitToSize(rawDataUrl, 768, 1024, "image/png");
+    if (conceptMeta.keepRatio) {
+      const srcRatio = await imageRatio(dataUrl);
+      imageDataUrl = await fitToRatio(rawDataUrl, srcRatio);
+    } else {
+      imageDataUrl = await fitToSize(rawDataUrl, 768, 1024, "image/png");
+    }
   } catch (_) {
     imageDataUrl = rawDataUrl; // 리사이즈 실패 시 원본 사용
   }
@@ -1339,6 +1398,8 @@ export default function PortraitStudio() {
         title: selected.title,
         // 아트 변환은 풍경/물건 등 얼굴 없는 사진도 가능해야 하므로 face precheck 우회
         skipFacePrecheck: art,
+        // 사진 복원: 768×1024 로 강제 크롭하지 말고 올린 사진의 비율을 그대로 유지
+        keepRatio: isRestoreConcept(selected),
         // 커플: 두 번째 참조 사진(상대)
         ...(isCoupleConcept(selected) && partnerPhoto ? { photo2: partnerPhoto } : {}),
         ...idMeta,
@@ -2927,6 +2988,10 @@ function ResultScreen({
   const [sharing, setSharing] = useState(false);
   const [toast, setToast] = useState("");
   const toastTimer = useRef(null);
+  // 결과의 실제 비율. 3:4 로 고정해 두면 가로 사진(복원)이나 세로로 긴
+  // 인생네컷 스트립이 화면에서 잘려 보인다 → 로드되면 진짜 비율로 바꾼다.
+  const [imgRatio, setImgRatio] = useState(null);
+  useEffect(() => { setImgRatio(null); }, [resultImage]);
 
   function flashToast(msg, ms = 2200) {
     setToast(msg);
@@ -3088,7 +3153,16 @@ function ResultScreen({
           <div style={S.screenKicker}>{t("result.done")}</div>
           <div style={S.screenTitle}>{localizedTitle(prompt)}</div>
           <div style={S.resultImage}>
-            <img src={resultImage} alt={localizedTitle(prompt)} style={S.resultImg} className="resultReveal" />
+            <img
+              src={resultImage}
+              alt={localizedTitle(prompt)}
+              style={{ ...S.resultImg, ...(imgRatio ? { aspectRatio: String(imgRatio) } : {}) }}
+              className="resultReveal"
+              onLoad={(e) => {
+                const { naturalWidth: w, naturalHeight: h } = e.currentTarget;
+                if (w && h) setImgRatio(w / h);
+              }}
+            />
           </div>
 
           {/* 기본 vs Pro 비교 (무료 Pro 체험) */}
