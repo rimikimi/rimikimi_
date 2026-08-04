@@ -237,7 +237,11 @@ export default async function handler(req, res) {
   // 커플 컨셉 가드 — 프롬프트가 "두 번째 참조 이미지"를 지칭하는데 사진이 한 장만 왔으면
   // 구버전 앱(사진 2장 UI가 없는 빌드)이다. 그대로 생성하면 없는 사람을 지어내므로
   // 차감 전에 업데이트를 안내한다. (웹은 항상 최신이라 해당 없음)
-  if (!base64_2 && /second reference image/i.test(prompt)) {
+  // ⚠️ 프롬프트마다 표현이 다르다. "second reference image" 외에
+  //    "two attached reference images", "the second is the man" 형태도 커플이다.
+  const NEEDS_TWO =
+    /second reference image|two attached reference images|the second is the man/i;
+  if (!base64_2 && NEEDS_TWO.test(prompt)) {
     return res.status(426).json({
       error:
         "이 컨셉은 두 사람의 사진이 필요해요.\n앱을 최신 버전으로 업데이트하면 사용할 수 있어요 🙂",
