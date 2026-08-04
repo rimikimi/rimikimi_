@@ -813,8 +813,10 @@ export default function PortraitStudio() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      // /concepts.json 은 서버에서 함수로 서빙된다(api/concepts.js) — 공개 시각이
+      // 지난 컨셉만 내려온다. 오프라인 폴백은 앱에 번들된 스냅샷.
       const urls = isNative()
-        ? [`${LEGAL_BASE}/concepts.json`, "/concepts.json"]
+        ? [`${LEGAL_BASE}/concepts.json`, "/concepts.fallback.json"]
         : ["/concepts.json"];
       for (const url of urls) {
         try {
