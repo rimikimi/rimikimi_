@@ -1178,6 +1178,16 @@ export default function PortraitStudio() {
     setShowBrooklyn(false);
   }
 
+  // 스토어는 어느 화면에서든 열 수 있다(헤더 크레딧 칩·확인화면·결과화면·프로필).
+  // "왔던 화면"을 기억해 두지 않으면 뒤로가기가 무조건 confirm 으로 가버려서,
+  // home 에서 크레딧 칩을 눌렀다가 뒤로 나오면 안 거쳤던 확인화면에 서게 된다.
+  const storeFromRef = useRef(null);
+  function openStore() {
+    storeFromRef.current = screen;
+    setNavDir("fwd");
+    setScreen("store");
+  }
+
   // ── 화면별 뒤로가기 목적지 (뒤로가기 애니메이션 방향도 설정) ──
   function goBack() {
     setNavDir("back");
@@ -1186,25 +1196,93 @@ export default function PortraitStudio() {
     else if (screen === "result") { setSelected(null); setScreen("gallery"); }
     else if (screen === "profile") setScreen("gallery");
     else if (screen === "mygallery") setScreen("profile");
-    else if (screen === "store") setScreen(selected ? "confirm" : "gallery");
+    else if (screen === "store") {
+      const from = storeFromRef.current;
+      storeFromRef.current = null;
+      // confirm 으로 돌아가는 건 실제로 거기서 왔고 컨셉이 살아있을 때만
+      if (from && from !== "store" && (from !== "confirm" || selected)) setScreen(from);
+      else setScreen(selected ? "confirm" : "gallery");
+    }
     else { setNavDir("fwd"); return false; } // gallery = 최상위, 뒤로 없음
     return true;
   }
 
-  // ── 왼쪽 엣지 스와이프 → 뒤로가기 (iOS 네이티브 제스처 느낌) ──
-  function onTouchStartRoot(e) {
-    const tt = e.touches && e.touches[0];
-    swipeRef.current = tt && tt.clientX <= 28 ? { x: tt.clientX, y: tt.clientY } : null;
+  // ── 왼쪽 엣지 스와이프 → 뒤로가기 ──
+  //
+  // 예전 구현은 "떼는 순간 dx>70 이면 뒤로" 였는데 실제로 잘 안 먹었다:
+  //   1) 판정 기준이 clientX(뷰포트 좌표)라 앱이 maxWidth 440 으로 가운데 정렬되는
+  //      넓은 화면(태블릿/데스크톱)에서는 화면 왼쪽 28px 이 앱 바깥이라 아예 시작조차 안 됨
+  //   2) 끄는 동안 아무 반응이 없어서, 먹었는지 아닌지 알 수가 없음 → "안 되네" 로 느껴짐
+  //   3) |dy| < 55 가 빡빡해서 자연스러운(살짝 휘는) 스와이프가 자주 탈락
+  //   4) touchcancel 처리가 없어 제스처가 취소되면 상태가 남음
+  // → 컨테이너 기준 좌표 + 끄는 동안 실시간 추종 + 거리/속도 판정으로 다시 짬.
+  function canSwipeBack() {
+    return !showBrooklyn && screen !== "gallery";
   }
-  function onTouchEndRoot(e) {
-    const s = swipeRef.current;
+
+  // 끄는 동안 본문을 따라 움직이게 (리렌더 없이 DOM 직접 조작 — 60fps 유지)
+  function paintDrag(px, animate) {
+    const el = mainRef.current;
+    if (!el) return;
+    el.style.transition = animate ? "transform .22s cubic-bezier(0.16,1,0.3,1), opacity .22s" : "";
+    el.style.transform = px ? `translateX(${px}px)` : "";
+    el.style.opacity = px ? String(Math.max(0.35, 1 - px / 520)) : "";
+  }
+  function endDrag() {
     swipeRef.current = null;
-    if (!s) return;
-    const tt = e.changedTouches && e.changedTouches[0];
+    paintDrag(0, true);
+    setTimeout(() => { const el = mainRef.current; if (el) el.style.transition = ""; }, 240);
+  }
+
+  function onTouchStartRoot(e) {
+    swipeRef.current = null;
+    if (!canSwipeBack()) return;
+    const tt = e.touches && e.touches[0];
     if (!tt) return;
-    const dx = tt.clientX - s.x;
-    const dy = tt.clientY - s.y;
-    if (dx > 70 && Math.abs(dy) < 55) goBack();
+    // 가로로 스크롤되는 줄(인기 컨셉 등)에서 시작했으면 그쪽 제스처에 양보
+    if (e.target?.closest?.("[data-hscroll]")) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = tt.clientX - rect.left; // ← 뷰포트가 아니라 앱 컨테이너 기준
+    const edge = Math.max(44, rect.width * 0.14);
+    if (x < 0 || x > edge) return;
+    swipeRef.current = { x0: tt.clientX, y0: tt.clientY, t0: Date.now(), w: rect.width, axis: null };
+  }
+
+  function onTouchMoveRoot(e) {
+    const s = swipeRef.current;
+    if (!s) return;
+    const tt = e.touches && e.touches[0];
+    if (!tt) return;
+    const dx = tt.clientX - s.x0;
+    const dy = tt.clientY - s.y0;
+    // 방향이 정해지기 전 몇 px 동안만 세로/가로를 판별한다 (세로면 스크롤에 양보)
+    if (!s.axis) {
+      if (Math.abs(dx) < 7 && Math.abs(dy) < 7) return;
+      s.axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
+      if (s.axis === "y") { swipeRef.current = null; return; }
+    }
+    s.dx = dx;
+    // 왼쪽으로 되돌리면 0 에 붙이고, 오른쪽 끝에서는 고무줄처럼 저항
+    const px = dx <= 0 ? 0 : Math.min(dx, s.w * 0.9);
+    paintDrag(px, false);
+  }
+
+  function onTouchEndRoot() {
+    const s = swipeRef.current;
+    if (!s) return;
+    const dx = s.dx || 0;
+    const v = dx / Math.max(1, Date.now() - s.t0); // px/ms
+    // 충분히 끌었거나(32%) 짧아도 빠르게 튕겼으면(60px + 속도) 뒤로
+    const commit = dx > s.w * 0.32 || (dx > 60 && v > 0.35);
+    swipeRef.current = null;
+    if (commit) {
+      paintDrag(0, false); // slideBack 애니메이션과 겹치지 않게 즉시 원위치
+      const el = mainRef.current;
+      if (el) el.style.opacity = "";
+      goBack();
+    } else {
+      endDrag();
+    }
   }
 
   // ── 안드로이드 하드웨어/제스처 뒤로가기 ──
@@ -1238,6 +1316,17 @@ export default function PortraitStudio() {
     return () => { if (sub) sub.remove(); clearTimeout(timer); };
   }, []);
 
+  // 화면이 바뀌면 스와이프 중 남은 인라인 스타일을 반드시 지운다.
+  // (main 엘리먼트는 화면이 바뀌어도 그대로라, 남으면 다음 화면이 밀려 보인다)
+  useEffect(() => {
+    const el = mainRef.current;
+    if (!el) return;
+    el.style.transition = "";
+    el.style.transform = "";
+    el.style.opacity = "";
+    swipeRef.current = null;
+  }, [screen]);
+
   // 뒤로가기 애니메이션이 재생될 시간을 준 뒤 방향을 정방향으로 리셋
   useEffect(() => {
     if (navDir !== "back") return;
@@ -1265,7 +1354,7 @@ export default function PortraitStudio() {
 
     if (!canGenerate) {
       if (PAYMENTS_ENABLED) {
-        setScreen("store");
+        openStore();
       } else {
         setPayToast("오늘 무료 횟수를 다 썼어요. 친구를 초대하면 크레딧을 받을 수 있어요 🙂");
         setTimeout(() => setPayToast(""), 3500);
@@ -1561,7 +1650,9 @@ export default function PortraitStudio() {
       style={S.app}
       data-navdir={navDir}
       onTouchStart={onTouchStartRoot}
+      onTouchMove={onTouchMoveRoot}
       onTouchEnd={onTouchEndRoot}
+      onTouchCancel={endDrag}
     >
       <style>{CSS}</style>
 
@@ -1585,7 +1676,7 @@ export default function PortraitStudio() {
         <div style={S.headerRight}>
           <button
             style={{ ...S.creditChip, visibility: quotaLoaded ? "visible" : "hidden" }}
-            onClick={PAYMENTS_ENABLED ? () => setScreen("store") : shareInvite}
+            onClick={PAYMENTS_ENABLED ? openStore : shareInvite}
           >
             <span style={S.creditDot} />
             {unlimited
@@ -1686,7 +1777,7 @@ export default function PortraitStudio() {
             fourcutStyleKey={fourcutStyleKey} setFourcutStyleKey={setFourcutStyleKey}
             onBack={() => setScreen("home")}
             onGenerate={startGenerate}
-            onStore={PAYMENTS_ENABLED ? () => setScreen("store") : () => { setPayToast("오늘 무료 횟수를 다 썼어요. 친구 초대로 크레딧을 받아보세요 🙂"); setTimeout(() => setPayToast(""), 3500); }}
+            onStore={PAYMENTS_ENABLED ? openStore : () => { setPayToast("오늘 무료 횟수를 다 썼어요. 친구 초대로 크레딧을 받아보세요 🙂"); setTimeout(() => setPayToast(""), 3500); }}
           />
         )}
         {screen === "result" && selected && (
@@ -1708,7 +1799,7 @@ export default function PortraitStudio() {
             onTryPro={tryProSample}
             onUpgrade={
               PAYMENTS_ENABLED
-                ? () => setScreen("store")
+                ? openStore
                 : () => { setPayToast("크레딧을 충전하면 Pro 화질로 계속 만들 수 있어요 🙂"); setTimeout(() => setPayToast(""), 3500); }
             }
             onShared={() => setRefreshTick((n) => n + 1)}
@@ -1731,7 +1822,7 @@ export default function PortraitStudio() {
             inviteMsg={inviteMsg}
             onBack={() => setScreen("gallery")}
             onOpenGallery={() => setScreen("mygallery")}
-            onOpenStore={PAYMENTS_ENABLED ? () => setScreen("store") : null}
+            onOpenStore={PAYMENTS_ENABLED ? openStore : null}
             onLogout={handleLogout}
             onDeleteAccount={handleDeleteAccount}
           />
@@ -2069,7 +2160,7 @@ function GalleryScreen({
       </div>
 
       <div style={S.stickyBar}>
-        <div style={S.catRowSticky}>
+        <div style={S.catRowSticky} data-hscroll>
           {categories.map((c, i) => (
             <button
               key={c.name}
@@ -2200,7 +2291,7 @@ function HomeLayout({ data, onPick, onMore, onBrooklyn }) {
           <div style={S.homeRowHead}>
             <div style={S.homeRowTitle}>{t("step1.featured")}</div>
           </div>
-          <div style={S.homeRailFeatured}>
+          <div style={S.homeRailFeatured} data-hscroll>
             {data.featured.map((p) => (
               <button
                 key={p.id}
@@ -2233,7 +2324,7 @@ function HomeLayout({ data, onPick, onMore, onBrooklyn }) {
               <span style={S.newBadge}>NEW</span>
             </div>
           </div>
-          <div style={S.homeRailFeatured}>
+          <div style={S.homeRailFeatured} data-hscroll>
             {data.newest.map((p) => (
               <button
                 key={p.id}
@@ -2286,7 +2377,7 @@ function HomeLayout({ data, onPick, onMore, onBrooklyn }) {
               {t("step1.rowMore")}
             </button>
           </div>
-          <div style={S.homeRail}>
+          <div style={S.homeRail} data-hscroll>
             {row.items.map((p) => (
               <button
                 key={p.id}
