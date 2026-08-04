@@ -2,16 +2,43 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "vite",
   "rewrites": [
-    { "source": "/concepts.json", "destination": "/api/concepts" },
-    { "source": "/privacy", "destination": "/privacy.html" },
-    { "source": "/terms", "destination": "/terms.html" },
-    { "source": "/refund", "destination": "/refund.html" },
-    { "source": "/delete-account", "destination": "/delete-account.html" },
-    { "source": "/download", "destination": "/download.html" },
-    { "source": "/checkout/(.*)", "destination": "/index.html" }
+    {
+      "source": "/concepts.json",
+      "destination": "/api/concepts"
+    },
+    {
+      "source": "/api/drops",
+      "destination": "/api/concepts?drops=1"
+    },
+    {
+      "source": "/privacy",
+      "destination": "/privacy.html"
+    },
+    {
+      "source": "/terms",
+      "destination": "/terms.html"
+    },
+    {
+      "source": "/refund",
+      "destination": "/refund.html"
+    },
+    {
+      "source": "/delete-account",
+      "destination": "/delete-account.html"
+    },
+    {
+      "source": "/download",
+      "destination": "/download.html"
+    },
+    {
+      "source": "/checkout/(.*)",
+      "destination": "/index.html"
+    }
   ],
   "crons": [
-    { "path": "/api/cron/refresh-apple-secret", "schedule": "0 4 1 * *" },
-    { "path": "/api/cron/daily-drop", "schedule": "5 11 * * *" }
+    {
+      "path": "/api/cron/refresh-apple-secret",
+      "schedule": "0 4 1 * *"
+    }
   ]
 }

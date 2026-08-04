@@ -12,8 +12,33 @@
 
 import ALL from "./_data/concepts.json" with { type: "json" };
 
+// 앞으로의 드롭 일정 — /api/drops 가 여기로 rewrite 된다.
+// ⚠️ 별도 파일로 두면 Vercel Hobby 의 서버리스 함수 12개 상한을 넘어 배포가
+//    통째로 실패한다(빌드는 성공하고 "Deploying outputs" 에서 죽음). 그래서 합쳤다.
+function dropsResponse(req, res, now) {
+  const days = Math.min(60, Math.max(1, parseInt(req.query?.days, 10) || 30));
+  const until = now + days * 24 * 60 * 60 * 1000;
+
+  const byTime = new Map();
+  for (const c of ALL) {
+    if (!c?.publishAt) continue;
+    const t = Date.parse(c.publishAt);
+    if (!Number.isFinite(t) || t <= now || t > until) continue;
+    if (!byTime.has(c.publishAt)) byTime.set(c.publishAt, []);
+    byTime.get(c.publishAt).push(c.title);
+  }
+  const drops = [...byTime.entries()]
+    .sort((a, b) => Date.parse(a[0]) - Date.parse(b[0]))
+    .map(([at, titles]) => ({ at, count: titles.length, titles }));
+
+  res.setHeader("Content-Type", "application/json; charset=utf-8");
+  res.setHeader("Cache-Control", "public, max-age=0, s-maxage=1800, stale-while-revalidate=3600");
+  return res.status(200).send(JSON.stringify(drops));
+}
+
 export default function handler(req, res) {
   const now = Date.now();
+  if (req.query?.drops) return dropsResponse(req, res, now);
 
   let list;
   try {
