@@ -4,7 +4,7 @@ import { isNative, platform, nativePickPhoto, nativeShare, nativeSaveToAlbum } f
 import { initAds, showInterstitial } from "./ads";
 import { initIap, loginIap, logoutIap, getIapPacks, purchaseIap, restoreIap, iapAvailable, isSubscription, getIapDiag } from "./iap";
 import { FOURCUT_COUNTS, FOURCUT_STYLES, composeStrip, todayStr, fourcutStyle } from "./fourcut";
-import { getSavedSet, markSaved, syncExpiryNotifications, cancelExpiryNotice } from "./notify";
+import { getSavedSet, markSaved, syncExpiryNotifications, cancelExpiryNotice, syncConceptDropNotifications } from "./notify";
 import { t, useLang, getLang, localizedTitle, localizedCategory, getLangPreference, setLang } from "./i18n";
 import LoginGate from "./LoginGate";
 import { shareImage, claimShareRewardApi } from "./share";
@@ -662,6 +662,22 @@ export default function PortraitStudio() {
   // 퍼널 계측: 앱(웹뷰) 실행 1회 (§C — 로그인 여부와 무관한 최상단 퍼널)
   useEffect(() => {
     track("app_open");
+  }, []);
+
+  // 새 컨셉 드롭 알림 예약 — 드롭 시각이 고정(매일 20시)이라 원격 푸시 없이
+  // 앱이 앞으로의 일정을 받아 로컬 알림으로 미리 깔아둔다.
+  // 앱을 열 때마다 다시 깔아서 일정 변경도 따라간다.
+  useEffect(() => {
+    if (!isNative()) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch(`${LEGAL_BASE}/api/drops?days=30`, { cache: "no-cache" });
+        const drops = await r.json();
+        if (!cancelled && Array.isArray(drops)) await syncConceptDropNotifications(drops);
+      } catch (_) { /* 알림 예약 실패는 앱 동작과 무관 */ }
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   // photo 가 바뀌면 localStorage 에 자동 저장 (없으면 키 삭제)

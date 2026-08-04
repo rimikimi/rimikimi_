@@ -103,6 +103,49 @@ export async function syncExpiryNotifications(items, savedSet) {
   }
 }
 
+/* ---------- 새 컨셉 드롭 알림 ---------- */
+
+// 갤러리 만료 알림은 갤러리 row id(작은 정수)를 그대로 쓰므로,
+// 드롭 알림은 절대 겹치지 않는 높은 번호대를 따로 쓴다.
+const DROP_ID_BASE = 900001;
+const DROP_ID_MAX = 30; // 최대 30일치 예약
+
+// 서버가 알려준 드롭 일정으로 로컬 알림을 예약한다.
+// 드롭 시각이 고정(매일 20시)이라 원격 푸시 없이도 제때 뜬다.
+// 일정이 바뀔 수 있으므로 예약을 매번 통째로 다시 깐다.
+export async function syncConceptDropNotifications(drops) {
+  const LN = await getPlugin();
+  if (!LN) return;
+  const ok = await ensureNotifyPermission();
+  if (!ok) return;
+
+  const now = Date.now();
+  const notifications = [];
+  (drops || []).slice(0, DROP_ID_MAX).forEach((d, i) => {
+    const at = Date.parse(d?.at);
+    if (!Number.isFinite(at) || at <= now) return;
+    const titles = (d.titles || []).slice(0, 3).join(", ");
+    notifications.push({
+      id: DROP_ID_BASE + i,
+      title: "새로운 컨셉이 도착했어요 ✨",
+      body: titles
+        ? `오늘의 새 컨셉 ${d.count}종 · ${titles}`
+        : `오늘의 새 컨셉 ${d.count}종이 올라왔어요`,
+      schedule: { at: new Date(at), allowWhileIdle: true },
+    });
+  });
+
+  try {
+    // 이전 예약 전부 제거 후 다시 깔기 (일정 변경·이미 지난 건 정리)
+    await LN.cancel({
+      notifications: Array.from({ length: DROP_ID_MAX }, (_, i) => ({ id: DROP_ID_BASE + i })),
+    });
+    if (notifications.length) await LN.schedule({ notifications });
+  } catch {
+    /* 예약 실패는 조용히 무시 — 컨셉 공개 자체와는 무관 */
+  }
+}
+
 export async function cancelExpiryNotice(id) {
   const LN = await getPlugin();
   if (!LN) return;
