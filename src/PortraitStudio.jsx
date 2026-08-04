@@ -1158,6 +1158,45 @@ export default function PortraitStudio() {
     setScreen("home"); // 컨셉 선택 후 사진 업로드 화면으로
   }
 
+  // ── 확인화면에서 좌우로 넘겨 다른 컨셉 보기 ──
+  // 갤러리에서 보던 순서(필터/검색 적용된 목록) 그대로 앞뒤로 이동한다.
+  // 사진을 다시 올릴 필요가 없으면 확인화면에 머물고, 필요하면 업로드 화면으로 보낸다.
+  function switchConcept(dir) {
+    const pool = filtered.length ? filtered : visiblePool;
+    if (!selected || pool.length < 2) return false;
+    const from = pool.findIndex((p) => p.id === selected.id);
+    if (from < 0) return false;
+
+    // 증명사진은 누르면 외부 앱 유도 모달이 뜨는 컨셉이라 스와이프로는 건너뛴다
+    let next = null;
+    for (let step = 1; step <= pool.length; step++) {
+      const cand = pool[(from + dir * step + pool.length * step) % pool.length];
+      if (!isIdPhoto(cand)) { next = cand; break; }
+    }
+    if (!next || next.id === selected.id) return false;
+
+    if (next.fourcutStyle && FOURCUT_STYLES.some((s) => s.key === next.fourcutStyle)) {
+      setFourcutStyleKey(next.fourcutStyle);
+    }
+
+    // 동의 문구가 바뀌면 체크를 다시 받아야 하고, 그러면 확인화면에 머물 수 없다
+    const consentChanged =
+      isArtConcept(next) !== isArtConcept(selected) ||
+      isCoupleConcept(next) !== isCoupleConcept(selected);
+    if (consentChanged) setAgeConfirmed(false);
+    if (isArtConcept(next)) setArtPhoto(null); // 매직 부스는 매번 새 사진
+
+    const needsPhoto =
+      isArtConcept(next) ||                              // 변환할 사진을 새로 받아야 함
+      (isCoupleConcept(next) && !partnerPhoto) ||        // 상대 사진 없음
+      !photo;                                            // 본인 사진 없음
+
+    setNavDir("fwd");
+    setSelected(next);
+    if (consentChanged || needsPhoto) setScreen("home");
+    return true;
+  }
+
   // ── 증명사진 → Brooklyn(picbox) 스토어로 유도 ──
   async function openBrooklyn() {
     const ua = navigator.userAgent || "";
@@ -1236,7 +1275,7 @@ export default function PortraitStudio() {
 
   function onTouchStartRoot(e) {
     swipeRef.current = null;
-    if (!canSwipeBack()) return;
+    if (showBrooklyn) return;
     const tt = e.touches && e.touches[0];
     if (!tt) return;
     // 가로로 스크롤되는 줄(인기 컨셉 등)에서 시작했으면 그쪽 제스처에 양보
@@ -1244,8 +1283,13 @@ export default function PortraitStudio() {
     const rect = e.currentTarget.getBoundingClientRect();
     const x = tt.clientX - rect.left; // ← 뷰포트가 아니라 앱 컨테이너 기준
     const edge = Math.max(44, rect.width * 0.14);
-    if (x < 0 || x > edge) return;
-    swipeRef.current = { x0: tt.clientX, y0: tt.clientY, t0: Date.now(), w: rect.width, axis: null };
+    // 왼쪽 엣지에서 시작 = 뒤로가기, 그 밖에서 시작 = (확인화면이면) 컨셉 넘기기.
+    // iOS 와 같은 규칙이라 두 제스처가 서로 안 싸운다.
+    const mode = x >= 0 && x <= edge
+      ? (canSwipeBack() ? "back" : null)
+      : (screen === "confirm" ? "concept" : null);
+    if (!mode) return;
+    swipeRef.current = { mode, x0: tt.clientX, y0: tt.clientY, t0: Date.now(), w: rect.width, axis: null };
   }
 
   function onTouchMoveRoot(e) {
@@ -1262,24 +1306,41 @@ export default function PortraitStudio() {
       if (s.axis === "y") { swipeRef.current = null; return; }
     }
     s.dx = dx;
-    // 왼쪽으로 되돌리면 0 에 붙이고, 오른쪽 끝에서는 고무줄처럼 저항
-    const px = dx <= 0 ? 0 : Math.min(dx, s.w * 0.9);
-    paintDrag(px, false);
+    if (s.mode === "back") {
+      // 왼쪽으로 되돌리면 0 에 붙임
+      paintDrag(dx <= 0 ? 0 : Math.min(dx, s.w * 0.9), false);
+    } else {
+      // 컨셉 넘기기는 양방향 — 끝에서 고무줄처럼 저항
+      paintDrag(Math.max(-s.w * 0.5, Math.min(dx, s.w * 0.5)) * 0.9, false);
+    }
   }
 
   function onTouchEndRoot() {
     const s = swipeRef.current;
     if (!s) return;
     const dx = s.dx || 0;
-    const v = dx / Math.max(1, Date.now() - s.t0); // px/ms
-    // 충분히 끌었거나(32%) 짧아도 빠르게 튕겼으면(60px + 속도) 뒤로
-    const commit = dx > s.w * 0.32 || (dx > 60 && v > 0.35);
+    const v = Math.abs(dx) / Math.max(1, Date.now() - s.t0); // px/ms
     swipeRef.current = null;
-    if (commit) {
-      paintDrag(0, false); // slideBack 애니메이션과 겹치지 않게 즉시 원위치
+
+    if (s.mode === "back") {
+      // 충분히 끌었거나(32%) 짧아도 빠르게 튕겼으면(60px + 속도) 뒤로
+      if (dx > s.w * 0.32 || (dx > 60 && v > 0.35)) {
+        paintDrag(0, false); // slideBack 애니메이션과 겹치지 않게 즉시 원위치
+        const el = mainRef.current;
+        if (el) el.style.opacity = "";
+        goBack();
+      } else {
+        endDrag();
+      }
+      return;
+    }
+
+    // 컨셉 넘기기: 왼쪽으로 밀면 다음, 오른쪽으로 밀면 이전
+    const enough = Math.abs(dx) > s.w * 0.25 || (Math.abs(dx) > 50 && v > 0.35);
+    if (enough && switchConcept(dx < 0 ? 1 : -1)) {
+      paintDrag(0, false);
       const el = mainRef.current;
       if (el) el.style.opacity = "";
-      goBack();
     } else {
       endDrag();
     }
@@ -1765,6 +1826,7 @@ export default function PortraitStudio() {
             photo={isArtConcept(selected) ? artPhoto : photo}
             art={isArtConcept(selected)}
             partnerPhoto={isCoupleConcept(selected) ? partnerPhoto : null}
+            canSwitch={(filtered.length ? filtered : visiblePool).length > 1}
             prompt={selected}
             freeLeft={freeLeft}
             credits={credits}
@@ -2846,7 +2908,7 @@ function ConfirmScreen({
   photo, prompt, freeLeft, credits, canGenerate, art,
   idPhoto, idSuit, setIdSuit, idBg, setIdBg,
   fourcut, fourcutCount, setFourcutCount, fourcutStyleKey, setFourcutStyleKey,
-  onBack, onGenerate, onStore, partnerPhoto = null,
+  onBack, onGenerate, onStore, partnerPhoto = null, canSwitch = false,
 }) {
   const useFree = freeLeft > 0;
   return (
@@ -2887,6 +2949,7 @@ function ConfirmScreen({
         <div style={S.confirmTitle}>{localizedTitle(prompt)}</div>
         <div style={S.confirmCat}>{localizedCategory(prompt.category)}</div>
         <div style={S.promptPeek}>{t(art ? "step3.peekArt" : "step3.peek")}</div>
+        {canSwitch && <div style={S.swipeHint}>{t("step3.swipeHint")}</div>}
       </div>
 
       {fourcut && (
@@ -4366,6 +4429,9 @@ const S = {
   confirmCat: {
     fontSize: 11, fontWeight: 700, color: ACCENT,
     marginTop: 4, marginBottom: 11,
+  },
+  swipeHint: {
+    fontSize: 11, fontWeight: 600, opacity: 0.42, marginTop: 8, textAlign: "center",
   },
   promptPeek: {
     fontSize: 11.5, lineHeight: 1.6, opacity: 0.55, fontWeight: 500,
