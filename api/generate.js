@@ -132,13 +132,25 @@ function nearestAspect(w, h) {
 const PHOTOREALISM =
   "CRITICAL — the output must look like a REAL PHOTOGRAPH taken by a professional photographer, " +
   "not an AI image, not a 3D render, not an illustration, not a digital painting. " +
-  "PRESERVE the person's real skin texture: visible pores, fine lines, natural skin tone variation, " +
-  "freckles, moles and small blemishes exactly as they are — skin must read as real human skin, not retouched. " +
+  // ⚠️ 예전엔 여기서 "잡티·주근깨·점을 있는 그대로 보존, 리터칭하지 말 것" 이라고 지시했다.
+  //    AI 티(밀랍 피부)를 막으려던 건데, 그 결과 여드름·홍조·잡티가 그대로 살아나
+  //    "사진관에서 찍은 인생사진" 이라는 제품의 목적과 정면으로 어긋났다.
+  //    → 실제 화보 리터처가 하는 일을 그대로 시킨다: 결점은 지우되 피부 결(모공)은 남긴다.
+  "SKIN — ULTRA-REALISTIC SOFT SKIN. Retouch it the way a professional beauty/editorial retoucher would: " +
+  "cleanly remove acne, pimples, spots, blemishes, blotchy redness, irritation, dark under-eye circles " +
+  "and uneven patches, and even out the overall skin tone into soft, clear, healthy skin with a natural glow. " +
+  "BUT keep it photographic: pore texture stays visible though softened, fine skin detail and the natural " +
+  "highlights and shadows of the face remain, and the person's real skin tone and undertone are unchanged. " +
+  "Aim for 'she has really good skin in this photo', NOT porcelain-doll or mannequin skin — " +
+  "never blurred, smudged, plastic, waxy, or airbrushed flat. " +
+  "Do NOT change the person's face shape, features, proportions or identity while doing this. " +
   "Keep natural facial asymmetry (eyes, brows and mouth are never perfectly symmetrical on a real face). " +
   "Keep real hair detail: individual strands, natural flyaways, a real hairline that is not painted-on. " +
-  "STRICTLY AVOID the typical AI/CGI look: waxy or plastic skin, airbrushed or over-smoothed faces, " +
-  "doll-like or beautified features, exaggerated symmetry, glassy or over-bright eyes, over-sharpened edges, " +
-  "halo outlines, unnatural glow or bloom, oversaturated colors, and a too-perfect flawless appearance. " +
+  // 아래 금지 목록은 "AI 티" 에 대한 것이지 피부 결점에 대한 게 아니다.
+  // 예전엔 여기 "too-perfect flawless appearance 금지" 가 있어서 위 리터칭 지시와 싸웠다.
+  "STRICTLY AVOID the typical AI/CGI look: waxy or plastic skin, blurred or melted-looking faces, " +
+  "doll-like or reshaped features, exaggerated symmetry, glassy or over-bright eyes, over-sharpened edges, " +
+  "halo outlines, unnatural glow or bloom, and oversaturated colors. " +
   "Camera: full-frame DSLR with an 85mm lens at around f/2.8 — natural, believable depth of field, " +
   "true-to-life color, natural micro-contrast and a faint, fine sensor grain like a real photograph. ";
 
