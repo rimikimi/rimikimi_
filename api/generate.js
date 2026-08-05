@@ -487,43 +487,85 @@ export default async function handler(req, res) {
     return up.status === 404 || (up.status >= 500 && up.status <= 599);
   }
 
-  // Vercel Hobby maxDuration 60s 안에서 (Pro 시도 + 폴백 재시도 + precheck/갤러리저장 여유)가
-  // 모두 끝나야 하므로 각 시도에 짧은 타임아웃을 건다. Pro 단독 성공 시엔 보통 ~25s.
-  const PRO_TIMEOUT_MS = 28000;
-  const FALLBACK_TIMEOUT_MS = 22000;
-  const SOLO_TIMEOUT_MS = 45000; // Pro 대상이 아닌 무료 경로(base 단일 시도)
+  // 남은 시간 예산. Vercel maxDuration 60s 안에서 (여러 번의 생성 시도 +
+  // precheck·갤러리저장 여유)가 전부 끝나야 한다.
+  const DEADLINE = Date.now() + 50000;
+  const left = () => DEADLINE - Date.now();
+  const budget = (want) => Math.min(want, left());
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  const PRO_MODEL = "gemini-3-pro-image";
+  const BASE_MODEL = "gemini-3.1-flash-image";
 
   let engineUsed = useProEngine ? "pro" : "base";
   let busyFallback = false;
-  let result = await callGemini(
-    useProEngine ? "gemini-3-pro-image" : "gemini-3.1-flash-image",
-    useProEngine,
-    useProEngine ? PRO_TIMEOUT_MS : SOLO_TIMEOUT_MS
-  );
+  let result;
 
-  // Pro가 혼잡(404/타임아웃/5xx)이면 base로 1회 자동 재시도 — 유저는 에러를 안 본다.
-  // 폴백이 발생한 요청은 크레딧/무료체험/하루한도를 전혀 차감하지 않는다(아래 6번 참고).
-  if (useProEngine && isBusyFailure(result)) {
-    console.error(
-      "[generate] Pro 혼잡 → base 폴백:",
-      result.networkError?.message || `HTTP ${result.upstream?.status}`
-    );
-    engineUsed = "base";
-    busyFallback = true;
-    result = await callGemini("gemini-3.1-flash-image", false, FALLBACK_TIMEOUT_MS);
+  if (useProEngine) {
+    // 1) Pro
+    result = await callGemini(PRO_MODEL, true, budget(26000));
+
+    // 2) Pro 혼잡(404/타임아웃/5xx)이면 base 로 폴백 — 유저는 에러를 안 본다.
+    //    폴백이 발생한 요청은 크레딧/무료체험/하루한도를 전혀 차감하지 않는다(아래 6번 참고).
+    if (isBusyFailure(result)) {
+      console.error("[generate] Pro 혼잡 → base 폴백:",
+        result.networkError?.message || `HTTP ${result.upstream?.status}`);
+      engineUsed = "base";
+      busyFallback = true;
+      result = await callGemini(BASE_MODEL, false, budget(15000));
+
+      // 3) base 까지 혼잡하면 짧게 쉬고 한 번 더.
+      //    503 "Spikes in demand are usually temporary" 는 실제로 몇 초 만에 풀리는 경우가 많은데,
+      //    지금까진 재시도가 아예 없어서 그 순간에 걸린 사용자가 그대로 에러를 봤다.
+      if (isBusyFailure(result) && left() > 9000) {
+        console.error("[generate] base 도 혼잡 → 1.2s 후 재시도");
+        await sleep(1200);
+        result = await callGemini(BASE_MODEL, false, budget(left() - 2000));
+      }
+    }
+  } else {
+    result = await callGemini(BASE_MODEL, false, budget(30000));
+    if (isBusyFailure(result) && left() > 9000) {
+      console.error("[generate] base 혼잡 → 1.2s 후 재시도");
+      await sleep(1200);
+      result = await callGemini(BASE_MODEL, false, budget(left() - 2000));
+    }
   }
 
+  // ⚠️ 여기까지 왔다는 건 폴백·재시도까지 전부 실패했다는 뜻이다.
+  //    예전엔 Gemini 원문 JSON("503 UNAVAILABLE...", "This operation was aborted")을
+  //    그대로 화면에 뿌려서, 사용자는 무슨 일인지도 모르고 차감됐는지도 알 수 없었다.
+  //    → 사람이 읽을 수 있는 안내 + "차감 안 됨" 을 명시한다. (실제로 차감은 이 아래에서 일어난다)
+  const BUSY_MSG =
+    "지금 이미지 서버가 많이 붐비고 있어요.\n1~2분 뒤에 다시 시도해 주세요.\n크레딧은 차감되지 않았어요 🙂";
+
   if (result.networkError) {
-    return res.status(502).json({
-      error: "Gemini 호출 실패: " + (result.networkError?.message || String(result.networkError)),
+    console.error("[generate] 최종 실패(네트워크):", result.networkError?.message || result.networkError);
+    return res.status(503).json({
+      error: BUSY_MSG,
+      busy: true,
+      quotaUsed: unlimited ? 0 : usage.count,
+      quotaLimit: unlimited ? null : dailyLimit,
+      unlimited,
     });
   }
   const upstream = result.upstream;
 
   if (!upstream.ok) {
     const raw = await upstream.text().catch(() => "");
+    console.error("[generate] 최종 실패:", upstream.status, raw.slice(0, 300));
+    // 혼잡 계열(5xx/404)은 사용자 잘못이 아니므로 안내 문구로, 그 외(400 등)만 원문을 보여준다.
+    if (upstream.status === 404 || upstream.status >= 500) {
+      return res.status(503).json({
+        error: BUSY_MSG,
+        busy: true,
+        quotaUsed: unlimited ? 0 : usage.count,
+        quotaLimit: unlimited ? null : dailyLimit,
+        unlimited,
+      });
+    }
     return res.status(upstream.status).json({
-      error: "Gemini 오류 (" + upstream.status + ")",
+      error: "이미지를 만들지 못했어요 (오류 " + upstream.status + ")\n크레딧은 차감되지 않았어요.",
       detail: raw.slice(0, 500),
     });
   }
