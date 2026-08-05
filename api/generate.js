@@ -501,9 +501,29 @@ export default async function handler(req, res) {
   let busyFallback = false;
   let result;
 
+  // base 를 최대 2번까지 시도한다 (1.2s 백오프). 혼잡은 대개 몇 초 만에 풀린다.
+  async function baseWithRetry(first) {
+    let r = await callGemini(BASE_MODEL, false, budget(first));
+    if (isBusyFailure(r) && left() > 6000) {
+      console.error("[generate] base 혼잡 → 1.2s 후 재시도:",
+        r.networkError?.message || `HTTP ${r.upstream?.status}`);
+      await sleep(1200);
+      r = await callGemini(BASE_MODEL, false, budget(left() - 1500));
+      if (isBusyFailure(r)) {
+        console.error("[generate] base 재시도도 실패:",
+          r.networkError?.message || `HTTP ${r.upstream?.status}`);
+      }
+    }
+    return r;
+  }
+
   if (useProEngine) {
     // 1) Pro
-    result = await callGemini(PRO_MODEL, true, budget(26000));
+    //    ⚠️ 실측(2026-08-05 로그): Pro 가 26s 를 넘겨 abort 되는 케이스가 반복됐다.
+    //    Pro 를 오래 기다릴수록 폴백에 남는 시간이 없어져 "둘 다 실패" 로 끝난다.
+    //    Pro 성공률을 조금 포기하고 폴백에 시간을 몰아주는 편이 최종 성공률이 높다.
+    //    (폴백으로 나간 요청은 어차피 무과금이라 사용자는 손해가 없다)
+    result = await callGemini(PRO_MODEL, true, budget(20000));
 
     // 2) Pro 혼잡(404/타임아웃/5xx)이면 base 로 폴백 — 유저는 에러를 안 본다.
     //    폴백이 발생한 요청은 크레딧/무료체험/하루한도를 전혀 차감하지 않는다(아래 6번 참고).
@@ -512,24 +532,10 @@ export default async function handler(req, res) {
         result.networkError?.message || `HTTP ${result.upstream?.status}`);
       engineUsed = "base";
       busyFallback = true;
-      result = await callGemini(BASE_MODEL, false, budget(15000));
-
-      // 3) base 까지 혼잡하면 짧게 쉬고 한 번 더.
-      //    503 "Spikes in demand are usually temporary" 는 실제로 몇 초 만에 풀리는 경우가 많은데,
-      //    지금까진 재시도가 아예 없어서 그 순간에 걸린 사용자가 그대로 에러를 봤다.
-      if (isBusyFailure(result) && left() > 9000) {
-        console.error("[generate] base 도 혼잡 → 1.2s 후 재시도");
-        await sleep(1200);
-        result = await callGemini(BASE_MODEL, false, budget(left() - 2000));
-      }
+      result = await baseWithRetry(13000);
     }
   } else {
-    result = await callGemini(BASE_MODEL, false, budget(30000));
-    if (isBusyFailure(result) && left() > 9000) {
-      console.error("[generate] base 혼잡 → 1.2s 후 재시도");
-      await sleep(1200);
-      result = await callGemini(BASE_MODEL, false, budget(left() - 2000));
-    }
+    result = await baseWithRetry(26000);
   }
 
   // ⚠️ 여기까지 왔다는 건 폴백·재시도까지 전부 실패했다는 뜻이다.
