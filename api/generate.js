@@ -163,6 +163,61 @@ const REALISTIC_GARMENT =
   "fabric, no painted or illustrated appearance, no stiff cardboard collar, no floating or " +
   "pasted-on garment, no costume-like styling, no AI artifacts. ";
 
+/* ============================================================
+   Vertex AI 경로
+   AI Studio API(generativelanguage)와 "같은 모델, 다른 인프라" 다.
+   2026-08-06: AI Studio 쪽 이미지 모델이 종일 503(high demand) 인 상태에서
+   Vertex 로는 gemini-3-pro-image 가 정상 생성됐다(200, 29s). 그래서 Vertex 를
+   1순위로 쓰고 AI Studio 를 폴백으로 둔다.
+   ⚠️ location 은 반드시 global — us-central1 은 404 (모델 미배포).
+   ============================================================ */
+const VERTEX_LOCATION = "global";
+let vertexTokenCache = { token: null, exp: 0 };
+
+function b64url(buf) {
+  return Buffer.from(buf).toString("base64")
+    .replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+}
+
+// 서비스 계정 → OAuth 액세스 토큰. 1시간짜리라 람다가 살아있는 동안 재사용한다.
+async function getVertexToken(sa) {
+  if (vertexTokenCache.token && Date.now() < vertexTokenCache.exp) {
+    return vertexTokenCache.token;
+  }
+  const { createSign } = await import("node:crypto");
+  const now = Math.floor(Date.now() / 1000);
+  const header = b64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
+  const claims = b64url(JSON.stringify({
+    iss: sa.client_email,
+    scope: "https://www.googleapis.com/auth/cloud-platform",
+    aud: "https://oauth2.googleapis.com/token",
+    iat: now, exp: now + 3600,
+  }));
+  const signer = createSign("RSA-SHA256");
+  signer.update(`${header}.${claims}`);
+  const jwt = `${header}.${claims}.${b64url(signer.sign(sa.private_key))}`;
+
+  const r = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+      assertion: jwt,
+    }),
+  });
+  const j = await r.json();
+  if (!j.access_token) throw new Error("vertex token 실패: " + JSON.stringify(j).slice(0, 150));
+  // 실제 만료(3600s)보다 5분 일찍 버려서 경계에서 만료된 토큰을 쓰지 않게 한다
+  vertexTokenCache = { token: j.access_token, exp: Date.now() + 55 * 60 * 1000 };
+  return j.access_token;
+}
+
+function vertexSA() {
+  const raw = process.env.VERTEX_SA_JSON;
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch (_) { return null; }
+}
+
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin","*");
   res.setHeader("Access-Control-Allow-Methods","GET,POST,DELETE,OPTIONS");
@@ -483,8 +538,13 @@ export default async function handler(req, res) {
 
   // Pro 서버 혼잡 판정: 네트워크 예외(타임아웃/hang 포함) · 404(빈 응답) · 5xx.
   // (2026-07-21 실측: 같은 키로 8/8 404 → 몇 분 뒤 15/15 성공 — 일시적 혼잡이지 우리 요청 문제가 아님.)
-  function isBusyFailure({ networkError, upstream: up }) {
-    if (networkError) return true;
+  // ⚠️ null/undefined 도 "실패" 로 본다 — 예산이 없어 시도조차 못 한 경로가 있어서,
+  //    그대로 두면 구조분해에서 TypeError 가 나 500 이 떨어진다.
+  function isBusyFailure(r) {
+    if (!r) return true;
+    if (r.networkError) return true;
+    const up = r.upstream;
+    if (!up) return true;
     return up.status === 404 || (up.status >= 500 && up.status <= 599);
   }
 
@@ -511,6 +571,31 @@ export default async function handler(req, res) {
   let engineUsed = useProEngine ? "pro" : "base";
   let busyFallback = false;
   let result;
+
+  // Vertex 로 호출 (AI Studio 와 요청/응답 본문 형태가 같아 bodyFor 를 그대로 쓴다)
+  async function callVertex(model, isPro, timeoutMs) {
+    const sa = vertexSA();
+    if (!sa) return { networkError: new Error("VERTEX_SA_JSON 미설정") };
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const token = await getVertexToken(sa);
+      const url =
+        `https://aiplatform.googleapis.com/v1/projects/${sa.project_id}` +
+        `/locations/${VERTEX_LOCATION}/publishers/google/models/${model}:generateContent`;
+      const upstream = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+        body: JSON.stringify(bodyFor(isPro)),
+        signal: controller.signal,
+      });
+      return { upstream };
+    } catch (e) {
+      return { networkError: e };
+    } finally {
+      clearTimeout(timer);
+    }
+  }
 
   // ── 나노바나나 프로(3-pro)를 최대한 살린다 ──
   // 오너 방침: 기본 모델은 무조건 gemini-3-pro-image.
@@ -555,17 +640,31 @@ export default async function handler(req, res) {
   }
 
   if (useProEngine) {
-    // 1) 나노바나나 프로를 예산이 허락하는 만큼 반복 시도 (기본 모델 사수).
-    //    마지막 12s 는 폴백 몫으로 남긴다 — 다 실패해도 사용자는 사진을 받아야 하니까.
-    result = await proWithRetries(12000);
+    // 1) Vertex 로 나노바나나 프로 (1순위).
+    //    실측 ~29s 로 느리므로 넉넉히 주되, 실패 시 AI Studio 몫을 남겨둔다.
+    if (vertexSA()) {
+      result = await callVertex(PRO_MODEL, true, budget(34000));
+      if (!isBusyFailure(result)) {
+        console.log("[generate] Vertex 3-pro 성공");
+      } else {
+        console.error("[generate] Vertex 3-pro 실패:",
+          result.networkError?.message || `HTTP ${result.upstream?.status}`);
+      }
+    }
 
-    // 2) 그래도 안 되면 폴백. 유저는 에러 대신 사진을 받는다.
+    // 2) Vertex 가 없거나 실패하면 AI Studio 로 같은 모델 재시도.
+    if (!result || isBusyFailure(result)) {
+      const r2 = await proWithRetries(10000);
+      if (r2) result = r2;
+    }
+
+    // 3) 그래도 안 되면 하위 모델 폴백. 유저는 에러 대신 사진을 받는다.
     //    폴백으로 나간 요청은 크레딧/무료체험/하루한도를 전혀 차감하지 않는다(아래 6번 참고).
     if (isBusyFailure(result)) {
-      console.error("[generate] 3-pro 재시도 모두 실패 → 폴백");
+      console.error("[generate] 3-pro 전 경로 실패 → 하위 모델 폴백");
       engineUsed = "base";
       busyFallback = true;
-      result = await baseThenLegacy(Math.max(6000, left() - 4000));
+      result = await baseThenLegacy(Math.max(6000, left() - 3000));
     }
   } else {
     result = await baseThenLegacy(24000);
@@ -578,8 +677,9 @@ export default async function handler(req, res) {
   const BUSY_MSG =
     "지금 이미지 서버가 많이 붐비고 있어요.\n1~2분 뒤에 다시 시도해 주세요.\n크레딧은 차감되지 않았어요 🙂";
 
-  if (result.networkError) {
-    console.error("[generate] 최종 실패(네트워크):", result.networkError?.message || result.networkError);
+  if (!result || result.networkError || !result.upstream) {
+    console.error("[generate] 최종 실패(네트워크):",
+      result?.networkError?.message || result?.networkError || "시도 없음");
     return res.status(503).json({
       error: BUSY_MSG,
       busy: true,
