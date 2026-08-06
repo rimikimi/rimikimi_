@@ -169,6 +169,41 @@ export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Headers","authorization,content-type");
   if (req.method === "OPTIONS") return res.status(204).end();
 
+  // ── 임시: 3-pro 반복시도 성공률 측정 (GET ?probe=<CRON_SECRET>) ──
+  // "재시도가 실제로 뚫리는가" 를 숫자로 확인하기 위한 것. 확인 후 제거.
+  if (req.method === "GET" && req.query?.probe) {
+    if (!process.env.CRON_SECRET || req.query.probe !== process.env.CRON_SECRET) {
+      return res.status(401).json({ error: "unauthorized" });
+    }
+    const key = process.env.GEMINI_API_KEY;
+    const out = [];
+    const deadline = Date.now() + 52000;
+    for (let i = 1; Date.now() < deadline - 9000; i++) {
+      const t0 = Date.now();
+      try {
+        const r = await fetch(
+          "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image:generateContent",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+            body: JSON.stringify({ contents: [{ parts: [{ text: "a red apple on a white table" }] }] }),
+            signal: AbortSignal.timeout(Math.min(20000, deadline - Date.now())),
+          }
+        );
+        out.push({ try: i, status: r.status, ms: Date.now() - t0 });
+        if (r.ok) break;
+      } catch (e) {
+        out.push({ try: i, status: "timeout", ms: Date.now() - t0 });
+      }
+      await new Promise((r2) => setTimeout(r2, 600));
+    }
+    return res.status(200).json({
+      model: "gemini-3-pro-image",
+      attempts: out,
+      success: out.some((o) => o.status === 200),
+    });
+  }
+
   if (req.method !== "POST") {
     return res.status(405).json({ error: "POST 만 받습니다." });
   }
@@ -508,6 +543,29 @@ export default async function handler(req, res) {
   let busyFallback = false;
   let result;
 
+  // ── 나노바나나 프로(3-pro)를 최대한 살린다 ──
+  // 오너 방침: 기본 모델은 무조건 gemini-3-pro-image.
+  // ⚠️ "더 오래 기다리기" 는 통하지 않는다 — 진단 실측상 45s 를 줘도 16s 에 503 이 온다.
+  //    거절이 빠르므로 유일한 레버는 "예산이 남는 한 계속 다시 던지는 것" 이다.
+  //    한 번 시도에 ~17s 가 걸려 60s 안에서 2~3회가 한계.
+  async function proWithRetries(reserveForFallback) {
+    let r = null;
+    for (let attempt = 1; ; attempt++) {
+      // 마지막 폴백 몫을 남겨두고, 한 번 더 던질 시간이 있는지 본다
+      const usable = left() - reserveForFallback;
+      if (usable < 9000) break;
+      r = await callGemini(PRO_MODEL, true, Math.min(20000, usable));
+      if (!isBusyFailure(r)) {
+        if (attempt > 1) console.log(`[generate] 3-pro ${attempt}번째 시도에서 성공`);
+        return r;
+      }
+      console.error(`[generate] 3-pro ${attempt}번째 실패:`,
+        r.networkError?.message || `HTTP ${r.upstream?.status}`);
+      await sleep(600); // 짧게만 — 거절 자체가 이미 오래 걸린다
+    }
+    return r;
+  }
+
   // base(3.1) → 안 되면 구세대(2.5) 로 갈아탄다.
   // ⚠️ 같은 모델을 재시도하는 건 효과가 없었다 (실측: 재시도까지 3번 연속 같은 503).
   //    혼잡한 건 모델 자체라, 다른 계열로 넘어가야 뚫린다.
@@ -528,21 +586,17 @@ export default async function handler(req, res) {
   }
 
   if (useProEngine) {
-    // 1) Pro
-    //    ⚠️ 실측(2026-08-05 로그): Pro 가 26s 를 넘겨 abort 되는 케이스가 반복됐다.
-    //    Pro 를 오래 기다릴수록 폴백에 남는 시간이 없어져 "둘 다 실패" 로 끝난다.
-    //    Pro 성공률을 조금 포기하고 폴백에 시간을 몰아주는 편이 최종 성공률이 높다.
-    //    (폴백으로 나간 요청은 어차피 무과금이라 사용자는 손해가 없다)
-    result = await callGemini(PRO_MODEL, true, budget(18000));
+    // 1) 나노바나나 프로를 예산이 허락하는 만큼 반복 시도 (기본 모델 사수).
+    //    마지막 12s 는 폴백 몫으로 남긴다 — 다 실패해도 사용자는 사진을 받아야 하니까.
+    result = await proWithRetries(12000);
 
-    // 2) Pro 혼잡(404/타임아웃/5xx)이면 base 로 폴백 — 유저는 에러를 안 본다.
-    //    폴백이 발생한 요청은 크레딧/무료체험/하루한도를 전혀 차감하지 않는다(아래 6번 참고).
+    // 2) 그래도 안 되면 폴백. 유저는 에러 대신 사진을 받는다.
+    //    폴백으로 나간 요청은 크레딧/무료체험/하루한도를 전혀 차감하지 않는다(아래 6번 참고).
     if (isBusyFailure(result)) {
-      console.error("[generate] Pro 혼잡 → base 폴백:",
-        result.networkError?.message || `HTTP ${result.upstream?.status}`);
+      console.error("[generate] 3-pro 재시도 모두 실패 → 폴백");
       engineUsed = "base";
       busyFallback = true;
-      result = await baseThenLegacy(12000);
+      result = await baseThenLegacy(Math.max(6000, left() - 4000));
     }
   } else {
     result = await baseThenLegacy(24000);
