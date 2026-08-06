@@ -557,7 +557,7 @@ export default async function handler(req, res) {
   //    얼굴 사전검사(~2~4s)를 썼고, 이후에도 축소·갤러리 저장이 남는다.
   //    50s 로 뒀다가 실측에서 "Task timed out after 60 seconds" 가 나서 40s 로 낮춘다.
   //    (타임아웃되면 응답 자체가 없어 클라가 "네트워크 요청 실패" 를 띄운다 — 최악)
-  const DEADLINE = Date.now() + 46000;
+  const DEADLINE = Date.now() + 50000;
   const left = () => DEADLINE - Date.now();
   const budget = (want) => Math.min(want, left());
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -646,7 +646,7 @@ export default async function handler(req, res) {
     // 1) Vertex 로 나노바나나 프로 (1순위).
     //    실측 ~29s 로 느리므로 넉넉히 주되, 실패 시 AI Studio 몫을 남겨둔다.
     if (vertexSA()) {
-      result = await callVertex(PRO_MODEL, true, budget(42000));
+      result = await callVertex(PRO_MODEL, true, budget(46000));
       if (!isBusyFailure(result)) {
         console.log("[generate] Vertex 3-pro 성공");
       } else {
