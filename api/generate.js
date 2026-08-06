@@ -168,6 +168,56 @@ export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Methods","GET,POST,DELETE,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers","authorization,content-type");
   if (req.method === "OPTIONS") return res.status(204).end();
+
+  // ── 임시 진단 (GET /api/generate?diag=<CRON_SECRET>) ──
+  // GEMINI_API_KEY 가 Vercel sensitive 라 로컬에서 값을 읽을 수 없다.
+  // "구글이 죽은 건지 / 우리 요청이 문제인지" 를 가르려면 서버가 대신 찔러봐야 한다.
+  // 원인 확인 후 이 블록은 제거할 것.
+  if (req.method === "GET" && req.query?.diag) {
+    if (!process.env.CRON_SECRET || req.query.diag !== process.env.CRON_SECRET) {
+      return res.status(401).json({ error: "unauthorized" });
+    }
+    const key = process.env.GEMINI_API_KEY;
+    if (!key) return res.status(500).json({ error: "GEMINI_API_KEY 없음" });
+    // 1x1 투명 PNG — 이미지 입력 경로가 문제인지 보려고
+    const TINY =
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+    const probes = [
+      ["2.5-flash-image / 텍스트만", "gemini-2.5-flash-image", false],
+      ["3.1-flash-image / 텍스트만", "gemini-3.1-flash-image", false],
+      ["3-pro-image / 텍스트만", "gemini-3-pro-image", false],
+      ["2.5-flash-image / 이미지입력", "gemini-2.5-flash-image", true],
+      ["2.5-flash-lite / 텍스트(대조군)", "gemini-2.5-flash-lite", false],
+    ];
+    const out = [];
+    for (const [label, model, withImg] of probes) {
+      const parts = [{ text: "a red apple on a white table" }];
+      if (withImg) parts.push({ inline_data: { mime_type: "image/png", data: TINY } });
+      const t0 = Date.now();
+      try {
+        const r = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+            body: JSON.stringify({ contents: [{ parts }] }),
+            signal: AbortSignal.timeout(9000),
+          }
+        );
+        const body = await r.text();
+        let msg = "";
+        try { msg = JSON.parse(body)?.error?.message || ""; } catch (_) {}
+        out.push({
+          probe: label, status: r.status, ms: Date.now() - t0,
+          ok: r.ok, msg: msg.slice(0, 160),
+        });
+      } catch (e) {
+        out.push({ probe: label, status: "EXC", ms: Date.now() - t0, msg: String(e?.message || e).slice(0, 160) });
+      }
+    }
+    return res.status(200).json({ probes: out });
+  }
+
   if (req.method !== "POST") {
     return res.status(405).json({ error: "POST 만 받습니다." });
   }
