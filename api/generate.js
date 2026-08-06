@@ -184,9 +184,13 @@ export default async function handler(req, res) {
       "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
     // 3-pro 는 앞선 진단에서 503 이 아니라 "9s 타임아웃" 이었다 →
     // 느릴 뿐 살아있을 가능성이 있어 넉넉히 기다려 본다.
+    // 커뮤니티 사례는 -preview 접미사 ID 를 쓴다. 우리 ID 는 503 이 오므로 존재는
+    // 하지만, 별도 용량 풀을 가진 변종이 있는지 확인한다.
     const probes = [
-      ["3-pro-image / 45초 대기", "gemini-3-pro-image", false, 45000],
-      ["3.1-flash-image / 20초 대기", "gemini-3.1-flash-image", false, 20000],
+      ["3-pro-image-preview", "gemini-3-pro-image-preview", false, 20000],
+      ["3-pro-image-latest", "gemini-3-pro-image-latest", false, 12000],
+      ["3.1-flash-image-preview", "gemini-3.1-flash-image-preview", false, 15000],
+      ["2.5-flash-image-preview", "gemini-2.5-flash-image-preview", false, 12000],
     ];
     const out = [];
     for (const [label, model, withImg, ms] of probes) {
