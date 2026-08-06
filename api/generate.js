@@ -169,42 +169,6 @@ export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Headers","authorization,content-type");
   if (req.method === "OPTIONS") return res.status(204).end();
 
-  // ── 임시: 원인 판별 프로브 (GET ?probe=<CRON_SECRET>) ──
-  if (req.method === "GET" && req.query?.probe) {
-    if (!process.env.CRON_SECRET || req.query.probe !== process.env.CRON_SECRET) {
-      return res.status(401).json({ error: "unauthorized" });
-    }
-    const key = process.env.GEMINI_API_KEY;
-    const B = "https://generativelanguage.googleapis.com/v1beta/models/";
-    const jobs = [
-      ["imagen-4.0-generate-001 (:predict)", B + "imagen-4.0-generate-001:predict",
-       { instances: [{ prompt: "a red apple" }], parameters: { sampleCount: 1 } }, 25000],
-      ["nano-banana-pro-preview (30s)", B + "nano-banana-pro-preview:generateContent",
-       { contents: [{ parts: [{ text: "a red apple" }] }] }, 30000],
-      ["gemini-3-pro-image (30s)", B + "gemini-3-pro-image:generateContent",
-       { contents: [{ parts: [{ text: "a red apple" }] }] }, 30000],
-    ];
-    const out = [];
-    for (const [label, url, body, ms] of jobs) {
-      const t0 = Date.now();
-      try {
-        const r = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-          body: JSON.stringify(body),
-          signal: AbortSignal.timeout(ms),
-        });
-        const txt = await r.text();
-        let err = null; try { err = JSON.parse(txt)?.error?.message?.slice(0, 130); } catch (_) {}
-        out.push({ probe: label, status: r.status, ms: Date.now() - t0,
-                   gotImage: /bytesBase64Encoded|inlineData|inline_data/.test(txt), err });
-      } catch (e) {
-        out.push({ probe: label, status: "timeout", ms: Date.now() - t0 });
-      }
-    }
-    return res.status(200).json({ out });
-  }
-
   if (req.method !== "POST") {
     return res.status(405).json({ error: "POST 만 받습니다." });
   }
