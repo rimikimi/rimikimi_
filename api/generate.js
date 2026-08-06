@@ -496,22 +496,31 @@ export default async function handler(req, res) {
 
   const PRO_MODEL = "gemini-3-pro-image";
   const BASE_MODEL = "gemini-3.1-flash-image";
+  // 최후 폴백 — 검증된 구세대 모델.
+  // gemini-3 계열 이미지 모델이 종일 503("high demand")을 뱉는 날이 있는데,
+  // 같은 키의 2.5 계열(precheck 의 gemini-2.5-flash-lite)은 멀쩡히 돌아간다.
+  // 즉 키·쿼터 문제가 아니라 3 계열 용량 문제라, 계열을 바꾸는 게 같은 모델을
+  // 재시도하는 것보다 훨씬 잘 먹는다.
+  const LEGACY_MODEL = "gemini-2.5-flash-image";
 
   let engineUsed = useProEngine ? "pro" : "base";
   let busyFallback = false;
   let result;
 
-  // base 를 최대 2번까지 시도한다 (1.2s 백오프). 혼잡은 대개 몇 초 만에 풀린다.
-  async function baseWithRetry(first) {
+  // base(3.1) → 안 되면 구세대(2.5) 로 갈아탄다.
+  // ⚠️ 같은 모델을 재시도하는 건 효과가 없었다 (실측: 재시도까지 3번 연속 같은 503).
+  //    혼잡한 건 모델 자체라, 다른 계열로 넘어가야 뚫린다.
+  async function baseThenLegacy(first) {
     let r = await callGemini(BASE_MODEL, false, budget(first));
     if (isBusyFailure(r) && left() > 6000) {
-      console.error("[generate] base 혼잡 → 1.2s 후 재시도:",
+      console.error("[generate] base 실패 → 구세대(2.5) 폴백:",
         r.networkError?.message || `HTTP ${r.upstream?.status}`);
-      await sleep(1200);
-      r = await callGemini(BASE_MODEL, false, budget(left() - 1500));
+      r = await callGemini(LEGACY_MODEL, false, budget(left() - 1500));
       if (isBusyFailure(r)) {
-        console.error("[generate] base 재시도도 실패:",
+        console.error("[generate] 구세대(2.5)도 실패:",
           r.networkError?.message || `HTTP ${r.upstream?.status}`);
+      } else {
+        console.log("[generate] 구세대(2.5) 로 성공");
       }
     }
     return r;
@@ -523,7 +532,7 @@ export default async function handler(req, res) {
     //    Pro 를 오래 기다릴수록 폴백에 남는 시간이 없어져 "둘 다 실패" 로 끝난다.
     //    Pro 성공률을 조금 포기하고 폴백에 시간을 몰아주는 편이 최종 성공률이 높다.
     //    (폴백으로 나간 요청은 어차피 무과금이라 사용자는 손해가 없다)
-    result = await callGemini(PRO_MODEL, true, budget(20000));
+    result = await callGemini(PRO_MODEL, true, budget(18000));
 
     // 2) Pro 혼잡(404/타임아웃/5xx)이면 base 로 폴백 — 유저는 에러를 안 본다.
     //    폴백이 발생한 요청은 크레딧/무료체험/하루한도를 전혀 차감하지 않는다(아래 6번 참고).
@@ -532,10 +541,10 @@ export default async function handler(req, res) {
         result.networkError?.message || `HTTP ${result.upstream?.status}`);
       engineUsed = "base";
       busyFallback = true;
-      result = await baseWithRetry(13000);
+      result = await baseThenLegacy(12000);
     }
   } else {
-    result = await baseWithRetry(26000);
+    result = await baseThenLegacy(24000);
   }
 
   // ⚠️ 여기까지 왔다는 건 폴백·재시도까지 전부 실패했다는 뜻이다.
