@@ -169,38 +169,26 @@ export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Headers","authorization,content-type");
   if (req.method === "OPTIONS") return res.status(204).end();
 
-  // ── 임시: 3-pro 반복시도 성공률 측정 (GET ?probe=<CRON_SECRET>) ──
-  // "재시도가 실제로 뚫리는가" 를 숫자로 확인하기 위한 것. 확인 후 제거.
+  // ── 임시: 이 키가 실제로 어떤 모델을 볼 수 있는지 (GET ?probe=<CRON_SECRET>) ──
   if (req.method === "GET" && req.query?.probe) {
     if (!process.env.CRON_SECRET || req.query.probe !== process.env.CRON_SECRET) {
       return res.status(401).json({ error: "unauthorized" });
     }
     const key = process.env.GEMINI_API_KEY;
-    const out = [];
-    const deadline = Date.now() + 52000;
-    for (let i = 1; Date.now() < deadline - 9000; i++) {
-      const t0 = Date.now();
-      try {
-        const r = await fetch(
-          "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image:generateContent",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-            body: JSON.stringify({ contents: [{ parts: [{ text: "a red apple on a white table" }] }] }),
-            signal: AbortSignal.timeout(Math.min(20000, deadline - Date.now())),
-          }
-        );
-        out.push({ try: i, status: r.status, ms: Date.now() - t0 });
-        if (r.ok) break;
-      } catch (e) {
-        out.push({ try: i, status: "timeout", ms: Date.now() - t0 });
-      }
-      await new Promise((r2) => setTimeout(r2, 600));
-    }
+    const r = await fetch(
+      "https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000",
+      { headers: { "x-goog-api-key": key } }
+    );
+    const j = await r.json().catch(() => ({}));
+    const names = (j.models || []).map((m) => m.name.replace("models/", ""));
+    const imageModels = names.filter((n) => /image|banana/i.test(n));
     return res.status(200).json({
-      model: "gemini-3-pro-image",
-      attempts: out,
-      success: out.some((o) => o.status === 200),
+      listStatus: r.status,
+      listError: j?.error?.message?.slice(0, 200) || null,
+      totalModels: names.length,
+      imageModels,
+      hasProImage: names.includes("gemini-3-pro-image"),
+      keyTail: key ? "..." + key.slice(-4) : null,
     });
   }
 
