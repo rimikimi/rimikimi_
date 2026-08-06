@@ -46,7 +46,9 @@ export default function handler(req, res) {
       if (!c || !c.publishAt) return true; // 예약 없는 건 이미 공개된 것
       const t = Date.parse(c.publishAt);
       return !Number.isFinite(t) || t <= now; // 날짜가 깨졌으면 숨기지 않는다
-    }).map(({ publishAt, ...rest }) => rest);
+    });
+    // publishAt 은 지우지 않고 그대로 내려준다 — 앱이 "실제 공개된 순서"로
+    // 정렬하는 데 쓴다. 이미 지난 시각이라 숨길 이유도 없다.
   } catch (_) {
     list = ALL; // 필터가 어떤 이유로든 터지면 전부 내보낸다 (빈 갤러리보다 낫다)
   }

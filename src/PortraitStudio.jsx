@@ -167,7 +167,22 @@ const perImageUsd = (pack) =>
 // 아트 변환 카테고리 = 본인 얼굴이 아닌 임의 사진을 별도로 업로드받는 컨셉.
 // 400번 이상 = 일반 화보 컨셉이 아니라 "기능" 컨셉(매직부스/복원/증명사진/인생네컷 프리셋).
 // 신규(NEW) 줄과 최신순 정렬에서 이들을 구분하는 기준.
-const FEATURE_ID_MIN = 400;
+// "기능" 컨셉 = 매직 부스 / 증명사진 / 인생네컷.
+// 일반 화보 컨셉과 성격이 달라 NEW 줄이나 목록 상단을 점령하면 안 된다.
+// ⚠️ 예전엔 id >= 400 으로 판별했는데, 일반 컨셉이 419번을 넘기면서
+//    새 컨셉이 전부 "기능" 으로 오인돼 목록 뒤로 밀리고 NEW 에서도 빠졌다.
+function isFeatureConcept(p) {
+  return isArtConcept(p) || isIdPhoto(p) || isFourcut(p);
+}
+
+// 실제 공개된 순서(최신 먼저). publishAt 이 있으면 그걸 우선하고,
+// 없으면(=처음부터 공개돼 있던 것) id 로 비교한다.
+function byNewest(a, b) {
+  const ta = a.publishAt ? Date.parse(a.publishAt) : 0;
+  const tb = b.publishAt ? Date.parse(b.publishAt) : 0;
+  if (ta !== tb) return tb - ta;
+  return b.id - a.id;
+}
 
 // 카테고리 칩 노출 순서. concepts.json 의 배열 순서에 따라 칩 순서가 들쭉날쭉해지는 걸 막는다.
 // 여기 없는 카테고리는 뒤에 붙는다. 컨셉이 0개인 카테고리는 칩 자체가 안 뜬다(빈 필터 방지) —
@@ -1044,13 +1059,15 @@ export default function PortraitStudio() {
           p.text.toLowerCase().includes(q);
         return catOk && qOk;
       })
-      // 새로 들어온 컨셉이 먼저 보이게 (id 큰 순 = 최신순).
-      // 단 기능 컨셉(400번대)은 항상 id 가 커서 맨 앞을 차지하므로 뒤로 보낸다.
+      // 실제로 새로 공개된 컨셉이 먼저 보이게.
+      // 기능 컨셉(매직부스/증명사진/인생네컷)만 뒤로 보낸다.
+      // ⚠️ 예전엔 "id >= 400" 을 기능 컨셉으로 봤는데, 일반 컨셉이 419번을
+      //    넘어가면서 새 컨셉이 통째로 뒤로 밀려 있었다.
       .sort((a, b) => {
-        const fa = a.id >= FEATURE_ID_MIN ? 1 : 0;
-        const fb = b.id >= FEATURE_ID_MIN ? 1 : 0;
+        const fa = isFeatureConcept(a) ? 1 : 0;
+        const fb = isFeatureConcept(b) ? 1 : 0;
         if (fa !== fb) return fa - fb;
-        return b.id - a.id;
+        return byNewest(a, b);
       });
   }, [visiblePool, query, activeCat]);
 
@@ -2178,32 +2195,35 @@ function GalleryScreen({
       const fill = [...pool].sort((a, b) => b.id - a.id).filter((p) => !have.has(p.id));
       featured = [...featured, ...fill].slice(0, 5);
     }
-    // 1.5) NEW: 최근 추가된 컨셉 (id 큰 순) — 추천과 같은 크기의 큰 카드 줄
-    //  ⚠️ 400번대는 "기능" 컨셉(매직부스/인생네컷/증명사진 등)이라 id 가 항상 커서 NEW 를 점령한다.
-    //     실제 신규 화보 컨셉만 보여주려고 기능 컨셉은 제외.
+    // 1.5) NEW: 실제로 최근 공개된 컨셉 — 추천과 같은 크기의 큰 카드 줄
+    //  ⚠️ 예전엔 "id < 400" 으로 기능 컨셉(매직부스/인생네컷/증명사진)을 걸렀는데,
+    //     신규 컨셉이 419번대를 넘어가면서 진짜 새 컨셉이 통째로 제외되고
+    //     오래된 것만 NEW 에 뜨고 있었다. → 기능 여부로 직접 판별한다.
     const newest = [...pool]
-      .filter((p) => p.id < FEATURE_ID_MIN)
-      .sort((a, b) => b.id - a.id)
+      .filter((p) => !isFeatureConcept(p))
+      .sort(byNewest)
       .slice(0, 10);
 
     // 2) 카테고리별 컨셉 모음
-    const byCat = new Map(); // catName -> { items, latestId }
+    const byCat = new Map(); // catName -> { items, latest }
     for (const p of pool) {
       const cats = p.categories || (p.category ? [p.category] : []);
+      // 공개 시각이 있으면 그걸로, 없으면 id 를 정렬 키로 쓴다 (숫자 크면 최신)
+      const key = p.publishAt ? Date.parse(p.publishAt) : p.id;
       for (const cat of cats) {
-        if (!byCat.has(cat)) byCat.set(cat, { items: [], latestId: 0 });
+        if (!byCat.has(cat)) byCat.set(cat, { items: [], latest: -Infinity });
         const g = byCat.get(cat);
         g.items.push(p);
-        if (p.id > g.latestId) g.latestId = p.id;
+        if (key > g.latest) g.latest = key;
       }
     }
-    // 카테고리 정렬: 최근 업데이트(=최대 ID) 큰 순
+    // 카테고리 정렬: 최근에 새 컨셉이 들어온 줄이 위로
     const rows = Array.from(byCat.entries())
       .map(([name, g]) => ({
         name,
-        latestId: g.latestId,
+        latestId: g.latest,
         count: g.items.length,
-        items: g.items.sort((a, b) => b.id - a.id).slice(0, 10), // 각 줄에 최신 10개
+        items: g.items.sort(byNewest).slice(0, 10), // 각 줄에 최신 10개
       }))
       .sort((a, b) => b.latestId - a.latestId);
     return { featured, newest, rows };
