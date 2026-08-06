@@ -1046,6 +1046,10 @@ export default function PortraitStudio() {
       });
   }, [visiblePool]);
 
+  // ⚠️ 여기서 정렬하지 않는다. 순서는 서버(/api/concepts)가 이미 정해서 준다.
+  //    정렬 규칙을 앱에 두면 순서 한 줄 바꾸는 데도 스토어 심사를 거쳐야 해서,
+  //    실제로 새 컨셉이 목록 뒤로 밀린 채 오래 방치됐다.
+  //    filter 는 순서를 보존하므로 서버 순서가 그대로 유지된다.
   const filtered = useMemo(() => {
     return visiblePool
       .filter((p) => {
@@ -1058,16 +1062,6 @@ export default function PortraitStudio() {
           cats.some((c) => c.toLowerCase().includes(q)) ||
           p.text.toLowerCase().includes(q);
         return catOk && qOk;
-      })
-      // 실제로 새로 공개된 컨셉이 먼저 보이게.
-      // 기능 컨셉(매직부스/증명사진/인생네컷)만 뒤로 보낸다.
-      // ⚠️ 예전엔 "id >= 400" 을 기능 컨셉으로 봤는데, 일반 컨셉이 419번을
-      //    넘어가면서 새 컨셉이 통째로 뒤로 밀려 있었다.
-      .sort((a, b) => {
-        const fa = isFeatureConcept(a) ? 1 : 0;
-        const fb = isFeatureConcept(b) ? 1 : 0;
-        if (fa !== fb) return fa - fb;
-        return byNewest(a, b);
       });
   }, [visiblePool, query, activeCat]);
 
