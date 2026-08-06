@@ -169,27 +169,41 @@ export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Headers","authorization,content-type");
   if (req.method === "OPTIONS") return res.status(204).end();
 
-  // ── 임시: 이 키가 실제로 어떤 모델을 볼 수 있는지 (GET ?probe=<CRON_SECRET>) ──
+  // ── 임시: 사용 가능한 이미지 모델 전수 조사 (GET ?probe=<CRON_SECRET>) ──
   if (req.method === "GET" && req.query?.probe) {
     if (!process.env.CRON_SECRET || req.query.probe !== process.env.CRON_SECRET) {
       return res.status(401).json({ error: "unauthorized" });
     }
     const key = process.env.GEMINI_API_KEY;
-    const r = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000",
-      { headers: { "x-goog-api-key": key } }
-    );
-    const j = await r.json().catch(() => ({}));
-    const names = (j.models || []).map((m) => m.name.replace("models/", ""));
-    const imageModels = names.filter((n) => /image|banana/i.test(n));
-    return res.status(200).json({
-      listStatus: r.status,
-      listError: j?.error?.message?.slice(0, 200) || null,
-      totalModels: names.length,
-      imageModels,
-      hasProImage: names.includes("gemini-3-pro-image"),
-      keyTail: key ? "..." + key.slice(-4) : null,
-    });
+    const models = [
+      "nano-banana-pro-preview",
+      "gemini-3.1-flash-lite-image",
+      "imagen-4.0-fast-generate-001",
+      "imagen-4.0-generate-001",
+      "gemini-3-pro-image",
+    ];
+    const out = [];
+    for (const m of models) {
+      const t0 = Date.now();
+      try {
+        const r = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+            body: JSON.stringify({ contents: [{ parts: [{ text: "a red apple on a white table" }] }] }),
+            signal: AbortSignal.timeout(9000),
+          }
+        );
+        const j = await r.json().catch(() => ({}));
+        const hasImg = JSON.stringify(j).includes("inlineData") || JSON.stringify(j).includes("inline_data");
+        out.push({ model: m, status: r.status, ms: Date.now() - t0, image: hasImg,
+                   err: j?.error?.message?.slice(0, 110) || null });
+      } catch (e) {
+        out.push({ model: m, status: "timeout", ms: Date.now() - t0 });
+      }
+    }
+    return res.status(200).json({ results: out });
   }
 
   if (req.method !== "POST") {
