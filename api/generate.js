@@ -182,15 +182,14 @@ export default async function handler(req, res) {
     // 1x1 투명 PNG — 이미지 입력 경로가 문제인지 보려고
     const TINY =
       "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+    // 3-pro 는 앞선 진단에서 503 이 아니라 "9s 타임아웃" 이었다 →
+    // 느릴 뿐 살아있을 가능성이 있어 넉넉히 기다려 본다.
     const probes = [
-      ["2.5-flash-image / 텍스트만", "gemini-2.5-flash-image", false],
-      ["3.1-flash-image / 텍스트만", "gemini-3.1-flash-image", false],
-      ["3-pro-image / 텍스트만", "gemini-3-pro-image", false],
-      ["2.5-flash-image / 이미지입력", "gemini-2.5-flash-image", true],
-      ["2.5-flash-lite / 텍스트(대조군)", "gemini-2.5-flash-lite", false],
+      ["3-pro-image / 45초 대기", "gemini-3-pro-image", false, 45000],
+      ["3.1-flash-image / 20초 대기", "gemini-3.1-flash-image", false, 20000],
     ];
     const out = [];
-    for (const [label, model, withImg] of probes) {
+    for (const [label, model, withImg, ms] of probes) {
       const parts = [{ text: "a red apple on a white table" }];
       if (withImg) parts.push({ inline_data: { mime_type: "image/png", data: TINY } });
       const t0 = Date.now();
@@ -201,7 +200,7 @@ export default async function handler(req, res) {
             method: "POST",
             headers: { "Content-Type": "application/json", "x-goog-api-key": key },
             body: JSON.stringify({ contents: [{ parts }] }),
-            signal: AbortSignal.timeout(9000),
+            signal: AbortSignal.timeout(ms),
           }
         );
         const body = await r.text();
