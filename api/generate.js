@@ -501,6 +501,9 @@ export default async function handler(req, res) {
   const bodyFor = (isPro) => ({
     contents: [
       {
+        // ⚠️ role 은 Vertex 에서 필수다 (없으면 400 "Please use a valid role: user, model").
+        //    AI Studio 는 생략해도 받아주므로 예전엔 빠져 있었다. 양쪽 다 이 형태로 동작한다.
+        role: "user",
         parts: [
           { text: instruction },
           { inline_data: { mime_type: mimeType, data: base64 } },
