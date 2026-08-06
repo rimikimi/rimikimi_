@@ -490,7 +490,11 @@ export default async function handler(req, res) {
 
   // 남은 시간 예산. Vercel maxDuration 60s 안에서 (여러 번의 생성 시도 +
   // precheck·갤러리저장 여유)가 전부 끝나야 한다.
-  const DEADLINE = Date.now() + 50000;
+  // ⚠️ 함수 전체가 60s(maxDuration) 안에 끝나야 한다. 여기 도달하기 전에 이미
+  //    얼굴 사전검사(~2~4s)를 썼고, 이후에도 축소·갤러리 저장이 남는다.
+  //    50s 로 뒀다가 실측에서 "Task timed out after 60 seconds" 가 나서 40s 로 낮춘다.
+  //    (타임아웃되면 응답 자체가 없어 클라가 "네트워크 요청 실패" 를 띄운다 — 최악)
+  const DEADLINE = Date.now() + 40000;
   const left = () => DEADLINE - Date.now();
   const budget = (want) => Math.min(want, left());
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
