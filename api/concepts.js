@@ -58,6 +58,16 @@ export default function handler(req, res) {
       return cats.some((x) => FEATURE_CATS.includes(x)) ||
         c.mode === "idphoto" || c.mode === "fourcut";
     };
+    // 추천 줄 고정 자리. 앱은 이 값을 보고 해당 위치에 꽂는다(1 = 첫 번째).
+    // 데이터로만 바꿀 수 있게 서버에 둔다 — 순서 조정에 앱 빌드가 필요 없도록.
+    const PINNED = {
+      408: 2, // 사진 복원 — 추천 두 번째
+    };
+    for (const c of list) {
+      const at = PINNED[Number(c.id)];
+      if (at) c.pinFeatured = at;
+    }
+
     const rank = (c) => (c.publishAt ? Date.parse(c.publishAt) : 0);
     list.sort((a, b) => {
       // 기능 컨셉(매직부스·증명사진·인생네컷)은 항상 뒤로

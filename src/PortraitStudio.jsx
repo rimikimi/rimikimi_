@@ -2260,9 +2260,21 @@ function GalleryScreen({
     let featured = popular.map((id) => byId.get(id)).filter(Boolean).slice(0, 5);
     if (featured.length < 5) {
       const have = new Set(featured.map((p) => p.id));
-      const fill = [...pool].sort((a, b) => b.id - a.id).filter((p) => !have.has(p.id));
+      const fill = [...pool].sort(byNewest).filter((p) => !have.has(p.id));
       featured = [...featured, ...fill].slice(0, 5);
     }
+    // 서버가 지정한 고정 자리(pinFeatured)를 반영한다. 1 = 첫 번째.
+    // 인기순은 매일 바뀌지만 여기 꽂힌 컨셉은 항상 그 자리에 온다.
+    // ⚠️ 자리 지정은 서버 데이터라 순서를 바꿀 때 앱 빌드가 필요 없다.
+    const pinned = pool
+      .filter((p) => Number(p.pinFeatured) > 0)
+      .sort((a, b) => a.pinFeatured - b.pinFeatured);
+    for (const p of pinned) {
+      featured = featured.filter((f) => f.id !== p.id); // 중복 제거 후
+      const at = Math.min(Math.max(1, Number(p.pinFeatured)), featured.length + 1);
+      featured.splice(at - 1, 0, p); // 지정한 자리에 삽입
+    }
+    featured = featured.slice(0, 5);
     // 1.5) NEW: 실제로 최근 공개된 컨셉 — 추천과 같은 크기의 큰 카드 줄
     //  ⚠️ 예전엔 "id < 400" 으로 기능 컨셉(매직부스/인생네컷/증명사진)을 걸렀는데,
     //     신규 컨셉이 419번대를 넘어가면서 진짜 새 컨셉이 통째로 제외되고
