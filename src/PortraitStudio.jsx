@@ -4,7 +4,7 @@ import { isNative, platform, nativePickPhoto, nativeShare, nativeSaveToAlbum } f
 import { initAds, showInterstitial } from "./ads";
 import { initIap, loginIap, logoutIap, getIapPacks, purchaseIap, restoreIap, iapAvailable, isSubscription, getIapDiag } from "./iap";
 import { FOURCUT_COUNTS, FOURCUT_STYLES, composeStrip, todayStr, fourcutStyle } from "./fourcut";
-import { getSavedSet, markSaved, syncExpiryNotifications, cancelExpiryNotice, syncConceptDropNotifications } from "./notify";
+import { getSavedSet, markSaved, syncExpiryNotifications, cancelExpiryNotice, syncConceptDropNotifications, scheduleGenDoneNotice, cancelGenDoneNotice } from "./notify";
 import { t, useLang, getLang, localizedTitle, localizedCategory, getLangPreference, setLang } from "./i18n";
 import LoginGate from "./LoginGate";
 import { shareImage, claimShareRewardApi } from "./share";
@@ -1148,15 +1148,25 @@ export default function PortraitStudio() {
       });
       const j = await r.json();
       const items = j?.items || [];
-      // 생성 시작 시점 이후에 만들어진, 같은 컨셉의 최신 결과
-      const hit = items.find(
+      // 생성 시작 시점 이후에 만들어진, 같은 컨셉의 결과들.
+      // ⚠️ 묶음 생성(3/6/12장)이면 여러 건이므로 전부 모은다 — 한 장만 되살리면
+      //    앱을 닫았던 사용자는 나머지를 영영 못 본다(갤러리엔 있지만 결과화면엔 없음).
+      const mine = items.filter(
         (it) =>
           it.url &&
           String(it.conceptId) === String(p.conceptId) &&
           new Date(it.createdAt).getTime() >= p.startedAt - 5000
       );
+      const hit = mine[0];
       if (hit) {
         setResultImage(hit.url);
+        setResultBatch(
+          mine.length > 1
+            ? mine.map((it) => ({
+                imageDataUrl: it.url, galleryId: it.id, galleryExpiresAt: it.expiresAt,
+              }))
+            : null
+        );
         setGenError(null);
         setGenerating(false);
         // 결과화면은 selected 가 있어야 렌더된다(앱 재시작 후엔 null). 마커의 컨셉으로 복원.
@@ -1592,6 +1602,12 @@ export default function PortraitStudio() {
     setScreen("result");
     // 백그라운드 복구용 마커 (생성 중 앱이 얼거나 요청이 끊겨도 결과를 되찾음)
     writePendingGen({ startedAt: Date.now(), conceptId: selected.id, conceptTitle: selected.title });
+    // 앱을 닫아도 서버는 계속 만든다. "다 됐다"고 알려줄 원격 푸시가 없으므로
+    // 예상 완료 시각에 로컬 알림을 걸어두고, 결과를 받으면 아래에서 취소한다.
+    scheduleGenDoneNotice(
+      isFourcut(selected) ? fourcutCount : batchCount,
+      localizedTitle(selected)
+    );
 
     try {
       const accessToken = session?.access_token;
@@ -1640,8 +1656,9 @@ export default function PortraitStudio() {
           getSavedSet()
         );
       }
-      // 정상 완료 → 복구 마커 제거
+      // 정상 완료 → 복구 마커 제거 + 예약해둔 완료 알림 취소(화면에 이미 떴으니)
       clearPendingGen();
+      cancelGenDoneNotice();
       // 서버가 알려준 진짜 사용량으로 업데이트
       if (typeof result.unlimited === "boolean") setUnlimited(result.unlimited);
       if (typeof result.quotaUsed === "number") setFreeUsed(result.quotaUsed);
@@ -1655,12 +1672,16 @@ export default function PortraitStudio() {
     } catch (err) {
       // 요청이 끊겼어도 서버는 끝냈을 수 있음 → 갤러리에서 방금 결과를 되찾아 표시
       const recovered = await tryRecoverGeneration();
-      if (!recovered) {
+      if (recovered) {
+        cancelGenDoneNotice(); // 결과가 화면에 떴으니 알림 불필요
+      } else {
         // 서버가 한도 정보를 같이 줬으면 화면 카운터도 반영
         if (typeof err.quotaUsed === "number") setFreeUsed(err.quotaUsed);
         setGenError(err.message || "이미지 생성에 실패했어요.");
         // 실패로 확정 — 마커를 남겨두면 이후 앱 복귀마다 갤러리를 헛되이 조회한다
         clearPendingGen();
+        // ⚠️ 실패했는데 "완성됐어요" 알림이 뜨면 안 된다
+        cancelGenDoneNotice();
       }
     } finally {
       setGenerating(false);
@@ -1916,6 +1937,7 @@ export default function PortraitStudio() {
           <ResultScreen
             generating={generating}
             fourcutProgress={fourcutProgress}
+            genCount={isFourcut(selected) ? fourcutCount : batchCount}
             prompt={selected}
             resultImage={resultImage}
             galleryId={resultGalleryId}
@@ -3254,6 +3276,7 @@ function CompareSlider({ before, after }) {
 
 function ResultScreen({
   generating, fourcutProgress = "", prompt, resultImage, galleryId = null, accessToken = null,
+  genCount = 1,
   genError, onRetry, onAgain, onHome, showAds = false,
   canTryPro = false, proSampleImg = null, proSampleBusy = false, onTryPro, onUpgrade,
   onShared, resultBatch = null,
@@ -3435,7 +3458,14 @@ function ResultScreen({
               ? `인생네컷 ${fourcutProgress} 컷 생성 중...`
               : `#${prompt.id} · ${localizedTitle(prompt)}`}
           </div>
-          <div style={S.genHint}>{t("result.generatingHint")}</div>
+          <div style={S.genHint}>
+            {genCount > 1
+              ? t("result.generatingHintBatch", { n: genCount })
+              : t("result.generatingHint")}
+          </div>
+          {/* 앱을 닫아도 서버는 계속 만든다 — 사용자가 기다리다 앱을 끄고
+              "날아갔나?" 하지 않도록 명시한다 */}
+          <div style={S.genSafe}>{t("result.generatingSafe")}</div>
           {showAds && <AdSlot />}
         </div>
       ) : genError ? (
@@ -4662,6 +4692,10 @@ const S = {
   },
   genSub: { fontSize: 11.5, fontWeight: 600, opacity: 0.5 },
   genHint: { fontSize: 10.5, fontWeight: 500, opacity: 0.4, marginTop: -8 },
+  genSafe: {
+    fontSize: 11.5, fontWeight: 600, opacity: 0.55, marginTop: 16,
+    textAlign: "center", lineHeight: 1.6, whiteSpace: "pre-line",
+  },
   reportLink: {
     display: "block", textAlign: "center", marginTop: 14,
     fontSize: 12, color: "#9aa0a6", textDecoration: "none",

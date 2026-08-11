@@ -146,6 +146,44 @@ export async function syncConceptDropNotifications(drops) {
   }
 }
 
+/* ---------- 생성 완료 알림 ---------- */
+
+// 생성은 서버(Vercel 함수)에서 끝까지 돌기 때문에 앱을 닫아도 결과는 갤러리에 남는다.
+// 문제는 "다 됐다"고 알려줄 방법인데, 원격 푸시가 없으므로 생성을 시작할 때
+// 예상 완료 시각에 로컬 알림을 걸어두고, 앱이 살아서 결과를 받으면 취소한다.
+//   · 앱을 닫았다 → 알림이 뜬다 → 열면 갤러리에서 결과를 찾아 보여준다
+//   · 앱을 켜두고 있었다 → 결과가 화면에 바로 뜨고 알림은 취소된다
+const GEN_DONE_ID = 910001;
+
+export async function scheduleGenDoneNotice(count = 1, conceptTitle = "") {
+  const LN = await getPlugin();
+  if (!LN) return;
+  const ok = await ensureNotifyPermission();
+  if (!ok) return;
+  // 여러 장은 동시에 만들어서 시간이 크게 늘지는 않지만 여유를 조금 더 준다
+  const waitMs = (count > 1 ? 100 : 70) * 1000;
+  try {
+    await LN.cancel({ notifications: [{ id: GEN_DONE_ID }] });
+    await LN.schedule({
+      notifications: [{
+        id: GEN_DONE_ID,
+        title: "사진이 완성됐어요 ✨",
+        body: conceptTitle
+          ? `'${conceptTitle}' ${count > 1 ? count + "장 " : ""}확인해 보세요`
+          : "앱을 열어 확인해 보세요",
+        schedule: { at: new Date(Date.now() + waitMs), allowWhileIdle: true },
+      }],
+    });
+  } catch { /* 예약 실패는 생성과 무관 */ }
+}
+
+// 앱이 살아있는 채로 결과(성공/실패)를 받았으면 예약된 알림은 필요 없다.
+export async function cancelGenDoneNotice() {
+  const LN = await getPlugin();
+  if (!LN) return;
+  try { await LN.cancel({ notifications: [{ id: GEN_DONE_ID }] }); } catch { /* 무시 */ }
+}
+
 export async function cancelExpiryNotice(id) {
   const LN = await getPlugin();
   if (!LN) return;

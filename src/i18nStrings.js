@@ -95,7 +95,9 @@ export const STR = {
 
     // === 생성 결과 ===
     "result.generating": "이미지를 만들고 있어요",
-    "result.generatingHint": "최대 30초 정도 걸릴 수 있어요",
+    "result.generatingHint": "최대 몇 분까지 걸릴 수 있어요",
+    "result.generatingHintBatch": "{n}장을 만드는 중이라 몇 분까지 걸릴 수 있어요",
+    "result.generatingSafe": "앱을 닫아도 계속 만들어져요.\n다 되면 알림으로 알려드릴게요 🔔",
     "result.done": "완성!",
     "result.fail": "생성 실패",
     "result.failHint": "다시 시도해 주세요",
@@ -343,7 +345,9 @@ export const STR = {
     "nav.exitHint": "Press back again to exit",
 
     "result.generating": "Creating your image",
-    "result.generatingHint": "This may take up to 30 seconds",
+    "result.generatingHint": "This can take a few minutes",
+    "result.generatingHintBatch": "Making {n} photos — this can take a few minutes",
+    "result.generatingSafe": "You can close the app — we'll keep going.\nWe'll notify you when it's ready 🔔",
     "result.done": "Done!",
     "result.fail": "Generation failed",
     "result.failHint": "Please try again",
