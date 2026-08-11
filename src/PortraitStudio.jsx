@@ -219,6 +219,15 @@ function isRestoreConcept(concept) {
   return Number(concept.id) === 408 || /복원|restor/i.test(concept.title || "");
 }
 
+// 묶음 생성 — 한 번에 여러 장. 요금표는 서버(api/generate.js BATCH_COST)와 반드시 일치.
+// 많이 만들수록 장당 단가가 싸진다. 유료(크레딧/무제한) 전용.
+const BATCH_OPTIONS = [
+  { count: 1, cost: 1, label: "1장" },
+  { count: 3, cost: 3, label: "3장" },
+  { count: 6, cost: 5, label: "6장", badge: "17% 할인" },
+  { count: 12, cost: 9, label: "12장", badge: "25% 할인" },
+];
+
 // 커플 = 참조 사진이 2장(본인 + 상대) 필요한 컨셉.
 // 프롬프트가 "the woman from the first reference image / the man from the second"
 // 형태라 두 장을 순서대로 보내야 한다.
@@ -453,6 +462,8 @@ async function generateImage(accessToken, dataUrl, promptText, conceptMeta = {})
         idSuit: conceptMeta.idSuit, idBg: conceptMeta.idBg, idBgName: conceptMeta.idBgName,
         // 인생네컷: 스타일 + 컷 인덱스 (서버가 컷별 프롬프트 조립)
         fourcutStyle: conceptMeta.fourcutStyle, cutIndex: conceptMeta.cutIndex,
+        // 묶음 생성 장수 (1/3/6/12)
+        count: conceptMeta.count,
         // 무료 Pro 체험(계정당 1회) — 결과화면 비교 슬라이더용
         proSample: !!conceptMeta.proSample,
       }),
@@ -497,8 +508,30 @@ async function generateImage(accessToken, dataUrl, promptText, conceptMeta = {})
   } catch (_) {
     imageDataUrl = rawDataUrl; // 리사이즈 실패 시 원본 사용
   }
+
+  // 묶음 생성(3/6/12장): 서버가 images[] 를 주면 전부 같은 방식으로 후처리한다.
+  // 첫 장은 위에서 이미 처리했으므로 나머지만 이어 붙인다.
+  let batch = null;
+  if (Array.isArray(json.images) && json.images.length > 1) {
+    batch = [{ imageDataUrl, galleryId: json.galleryId, galleryExpiresAt: json.galleryExpiresAt }];
+    for (const it of json.images.slice(1)) {
+      const raw = "data:" + it.mimeType + ";base64," + it.base64;
+      let url;
+      try {
+        url = conceptMeta.keepRatio
+          ? await fitToRatio(raw, await imageRatio(dataUrl))
+          : await fitToSize(raw, 768, 1024, "image/png");
+      } catch (_) { url = raw; }
+      batch.push({ imageDataUrl: url, galleryId: it.galleryId, galleryExpiresAt: it.galleryExpiresAt });
+    }
+  }
+
   return {
     imageDataUrl,
+    batch,                      // 묶음이면 배열, 단건이면 null
+    requested: json.requested,
+    produced: json.produced,
+    credits: json.credits,
     quotaUsed: json.quotaUsed,
     quotaLimit: json.quotaLimit,
     unlimited: json.unlimited,
@@ -630,6 +663,9 @@ export default function PortraitStudio() {
   const [fourcutCount, setFourcutCount] = useState(4);
   const [fourcutStyleKey, setFourcutStyleKey] = useState(FOURCUT_STYLES[0].key);
   const [fourcutProgress, setFourcutProgress] = useState("");
+  // 묶음 생성 장수 (1/3/6/12) — 유료 전용. 결과는 resultBatch 에 담긴다.
+  const [batchCount, setBatchCount] = useState(1);
+  const [resultBatch, setResultBatch] = useState(null);
   const [selected, setSelected] = useState(null);
   const [navDir, setNavDir] = useState("fwd"); // 화면 전환 방향 (뒤로가기 애니메이션용)
   const [showBrooklyn, setShowBrooklyn] = useState(false); // 증명사진 → Brooklyn 유도 모달
@@ -1176,6 +1212,7 @@ export default function PortraitStudio() {
     }
     // 아트 변환 컨셉이면 이전 일회용 사진 비우고 들어감 (매번 새로 받음)
     if (isArtConcept(p)) setArtPhoto(null);
+    setBatchCount(1); // 컨셉을 바꾸면 장수 선택도 초기화
     // 동의 문구가 바뀌면(본인 사진 ↔ 타인 사진 권리) 체크도 다시 받아야 한다.
     // 안 그러면 매직 부스에 들어갔는데 "타인 사진 동의 받았습니다" 가 이미 체크돼 있다.
     if (
@@ -1547,6 +1584,7 @@ export default function PortraitStudio() {
     // 인증 + 횟수 체크는 서버(/api/generate)가 처리
     setGenError(null);
     setResultImage(null);
+    setResultBatch(null);
     setProSampleImg(null);
     setCanTryPro(false);
     setResultGalleryId(null);
@@ -1579,6 +1617,8 @@ export default function PortraitStudio() {
         skipFacePrecheck: art,
         // 사진 복원: 768×1024 로 강제 크롭하지 말고 올린 사진의 비율을 그대로 유지
         keepRatio: isRestoreConcept(selected),
+          // 묶음 생성 장수. 인생네컷은 자체 컷 수가 있고, 매직부스는 일회용 사진이라 1장 고정.
+        count: (isFourcut(selected) || isArtConcept(selected)) ? 1 : batchCount,
         // 커플: 두 번째 참조 사진(상대)
         ...(isCoupleConcept(selected) && partnerPhoto ? { photo2: partnerPhoto } : {}),
         ...idMeta,
@@ -1587,6 +1627,7 @@ export default function PortraitStudio() {
       lastGenRef.current = { photo: photoToUse, promptText, meta: genMeta };
       const result = await generateImage(accessToken, photoToUse, promptText, genMeta);
       setResultImage(result.imageDataUrl);
+      setResultBatch(result.batch || null);
       setResultGalleryId(result.galleryId || null); // 저장 시 원본(2K) 받으려고 보관
       track("generate", { engine: result.engine || null, concept: selected?.id ?? null });
       noteGeneration(); // 리뷰 요청 조건(생성 2장 이상) 카운트만 올림 — 여기선 묻지 않음
@@ -1854,6 +1895,8 @@ export default function PortraitStudio() {
             art={isArtConcept(selected)}
             partnerPhoto={isCoupleConcept(selected) ? partnerPhoto : null}
             canSwitch={(filtered.length ? filtered : visiblePool).length > 1}
+            batchCount={batchCount} setBatchCount={setBatchCount}
+            unlimited={unlimited}
             prompt={selected}
             freeLeft={freeLeft}
             credits={credits}
@@ -1892,6 +1935,7 @@ export default function PortraitStudio() {
                 : () => { setPayToast("크레딧을 충전하면 Pro 화질로 계속 만들 수 있어요 🙂"); setTimeout(() => setPayToast(""), 3500); }
             }
             onShared={() => setRefreshTick((n) => n + 1)}
+            resultBatch={resultBatch}
           />
         )}
         {screen === "profile" && (
@@ -2939,6 +2983,7 @@ function ConfirmScreen({
   idPhoto, idSuit, setIdSuit, idBg, setIdBg,
   fourcut, fourcutCount, setFourcutCount, fourcutStyleKey, setFourcutStyleKey,
   onBack, onGenerate, onStore, partnerPhoto = null, canSwitch = false,
+  batchCount = 1, setBatchCount, unlimited = false,
 }) {
   const useFree = freeLeft > 0;
   return (
@@ -2981,6 +3026,49 @@ function ConfirmScreen({
         <div style={S.promptPeek}>{t(art ? "step3.peekArt" : "step3.peek")}</div>
         {canSwitch && <div style={S.swipeHint}>{t("step3.swipeHint")}</div>}
       </div>
+
+      {/* 한 번에 여러 장 — 유료 전용.
+          인생네컷은 자체 컷 수가 있고, 매직부스는 일회용 사진이라 제외 */}
+      {!fourcut && !art && (
+        <div style={S.idOptCard}>
+          <div style={S.idOptLabel}>
+            {t("batch.title")}
+            {!unlimited && (
+              <span style={S.batchHave}> · {t("batch.have", { n: credits })}</span>
+            )}
+          </div>
+          <div style={S.batchRow}>
+            {BATCH_OPTIONS.map((b) => {
+              // 크레딧이 모자라면 잠근다 (1장은 무료 한도로도 가능하므로 항상 열림)
+              const locked = !unlimited && b.count > 1 && credits < b.cost;
+              const on = batchCount === b.count;
+              return (
+                <button
+                  key={b.count}
+                  type="button"
+                  disabled={locked}
+                  aria-pressed={on}
+                  onClick={() => { if (!locked) setBatchCount(b.count); }}
+                  style={{
+                    ...S.batchChip,
+                    ...(on ? S.batchChipOn : null),
+                    opacity: locked ? 0.45 : 1,
+                    cursor: locked ? "not-allowed" : "pointer",
+                  }}
+                >
+                  <span style={S.batchChipLabel}>{b.label}</span>
+                  <span style={{ ...S.batchChipCost, color: locked ? "#9a97ab" : ACCENT }}>
+                    {unlimited ? t("batch.unlimited") : locked ? "🔒 " + b.cost : t("batch.cost", { n: b.cost })}
+                  </span>
+                  {b.badge && !locked && !unlimited && (
+                    <span style={S.batchBadge}>{b.badge}</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {fourcut && (
         <div style={S.idOptCard}>
@@ -3168,7 +3256,7 @@ function ResultScreen({
   generating, fourcutProgress = "", prompt, resultImage, galleryId = null, accessToken = null,
   genError, onRetry, onAgain, onHome, showAds = false,
   canTryPro = false, proSampleImg = null, proSampleBusy = false, onTryPro, onUpgrade,
-  onShared,
+  onShared, resultBatch = null,
 }) {
   const [saving, setSaving] = useState(false);
   const [sharing, setSharing] = useState(false);
@@ -3189,13 +3277,39 @@ function ResultScreen({
   // 갤러리에 보관된 원본을 서명URL로 받아 저장한다.
   // ⚠️ 실패해도 축소본으로 조용히 폴백하지 않는다 — 1회 재시도 후에도 실패하면 null
   // (호출측이 저장을 중단하고 안내). 축소본을 원본인 척 저장하는 건 금지.
-  async function fetchHiResDataUrl() {
-    if (!galleryId || !accessToken) return null;
+  // 묶음 결과에서 한 장만 저장 — 갤러리 원본(2K)이 있으면 그걸 받는다.
+  async function onSaveOne(it, i) {
+    const hi = it.galleryId ? await fetchHiResDataUrl(it.galleryId) : null;
+    const data = hi || it.imageDataUrl;
+    const filename = "rimikimi_" + (prompt?.id ?? "art") + "_" + (i + 1);
+    if (isNative()) {
+      const r = await nativeSaveToAlbum(data, filename);
+      flashToast(r?.ok ? t("save.toast.done") : t("save.toast.fail"));
+    } else {
+      const a = document.createElement("a");
+      a.href = data;
+      a.download = filename + (/^data:image\/jpe?g/i.test(data) ? ".jpg" : ".png");
+      document.body.appendChild(a); a.click(); a.remove();
+      flashToast(t("save.toast.done"));
+    }
+    if (it.galleryId) markSaved(it.galleryId);
+  }
+
+  async function onShareOne(it, i) {
+    const hi = it.galleryId ? await fetchHiResDataUrl(it.galleryId) : null;
+    try {
+      await nativeShare(hi || it.imageDataUrl, t("share.caption"));
+      flashToast(t("share.doneToast"));
+    } catch (_) { /* 사용자가 취소한 경우 등은 무시 */ }
+  }
+
+  async function fetchHiResDataUrl(id = galleryId) {
+    if (!id || !accessToken) return null;
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
         const r = await fetch("/api/gallery", { headers: { Authorization: "Bearer " + accessToken } });
         const j = await r.json();
-        const url = (j.items || []).find((it) => it.id === galleryId)?.url;
+        const url = (j.items || []).find((it) => it.id === id)?.url;
         if (!url) continue;
         const resp = await fetch(url);
         if (!resp.ok) continue;
@@ -3338,18 +3452,48 @@ function ResultScreen({
         <div className="fade">
           <div style={S.screenKicker}>{t("result.done")}</div>
           <div style={S.screenTitle}>{localizedTitle(prompt)}</div>
-          <div style={S.resultImage}>
-            <img
-              src={resultImage}
-              alt={localizedTitle(prompt)}
-              style={{ ...S.resultImg, ...(imgRatio ? { aspectRatio: String(imgRatio) } : {}) }}
-              className="resultReveal"
-              onLoad={(e) => {
-                const { naturalWidth: w, naturalHeight: h } = e.currentTarget;
-                if (w && h) setImgRatio(w / h);
-              }}
-            />
-          </div>
+          {/* 묶음 생성이면 1컬럼 세로로 전부 보여준다. 장마다 저장/공유 가능 */}
+          {resultBatch && resultBatch.length > 1 ? (
+            <>
+              <div style={S.batchNotice}>{t("batch.done", { n: resultBatch.length })}</div>
+              <div style={S.batchList}>
+                {resultBatch.map((it, i) => (
+                  <div key={it.galleryId || i} style={S.batchItem}>
+                    <img
+                      src={it.imageDataUrl}
+                      alt={`${localizedTitle(prompt)} ${i + 1}`}
+                      style={{ ...S.resultImg, ...(imgRatio ? { aspectRatio: String(imgRatio) } : {}) }}
+                      onLoad={(e) => {
+                        if (i !== 0) return;
+                        const { naturalWidth: w, naturalHeight: h } = e.currentTarget;
+                        if (w && h) setImgRatio(w / h);
+                      }}
+                    />
+                    <div style={S.batchBar}>
+                      <span style={S.batchIdx}>{i + 1} / {resultBatch.length}</span>
+                      <button type="button" style={S.batchBtn}
+                        onClick={() => onSaveOne && onSaveOne(it, i)}>{t("common.save")}</button>
+                      <button type="button" style={S.batchBtn}
+                        onClick={() => onShareOne && onShareOne(it, i)}>{t("common.share")}</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <div style={S.resultImage}>
+              <img
+                src={resultImage}
+                alt={localizedTitle(prompt)}
+                style={{ ...S.resultImg, ...(imgRatio ? { aspectRatio: String(imgRatio) } : {}) }}
+                className="resultReveal"
+                onLoad={(e) => {
+                  const { naturalWidth: w, naturalHeight: h } = e.currentTarget;
+                  if (w && h) setImgRatio(w / h);
+                }}
+              />
+            </div>
+          )}
 
           {/* 기본 vs Pro 비교 (무료 Pro 체험) */}
           {proSampleImg ? (
@@ -4047,6 +4191,41 @@ const S = {
     borderRadius: 14, padding: "13px", fontSize: 13.5, fontWeight: 700,
     fontFamily: "'Quicksand', sans-serif", cursor: "pointer",
   },
+  // ── 묶음 생성 칩 (1/3/6/12장) ──
+  batchHave: { fontWeight: 600, fontSize: 11, opacity: 0.55 },
+  batchRow: { display: "flex", gap: 8, marginTop: 10 },
+  batchChip: {
+    flex: 1, position: "relative", display: "flex", flexDirection: "column",
+    alignItems: "center", gap: 3, padding: "11px 4px 10px",
+    background: "#fff", border: "2px solid " + INK + "14", borderRadius: 14,
+    fontFamily: "'Quicksand', sans-serif",
+  },
+  batchChipOn: { borderColor: ACCENT, background: ACCENT + "0d" },
+  batchChipLabel: { fontSize: 15, fontWeight: 800, color: INK },
+  batchChipCost: { fontSize: 10.5, fontWeight: 700 },
+  batchBadge: {
+    position: "absolute", top: -8, right: -2,
+    background: ACCENT, color: "#fff", fontSize: 9, fontWeight: 800,
+    padding: "2px 6px", borderRadius: 999, whiteSpace: "nowrap",
+  },
+
+  // ── 묶음 결과 (1컬럼 세로 스크롤) ──
+  batchNotice: {
+    fontSize: 12.5, fontWeight: 700, opacity: 0.6,
+    textAlign: "center", margin: "14px 0 10px",
+  },
+  batchList: { display: "flex", flexDirection: "column", gap: 18 },
+  batchItem: { position: "relative" },
+  batchBar: {
+    display: "flex", alignItems: "center", gap: 8, marginTop: 8,
+  },
+  batchIdx: { fontSize: 11.5, fontWeight: 700, opacity: 0.5, marginRight: "auto" },
+  batchBtn: {
+    background: "#fff", color: INK, border: "2px solid " + INK + "18",
+    borderRadius: 12, padding: "8px 16px", fontSize: 12.5, fontWeight: 700,
+    fontFamily: "'Quicksand', sans-serif", cursor: "pointer",
+  },
+
   // ── 커플 컨셉: 사진 두 장 슬롯 ──
   coupleRow: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 },
   coupleSlot: {

@@ -228,6 +228,12 @@ export const STR = {
     // === 커플 컨셉 (사진 2장) ===
     "step3.swipeHint": "← 좌우로 밀면 다른 컨셉을 볼 수 있어요 →",
 
+    "batch.title": "한 번에 만들기",
+    "batch.have": "크레딧 {n}개 보유",
+    "batch.cost": "{n} 크레딧",
+    "batch.unlimited": "무제한",
+    "batch.done": "{n}장 만들었어요 · 아래로 넘겨서 보기",
+
     "couple.hero.title": "두 분의 사진을 올려주세요",
     "couple.hero.desc1": "커플 컨셉은 사진이 두 장 필요해요.",
     "couple.hero.desc2": "각자 얼굴이 잘 보이는 사진이면 좋아요.",
@@ -461,6 +467,12 @@ export const STR = {
     "step2.privacyNote": "Your uploaded photo is never stored on our servers and is discarded right after generation.",
 
     "step3.swipeHint": "← Swipe to browse other concepts →",
+
+    "batch.title": "Make several at once",
+    "batch.have": "{n} credits",
+    "batch.cost": "{n} credits",
+    "batch.unlimited": "Unlimited",
+    "batch.done": "{n} photos ready · scroll down to see them all",
 
     "couple.hero.title": "Upload a photo of each of you",
     "couple.hero.desc1": "Couple concepts need two photos.",
