@@ -10,12 +10,17 @@
 
 import { getAuthedUser, countTodayUsage, FREE_DAILY, dailyLimitFor, isUnlimited, isTester } from "./_lib/auth.js";
 import { precheckHasFace } from "./_lib/precheck.js";
-import { getCreditInfo, consumeCredit, getProSampleUsed, markProSampleUsed } from "./_lib/credits.js";
+import { getCreditInfo, consumeCredit, consumeCredits, refundCredits, getProSampleUsed, markProSampleUsed } from "./_lib/credits.js";
 import { saveToGallery } from "./_lib/gallery.js";
 
-// Pro 모델(gemini-3-pro-image)이 느릴 때(~25s) 함수가 타임아웃되지 않도록 상향.
-// (Vercel Hobby 최대 60s)
-export const config = { maxDuration: 60 };
+// Vertex 의 나노바나나 프로는 2K 요청이 ~42s 걸리고, 묶음 생성(3/6/12장)은 그보다
+// 훨씬 오래 걸린다. 팀 플랜이 Pro 라 300s 까지 쓸 수 있다(picbox·claire 와 동일).
+// 60s 로 묶어두는 바람에 그동안 Vertex 를 쥐어짜고 있었다.
+export const config = { maxDuration: 300 };
+
+// 묶음 생성 요금표 — 많이 만들수록 장당 단가가 싸진다 (picbox·claire 와 동일).
+// 1장=1, 3장=3, 6장=5(1장 이득), 12장=9(3장 이득)
+export const BATCH_COST = { 1: 1, 3: 3, 6: 5, 12: 9 };
 
 // Gemini 원본 이미지는 클 수 있음(>4.5MB → Vercel 응답 한도 초과로 본문 잘림 = 클라 "오류 200").
 // 응답 전에 최대 1024×1365, JPEG q82 로 줄여서 항상 작고 빠르게.
@@ -295,7 +300,12 @@ export default async function handler(req, res) {
     // 커플: 두 번째 참조 사진(상대). 프롬프트가 "first/second reference image" 를
     // 지칭하므로 반드시 base64 → base64_2 순서로 넣는다.
     mimeType2, base64_2,
+    // 묶음 생성 장수 (1/3/6/12). 요금표 밖의 값은 1장으로 취급.
+    count,
   } = req.body || {};
+
+  const batchCount = BATCH_COST[Number(count)] ? Number(count) : 1;
+  const batchCost = BATCH_COST[batchCount];
   if (!mimeType || !base64 || !prompt) {
     return res
       .status(400)
@@ -551,13 +561,10 @@ export default async function handler(req, res) {
     return up.status === 404 || (up.status >= 500 && up.status <= 599);
   }
 
-  // 남은 시간 예산. Vercel maxDuration 60s 안에서 (여러 번의 생성 시도 +
-  // precheck·갤러리저장 여유)가 전부 끝나야 한다.
-  // ⚠️ 함수 전체가 60s(maxDuration) 안에 끝나야 한다. 여기 도달하기 전에 이미
-  //    얼굴 사전검사(~2~4s)를 썼고, 이후에도 축소·갤러리 저장이 남는다.
-  //    50s 로 뒀다가 실측에서 "Task timed out after 60 seconds" 가 나서 40s 로 낮춘다.
-  //    (타임아웃되면 응답 자체가 없어 클라가 "네트워크 요청 실패" 를 띄운다 — 최악)
-  const DEADLINE = Date.now() + 50000;
+  // 남은 시간 예산. maxDuration(300s) 안에서 생성 시도 + precheck·축소·갤러리저장이
+  // 모두 끝나야 한다. 예전엔 60s 라 Vertex(2K, ~42s)를 쥐어짜다 자주 잘렸다.
+  //  → 200s 로 넉넉히 잡되, 롤백/응답 시간을 위해 300s 는 다 쓰지 않는다.
+  const DEADLINE = Date.now() + 200000;
   const left = () => DEADLINE - Date.now();
   const budget = (want) => Math.min(want, left());
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -642,11 +649,114 @@ export default async function handler(req, res) {
     return r;
   }
 
+  // ── 묶음 생성 (3/6/12장) — 유료 전용 ──
+  // picbox/claire 와 동일한 요금표. 많이 만들수록 장당 단가가 싸진다.
+  // 무료 한도(하루 1장)로는 애초에 불가능하므로 크레딧/무제한만 허용한다.
+  if (batchCount > 1) {
+    if (!unlimited && !useCredit) {
+      return res.status(402).json({
+        error: `${batchCount}장 만들기는 크레딧이 필요해요.\n크레딧을 충전하면 한 번에 여러 장을 만들 수 있어요.`,
+        credits: creditsLeft,
+        needed: batchCost,
+      });
+    }
+    // ⚠️ 비싼 생성 호출 전에 원자적으로 예약한다. 나중에 차감하면 동시 요청이
+    //    같은 잔액을 두 번 쓰는 레이스가 생긴다. 실패분은 아래에서 환불.
+    if (!unlimited) {
+      const reserved = await consumeCredits(admin, user.id, batchCost);
+      if (!reserved) {
+        return res.status(429).json({
+          error: `크레딧이 부족해요. ${batchCount}장 만들기엔 ${batchCost}개가 필요해요.`,
+          credits: creditsLeft,
+          needed: batchCost,
+        });
+      }
+      creditsLeft = Math.max(0, creditsLeft - batchCost);
+    }
+
+    // 한 장 생성 = Vertex 우선, 실패 시 AI Studio. (단건 경로와 같은 순서)
+    async function oneShot() {
+      if (vertexSA()) {
+        const r = await callVertex(PRO_MODEL, true, budget(90000));
+        if (!isBusyFailure(r)) return r;
+      }
+      const r2 = await callGemini(PRO_MODEL, true, budget(40000));
+      if (!isBusyFailure(r2)) return r2;
+      return await callGemini(BASE_MODEL, false, budget(30000));
+    }
+
+    // 전부 동시에 던진다. Vertex 가 장당 ~42s 라 순차로는 12장이 불가능하고,
+    // RPM 한도(5/500)에도 여유가 커서 동시 실행이 안전하다.
+    const settled = await Promise.all(
+      Array.from({ length: batchCount }, () => oneShot().catch(() => null))
+    );
+
+    const images = [];
+    for (const r of settled) {
+      if (isBusyFailure(r) || !r?.upstream?.ok) continue;
+      let j = null;
+      try { j = await r.upstream.json(); } catch (_) { continue; }
+      const part = (j?.candidates?.[0]?.content?.parts || [])
+        .find((x) => x.inlineData || x.inline_data);
+      if (!part) continue;
+      const inline = part.inlineData || part.inline_data;
+      const rawMime = inline.mimeType || inline.mime_type || "image/png";
+      const small = await shrinkOutput(inline.data, rawMime);
+      let gId = null, gExp = null;
+      try {
+        const saved = await saveToGallery(admin, user, {
+          conceptId: conceptId || 0, conceptTitle: conceptTitle || null,
+          base64: inline.data, mimeType: rawMime,
+        });
+        if (saved.ok) { gId = saved.id; gExp = saved.expiresAt; }
+      } catch (_) { /* 갤러리 저장 실패가 응답을 막지 않는다 */ }
+      images.push({
+        base64: small.base64, mimeType: small.mime,
+        galleryId: gId, galleryExpiresAt: gExp,
+      });
+    }
+
+    // 부분 실패 환불 — 만들어진 만큼만 받는다.
+    if (!unlimited && images.length < batchCount) {
+      const refundUnits = images.length === 0
+        ? batchCost
+        : batchCost - Math.ceil((batchCost * images.length) / batchCount);
+      if (refundUnits > 0) {
+        await refundCredits(admin, user.id, refundUnits).catch(() => {});
+        creditsLeft += refundUnits;
+      }
+    }
+    console.log(`[generate] batch ${batchCount}장 요청 → 성공 ${images.length} | cost=${batchCost}`);
+
+    if (images.length === 0) {
+      return res.status(503).json({
+        error: "지금 이미지 서버가 많이 붐비고 있어요.\n1~2분 뒤에 다시 시도해 주세요.\n크레딧은 차감되지 않았어요 🙂",
+        busy: true, credits: creditsLeft,
+      });
+    }
+    if (images.length > 0) {
+      admin.from("usage_log").insert({ user_id: user.id }).then(() => {}).catch(() => {});
+    }
+    return res.status(200).json({
+      images,
+      requested: batchCount,
+      produced: images.length,
+      credits: creditsLeft,
+      unlimited,
+      // 구버전 앱 호환 — images 를 모르는 클라이언트도 첫 장은 받는다
+      base64: images[0].base64,
+      mimeType: images[0].mimeType,
+      galleryId: images[0].galleryId,
+      galleryExpiresAt: images[0].galleryExpiresAt,
+      engine: "pro",
+    });
+  }
+
   if (useProEngine) {
     // 1) Vertex 로 나노바나나 프로 (1순위).
     //    실측 ~29s 로 느리므로 넉넉히 주되, 실패 시 AI Studio 몫을 남겨둔다.
     if (vertexSA()) {
-      result = await callVertex(PRO_MODEL, true, budget(46000));
+      result = await callVertex(PRO_MODEL, true, budget(90000));
       if (!isBusyFailure(result)) {
         console.log("[generate] Vertex 3-pro 성공");
       } else {

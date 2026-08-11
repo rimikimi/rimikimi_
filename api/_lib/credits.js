@@ -71,6 +71,70 @@ export async function markProSampleUsed(admin, userId) {
 }
 
 // 크레딧 1개 사용 (credits_used += 1). 성공 시 true.
+// 크레딧 N개를 한 번에 예약(차감)한다 — 묶음 생성(3/6/12장)용.
+// picbox 구현을 rimikimi 스키마(credits_shared)에 맞춰 이식.
+//
+// ⚠️ 잔액이 모자라면 부분 차감 없이 통째로 거절한다. "12장 요청했는데 8장만
+//    차감되고 8장만 나오는" 애매한 상태를 만들지 않기 위해서다.
+// ⚠️ 낙관적 잠금(update ... eq(credits_used, used))으로 동시 요청 레이스를 막는다.
+//    다른 요청이 먼저 바꿨으면 매칭이 0건이라 재시도한다.
+export async function consumeCredits(admin, userId, n) {
+  const need = Math.max(1, Math.floor(n || 1));
+  if (need === 1) return consumeCredit(admin, userId);
+
+  await admin
+    .from("user_credits")
+    .upsert({ user_id: userId }, { onConflict: "user_id", ignoreDuplicates: true });
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const [{ count: referralCount, error: rErr }, { data: row, error: uErr }] =
+      await Promise.all([
+        admin.from("referrals").select("*", { count: "exact", head: true }).eq("referrer_id", userId),
+        admin.from("user_credits")
+          .select("credits_used, credits_purchased, credits_shared")
+          .eq("user_id", userId).maybeSingle(),
+      ]);
+    if (rErr || uErr || !row) return false;
+
+    const used = row.credits_used || 0;
+    const totalEarned =
+      Math.floor((referralCount || 0) / PER_CREDIT) +
+      (row.credits_purchased || 0) +
+      (row.credits_shared || 0);
+    if (totalEarned - used < need) return false; // 잔액 부족 — 부분 차감 없이 거절
+
+    const { data: updated, error: updErr } = await admin
+      .from("user_credits")
+      .update({ credits_used: used + need })
+      .eq("user_id", userId)
+      .eq("credits_used", used)
+      .select("credits_used");
+    if (updErr) return false;
+    if (updated && updated.length > 0) return true;
+  }
+  return false;
+}
+
+// 예약한 크레딧을 실패분만큼 되돌린다(하한 0). best-effort —
+// 환불 실패가 사용자 응답을 막아선 안 되므로 호출부는 반환값을 무시해도 된다.
+export async function refundCredits(admin, userId, n) {
+  const back = Math.max(1, Math.floor(n || 1));
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const { data: row, error } = await admin
+      .from("user_credits").select("credits_used").eq("user_id", userId).maybeSingle();
+    if (error || !row) return false;
+    const used = row.credits_used || 0;
+    if (used <= 0) return true;
+    const next = Math.max(0, used - back);
+    const { data: updated, error: updErr } = await admin
+      .from("user_credits").update({ credits_used: next })
+      .eq("user_id", userId).eq("credits_used", used).select("credits_used");
+    if (updErr) return false;
+    if (updated && updated.length > 0) return true;
+  }
+  return false;
+}
+
 export async function consumeCredit(admin, userId) {
   // 현재 사용량 읽기
   const { data } = await admin
