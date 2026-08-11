@@ -184,6 +184,29 @@ export async function cancelGenDoneNotice() {
   try { await LN.cancel({ notifications: [{ id: GEN_DONE_ID }] }); } catch { /* 무시 */ }
 }
 
+// 실제로 생성이 끝난 그 순간 알림을 띄운다 (앱이 백그라운드에 있을 때).
+// 화면을 보고 있으면 결과가 이미 떠 있으므로 알림은 띄우지 않는다.
+export async function notifyGenDoneNow(count = 1, conceptTitle = "") {
+  const LN = await getPlugin();
+  if (!LN) return;
+  // 포그라운드면 알림 대신 화면으로 보여주면 된다
+  if (typeof document !== "undefined" && !document.hidden) return;
+  const ok = await ensureNotifyPermission();
+  if (!ok) return;
+  try {
+    await LN.schedule({
+      notifications: [{
+        id: GEN_DONE_ID,
+        title: "사진이 완성됐어요 ✨",
+        body: conceptTitle
+          ? `'${conceptTitle}' ${count > 1 ? count + "장 " : ""}확인해 보세요`
+          : "앱을 열어 확인해 보세요",
+        // at 을 주지 않으면 즉시 표시된다
+      }],
+    });
+  } catch { /* 무시 */ }
+}
+
 export async function cancelExpiryNotice(id) {
   const LN = await getPlugin();
   if (!LN) return;

@@ -4,7 +4,7 @@ import { isNative, platform, nativePickPhoto, nativeShare, nativeSaveToAlbum } f
 import { initAds, showInterstitial } from "./ads";
 import { initIap, loginIap, logoutIap, getIapPacks, purchaseIap, restoreIap, iapAvailable, isSubscription, getIapDiag } from "./iap";
 import { FOURCUT_COUNTS, FOURCUT_STYLES, composeStrip, todayStr, fourcutStyle } from "./fourcut";
-import { getSavedSet, markSaved, syncExpiryNotifications, cancelExpiryNotice, syncConceptDropNotifications, scheduleGenDoneNotice, cancelGenDoneNotice } from "./notify";
+import { getSavedSet, markSaved, syncExpiryNotifications, cancelExpiryNotice, syncConceptDropNotifications, scheduleGenDoneNotice, cancelGenDoneNotice, notifyGenDoneNow } from "./notify";
 import { t, useLang, getLang, localizedTitle, localizedCategory, getLangPreference, setLang } from "./i18n";
 import LoginGate from "./LoginGate";
 import { shareImage, claimShareRewardApi } from "./share";
@@ -1656,9 +1656,17 @@ export default function PortraitStudio() {
           getSavedSet()
         );
       }
-      // 정상 완료 → 복구 마커 제거 + 예약해둔 완료 알림 취소(화면에 이미 떴으니)
+      // 정상 완료 → 복구 마커 제거.
+      // 화면을 보고 있으면 결과가 이미 떴으니 예약 알림만 지우고,
+      // 백그라운드였다면 "지금" 완료 알림을 띄운다(예상 시각이 아니라 실제 완료 시각).
       clearPendingGen();
-      cancelGenDoneNotice();
+      // ⚠️ 순서 중요: 예약분을 먼저 지우고 나서 즉시 알림을 띄운다.
+      //    반대로 하면 방금 띄운 알림을 취소가 지워버릴 수 있다.
+      await cancelGenDoneNotice();
+      notifyGenDoneNow(
+        isFourcut(selected) ? fourcutCount : batchCount,
+        localizedTitle(selected)
+      );
       // 서버가 알려준 진짜 사용량으로 업데이트
       if (typeof result.unlimited === "boolean") setUnlimited(result.unlimited);
       if (typeof result.quotaUsed === "number") setFreeUsed(result.quotaUsed);
