@@ -3,7 +3,7 @@
 // 대기 중인 컨셉을 공개 데이터(api/_data/concepts.json)에 넣는다.
 //
 //   node scripts/publish-staged.mjs 591 610            → 즉시 공개
-//   node scripts/publish-staged.mjs 591 710 --daily 2  → 매일 20시(KST) 2종씩 예약
+//   node scripts/publish-staged.mjs 591 710 --daily 3  → 매일 20시(KST) 3종씩 예약
 //   node scripts/publish-staged.mjs --list             → 대기 목록만 보기
 //
 // 넣기만 하고 배포는 안 한다. 확인 후 커밋·push 하면 반영된다.
@@ -42,7 +42,7 @@ if (args.includes("--list") || args.length < 2) {
 const from = Number(args[0]);
 const to = Number(args[1]);
 const di = args.indexOf("--daily");
-const perDay = di >= 0 ? Number(args[di + 1] || 2) : 0;
+const perDay = di >= 0 ? Number(args[di + 1] || 3) : 0;
 
 const picked = [];
 for (let id = from; id <= to; id++) {
