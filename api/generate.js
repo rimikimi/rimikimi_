@@ -558,7 +558,10 @@ export default async function handler(req, res) {
     if (r.networkError) return true;
     const up = r.upstream;
     if (!up) return true;
-    return up.status === 404 || (up.status >= 500 && up.status <= 599);
+    // ⚠️ 429(RESOURCE_EXHAUSTED)도 "잠시 후 되는" 실패다. 빠져 있어서 폴백도
+    //    재시도도 안 타고 원문 JSON 이 그대로 화면에 떴다(실측 2026-08-13).
+    return up.status === 404 || up.status === 429 ||
+      (up.status >= 500 && up.status <= 599);
   }
 
   // 남은 시간 예산. maxDuration(300s) 안에서 생성 시도 + precheck·축소·갤러리저장이
@@ -604,6 +607,25 @@ export default async function handler(req, res) {
       return { networkError: e };
     } finally {
       clearTimeout(timer);
+    }
+  }
+
+  // 429(RESOURCE_EXHAUSTED) 전용 백오프 재시도.
+  // ⚠️ 인생네컷은 앱이 컷 수만큼 /api/generate 를 "동시에" 부른다(8컷 = 8동시).
+  //    그러면 Vertex 분당 한도에 걸려 429 가 쏟아진다. 429 는 몇 초만 쉬면
+  //    대개 풀리므로 폴백보다 "기다렸다 다시 던지기" 가 맞다.
+  //    (maxDuration 300s / 예산 200s 라 여유가 있다)
+  async function callVertexBackoff(model, isPro, timeoutMs) {
+    const waits = [2500, 6000, 12000];
+    for (let i = 0; ; i++) {
+      const r = await callVertex(model, isPro, Math.min(timeoutMs, Math.max(8000, left() - 4000)));
+      if (r?.upstream?.status !== 429) return r;
+      if (i >= waits.length || left() < waits[i] + 15000) {
+        console.error("[generate] Vertex 429 — 재시도 여력 없음");
+        return r;
+      }
+      console.error(`[generate] Vertex 429 → ${waits[i]}ms 후 재시도 (${i + 1}/${waits.length})`);
+      await sleep(waits[i]);
     }
   }
 
@@ -677,7 +699,7 @@ export default async function handler(req, res) {
     // 한 장 생성 = Vertex 우선, 실패 시 AI Studio. (단건 경로와 같은 순서)
     async function oneShot() {
       if (vertexSA()) {
-        const r = await callVertex(PRO_MODEL, true, budget(90000));
+        const r = await callVertexBackoff(PRO_MODEL, true, budget(90000));
         if (!isBusyFailure(r)) return r;
       }
       const r2 = await callGemini(PRO_MODEL, true, budget(40000));
@@ -685,11 +707,20 @@ export default async function handler(req, res) {
       return await callGemini(BASE_MODEL, false, budget(30000));
     }
 
-    // 전부 동시에 던진다. Vertex 가 장당 ~42s 라 순차로는 12장이 불가능하고,
-    // RPM 한도(5/500)에도 여유가 커서 동시 실행이 안전하다.
-    const settled = await Promise.all(
-      Array.from({ length: batchCount }, () => oneShot().catch(() => null))
-    );
+    // ⚠️ 예전엔 batchCount 를 전부 동시에 던졌는데, 12장이면 Vertex 분당 한도에
+    //    걸려 429 가 쏟아진다(실측 2026-08-13). 4개씩 나눠 보낸다.
+    //    장당 ~42s 이므로 12장 = 3파 × 42s ≈ 126s — 예산 200s 안에 들어온다.
+    const CONCURRENCY = 4;
+    const settled = [];
+    for (let i = 0; i < batchCount; i += CONCURRENCY) {
+      const n = Math.min(CONCURRENCY, batchCount - i);
+      const wave = await Promise.all(
+        Array.from({ length: n }, () => oneShot().catch(() => null))
+      );
+      settled.push(...wave);
+      // 다음 파 전에 잠깐 쉬어 분당 한도에 여유를 준다
+      if (i + CONCURRENCY < batchCount && left() > 20000) await sleep(1200);
+    }
 
     const images = [];
     for (const r of settled) {
@@ -756,7 +787,7 @@ export default async function handler(req, res) {
     // 1) Vertex 로 나노바나나 프로 (1순위).
     //    실측 ~29s 로 느리므로 넉넉히 주되, 실패 시 AI Studio 몫을 남겨둔다.
     if (vertexSA()) {
-      result = await callVertex(PRO_MODEL, true, budget(90000));
+      result = await callVertexBackoff(PRO_MODEL, true, budget(90000));
       if (!isBusyFailure(result)) {
         console.log("[generate] Vertex 3-pro 성공");
       } else {
