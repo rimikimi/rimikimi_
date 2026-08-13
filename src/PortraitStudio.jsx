@@ -3,7 +3,7 @@ import { supabase } from "./supabaseClient";
 import { isNative, platform, nativePickPhoto, nativeShare, nativeSaveToAlbum } from "./nativeBridge";
 import { initAds, showInterstitial } from "./ads";
 import { initIap, loginIap, logoutIap, getIapPacks, purchaseIap, restoreIap, iapAvailable, isSubscription, getIapDiag } from "./iap";
-import { FOURCUT_COUNTS, FOURCUT_STYLES, composeStrip, todayStr, fourcutStyle } from "./fourcut";
+import { FOURCUT_COUNTS, FOURCUT_STYLES, fourcutStyle } from "./fourcut";
 import { getSavedSet, markSaved, syncExpiryNotifications, cancelExpiryNotice, syncConceptDropNotifications, scheduleGenDoneNotice, cancelGenDoneNotice, notifyGenDoneNow } from "./notify";
 import { t, useLang, getLang, localizedTitle, localizedCategory, getLangPreference, setLang } from "./i18n";
 import LoginGate from "./LoginGate";
@@ -61,6 +61,31 @@ function readPendingGen() {
 }
 function clearPendingGen() {
   try { localStorage.removeItem(PENDING_GEN_KEY); } catch (_) {}
+}
+
+/* ── 로그인 게이트: "다음"(사진 입력 → 옵션 화면) 전환 복원 ──────────────
+   비로그인 상태로 컨셉·사진까지 다 고른 뒤 "다음"을 누르면 여기서 로그인 시트를 띄운다.
+   로그인은 OAuth 왕복(웹은 전체 새로고침, 네이티브는 시스템 브라우저 왕복)이라
+   메모리 state(selected, artPhoto 등)가 사라질 수 있으므로 localStorage 에 남겨두고,
+   로그인 성공 시 옵션 화면(confirm)으로 바로 이어서 보낸다 — 첫 화면으로 되돌리지 않는다.
+   프로필/상대 사진은 이미 rimikimi_photo / rimikimi_partner_photo 키로 항상 저장돼 있어
+   자동으로 살아남는다. artPhoto(매직부스 일회용 사진)만 원래 휘발성이라 여기 같이 담아둔다. */
+const PENDING_CONTINUE_KEY = "rimikimi_pending_continue";
+const PENDING_CONTINUE_MAX_AGE = 30 * 60 * 1000; // 30분 — 2FA 등으로 로그인이 오래 걸려도 살아있게
+
+function writePendingContinue(p) {
+  try { localStorage.setItem(PENDING_CONTINUE_KEY, JSON.stringify(p)); } catch (_) {}
+}
+function readPendingContinue() {
+  try {
+    const p = JSON.parse(localStorage.getItem(PENDING_CONTINUE_KEY) || "null");
+    if (!p || !p.savedAt) return null;
+    if (Date.now() - p.savedAt > PENDING_CONTINUE_MAX_AGE) { clearPendingContinue(); return null; }
+    return p;
+  } catch (_) { return null; }
+}
+function clearPendingContinue() {
+  try { localStorage.removeItem(PENDING_CONTINUE_KEY); } catch (_) {}
 }
 
 /* 사업자/통신판매업 고지는 한국 전자상거래법상 한국 접속자에게만 필요.
@@ -464,6 +489,8 @@ async function generateImage(accessToken, dataUrl, promptText, conceptMeta = {})
         fourcutStyle: conceptMeta.fourcutStyle, cutIndex: conceptMeta.cutIndex,
         // 묶음 생성 장수 (1/3/6/12)
         count: conceptMeta.count,
+        // 인생네컷: 스트립 분할 수 — 서버가 이걸 보고 한 장으로 만든다
+        cutCount: conceptMeta.cutCount,
         // 무료 Pro 체험(계정당 1회) — 결과화면 비교 슬라이더용
         proSample: !!conceptMeta.proSample,
       }),
@@ -669,6 +696,9 @@ export default function PortraitStudio() {
   const [selected, setSelected] = useState(null);
   const [navDir, setNavDir] = useState("fwd"); // 화면 전환 방향 (뒤로가기 애니메이션용)
   const [showBrooklyn, setShowBrooklyn] = useState(false); // 증명사진 → Brooklyn 유도 모달
+  // 로그인 시트 — 비로그인으로 컨셉·사진까지 고르고 "다음"을 누른 순간 뜬다.
+  // 그 전(둘러보기·컨셉 선택·사진 업로드)까진 비로그인으로 전부 가능.
+  const [showLoginSheet, setShowLoginSheet] = useState(false);
   const swipeRef = useRef(null); // 왼쪽 엣지 스와이프 추적
   const [query, setQuery] = useState("");
   const [activeCat, setActiveCat] = useState("전체");
@@ -700,10 +730,10 @@ export default function PortraitStudio() {
   const mainRef = useRef(null);
 
   // ─── 로그인 세션 ───
+  // ⚠️ 로그인은 게이트가 아니다 — 둘러보기·컨셉 선택·사진 업로드까지는 session 없이도 전부 된다.
+  //    로그인은 "다음"(사진 입력 → 옵션 화면) 전환 시 로그인 시트로만 요구한다(아래 handleContinueFromHome).
   const [session, setSession] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
-  // 세션이 자리잡는 중인지 — 로그인 직후/리다이렉트 복귀 때 로그인 화면이 잠깐 번쩍이는 것 방지
-  const [authSettling, setAuthSettling] = useState(true);
 
   useEffect(() => {
     const t = setTimeout(() => setBooting(false), 2200);
@@ -748,33 +778,25 @@ export default function PortraitStudio() {
   }, [partnerPhoto]);
 
   // 페이지 로드 시 현재 세션 확인 + 이후 변경 감지
+  // ⚠️ 로그인이 앱 게이트가 아니므로(위 주석 참고), 세션이 없어도 스플래시를 계속
+  //    붙잡아둘 이유가 없다 — authChecked 만 확인되면 바로 앱을 보여준다.
   useEffect(() => {
     let mounted = true;
-    // OAuth 리다이렉트로 복귀 중인지 (해시/쿼리에 토큰·코드가 있으면 세션이 곧 들어옴)
-    const hasAuthRedirect = /[#&?](access_token|code|provider_token|auth)=/.test(
-      window.location.hash + window.location.search
-    );
     supabase.auth.getSession().then(({ data }) => {
       if (!mounted) return;
       setSession(data.session);
       setAuthChecked(true);
       setTrackUser(data.session?.user?.id || null);
-      // 세션도 없고 리다이렉트 복귀도 아니면 진짜 로그아웃 → 바로 로그인 화면 허용
-      if (!data.session && !hasAuthRedirect) setAuthSettling(false);
     });
     const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
       if (!mounted) return;
       setSession(s);
       setTrackUser(s?.user?.id || null);
-      if (s) setAuthSettling(false);
       if (_event === "SIGNED_IN" && s?.user) trackSignupIfNew(s.user);
     });
-    // 안전장치: 5초 안에 세션이 안 들어오면 로그인 화면 보여줌 (로그인 실패 대비)
-    const failsafe = setTimeout(() => { if (mounted) setAuthSettling(false); }, 5000);
     return () => {
       mounted = false;
       sub.subscription.unsubscribe();
-      clearTimeout(failsafe);
     };
   }, []);
 
@@ -1291,6 +1313,54 @@ export default function PortraitStudio() {
     setShowBrooklyn(false);
   }
 
+  // ── 로그인 게이트: 사진 입력 화면(home)의 "다음" ──
+  // 스타일/옵션 선택 → 내 사진 넣기 는 비로그인으로 전부 가능. 그다음 옵션 화면(confirm)으로
+  // 넘어가는 이 시점에만 로그인을 요구한다. 이미 여기까지 온 사용자는 컨셉·사진을 다
+  // 골라둔 상태이므로, 로그인 왕복에서 그걸 잃지 않도록 남겨두고 로그인 성공 시
+  // 첫 화면이 아니라 바로 옵션 화면(confirm)으로 이어서 보낸다(아래 복원 effect).
+  function handleContinueFromHome() {
+    if (session) {
+      setNavDir("fwd");
+      setScreen("confirm");
+      return;
+    }
+    if (!selected) return; // 방어적 — home 화면은 항상 selected 와 함께 온다
+    const needArt = isArtConcept(selected);
+    writePendingContinue({
+      savedAt: Date.now(),
+      conceptId: selected.id,
+      conceptTitle: selected.title || "",
+      conceptText: selected.text || "",
+      needArt,
+      // profile/partner 사진은 이미 rimikimi_photo / rimikimi_partner_photo 로 저장돼 살아남는다.
+      // art 사진(매직부스)만 원래 휘발성이라 로그인 왕복에서 유일하게 사라질 수 있어 같이 담아둔다.
+      artPhoto: needArt ? artPhoto : null,
+    });
+    setShowLoginSheet(true);
+  }
+
+  function closeLoginSheet() {
+    // 사용자가 로그인을 건너뛰기로 함 — 남겨두면 나중에 무관한 로그인 때 엉뚱하게 이어붙는다
+    clearPendingContinue();
+    setShowLoginSheet(false);
+  }
+
+  // 로그인 성공 시, "다음" 단계에서 멈췄던 흐름을 옵션 화면(confirm)으로 이어서 재개.
+  // concepts 가 아직 로딩 중이면(앱 막 시작) 최소 정보로만 복원되니, 로딩이 끝날 때까지 기다린다.
+  useEffect(() => {
+    if (!session || conceptsLoading) return;
+    const pc = readPendingContinue();
+    if (!pc) return;
+    const found = concepts.find((c) => String(c.id) === String(pc.conceptId));
+    const concept = found || { id: pc.conceptId, title: pc.conceptTitle, text: pc.conceptText };
+    setSelected(concept);
+    if (pc.needArt && pc.artPhoto) setArtPhoto(pc.artPhoto);
+    clearPendingContinue();
+    setShowLoginSheet(false);
+    setNavDir("fwd");
+    setScreen("confirm");
+  }, [session, conceptsLoading, concepts]);
+
   // 스토어는 어느 화면에서든 열 수 있다(헤더 크레딧 칩·확인화면·결과화면·프로필).
   // "왔던 화면"을 기억해 두지 않으면 뒤로가기가 무조건 confirm 으로 가버려서,
   // home 에서 크레딧 칩을 눌렀다가 뒤로 나오면 안 거쳤던 확인화면에 서게 된다.
@@ -1330,7 +1400,7 @@ export default function PortraitStudio() {
   //   4) touchcancel 처리가 없어 제스처가 취소되면 상태가 남음
   // → 컨테이너 기준 좌표 + 끄는 동안 실시간 추종 + 거리/속도 판정으로 다시 짬.
   function canSwipeBack() {
-    return !showBrooklyn && screen !== "gallery";
+    return !showBrooklyn && !showLoginSheet && screen !== "gallery";
   }
 
   // 끄는 동안 본문을 따라 움직이게 (리렌더 없이 DOM 직접 조작 — 60fps 유지)
@@ -1349,7 +1419,7 @@ export default function PortraitStudio() {
 
   function onTouchStartRoot(e) {
     swipeRef.current = null;
-    if (showBrooklyn) return;
+    if (showBrooklyn || showLoginSheet) return;
     const tt = e.touches && e.touches[0];
     if (!tt) return;
     // 가로로 스크롤되는 줄(인기 컨셉 등)에서 시작했으면 그쪽 제스처에 양보
@@ -1427,6 +1497,7 @@ export default function PortraitStudio() {
   const backRef = useRef(() => "exit");
   backRef.current = () => {
     if (showBrooklyn) { setShowBrooklyn(false); return "handled"; }
+    if (showLoginSheet) { closeLoginSheet(); return "handled"; }
     return goBack() ? "handled" : "exit";
   };
   useEffect(() => {
@@ -1499,91 +1570,67 @@ export default function PortraitStudio() {
 
     // ── 인생네컷: N컷 = N장 차감. 잔여 확인 후 N장 병렬 생성 → 코드로 합성 ──
     if (isFourcut(selected)) {
+      // ⚠️ 2026-08-13: 스트립을 "한 번의 호출로 한 장" 생성하도록 바꿨다.
+      //    예전엔 컷 수만큼 따로 뽑아 캔버스로 붙였는데,
+      //      · 컷마다 독립 생성이라 옷·머리카락이 미묘하게 달랐고
+      //      · /api/generate 를 컷 수만큼 동시에 불러 Vertex 429 를 유발했다.
+      //    나노바나나 프로는 한 장에 N분할을 일관되게 그린다 → 크레딧도 1장.
       const available = unlimited ? Infinity : freeLeft + credits;
-      if (available < fourcutCount) {
-        setPayToast(
-          `${fourcutCount}컷은 ${fourcutCount}장이 필요해요. 남은 건 ${available === Infinity ? "∞" : available}장이에요 🙂`
-        );
-        setTimeout(() => setPayToast(""), 4000);
+      if (available < 1) {
+        setPayToast("오늘 무료 횟수를 다 썼어요 🙂");
+        setTimeout(() => setPayToast(""), 3500);
         return;
       }
       setGenError(null);
       setResultImage(null);
+      setResultBatch(null);
       setProSampleImg(null);
       setCanTryPro(false); // 인생네컷은 Pro 비교 미제공 (스트립이라)
-      // 스트립은 클라 합성이라 서버 갤러리 원본이 없음 — 이전 단일생성의 galleryId가
-      // 남아있으면 저장 시 엉뚱한 사진의 2K를 받아오게 되므로 반드시 초기화.
       setResultGalleryId(null);
       setGenerating(true);
       setScreen("result");
-      setFourcutProgress(`0/${fourcutCount}`);
+      setFourcutProgress(String(fourcutCount));
+      writePendingGen({ startedAt: Date.now(), conceptId: selected.id, conceptTitle: selected.title });
+      scheduleGenDoneNotice(1, localizedTitle(selected));
       try {
         const accessToken = session?.access_token;
-        let done = 0;
-        const tasks = Array.from({ length: fourcutCount }, (_, i) =>
-          generateImage(accessToken, photo, "인생네컷", {
-            id: selected.id,
-            title: selected.title,
-            fourcutStyle: fourcutStyleKey,
-            cutIndex: i,
-          }).then((r) => {
-            done += 1;
-            setFourcutProgress(`${done}/${fourcutCount}`);
-            return r;
-          })
-        );
-        const results = await Promise.all(tasks);
-        const strip = await composeStrip(
-          results.map((r) => r.imageDataUrl),
-          fourcutStyleKey,
-          fourcutCount,
-          todayStr()
-        );
-        setResultImage(strip);
-        // ⚠️ 인생네컷의 결과물은 "스트립 1장"이다. 컷 N장은 합성 재료일 뿐이라
-        //    갤러리(내 사진)에 개별로 남기면 안 된다 → 스트립을 올리고 컷은 서버에서 정리.
-        const cutIds = results.map((r) => r?.galleryId).filter(Boolean);
-        try {
-          const up = await fetch("/api/gallery", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: "Bearer " + accessToken },
-            body: JSON.stringify({
-              base64: strip.split(",")[1],
-              mimeType: "image/jpeg",
-              conceptId: selected.id,
-              // 410(일반 인생네컷)은 제목에 스타일이 없으니 붙여준다. 411~418은 이미 포함.
-              conceptTitle: selected.fourcutStyle
-                ? selected.title
-                : `${selected.title} · ${fourcutStyle(fourcutStyleKey).label}`,
-              replaceIds: cutIds,
-            }),
-          });
-          const uj = await up.json();
-          if (uj?.id && uj?.expiresAt) {
-            // 만료 10분 전 리마인드 푸시는 스트립 1건에만
-            syncExpiryNotifications(
-              [{ id: uj.id, expiresAt: uj.expiresAt, conceptTitle: selected.title }],
-              getSavedSet()
-            );
-          }
-        } catch (_) {
-          // 스트립 보관 실패해도 화면의 결과물은 그대로 저장 가능 (컷은 서버에 남아 만료로 사라짐)
+        const r = await generateImage(accessToken, photo, "인생네컷", {
+          id: selected.id,
+          title: selected.title,
+          fourcutStyle: fourcutStyleKey,
+          cutCount: fourcutCount,   // ← 이게 있으면 서버가 스트립 한 장을 만든다
+          keepRatio: false,
+        });
+        setResultImage(r.imageDataUrl);
+        setResultGalleryId(r.galleryId || null);
+        // 서버가 스트립을 그대로 갤러리에 저장했다 — 별도 업로드/컷 정리가 필요 없다.
+        if (r.galleryId && r.galleryExpiresAt) {
+          syncExpiryNotifications(
+            [{ id: r.galleryId, expiresAt: r.galleryExpiresAt, conceptTitle: selected.title }],
+            getSavedSet()
+          );
         }
-        const last = results[results.length - 1];
-        if (typeof last?.unlimited === "boolean") setUnlimited(last.unlimited);
-        if (typeof last?.quotaUsed === "number") setFreeUsed(last.quotaUsed);
+        if (typeof r.unlimited === "boolean") setUnlimited(r.unlimited);
+        if (typeof r.quotaUsed === "number") setFreeUsed(r.quotaUsed);
         setRefreshTick((n) => n + 1); // 크레딧/잔여 정확히 재조회
-        track("generate", { engine: last?.engine || null, concept: selected?.id ?? null });
-        noteGeneration(); // 리뷰 요청 조건(생성 2장 이상) 카운트만 올림 — 여기선 묻지 않음
-        // 컷 중 하나라도 Pro 혼잡으로 base 폴백됐으면 고지 (무과금)
-        if (results.some((r) => r?.busyFallback)) {
+        clearPendingGen();
+        await cancelGenDoneNotice();
+        notifyGenDoneNow(1, localizedTitle(selected));
+        track("generate", { engine: r.engine || null, concept: selected?.id ?? null });
+        noteGeneration();
+        if (r.busyFallback) {
           setPayToast(t("engine.busyFallback"));
           setTimeout(() => setPayToast(""), 4500);
         }
         if (showAds) showInterstitial();
       } catch (err) {
-        if (typeof err.quotaUsed === "number") setFreeUsed(err.quotaUsed);
-        setGenError(err.message || "인생네컷 생성에 실패했어요.");
+        const recovered = await tryRecoverGeneration();
+        if (!recovered) {
+          if (typeof err.quotaUsed === "number") setFreeUsed(err.quotaUsed);
+          setGenError(err.message || "인생네컷 생성에 실패했어요.");
+          clearPendingGen();
+        }
+        await cancelGenDoneNotice();
       } finally {
         setGenerating(false);
         setFourcutProgress("");
@@ -1735,7 +1782,10 @@ export default function PortraitStudio() {
   // 친구 초대 — 네이티브 시트 우선, 그 다음 웹 공유, 마지막 클립보드
   async function shareInvite() {
     const uid = session?.user?.id;
-    if (!uid) return;
+    // 초대 링크엔 uid가 들어가므로 비로그인이면 만들 수 없다. 예전엔 조용히 return 해서
+    // 버튼을 눌러도 아무 일도 안 일어났다 — 이제 로그인 게이트가 걷혀 비로그인도 이 배너를
+    // 보게 되므로, 눌리면 로그인 시트를 띄운다.
+    if (!uid) { setShowLoginSheet(true); return; }
     // 네이티브 앱에선 origin이 capacitor://localhost(iOS)·http://localhost(안드) 라
     // 초대 링크가 localhost로 나가는 버그가 있음 → 정식 도메인(LEGAL_BASE) 사용
     const base = isNative() ? LEGAL_BASE : window.location.origin;
@@ -1787,21 +1837,10 @@ export default function PortraitStudio() {
   }
 
   // 스플래시는 부팅 타이머 + 세션 확인이 끝날 때까지 유지 (빈 화면 깜빡임 방지)
+  // ⚠️ 로그인은 게이트가 아니다 — 세션이 없어도(비로그인) 여기서 그냥 앱을 그린다.
+  //    둘러보기·컨셉 선택·사진 업로드는 전부 비로그인으로 가능하고, 로그인은
+  //    "다음"(사진 입력 → 옵션 화면) 전환 시 로그인 시트로만 요구한다(handleContinueFromHome).
   if (booting || !authChecked) return <Splash />;
-
-  // 로그인 안 됐어도, 세션이 자리잡는 중이면 로그인 화면 대신 스플래시 유지
-  // (로그인 직후/리다이렉트 복귀 때 로그인 화면이 잠깐 번쩍이는 것 방지)
-  if (!session && authSettling) return <Splash />;
-
-  // 로그인 안 됐으면 로그인 화면
-  if (!session) {
-    return (
-      <>
-        <style>{CSS}</style>
-        <LoginGate Logo={Logo} />
-      </>
-    );
-  }
 
   return (
     <div
@@ -1885,7 +1924,7 @@ export default function PortraitStudio() {
               onPickPartner={() => pickPhoto("partner")}
               ageConfirmed={ageConfirmed}
               setAgeConfirmed={setAgeConfirmed}
-              onContinue={() => setScreen("confirm")}
+              onContinue={handleContinueFromHome}
               onBack={() => setScreen("gallery")}
               showAds={showAds}
             />
@@ -1988,6 +2027,7 @@ export default function PortraitStudio() {
             onOpenStore={PAYMENTS_ENABLED ? openStore : null}
             onLogout={handleLogout}
             onDeleteAccount={handleDeleteAccount}
+            onLoginRequest={() => setShowLoginSheet(true)}
           />
         )}
         {screen === "mygallery" && (
@@ -1995,6 +2035,7 @@ export default function PortraitStudio() {
             accessToken={session?.access_token}
             onBack={() => setScreen("profile")}
             onShared={() => setRefreshTick((n) => n + 1)}
+            onLoginRequest={() => setShowLoginSheet(true)}
           />
         )}
         {screen === "store" && PAYMENTS_ENABLED && (
@@ -2046,6 +2087,18 @@ export default function PortraitStudio() {
             <button style={S.bkClose} onClick={() => setShowBrooklyn(false)}>
               다음에
             </button>
+          </div>
+        </div>
+      )}
+
+      {showLoginSheet && (
+        <div style={S.loginSheetBackdrop} onClick={closeLoginSheet}>
+          <div
+            className="loginSheetCard"
+            style={S.loginSheetCard}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <LoginGate Logo={Logo} embedded message={t("login.sheet.message")} onClose={closeLoginSheet} />
           </div>
         </div>
       )}
@@ -2592,7 +2645,37 @@ function ProfileScreen({
   referralCount, untilNext,
   onInvite, inviteMsg = "",
   onBack, onLogout, onDeleteAccount, onOpenGallery, onOpenStore,
+  onLoginRequest,
 }) {
+  // 비로그인 — 계정 정보/크레딧/내 갤러리/초대는 전부 로그인 후에만 의미가 있으므로
+  // 가짜 값(0/0 등)을 보여주는 대신 로그인 CTA 로 대체한다. 언어 설정만 기기 값이라 그대로 둔다.
+  if (!session) {
+    return (
+      <div className="fade">
+        <div style={S.navRow}>
+          <button style={S.backBtn} onClick={onBack}>←</button>
+          <div>
+            <div style={S.screenKicker}>{t("profile.kicker")}</div>
+            <div style={S.screenTitle}>{t("profile.title")}</div>
+          </div>
+        </div>
+
+        <div style={S.profileCard}>
+          <div style={S.profileAvatar}>
+            <div style={S.profileAvatarEmpty}>👤</div>
+          </div>
+          <div style={S.profileName}>{t("profile.guest.title")}</div>
+          <div style={S.profileMeta}>{t("profile.guest.desc")}</div>
+          <button style={{ ...S.secondaryBtn, marginTop: 16, width: "100%" }} onClick={onLoginRequest}>
+            {t("profile.guest.cta")}
+          </button>
+        </div>
+
+        <LangSelector />
+      </div>
+    );
+  }
+
   const u = session?.user || {};
   const meta = u.user_metadata || {};
   const provider = u.app_metadata?.provider || meta.provider || "email";
@@ -2772,7 +2855,7 @@ function LangSelector() {
 /* ============================================================
    내 갤러리 (1시간 보관)
    ============================================================ */
-function MyGalleryScreen({ accessToken, onBack, onShared }) {
+function MyGalleryScreen({ accessToken, onBack, onShared, onLoginRequest }) {
   const [items, setItems] = useState(null); // null=로딩, []=빈, [...]=있음
   const [error, setError] = useState(null);
   const [tick, setTick] = useState(0); // 1초마다 남은시간 갱신
@@ -2928,20 +3011,31 @@ function MyGalleryScreen({ accessToken, onBack, onShared }) {
         </div>
       </div>
 
-      <div style={S.galleryNotice}>
-        {t("gallery.notice1")}<br />
-        {t("gallery.notice2")}
-      </div>
+      {!accessToken ? (
+        // 비로그인 — 서버 갤러리는 계정에 묶여 있어 여기선 아무것도 못 불러온다.
+        // (fetch 자체를 안 하므로 items 는 계속 null 로 남는데, 그대로 두면 무한 로딩처럼 보인다)
+        <div style={S.emptyState}>
+          <div>{t("gallery.loginRequired")}</div>
+          <button style={{ ...S.moreBtn, marginTop: 14 }} onClick={onLoginRequest}>
+            {t("profile.guest.cta")}
+          </button>
+        </div>
+      ) : (
+        <div style={S.galleryNotice}>
+          {t("gallery.notice1")}<br />
+          {t("gallery.notice2")}
+        </div>
+      )}
 
-      {items === null && !error && (
+      {accessToken && items === null && !error && (
         <div style={S.emptyState}>{t("common.loading")}</div>
       )}
 
-      {error && (
+      {accessToken && error && (
         <div style={S.errorCard}>{error}</div>
       )}
 
-      {items && items.length === 0 && (
+      {accessToken && items && items.length === 0 && (
         <div style={S.emptyState}>
           <div>{t("gallery.empty")}</div>
           <button
@@ -2953,7 +3047,7 @@ function MyGalleryScreen({ accessToken, onBack, onShared }) {
         </div>
       )}
 
-      {items && items.length > 0 && (
+      {accessToken && items && items.length > 0 && (
         <div style={S.myGalleryGrid}>
           {items.map((it) => {
             const expMs = new Date(it.expiresAt).getTime() - Date.now();
@@ -3114,7 +3208,7 @@ function ConfirmScreen({
 
       {fourcut && (
         <div style={S.idOptCard}>
-          <div style={S.idOptLabel}>컷 수 (선택한 컷 수만큼 차감돼요)</div>
+          <div style={S.idOptLabel}>컷 수 (몇 컷이든 1장만 차감돼요)</div>
           <div style={S.idSuitRow}>
             {FOURCUT_COUNTS.map((n) => (
               <button
@@ -3475,7 +3569,7 @@ function ResultScreen({
           <div style={S.genTitle}>{t("result.generating")}</div>
           <div style={S.genSub}>
             {fourcutProgress
-              ? `인생네컷 ${fourcutProgress} 컷 생성 중...`
+              ? `인생네컷 ${fourcutProgress}컷 스트립을 만들고 있어요...`
               : `#${prompt.id} · ${localizedTitle(prompt)}`}
           </div>
           <div style={S.genHint}>
@@ -4498,6 +4592,22 @@ const S = {
     color: "#9a938c", fontSize: 13.5, fontWeight: 600,
     fontFamily: "'Quicksand', sans-serif", cursor: "pointer", padding: 8,
   },
+  // 로그인 시트 — "다음"(사진 입력 → 옵션 화면) 전환 때 뜨는 바텀시트.
+  loginSheetBackdrop: {
+    position: "fixed", inset: 0, zIndex: 1000,
+    background: "rgba(20,16,16,0.44)",
+    backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)",
+    display: "flex", alignItems: "flex-end", justifyContent: "center",
+    animation: "fadeIn .2s ease",
+  },
+  loginSheetCard: {
+    width: "100%", maxWidth: 440, background: "#fffdf9",
+    borderRadius: "24px 24px 0 0", padding: "22px 24px calc(env(safe-area-inset-bottom, 0px) + 22px)",
+    boxShadow: "0 -24px 60px -12px rgba(20,16,16,0.35)",
+    animation: "sheetUp .32s cubic-bezier(.32,.72,0,1) both",
+    maxHeight: "88vh", overflowY: "auto", overscrollBehavior: "contain",
+    WebkitOverflowScrolling: "touch",
+  },
   packPriceSub: {
     fontSize: 11, fontWeight: 500, opacity: 0.55, marginLeft: 4,
   },
@@ -4916,6 +5026,11 @@ body { margin: 0; background: ${BG}; }
 @keyframes bkPop {
   from { opacity: 0; transform: scale(.9) translateY(8px); }
   to { opacity: 1; transform: scale(1) translateY(0); }
+}
+/* 로그인 시트 — iOS 느낌의 드로어 곡선(transform 만, GPU) */
+@keyframes sheetUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
 }
 @keyframes toastIn {
   from { opacity: 0; transform: translateX(-50%) translateY(-8px); }

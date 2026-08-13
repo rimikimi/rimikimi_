@@ -6,7 +6,7 @@
 //  - 포토부스 공통 포맷(흰 여백 + 하단 브랜드/날짜)의 rimikimi 오리지널 프레임
 // ============================================================
 
-export const FOURCUT_COUNTS = [2, 3, 4, 6, 8];
+export const FOURCUT_COUNTS = [2, 3, 4, 6];
 
 export const FOURCUT_STYLES = [
   { key: "cute",     label: "큐티",     emoji: "🎀", bg: "#ffe6f0", cell: "#ffffff", accent: "#ff8fb1", text: "#d6457a", stickers: ["🎀", "💕", "⭐", "🌸"] },

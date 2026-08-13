@@ -297,6 +297,8 @@ export default async function handler(req, res) {
     idSuit, idBg, idBgName,
     // 인생네컷: 스타일 + 컷 인덱스 (서버가 컷별 포즈/악세서리 프롬프트 조립)
     fourcutStyle, cutIndex,
+    // 인생네컷 스트립 한 장 생성 (신버전 앱). 없으면 구버전(컷별 생성) 경로.
+    cutCount,
     // 커플: 두 번째 참조 사진(상대). 프롬프트가 "first/second reference image" 를
     // 지칭하므로 반드시 base64 → base64_2 순서로 넣는다.
     mimeType2, base64_2,
@@ -428,6 +430,35 @@ export default async function handler(req, res) {
   ];
   const fc = FC_STYLE[fourcutStyle] || FC_STYLE.cute;
   const fcPose = FC_POSES[(Number(cutIndex) || 0) % FC_POSES.length];
+
+  // ── 스트립 한 장 생성 (2026-08-13) ──
+  // 예전엔 컷 수만큼 따로 뽑아 앱에서 붙였다. 문제가 둘이었다:
+  //   1) 컷마다 독립 생성이라 옷 주름·머리카락이 미묘하게 달라진다
+  //   2) 앱이 /api/generate 를 컷 수만큼 동시에 불러 Vertex 429 를 유발
+  // 나노바나나 프로는 한 장에 N분할을 일관되게 그린다(실측: 옷·귀걸이·머리까지 동일).
+  // → 한 번의 호출로 스트립 전체를 만든다. 크레딧도 1장.
+  const STRIP_GRID = { 2: "1 column x 2 rows", 3: "1 column x 3 rows",
+                       4: "2 columns x 2 rows", 6: "2 columns x 3 rows" };
+  const STRIP_RATIO = { 2: "3:4", 3: "9:16", 4: "3:4", 6: "3:4" };
+  const stripN = STRIP_GRID[Number(cutCount)] ? Number(cutCount) : 4;
+  const stripInstruction =
+    `Create a Korean photo-booth (인생네컷) PHOTO STRIP as ONE single image, using the person in the provided photo.\n\n` +
+    `LAYOUT: exactly ${stripN} photo cells arranged in ${STRIP_GRID[stripN]} on one clean strip. ` +
+    `Even gutters between cells, a wider margin at the bottom. Each cell has slightly rounded corners. ` +
+    `All ${stripN} cells fully inside the frame, none cropped.\n\n` +
+    `THE PERSON: the SAME person in every cell — keep their exact face, identity and natural likeness from the provided photo. ` +
+    `Identical hairstyle, outfit, accessories and makeup across all cells. Only pose, head angle and expression differ slightly, ` +
+    `like ${stripN} consecutive frames from one photo-booth session. Head-and-shoulders framing, centered in each cell.\n\n` +
+    `POSES (one per cell, in order): ` +
+    FC_POSES.slice(0, stripN).map((p, i) => `cell ${i + 1} — ${p}`).join("; ") + ".\n" +
+    `Expressions must look NATURAL and unforced, like candid frames from a real session. ` +
+    `No exaggerated grins, no stiff or theatrical posing, no cheesy hand gestures.\n\n` +
+    `The person is naturally wearing ${fc.acc}, tastefully styled to suit them (a real worn accessory, not a sticker). ` +
+    (fc.extra ? `Wardrobe & styling: ${fc.extra}. ` : "") +
+    `Overall aesthetic: ${fc.mood}. Simple, clean, uniform background behind the person in every cell.\n\n` +
+    `Bright, clean, flattering lighting. Sharp focus, photorealistic, true-to-life skin. Exactly one person per cell.\n\n` +
+    `STRICTLY: no text, no letters, no numbers, no date stamp, no logo, no watermark anywhere.`;
+
   const fourcutInstruction =
     "Create a single Korean photo-booth (인생네컷) style portrait CUT using the person in the provided photo. " +
     "Keep their exact face, identity, facial features and natural likeness — clearly recognizable; do not change who they are or beautify them unnaturally. " +
@@ -443,8 +474,10 @@ export default async function handler(req, res) {
     "Background: a simple, clean, fairly uniform studio-style background that fits the theme, so the cut composites cleanly into a photo strip. " +
     "Bright, clean, flattering lighting. Sharp focus, photorealistic, true-to-life skin. Exactly one person in frame.";
 
+  // cutCount 가 오면 스트립 한 장, 아니면 구버전(컷별) — 구버전 앱 호환
+  const isStrip = isFourcut && !!STRIP_GRID[Number(cutCount)];
   const conceptInstruction = isFourcut
-    ? fourcutInstruction
+    ? (isStrip ? stripInstruction : fourcutInstruction)
     : isIdPhoto
     ? idInstruction
     : isRestore
@@ -525,7 +558,11 @@ export default async function handler(req, res) {
       },
     ],
     // Pro 는 2K 고해상도로. (기본 모델은 편집모드 비율보존 위해 설정 생략 — 기존 동작 유지)
-    ...(isPro ? { generationConfig: { imageConfig: { imageSize: "2K" } } } : {}),
+    // 스트립은 분할 수에 맞는 비율을 명시해야 칸이 잘리지 않는다.
+    ...(isPro
+      ? { generationConfig: { imageConfig: { imageSize: "2K",
+          ...(isStrip ? { aspectRatio: STRIP_RATIO[stripN] } : {}) } } }
+      : {}),
   });
 
   // Gemini 한 번 호출(타임아웃 포함). 네트워크 예외(hang/AbortError 포함)는 upstream 없이 반환.
