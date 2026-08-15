@@ -36,9 +36,33 @@ function dropsResponse(req, res, now) {
   return res.status(200).send(JSON.stringify(drops));
 }
 
+// 공개된 컨셉 개수만 — 랜딩 페이지("N가지 컨셉")가 쓴다.
+// 목록 전체는 400KB 라 마케팅 페이지에서 받게 하면 안 된다. 여기서 숫자만 준다.
+function countResponse(req, res, now) {
+  let n = 0;
+  for (const c of ALL) {
+    if (!c?.publishAt) { n++; continue; }
+    const t = Date.parse(c.publishAt);
+    if (!Number.isFinite(t) || t <= now) n++;
+  }
+  res.setHeader("Content-Type", "application/json; charset=utf-8");
+  res.setHeader("Cache-Control", "public, max-age=0, s-maxage=300, stale-while-revalidate=600");
+  return res.status(200).send(JSON.stringify({ total: n }));
+}
+
 export default function handler(req, res) {
+  // ⚠️ CORS 필수. 네이티브 앱은 capacitor://localhost 에서 이 주소를 부르므로
+  //    크로스 오리진이다. 정적 파일일 땐 Vercel 이 알아서 열어줬는데, 함수로
+  //    바꾸면서 헤더가 빠져 앱의 fetch 가 통째로 차단됐다 → 앱이 번들된 옛
+  //    목록으로 폴백해 새 컨셉이 열흘간 안 보였다(2026-08-05 ~ 08-15).
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "content-type");
+  if (req.method === "OPTIONS") return res.status(204).end();
+
   const now = Date.now();
   if (req.query?.drops) return dropsResponse(req, res, now);
+  if (req.query?.count) return countResponse(req, res, now);
 
   let list;
   try {
