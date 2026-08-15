@@ -1,16 +1,18 @@
 // ============================================================
 // IAP 크레딧 지급 공용 헬퍼 (grant 엔드포인트 + webhook 공유)
 //
-//  - PRODUCT_CREDITS : productId → 적립 크레딧 (packages.js 단일 출처)
+//  - PRODUCT_CREDITS : productId → 적립 크레딧 (packages.js ALL_PACKAGES 단일 출처.
+//      판매중 상품(PACKAGES) + 레거시 상품(LEGACY_PACKAGES) 을 전부 포함해야
+//      과거 productId 의 복원/웹훅 재전송이 "알 수 없는 상품"으로 거부되지 않는다.)
 //  - grantCreditsForTransaction : 거래ID 기준 멱등 적립
 //      (iap_events 에 거래ID UNIQUE → 중복 호출/웹훅 재전송에도 1회만 적립)
 //  - fetchRevenueCatSubscriber : RevenueCat REST 로 구매 재검증
 // ============================================================
 
-import { PACKAGES } from "./payments/packages.js";
+import { ALL_PACKAGES } from "./payments/packages.js";
 
 export const PRODUCT_CREDITS = Object.fromEntries(
-  PACKAGES.map((p) => [p.id, p.credits])
+  ALL_PACKAGES.map((p) => [p.id, p.credits])
 );
 
 // RevenueCat REST v2: 고객(=우리 user.id)의 구매 내역 조회

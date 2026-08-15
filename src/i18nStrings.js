@@ -41,6 +41,13 @@ export const STR = {
     "login.email.checkInbox": "확인 메일을 보냈어요! 메일의 링크를 눌러 가입을 완료해 주세요 📧",
     "login.email.needFields": "이메일과 비밀번호를 입력해 주세요.",
     "login.email.shortPw": "비밀번호는 6자 이상이어야 해요.",
+    "login.sheet.message": "생성된 이미지 저장을 위해 로그인이 필요합니다",
+
+    // === 로그인 필요(프로필/내 갤러리) ===
+    "profile.guest.title": "로그인이 필요해요",
+    "profile.guest.desc": "로그인하면 크레딧, 내 갤러리, 친구 초대를 이용할 수 있어요.",
+    "profile.guest.cta": "로그인",
+    "gallery.loginRequired": "로그인하면 내가 만든 이미지를 볼 수 있어요",
 
     // === 헤더 ===
     "header.unlimited": "∞ 무제한",
@@ -197,6 +204,9 @@ export const STR = {
     "store.count": "{n}장",
     "store.per": "장당 {price}",
     "store.save": " · {n}% 절약",
+    // 크레딧팩 장당가·할인율 (4앱 공용 키 이름, packPricing.js 로 계산)
+    "pack.perUnit": "장당 {price}",
+    "pack.discount": "{pct}% 할인",
     "store.pay": "구매하기",
     "store.payWeb": "PayPal로 결제",
     "store.paying": "처리 중…",
@@ -206,8 +216,11 @@ export const STR = {
     "store.restoring": "복원 중…",
     "store.restoreOk": "구매 내역을 복원했어요.",
     "store.badge.popular": "가장 인기",
+    "store.badge.first": "첫 구매",
+    "store.badge.best": "베스트 가치",
+    "store.badge.cheapest": "장당 최저",
     "profile.store.title": "💳 크레딧 충전",
-    "profile.store.desc": "인앱결제 · 10/30/70/120 크레딧 패키지",
+    "profile.store.desc": "인앱결제 · 6/12/24/45 크레딧 패키지",
     "step3.topupGenerate": "크레딧 충전하고 생성하기",
 
     // === 결제 토스트 ===
@@ -296,6 +309,12 @@ export const STR = {
     "login.email.checkInbox": "Check your inbox! Tap the link in the email to finish signing up 📧",
     "login.email.needFields": "Please enter both email and password.",
     "login.email.shortPw": "Password must be at least 6 characters.",
+    "login.sheet.message": "Sign in to save your generated image",
+
+    "profile.guest.title": "Sign in required",
+    "profile.guest.desc": "Sign in to use credits, your gallery, and invite friends.",
+    "profile.guest.cta": "Sign in",
+    "gallery.loginRequired": "Sign in to see the images you've created",
 
     "header.unlimited": "∞ Unlimited",
     "header.blocked": "🔒 Beta only",
@@ -442,6 +461,9 @@ export const STR = {
     "store.count": "{n} images",
     "store.per": "{price} each",
     "store.save": " · save {n}%",
+    // Credit pack per-unit price·discount (shared key name across all 4 apps, packPricing.js)
+    "pack.perUnit": "{price} each",
+    "pack.discount": "Save {pct}%",
     "store.pay": "Buy",
     "store.payWeb": "Pay with PayPal",
     "store.paying": "Processing…",
@@ -451,8 +473,11 @@ export const STR = {
     "store.restoring": "Restoring…",
     "store.restoreOk": "Purchases restored.",
     "store.badge.popular": "Most popular",
+    "store.badge.first": "First purchase",
+    "store.badge.best": "Best value",
+    "store.badge.cheapest": "Lowest per image",
     "profile.store.title": "💳 Buy credits",
-    "profile.store.desc": "In-app purchase · 10/30/70/120 credit packs",
+    "profile.store.desc": "In-app purchase · 6/12/24/45 credit packs",
     "step3.topupGenerate": "Top up & generate",
 
     "pay.checking": "Verifying payment…",

@@ -10,6 +10,7 @@ import LoginGate from "./LoginGate";
 import { shareImage, claimShareRewardApi } from "./share";
 import { track, setTrackUser } from "./track";
 import { noteGeneration, maybeRequestReview } from "./appReview";
+import { perUnitKrw, perUnitUsd, packDiscountPercent } from "./packPricing";
 
 // ── 퍼널 계측: signup 은 로그인 이벤트만으로 구분 불가(OAuth 도 최초 1회는 SIGNED_IN) —
 // user.created_at 과 last_sign_in_at 이 아주 가까우면(첫 로그인) signup 으로 판정한다.
@@ -164,17 +165,25 @@ function _OldLogo({ height = 30, mono = false }) {
 // (v1.0은 무료+광고로 통과 → v1.1부터 IAP 켬)
 const PAYMENTS_ENABLED = isNative();
 
+// 2026-08-14: claire.pack.* 와 동일 구조(6/12/24/45장)로 교체(오너 지시). badgeKey 는
+// i18nStrings.js 의 store.badge.* 키 — 팩마다 의미가 다른 배지(첫 구매/베스트 가치/장당
+// 최저)를 정확히 표시하기 위해 문자열 대신 키로 넘긴다.
+// ⚠️ 옛 credits10/30/70/120 은 이 판매 목록에서 뺐을 뿐 지우지 않았다 — 크레딧 매핑은
+// api/_lib/payments/packages.js 의 LEGACY_PACKAGES 에 남아있다(과거 구매자 그랜트/복원용).
 const CREDIT_PACKS = [
-  { id: "credits10",  count: 10,  krw: 7900,  usd: "5.99",  label: null },
-  { id: "credits30",  count: 30,  krw: 19800, usd: "14.99", label: "가장 인기" },
-  { id: "credits70",  count: 70,  krw: 39800, usd: "29.99", label: null },
-  { id: "credits120", count: 120, krw: 59800, usd: "44.99", label: "최고 가성비" },
+  { id: "rimikimi.pack.intro",    count: 6,  krw: 3900,  usd: "2.99",  badgeKey: "store.badge.first" },
+  { id: "rimikimi.pack.mini",     count: 12, krw: 7900,  usd: "5.99",  badgeKey: null },
+  { id: "rimikimi.pack.standard", count: 24, krw: 14900, usd: "10.99", badgeKey: "store.badge.best" },
+  { id: "rimikimi.pack.pro",      count: 45, krw: 27000, usd: "19.99", badgeKey: "store.badge.cheapest" },
 ];
 
-// 구독 rimikimi+ (자동갱신) — 광고·워터마크 제거 + 크레딧 자동충전(월 20 / 연 240)
+// 구독 rimikimi+ (자동갱신) — 광고·워터마크 제거 + 크레딧 자동충전.
+// 2026-08-14 claire 구조로 통일: 주 8 / 월 30 / 연 240 크레딧.
+// 옛 plus_monthly·plus_annual 은 판매 목록에서 뺐지만 기존 구독자 갱신은 계속된다(iap.js 참조).
 const SUB_PLANS = [
-  { id: "plus_monthly", period: "month", credits: 20,  krw: 9900,  usd: "7.99",  label_ko: "월간", label_en: "Monthly", badge: null },
-  { id: "plus_annual",  period: "year",  credits: 240, krw: 99000, usd: "74.99", label_ko: "연간", label_en: "Annual", badge: "2개월 무료" },
+  { id: "rimikimi.sub.plus.weekly",  period: "week",  credits: 8,   krw: 6900,   usd: "4.99",  label_ko: "위클리", label_en: "Weekly", badge: null },
+  { id: "rimikimi.sub.plus.monthly", period: "month", credits: 30,  krw: 12900,  usd: "9.99",  label_ko: "먼슬리", label_en: "Monthly", badge: null },
+  { id: "rimikimi.sub.plus.annual",  period: "year",  credits: 240, krw: 109000, usd: "89.99", label_ko: "애뉴얼", label_en: "Annual", badge: "가장 저렴" },
 ];
 const SUB_IDS = SUB_PLANS.map((p) => p.id);
 
@@ -185,9 +194,7 @@ const HEARTS = ["#e6403c", "#f9c83c", "#60c9de", "#8a5da7"];
 
 const won = (n) => n.toLocaleString("ko-KR") + "원";
 const usd = (s) => "$" + s;
-const perImage = (pack) => Math.round(pack.krw / pack.count);
-const perImageUsd = (pack) =>
-  (parseFloat(pack.usd) / pack.count).toFixed(2);
+// 장당가·할인율 계산은 packPricing.js(4앱 공용) — perUnitKrw/perUnitUsd/packDiscountPercent.
 
 // 아트 변환 카테고리 = 본인 얼굴이 아닌 임의 사진을 별도로 업로드받는 컨셉.
 // 400번 이상 = 일반 화보 컨셉이 아니라 "기능" 컨셉(매직부스/복원/증명사진/인생네컷 프리셋).
@@ -3720,7 +3727,6 @@ function ResultScreen({
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function StoreScreen({ packs, credits, session, freeLimit = FREE_DAILY, onCredited, onBack }) {
-  const cheapest = Math.max(...packs.map((p) => perImage(p)));
   // 한국어 = 원화(₩) 주 표시, 그 외 = 달러($) 주 표시
   const ko = getLang() === "ko";
   const native = isNative();
@@ -3857,8 +3863,7 @@ function StoreScreen({ packs, credits, session, freeLimit = FREE_DAILY, onCredit
 
       <div style={S.packList}>
         {packs.map((pack, i) => {
-          const per = perImage(pack);
-          const save = Math.round((1 - per / cheapest) * 100);
+          const discount = packDiscountPercent(pack, packs);
           const busy = busyId === pack.id;
           // 네이티브: 스토어 실제 가격 문자열(현지통화 자동). 로딩 전엔 우리 표시가로 폴백.
           const rc = native ? iapById?.[pack.id] : null;
@@ -3866,9 +3871,9 @@ function StoreScreen({ packs, credits, session, freeLimit = FREE_DAILY, onCredit
           return (
             <div
               key={pack.id}
-              style={{ ...S.pack, ...(pack.label ? S.packFeatured : {}) }}
+              style={{ ...S.pack, ...(pack.badgeKey ? S.packFeatured : {}) }}
             >
-              {pack.label && <div style={S.packBadge}>{t("store.badge.popular")}</div>}
+              {pack.badgeKey && <div style={S.packBadge}>{t(pack.badgeKey)}</div>}
               <div style={S.packCount}>
                 <span style={{ color: HEARTS[i % HEARTS.length] }}>♥</span>{" "}
                 {t("store.count", { n: pack.count })}
@@ -3884,8 +3889,8 @@ function StoreScreen({ packs, credits, session, freeLimit = FREE_DAILY, onCredit
                 )}
               </div>
               <div style={S.packPer}>
-                {t("store.per", { price: ko ? won(perImage(pack)) : usd(perImageUsd(pack)) })}
-                {save > 0 && <span style={S.packSave}>{t("store.save", { n: save })}</span>}
+                {t("pack.perUnit", { price: ko ? won(perUnitKrw(pack)) : usd(perUnitUsd(pack).toFixed(2)) })}
+                {discount != null && <span style={S.packSave}>{t("pack.discount", { pct: discount })}</span>}
               </div>
               <button
                 style={{
@@ -4953,7 +4958,7 @@ const S = {
     fontSize: 10.5, fontWeight: 600, opacity: 0.55,
     gridColumn: "1 / 3", marginTop: -4,
   },
-  packSave: { color: ACCENT, fontWeight: 700 },
+  packSave: { color: ACCENT, fontWeight: 700, marginLeft: 5 },
   packBtn: {
     gridRow: "1 / 3", gridColumn: 3, background: INK, color: "#fff",
     border: "none", borderRadius: 13, padding: "13px 22px",

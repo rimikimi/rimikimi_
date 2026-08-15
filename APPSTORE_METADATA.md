@@ -180,38 +180,43 @@ One selfie is all it takes! AI-crafted profile pictures in endless concepts.
 
 | 항목 | 값 |
 |---|---|
-| **데모 계정 이메일** | appreview@rimikimi.com |
-| **데모 계정 비밀번호** | Rimikimi-Review-2026! |
+| **데모 계정 이메일** | appreview@rimikimi.com|
+| **데모 계정 비밀번호** | Rev-GdJbCeLKTkLa!|
 | **연락처 이름** | (사장님 이름) |
 | **연락처 전화** | (사장님 번호) |
 | **연락처 이메일** | (사장님 이메일) |
 
 > 데모 계정은 Supabase 에 email_confirm 완료 상태로 생성됨 (확인 메일 불필요).
 > 베타 테스터 화이트리스트(TESTER_EMAILS)에도 등록되어 실제 이미지 생성 가능(하루 3장, 일반 무료 1장보다 넉넉).
-> 로그인 화면 → "이메일로 로그인 / 가입" → 위 이메일/비번 입력.
+> ⚠️ 2026-08-13부터 앱 진입 시 로그인 화면이 없다(게스트 모드). 로그인 시트는
+> **사진 입력 다음 단계로 넘어갈 때** 뜬다 — 심사 메모에 그 경로가 적혀 있어야 한다.
 > (무료 1장/일 개방 — 아무 계정으로도 생성 테스트 가능. 크레딧/구독 흐름은 데모 계정으로 Sandbox 결제 테스트)
 
 ### 심사 메모 (Notes) — 영어 예시
 ```
-This app generates AI profile pictures from a user-uploaded photo.
+This app generates AI portraits from a user-uploaded photo.
+
+The app is fully browsable WITHOUT an account. Sign-in is requested only when the
+user moves past the photo step (generated images are saved to the account), so the
+first screen is the app itself — not a login wall.
 
 To test:
-1. Sign in with the demo account (email/password provided above),
-   or use any social login.
-2. On the gallery screen, pick a concept.
-3. Upload a face photo (a sample selfie works fine).
-4. Tap "Create" to generate the AI portrait.
+1. Launch the app. You are signed out; browse and pick a style freely.
+2. Pick a concept from the gallery.
+3. Add a face photo (any sample selfie works).
+4. Tap Next (다음).
+5. A sign-in sheet appears ("Sign in to save your generated image").
+   Sign in with the demo account below, or any social login.
+6. Your style and photo are preserved — the flow continues where you left off.
 
-Free tier: 1 generation per day (resets at midnight KST), using the
-gemini-2.5-flash-image engine. To test paid tiers, purchase a credit
-pack or subscribe to rimikimi+ via Sandbox — paid generations use the
-gemini-3-pro-image engine at 2K resolution and remove ads.
+Notes:
+- Image generation runs on our backend via the Google Gemini API.
+- Photos picked before sign-in are kept only on the device (IndexedDB/localStorage)
+  and are moved to the account slot after sign-in. They are never uploaded until
+  generation, which always requires an authenticated request.
+- Account deletion is available in-app under Settings.
 
-Note: Image generation uses the Google Gemini API on our backend.
-Uploaded photos are not stored; generated images auto-expire in 1 hour.
-
-The "Art Transformation" category accepts any photo (people,
-landscapes, objects), not only faces.
+App bundle ID: com.rimikimi.app
 ```
 
 ---

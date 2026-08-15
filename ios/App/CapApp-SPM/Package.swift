@@ -13,6 +13,7 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", exact: "8.3.4"),
         .package(name: "CapacitorCommunityAdmob", path: "../../../node_modules/@capacitor-community/admob"),
+        .package(name: "CapacitorCommunityInAppReview", path: "../../../node_modules/@capacitor-community/in-app-review"),
         .package(name: "CapacitorCommunityMedia", path: "../../../node_modules/@capacitor-community/media"),
         .package(name: "CapacitorApp", path: "../../../node_modules/@capacitor/app"),
         .package(name: "CapacitorBrowser", path: "../../../node_modules/@capacitor/browser"),
@@ -29,6 +30,7 @@ let package = Package(
                 .product(name: "Capacitor", package: "capacitor-swift-pm"),
                 .product(name: "Cordova", package: "capacitor-swift-pm"),
                 .product(name: "CapacitorCommunityAdmob", package: "CapacitorCommunityAdmob"),
+                .product(name: "CapacitorCommunityInAppReview", package: "CapacitorCommunityInAppReview"),
                 .product(name: "CapacitorCommunityMedia", package: "CapacitorCommunityMedia"),
                 .product(name: "CapacitorApp", package: "CapacitorApp"),
                 .product(name: "CapacitorBrowser", package: "CapacitorBrowser"),

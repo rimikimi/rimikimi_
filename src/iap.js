@@ -21,17 +21,35 @@ import { isNative, platform } from "./nativeBridge";
 // 죽고(무한 Processing / 상품 0개), RC 백엔드에 고객 0명이 되던 근본 원인.
 import { Purchases as _PurchasesStatic } from "@revenuecat/purchases-capacitor";
 
-// 우리 팩 정의 (서버 packages.js 와 productId 1:1 매칭 필수)
+// 우리 팩 정의 (서버 packages.js PACKAGES 와 productId 1:1 매칭 필수)
 // 소비형(크레딧) + 구독(rimikimi+). 구독은 1갱신당 지급 크레딧.
+// 여기 있는 productId 만 스토어에서 조회/구매 대상이 된다 — 즉 "현재 판매중" 목록.
+//
+// 2026-08-14: 크레딧 팩을 claire.pack.* 와 동일 구조(6/12/24/45장)로 교체(오너 지시).
+// ⚠️ 옛 productId(credits10/30/70/120, credits_10/30/70/120)는 여기서 뺐지만 코드에서
+// 지우지 않았다 — 과거 구매자 그랜트/웹훅 판정용 매핑은 서버
+// api/_lib/payments/packages.js 의 LEGACY_PACKAGES 에 그대로 남아있다. 이미 구매가
+// 끝난 소비형 상품이라 이 화면에서 다시 조회/구매할 필요는 없다(복원은 RevenueCat
+// restorePurchases() 로 별도 동작, IAP_PRODUCTS 맵과 무관).
 export const IAP_PRODUCTS = {
-  credits10: 10,
-  credits30: 30,
-  credits70: 70,
-  credits120: 120,
+  "rimikimi.pack.intro": 6,
+  "rimikimi.pack.mini": 12,
+  "rimikimi.pack.standard": 24,
+  "rimikimi.pack.pro": 45,
+  "rimikimi.sub.plus.weekly": 8,
+  "rimikimi.sub.plus.monthly": 30,
+  "rimikimi.sub.plus.annual": 240,
+  // 옛 구독 — 신규 판매는 안 하지만 **기존 구독자가 갱신 중**이라 남긴다.
+  // 여기서 빠지면 갱신 영수증이 "알 수 없는 상품"으로 거부돼 크레딧이 안 들어간다.
   plus_monthly: 20,
   plus_annual: 240,
+  rimikimi_plus_monthly: 20,
+  rimikimi_plus_annual: 240,
 };
-export const SUBSCRIPTION_IDS = ["plus_monthly", "plus_annual"];
+export const SUBSCRIPTION_IDS = [
+  "rimikimi.sub.plus.weekly", "rimikimi.sub.plus.monthly", "rimikimi.sub.plus.annual",
+  "plus_monthly", "plus_annual", "rimikimi_plus_monthly", "rimikimi_plus_annual",
+];
 export const isSubscription = (id) => SUBSCRIPTION_IDS.includes(id);
 export const PRODUCT_IDS = Object.keys(IAP_PRODUCTS);
 

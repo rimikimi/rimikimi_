@@ -19,7 +19,11 @@ import { isNative } from "./nativeBridge";
 // 네이티브 앱 OAuth 복귀용 딥링크 (iOS/Android URL scheme + Supabase Redirect URL 에 등록)
 const NATIVE_REDIRECT = "com.rimikimi.app://login-callback";
 
-export default function LoginGate({ Logo }) {
+// embedded = 시트/모달 안에 끼워 넣을 때(로그인 게이트 시트). 전체 페이지 안전영역
+//            패딩·고정 높이를 빼고 카드 안에 맞는 여백으로 렌더링한다.
+// message  = 태그라인 대신 보여줄 문구(왜 지금 로그인해야 하는지 맥락 설명용).
+// onClose  = 있으면 우상단에 닫기(✕) 버튼 표시 — 로그인 없이 시트만 닫고 계속 둘러볼 수 있게.
+export default function LoginGate({ Logo, embedded = false, message, onClose }) {
   useLang(); // 언어 바뀌면 리렌더
   const [busy, setBusy] = useState(null); // 'apple' | 'kakao' | 'naver' | 'google' | 'email' | null
   const [error, setError] = useState(null);
@@ -221,12 +225,23 @@ export default function LoginGate({ Logo }) {
   }
 
   return (
-    <div style={S.wrap}>
-      <div style={S.logoBox}>
-        {Logo ? <Logo height={70} /> : <span style={S.fallback}>rimikimi</span>}
+    <div style={embedded ? S.embeddedWrap : S.wrap}>
+      {embedded && onClose && (
+        <button
+          type="button"
+          style={S.embeddedClose}
+          onClick={onClose}
+          aria-label={t("common.close")}
+        >
+          ✕
+        </button>
+      )}
+
+      <div style={embedded ? S.embeddedLogoBox : S.logoBox}>
+        {Logo ? <Logo height={embedded ? 52 : 70} /> : <span style={S.fallback}>rimikimi</span>}
       </div>
 
-      <p style={S.tagline}>{t("login.tagline")}</p>
+      <p style={embedded ? S.embeddedTagline : S.tagline}>{message || t("login.tagline")}</p>
 
       <div style={S.buttons}>
         <button
@@ -438,6 +453,26 @@ const S = {
     // 내용(이메일 폼 펼침 등)이 길어지면 화면 안에서만 스크롤, 문서 바운스 없음
     overflowY: "auto", overflowX: "hidden", overscrollBehavior: "contain",
     WebkitOverflowScrolling: "touch",
+  },
+  // 시트(embedded) 안에 끼워 넣을 때 — 카드 안 여백만 쓰고, 배경/높이는 카드가 담당.
+  embeddedWrap: {
+    width: "100%", maxWidth: 400, margin: "0 auto",
+    boxSizing: "border-box", color: INK,
+    padding: "4px 4px 2px",
+    display: "flex", flexDirection: "column", alignItems: "center",
+    fontFamily: "'Quicksand', sans-serif", position: "relative",
+  },
+  embeddedClose: {
+    position: "absolute", top: -4, right: -4, width: 32, height: 32,
+    borderRadius: "50%", border: "none", background: "rgba(35,31,32,0.06)",
+    color: INK, fontSize: 14, fontWeight: 700, cursor: "pointer",
+    display: "flex", alignItems: "center", justifyContent: "center",
+  },
+  embeddedLogoBox: { marginTop: 4, marginBottom: 10 },
+  embeddedTagline: {
+    fontFamily: "'Jua', sans-serif",
+    fontSize: 15, color: INK, opacity: 0.75,
+    margin: "0 0 22px", letterSpacing: "-0.005em", textAlign: "center",
   },
   logoBox: { marginTop: 48, marginBottom: 18 },
   fallback: {
