@@ -13,6 +13,18 @@ const config: CapacitorConfig = {
     scheme: 'rimikimi',
     backgroundColor: '#fffdf9',
   },
+  // SwiftPM 이 firebase-ios-sdk 를 두 번(플러그인 경로 + 자체 경로) 잡으면서
+  // "package identity collision" 으로 iOS 빌드가 깨진다. symlink 로 해결.
+  // (Capacitor CLI 8.4.0+ 필요)
+  experimental: {
+    ios: {
+      spm: {
+        packageOptions: {
+          '@capacitor-firebase/messaging': { symlink: true },
+        },
+      },
+    },
+  },
   server: {
     // 베타 동안: vercel 사이트를 그대로 띄움 (네이티브 셸 안에 웹뷰)
     // 정식 출시 시 server.url 제거하고 dist 번들로 전환 가능

@@ -29,8 +29,17 @@ ios/App/build
 ios/DerivedData
 ios/App/App/public
 ios/App/Podfile.lock
+# cap sync 가 만드는 node_modules 심볼릭 링크 (절대경로라 이 맥에서만 유효)
+ios/App/CapApp-SPM/symlinks
 assets/
 scripts/admin.jpeg
+
+# Firebase 앱 설정 (푸시용). 이 저장소는 public 이라 올리지 않는다.
+# 안에 든 건 클라이언트 API 키라 앱 바이너리에도 들어가지만, 공개 저장소에
+# 두면 스크래핑 대상이 되므로 로컬에만 둔다. 잃어버리면 Firebase 콘솔
+# (프로젝트 rimikimi-ad8aa) → 프로젝트 설정 에서 다시 받으면 된다.
+android/app/google-services.json
+ios/App/App/GoogleService-Info.plist
 
 # 안드로이드 서명 키 (절대 커밋 금지 — 잃어버리면 앱 업데이트 불가)
 keystore/

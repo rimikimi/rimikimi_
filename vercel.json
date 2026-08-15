@@ -39,6 +39,10 @@
     {
       "path": "/api/cron/refresh-apple-secret",
       "schedule": "0 4 1 * *"
+    },
+    {
+      "path": "/api/cron/notify-drop",
+      "schedule": "10 11 * * *"
     }
   ]
 }

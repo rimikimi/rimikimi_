@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 푸시 알림 아이콘 강조색 (앱에서 쓰는 브랜드 레드) -->
+    <color name="push_accent">#E6403C</color>
+</resources>

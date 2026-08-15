@@ -5,6 +5,7 @@ import { initAds, showInterstitial } from "./ads";
 import { initIap, loginIap, logoutIap, getIapPacks, purchaseIap, restoreIap, iapAvailable, isSubscription, getIapDiag } from "./iap";
 import { FOURCUT_COUNTS, FOURCUT_STYLES, fourcutStyle } from "./fourcut";
 import { getSavedSet, markSaved, syncExpiryNotifications, cancelExpiryNotice, syncConceptDropNotifications, scheduleGenDoneNotice, cancelGenDoneNotice, notifyGenDoneNow } from "./notify";
+import { initPush, attachPushHandlers } from "./push";
 import { t, useLang, getLang, localizedTitle, localizedCategory, getLangPreference, setLang } from "./i18n";
 import LoginGate from "./LoginGate";
 import { shareImage, claimShareRewardApi } from "./share";
@@ -752,13 +753,17 @@ export default function PortraitStudio() {
     track("app_open");
   }, []);
 
-  // 새 컨셉 드롭 알림 예약 — 드롭 시각이 고정(매일 20시)이라 원격 푸시 없이
-  // 앱이 앞으로의 일정을 받아 로컬 알림으로 미리 깔아둔다.
-  // 앱을 열 때마다 다시 깔아서 일정 변경도 따라간다.
+  // 새 컨셉 드롭 알림.
+  //   1순위: 원격 푸시(FCM 토픽 구독) — 앱이 꺼져 있어도 서버가 바로 쏜다.
+  //   2순위: 원격이 안 되면(권한 거부·등록 실패) 예전처럼 일정을 받아
+  //          로컬 알림을 미리 깔아둔다. 둘 다 켜면 같은 알림이 두 번 뜬다.
   useEffect(() => {
     if (!isNative()) return;
     let cancelled = false;
     (async () => {
+      attachPushHandlers();
+      const remote = await initPush();
+      if (cancelled || remote) return;
       try {
         const r = await fetch(`${LEGAL_BASE}/api/drops?days=30`, { cache: "no-cache" });
         const drops = await r.json();

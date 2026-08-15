@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- 원격 푸시. App Store/TestFlight 빌드는 production 이어야 한다.
+	     App ID(com.rimikimi.app)에 Push Notifications 를 켜고 프로비저닝
+	     프로파일(rimikimi AppStore v3)을 재발급해야 서명이 통과한다. -->
+	<key>aps-environment</key>
+	<string>production</string>
+</dict>
+</plist>

@@ -1,5 +1,6 @@
 // ============================================================
-// Apple "Sign in with Apple" 클라이언트 시크릿 자동 갱신 (Vercel Cron)
+// Apple "Sign in with Apple" 클라이언트 시크릿 자동 갱신
+// (Vercel Cron → api/cron/[job].js?job=refresh-apple-secret 에서 호출)
 //
 // 왜:
 //   Apple 로그인용 client-secret(JWT)은 최대 6개월짜리.
@@ -77,14 +78,8 @@ function makeAppleSecret(p8Pem) {
   return { jwt: `${signingInput}.${b64url(signature)}`, exp };
 }
 
-export default async function handler(req, res) {
-  // 1) Cron 인증: Vercel 이 붙여주는 Bearer 토큰 확인
-  const authHeader = req.headers.authorization || "";
-  const expected = `Bearer ${process.env.CRON_SECRET}`;
-  if (!process.env.CRON_SECRET || authHeader !== expected) {
-    return res.status(401).json({ error: "unauthorized" });
-  }
-
+// 크론 인증은 호출자(api/cron/[job].js)가 이미 끝냈다.
+export async function refreshAppleSecret(req, res) {
   // 2) 필수 env 확인
   const p8Raw = process.env.APPLE_P8_KEY;
   const sbToken = process.env.SUPABASE_ACCESS_TOKEN;
