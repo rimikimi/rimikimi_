@@ -16,11 +16,19 @@
 
 import { FirebaseMessaging } from "@capacitor-firebase/messaging";
 import { isNative } from "./nativeBridge";
+import { setRemotePushActive } from "./notify";
 
 // 서버(api/_lib/dropNotice.js)의 DROP_TOPIC 과 반드시 같아야 한다.
 const DROP_TOPIC = "concepts";
 
 let inited = false;
+let fcmToken = null;
+
+// 이 기기로 직접 알림을 보낼 때 쓰는 토큰. 생성 요청에 같이 실어 보내면
+// 서버가 "생성 끝났다"를 이 기기에만 쏜다 — 등록용 API 가 필요 없다.
+export function getPushToken() {
+  return fcmToken;
+}
 
 // 원격 푸시 준비. 성공하면 true — 호출부는 이 값을 보고 로컬 예약을
 // 건너뛴다(둘 다 켜두면 같은 알림이 두 번 뜬다).
@@ -36,10 +44,20 @@ export async function initPush() {
 
     // iOS 는 APNs 등록이 끝나야 FCM 토큰이 나오고, 토큰이 있어야 토픽 구독이
     // 된다. getToken() 이 그 순서를 보장해 주므로 먼저 부른다.
-    await FirebaseMessaging.getToken();
+    const { token } = await FirebaseMessaging.getToken();
+    fcmToken = token || null;
     await FirebaseMessaging.subscribeToTopic({ topic: DROP_TOPIC });
 
+    // 토큰은 앱 재설치·장기 미사용 등으로 갱신된다. 갱신되면 최신 것을 쓴다.
+    FirebaseMessaging.addListener("tokenReceived", (e) => {
+      if (e?.token) fcmToken = e.token;
+    }).catch(() => {});
+
     inited = true;
+    // 완료 알림은 토큰이 있어야 서버가 이 기기로 쏠 수 있다. 토큰을 못 받았으면
+    // 로컬 알림을 그대로 살려둔다 — 안 그러면 둘 다 꺼져 아무것도 안 온다.
+    setRemotePushActive(!!fcmToken);
+    // 드롭 알림은 토픽 구독이라 토큰과 무관하게 동작한다.
     return true;
   } catch (_) {
     // 푸시가 안 되는 것과 앱 동작은 무관하다. 조용히 실패하고 로컬 알림에 맡긴다.

@@ -63,7 +63,20 @@ async function getAccessToken(sa) {
 // 토픽 전체에 알림 1건 발송.
 //   topic  : "concepts" 같은 문자열 (앱이 구독한 이름과 같아야 한다)
 //   data   : 알림을 눌렀을 때 앱이 읽을 부가 정보 (전부 문자열이어야 함)
-export async function sendToTopic(topic, { title, body, data = {} } = {}) {
+export function sendToTopic(topic, opts) {
+  return send({ topic }, opts);
+}
+
+// 기기 하나에 발송 — 생성 완료처럼 "요청한 사람에게만" 알릴 때.
+// 토큰은 생성 요청 본문으로 같이 받는다(등록 API 를 따로 두지 않으려고).
+export function sendToToken(token, opts) {
+  if (!token) return Promise.resolve({ ok: false, error: "no token" });
+  return send({ token }, opts);
+}
+
+// ⚠️ 포그라운드에서는 이 알림이 화면에 뜨지 않는다(안드로이드·iOS 기본 동작).
+//    앱을 보고 있으면 결과가 이미 화면에 있으므로 그게 맞는 동작이다.
+async function send(target, { title, body, data = {} } = {}) {
   const sa = fcmSA();
   if (!sa) return { ok: false, error: "FCM_SA_JSON 미설정" };
 
@@ -76,7 +89,7 @@ export async function sendToTopic(topic, { title, body, data = {} } = {}) {
 
   const payload = {
     message: {
-      topic,
+      ...target,
       notification: { title, body },
       // 값은 반드시 문자열 — 숫자를 넣으면 FCM 이 400 을 준다
       data: Object.fromEntries(Object.entries(data).map(([k, v]) => [k, String(v)])),

@@ -217,6 +217,23 @@ async function getVertexToken(sa) {
   return j.access_token;
 }
 
+// 생성 완료 알림. 서버리스는 응답을 보내고 나면 얼어붙을 수 있어서
+// fire-and-forget 이 아니라 응답 전에 await 한다(FCM 왕복 ~200ms).
+// 실패해도 생성 결과와는 무관하므로 삼킨다.
+async function notifyDone(pushToken, count, conceptTitle) {
+  if (!pushToken) return;
+  try {
+    const { sendToToken } = await import("./_lib/push.js");
+    await sendToToken(pushToken, {
+      title: "사진이 완성됐어요 ✨",
+      body: conceptTitle
+        ? `'${conceptTitle}' ${count > 1 ? count + "장 " : ""}확인해 보세요`
+        : "앱을 열어 확인해 보세요",
+      data: { kind: "genDone", count },
+    });
+  } catch (_) { /* 알림 실패는 생성과 무관 */ }
+}
+
 function vertexSA() {
   const raw = process.env.VERTEX_SA_JSON;
   if (!raw) return null;
@@ -304,6 +321,9 @@ export default async function handler(req, res) {
     mimeType2, base64_2,
     // 묶음 생성 장수 (1/3/6/12). 요금표 밖의 값은 1장으로 취급.
     count,
+    // 이 기기의 FCM 토큰(네이티브만). 생성이 끝나면 여기로 "완성됐어요"를 쏜다.
+    // 앱이 완전히 종료돼도 도착한다 — 로컬 알림으로는 안 되던 부분.
+    pushToken,
   } = req.body || {};
 
   const batchCount = BATCH_COST[Number(count)] ? Number(count) : 1;
@@ -805,6 +825,7 @@ export default async function handler(req, res) {
     if (images.length > 0) {
       admin.from("usage_log").insert({ user_id: user.id }).then(() => {}).catch(() => {});
     }
+    await notifyDone(pushToken, images.length, conceptTitle);
     return res.status(200).json({
       images,
       requested: batchCount,
@@ -972,6 +993,7 @@ export default async function handler(req, res) {
     proSampleAvailable = !(await getProSampleUsed(admin, user.id));
   }
 
+  await notifyDone(pushToken, 1, conceptTitle);
   return res.status(200).json({
     mimeType: outMime,
     base64: outData,

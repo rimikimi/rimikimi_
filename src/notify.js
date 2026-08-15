@@ -155,7 +155,14 @@ export async function syncConceptDropNotifications(drops) {
 //   · 앱을 켜두고 있었다 → 결과가 화면에 바로 뜨고 알림은 취소된다
 const GEN_DONE_ID = 910001;
 
+// 원격 푸시(FCM)가 살아 있으면 서버가 실제 완료 시점에 직접 쏘므로 로컬 쪽은
+// 통째로 끈다. 둘 다 켜두면 같은 내용이 두 번 뜨고, 로컬은 "예상 시각" 이라
+// 실제 완료보다 이르거나 늦다. push.js 가 초기화에 성공하면 켜준다.
+let remotePushOn = false;
+export function setRemotePushActive(on) { remotePushOn = !!on; }
+
 export async function scheduleGenDoneNotice(count = 1, conceptTitle = "") {
+  if (remotePushOn) return;
   const LN = await getPlugin();
   if (!LN) return;
   const ok = await ensureNotifyPermission();
@@ -187,6 +194,7 @@ export async function cancelGenDoneNotice() {
 // 실제로 생성이 끝난 그 순간 알림을 띄운다 (앱이 백그라운드에 있을 때).
 // 화면을 보고 있으면 결과가 이미 떠 있으므로 알림은 띄우지 않는다.
 export async function notifyGenDoneNow(count = 1, conceptTitle = "") {
+  if (remotePushOn) return;
   const LN = await getPlugin();
   if (!LN) return;
   // 포그라운드면 알림 대신 화면으로 보여주면 된다

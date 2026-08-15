@@ -5,7 +5,7 @@ import { initAds, showInterstitial } from "./ads";
 import { initIap, loginIap, logoutIap, getIapPacks, purchaseIap, restoreIap, iapAvailable, isSubscription, getIapDiag } from "./iap";
 import { FOURCUT_COUNTS, FOURCUT_STYLES, fourcutStyle } from "./fourcut";
 import { getSavedSet, markSaved, syncExpiryNotifications, cancelExpiryNotice, syncConceptDropNotifications, scheduleGenDoneNotice, cancelGenDoneNotice, notifyGenDoneNow } from "./notify";
-import { initPush, attachPushHandlers } from "./push";
+import { initPush, attachPushHandlers, getPushToken } from "./push";
 import { t, useLang, getLang, localizedTitle, localizedCategory, getLangPreference, setLang } from "./i18n";
 import LoginGate from "./LoginGate";
 import { shareImage, claimShareRewardApi } from "./share";
@@ -501,6 +501,9 @@ async function generateImage(accessToken, dataUrl, promptText, conceptMeta = {})
         cutCount: conceptMeta.cutCount,
         // 무료 Pro 체험(계정당 1회) — 결과화면 비교 슬라이더용
         proSample: !!conceptMeta.proSample,
+        // 이 기기의 푸시 토큰. 서버가 생성을 마치면 여기로 "완성됐어요"를 쏜다.
+        // 앱을 완전히 종료해도 알림이 온다 — 로컬 알림으로는 안 되던 부분.
+        ...(getPushToken() ? { pushToken: getPushToken() } : {}),
       }),
     });
   } catch (e) {
