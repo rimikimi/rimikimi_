@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo, useEffect } from "react";
+import React, { useState, useRef, useMemo, useEffect, useCallback } from "react";
 import { supabase } from "./supabaseClient";
 import { isNative, platform, nativePickPhoto, nativeShare, nativeSaveToAlbum } from "./nativeBridge";
 import { initAds, showInterstitial } from "./ads";
@@ -756,25 +756,30 @@ export default function PortraitStudio() {
     track("app_open");
   }, []);
 
-  // 새 컨셉 드롭 알림.
+  // 알림 설정.
   //   1순위: 원격 푸시(FCM 토픽 구독) — 앱이 꺼져 있어도 서버가 바로 쏜다.
   //   2순위: 원격이 안 되면(권한 거부·등록 실패) 예전처럼 일정을 받아
   //          로컬 알림을 미리 깔아둔다. 둘 다 켜면 같은 알림이 두 번 뜬다.
+  //
+  // ask 를 넘기지 않으면 권한 팝업을 띄우지 않고, 이미 허용된 경우에만 설정한다.
+  // 앱을 켜자마자 묻는 건 대부분 거부로 이어지고(iOS 는 거부 후 재요청 불가),
+  // 심사에서도 "맥락 없는 권한 요청"으로 지적받을 수 있다.
+  const setupNotifications = useCallback(async (ask = false) => {
+    if (!isNative()) return;
+    const remote = await initPush({ ask });
+    if (remote) return;
+    try {
+      const r = await fetch(`${LEGAL_BASE}/api/drops?days=30`, { cache: "no-cache" });
+      const drops = await r.json();
+      if (Array.isArray(drops)) await syncConceptDropNotifications(drops, { ask });
+    } catch (_) { /* 알림 예약 실패는 앱 동작과 무관 */ }
+  }, []);
+
   useEffect(() => {
     if (!isNative()) return;
-    let cancelled = false;
-    (async () => {
-      attachPushHandlers();
-      const remote = await initPush();
-      if (cancelled || remote) return;
-      try {
-        const r = await fetch(`${LEGAL_BASE}/api/drops?days=30`, { cache: "no-cache" });
-        const drops = await r.json();
-        if (!cancelled && Array.isArray(drops)) await syncConceptDropNotifications(drops);
-      } catch (_) { /* 알림 예약 실패는 앱 동작과 무관 */ }
-    })();
-    return () => { cancelled = true; };
-  }, []);
+    attachPushHandlers();
+    setupNotifications(false); // 이미 허용한 사람만 조용히 설정
+  }, [setupNotifications]);
 
   // photo 가 바뀌면 localStorage 에 자동 저장 (없으면 키 삭제)
   useEffect(() => {
@@ -1633,6 +1638,9 @@ export default function PortraitStudio() {
         notifyGenDoneNow(1, localizedTitle(selected));
         track("generate", { engine: r.engine || null, concept: selected?.id ?? null });
         noteGeneration();
+        // 결과가 나온 지금이 알림을 물어볼 자리다 — 다음 컨셉 알림도, 생성 완료
+        // 알림도 여기서 처음 "필요하다"고 느낀다.
+        setupNotifications(true);
         if (r.busyFallback) {
           setPayToast(t("engine.busyFallback"));
           setTimeout(() => setPayToast(""), 4500);
@@ -1709,6 +1717,8 @@ export default function PortraitStudio() {
       setResultGalleryId(result.galleryId || null); // 저장 시 원본(2K) 받으려고 보관
       track("generate", { engine: result.engine || null, concept: selected?.id ?? null });
       noteGeneration(); // 리뷰 요청 조건(생성 2장 이상) 카운트만 올림 — 여기선 묻지 않음
+      setupNotifications(true); // 결과를 본 지금이 알림 권한을 물어볼 자리
+
       // 방금 생성이 무료(기본 엔진)이고 무료 Pro 체험이 남아있으면 비교 CTA 노출
       setCanTryPro(result.engine === "base" && !!result.proSampleAvailable);
       // 생성 직후 만료 10분 전 리마인드 푸시 예약 (갤러리를 안 열어도 동작)

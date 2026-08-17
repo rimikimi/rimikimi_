@@ -51,12 +51,15 @@ async function getPlugin() {
   }
 }
 
-export async function ensureNotifyPermission() {
+// ask=false 면 이미 허용된 경우에만 true 를 주고 팝업은 띄우지 않는다.
+// (앱 첫 화면에서 맥락 없이 묻지 않기 위해 — push.js 의 같은 이유)
+export async function ensureNotifyPermission(ask = true) {
   const LN = await getPlugin();
   if (!LN) return false;
   try {
     let p = await LN.checkPermissions();
-    if (p.display !== "granted" && !permAsked) {
+    if (p.display !== "granted") {
+      if (!ask || permAsked) return false;
       permAsked = true;
       p = await LN.requestPermissions();
     }
@@ -113,10 +116,10 @@ const DROP_ID_MAX = 30; // 최대 30일치 예약
 // 서버가 알려준 드롭 일정으로 로컬 알림을 예약한다.
 // 드롭 시각이 고정(매일 20시)이라 원격 푸시 없이도 제때 뜬다.
 // 일정이 바뀔 수 있으므로 예약을 매번 통째로 다시 깐다.
-export async function syncConceptDropNotifications(drops) {
+export async function syncConceptDropNotifications(drops, { ask = true } = {}) {
   const LN = await getPlugin();
   if (!LN) return;
-  const ok = await ensureNotifyPermission();
+  const ok = await ensureNotifyPermission(ask);
   if (!ok) return;
 
   const now = Date.now();

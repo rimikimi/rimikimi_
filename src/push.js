@@ -32,12 +32,18 @@ export function getPushToken() {
 
 // 원격 푸시 준비. 성공하면 true — 호출부는 이 값을 보고 로컬 예약을
 // 건너뛴다(둘 다 켜두면 같은 알림이 두 번 뜬다).
-export async function initPush() {
+//
+// ask=false 면 이미 허용된 경우에만 조용히 설정하고, 권한 팝업은 띄우지 않는다.
+// 앱을 켜자마자 아무 맥락 없이 "알림을 허용하시겠습니까"를 띄우면 대부분 거부를
+// 누르고, 한 번 거부하면 iOS 는 다시 물어볼 방법이 없다(설정에서 직접 켜야 함).
+// 그래서 사진을 처음 만들어 본 뒤 — 알림이 왜 필요한지 알게 된 시점 — 에만 묻는다.
+export async function initPush({ ask = false } = {}) {
   if (!isNative() || inited) return inited;
 
   try {
     let perm = await FirebaseMessaging.checkPermissions();
     if (perm.receive !== "granted") {
+      if (!ask) return false;
       perm = await FirebaseMessaging.requestPermissions();
     }
     if (perm.receive !== "granted") return false;
