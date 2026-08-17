@@ -111,7 +111,18 @@ export async function syncExpiryNotifications(items, savedSet) {
 // 갤러리 만료 알림은 갤러리 row id(작은 정수)를 그대로 쓰므로,
 // 드롭 알림은 절대 겹치지 않는 높은 번호대를 따로 쓴다.
 const DROP_ID_BASE = 900001;
-const DROP_ID_MAX = 30; // 최대 30일치 예약
+const DROP_ID_MAX = 30; // 최대 30일치 예약 (iOS 대기 알림 64개 한도 안쪽)
+const DROP_HOUR_LOCAL = 20; // 현지 저녁 8시
+
+// 드롭은 매일 11:00 UTC 에 열린다. 그 시각에 알리면 한국은 20시지만 LA 는
+// 새벽 4시다. 그래서 "공개된 뒤 처음 오는 현지 저녁 8시"에 띄운다.
+// setHours 는 기기 현지시각 기준이라 시간대·서머타임을 OS 가 알아서 처리한다.
+function localDropTime(publishMs) {
+  const d = new Date(publishMs);
+  d.setHours(DROP_HOUR_LOCAL, 0, 0, 0);
+  if (d.getTime() < publishMs) d.setDate(d.getDate() + 1);
+  return d.getTime();
+}
 
 // 서버가 알려준 드롭 일정으로 로컬 알림을 예약한다.
 // 드롭 시각이 고정(매일 20시)이라 원격 푸시 없이도 제때 뜬다.
@@ -126,7 +137,9 @@ export async function syncConceptDropNotifications(drops, { ask = true } = {}) {
   const notifications = [];
   (drops || []).slice(0, DROP_ID_MAX).forEach((d, i) => {
     const at = Date.parse(d?.at);
-    if (!Number.isFinite(at) || at <= now) return;
+    if (!Number.isFinite(at)) return;
+    const fireAt = localDropTime(at);
+    if (fireAt <= now) return;
     const titles = (d.titles || []).slice(0, 3).join(", ");
     notifications.push({
       id: DROP_ID_BASE + i,
@@ -134,7 +147,7 @@ export async function syncConceptDropNotifications(drops, { ask = true } = {}) {
       body: titles
         ? `오늘의 새 컨셉 ${d.count}종 · ${titles}`
         : `오늘의 새 컨셉 ${d.count}종이 올라왔어요`,
-      schedule: { at: new Date(at), allowWhileIdle: true },
+      schedule: { at: new Date(fireAt), allowWhileIdle: true },
     });
   });
 
