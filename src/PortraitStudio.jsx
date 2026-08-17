@@ -4,7 +4,7 @@ import { isNative, platform, nativePickPhoto, nativeShare, nativeSaveToAlbum } f
 import { initAds, showInterstitial } from "./ads";
 import { initIap, loginIap, logoutIap, getIapPacks, purchaseIap, restoreIap, iapAvailable, isSubscription, getIapDiag } from "./iap";
 import { FOURCUT_COUNTS, FOURCUT_STYLES, fourcutStyle } from "./fourcut";
-import { getSavedSet, markSaved, syncExpiryNotifications, cancelExpiryNotice, syncConceptDropNotifications, scheduleGenDoneNotice, cancelGenDoneNotice, notifyGenDoneNow } from "./notify";
+import { getSavedSet, markSaved, syncExpiryNotifications, cancelExpiryNotice, syncConceptDropNotifications, cancelGenDoneNotice, notifyGenDoneNow } from "./notify";
 import { initPush, attachPushHandlers, getPushToken } from "./push";
 import { t, useLang, getLang, localizedTitle, localizedCategory, getLangPreference, setLang } from "./i18n";
 import LoginGate from "./LoginGate";
@@ -1610,7 +1610,6 @@ export default function PortraitStudio() {
       setScreen("result");
       setFourcutProgress(String(fourcutCount));
       writePendingGen({ startedAt: Date.now(), conceptId: selected.id, conceptTitle: selected.title });
-      scheduleGenDoneNotice(1, localizedTitle(selected));
       try {
         const accessToken = session?.access_token;
         const r = await generateImage(accessToken, photo, "인생네컷", {
@@ -1671,12 +1670,6 @@ export default function PortraitStudio() {
     setScreen("result");
     // 백그라운드 복구용 마커 (생성 중 앱이 얼거나 요청이 끊겨도 결과를 되찾음)
     writePendingGen({ startedAt: Date.now(), conceptId: selected.id, conceptTitle: selected.title });
-    // 앱을 닫아도 서버는 계속 만든다. "다 됐다"고 알려줄 원격 푸시가 없으므로
-    // 예상 완료 시각에 로컬 알림을 걸어두고, 결과를 받으면 아래에서 취소한다.
-    scheduleGenDoneNotice(
-      isFourcut(selected) ? fourcutCount : batchCount,
-      localizedTitle(selected)
-    );
 
     try {
       const accessToken = session?.access_token;

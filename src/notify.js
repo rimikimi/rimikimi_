@@ -177,30 +177,19 @@ const GEN_DONE_ID = 910001;
 let remotePushOn = false;
 export function setRemotePushActive(on) { remotePushOn = !!on; }
 
-export async function scheduleGenDoneNotice(count = 1, conceptTitle = "") {
-  if (remotePushOn) return;
-  const LN = await getPlugin();
-  if (!LN) return;
-  const ok = await ensureNotifyPermission();
-  if (!ok) return;
-  // 여러 장은 동시에 만들어서 시간이 크게 늘지는 않지만 여유를 조금 더 준다
-  const waitMs = (count > 1 ? 100 : 70) * 1000;
-  try {
-    await LN.cancel({ notifications: [{ id: GEN_DONE_ID }] });
-    await LN.schedule({
-      notifications: [{
-        id: GEN_DONE_ID,
-        title: "사진이 완성됐어요 ✨",
-        body: conceptTitle
-          ? `'${conceptTitle}' ${count > 1 ? count + "장 " : ""}확인해 보세요`
-          : "앱을 열어 확인해 보세요",
-        schedule: { at: new Date(Date.now() + waitMs), allowWhileIdle: true },
-      }],
-    });
-  } catch { /* 예약 실패는 생성과 무관 */ }
-}
+// ❌ scheduleGenDoneNotice(예상 완료 시각에 미리 예약) 는 제거했다.
+//
+// "70초 뒤에 완성됐다고 알린다"는 타이머였고, 생성이 실제로 끝났는지 성공했는지
+// 전혀 모른 채 떴다. maxDuration 을 60s→300s 로 올린 뒤로는 생성이 70초를 넘는
+// 일이 흔해져서, 아직 만드는 중인데 "완성됐어요"가 뜨고 실패해도 그대로 떴다.
+// (사용자 신고 2026-08-17: "이미지 생성이 안 됐는데 왜 푸시알림이 옴?")
+//
+// 완료 통지는 실제 완료를 아는 쪽만 한다:
+//   · 앱이 살아 있음 → notifyGenDoneNow (결과를 받은 그 순간)
+//   · 앱이 완전히 종료 → 서버 원격 푸시 (api/generate.js notifyDone)
+// 원격 푸시를 못 쓰는 기기는 완료 알림이 없다 — 거짓 알림보다 낫다.
 
-// 앱이 살아있는 채로 결과(성공/실패)를 받았으면 예약된 알림은 필요 없다.
+// 예약을 쓰던 구버전에서 올라온 경우 남아 있는 알림을 지우는 용도로 남긴다.
 export async function cancelGenDoneNotice() {
   const LN = await getPlugin();
   if (!LN) return;
