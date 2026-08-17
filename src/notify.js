@@ -8,6 +8,12 @@
 // ============================================================
 
 import { isNative } from "./nativeBridge";
+// ⚠️ 정적 import 필수 (nativeBridge/ads/iap 와 같은 이유) — 네이티브 WKWebView 에서
+//    동적 import() 가 영원히 pending 되는 버그가 있다. 여기만 동적으로 남아 있었고,
+//    실제로 생성 성공 직후 await cancelGenDoneNotice() 가 반환되지 않아 finally 의
+//    setGenerating(false) 까지 못 가서 로딩 화면에 갇히는 사고가 났다(2026-08-17).
+//    registerPlugin 은 동기이고 웹에선 호출할 때까지 아무 일도 안 하므로 안전하다.
+import { LocalNotifications } from "@capacitor/local-notifications";
 
 const SAVED_KEY = "rimikimi_saved_gallery";
 const LEAD_MS = 10 * 60 * 1000; // 만료 10분 전
@@ -41,14 +47,8 @@ export function markSaved(id) {
 
 let permAsked = false;
 
-async function getPlugin() {
-  if (!isNative()) return null;
-  try {
-    const mod = await import("@capacitor/local-notifications");
-    return mod.LocalNotifications;
-  } catch {
-    return null;
-  }
+function getPlugin() {
+  return isNative() ? LocalNotifications : null;
 }
 
 // ask=false 면 이미 허용된 경우에만 true 를 주고 팝업은 띄우지 않는다.
@@ -206,6 +206,9 @@ export async function notifyGenDoneNow(count = 1, conceptTitle = "") {
   if (typeof document !== "undefined" && !document.hidden) return;
   const ok = await ensureNotifyPermission();
   if (!ok) return;
+  // 구버전에서 남은 예약분이 있으면 먼저 지운다. 호출부가 순서를 지키느라
+  // await 를 걸었다가 UI 가 멈춘 적이 있어서, 순서를 여기 안으로 넣었다.
+  await cancelGenDoneNotice();
   try {
     await LN.schedule({
       notifications: [{

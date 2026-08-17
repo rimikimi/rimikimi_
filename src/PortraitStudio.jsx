@@ -1632,7 +1632,7 @@ export default function PortraitStudio() {
         if (typeof r.quotaUsed === "number") setFreeUsed(r.quotaUsed);
         setRefreshTick((n) => n + 1); // 크레딧/잔여 정확히 재조회
         clearPendingGen();
-        await cancelGenDoneNotice();
+        // ⚠️ await 금지 — 여기서 멈추면 finally 의 setGenerating(false) 를 못 탄다
         notifyGenDoneNow(1, localizedTitle(selected));
         track("generate", { engine: r.engine || null, concept: selected?.id ?? null });
         noteGeneration();
@@ -1651,7 +1651,7 @@ export default function PortraitStudio() {
           setGenError(err.message || "인생네컷 생성에 실패했어요.");
           clearPendingGen();
         }
-        await cancelGenDoneNotice();
+        cancelGenDoneNotice();
       } finally {
         setGenerating(false);
         setFourcutProgress("");
@@ -1724,9 +1724,9 @@ export default function PortraitStudio() {
       // 화면을 보고 있으면 결과가 이미 떴으니 예약 알림만 지우고,
       // 백그라운드였다면 "지금" 완료 알림을 띄운다(예상 시각이 아니라 실제 완료 시각).
       clearPendingGen();
-      // ⚠️ 순서 중요: 예약분을 먼저 지우고 나서 즉시 알림을 띄운다.
-      //    반대로 하면 방금 띄운 알림을 취소가 지워버릴 수 있다.
-      await cancelGenDoneNotice();
+      // ⚠️ 알림 호출은 절대 await 하지 않는다. 여기서 멈추면 finally 의
+      //    setGenerating(false) 까지 못 가서 결과가 나왔는데도 로딩 화면에
+      //    갇힌다(2026-08-17 실제 사고). 예약분 정리 순서는 함수 안에 있다.
       notifyGenDoneNow(
         isFourcut(selected) ? fourcutCount : batchCount,
         localizedTitle(selected)
