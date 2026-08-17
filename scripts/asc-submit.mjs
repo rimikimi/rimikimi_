@@ -1,7 +1,7 @@
 import { createSign } from "node:crypto";
 import { readFileSync } from "node:fs";
 const KEY_ID="3KXPZAL47V", ISSUER="257d4dcf-3cfc-482b-8df3-b038f7c50485", APP="6782776518";
-const VERSION="1.28", BUILD="54";
+const VERSION="1.28", BUILD="55";
 const DRY = process.argv.includes("--dry");
 
 const NOTES = {
