@@ -67,11 +67,16 @@ if (perDay > 0) {
   });
 } // perDay 0 이면 publishAt 없이 = 즉시 공개
 
+// ⚠️ 마지막 공개 시각은 reverse 전에 뽑는다. reverse 는 배열을 제자리에서
+//    뒤집으므로, 뒤에서 picked[length-1] 을 읽으면 "첫" 공개일이 나온다
+//    (실제로 190종을 4종씩 깔고 "9/20 까지" 라고 잘못 출력했었다).
+const lastPublishAt = picked[picked.length - 1].publishAt;
+
 writeFileSync(DATA, JSON.stringify([...picked.reverse(), ...data], null, 0), "utf8");
 
 const ids = picked.map((c) => c.id).sort((a, b) => a - b);
 console.log(`추가 ${picked.length}종: ${ids[0]} ~ ${ids[ids.length - 1]}`);
 console.log(perDay > 0
-  ? `예약: ${picked[picked.length - 1].publishAt} 까지 매일 ${perDay}종`
+  ? `예약: 매일 ${perDay}종씩 ${lastPublishAt} 까지`
   : "즉시 공개");
 console.log("\n다음: public/sw.js VERSION 올리고 커밋·push 하면 반영됩니다.");
