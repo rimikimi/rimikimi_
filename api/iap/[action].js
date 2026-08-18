@@ -11,6 +11,8 @@ import { getAuthedUser, makeAdmin } from "../_lib/auth.js";
 import {
   PRODUCT_CREDITS,
   fetchCustomerPurchases,
+  fetchCustomerSubscriptions,
+  fetchProductMap,
   purchaseStoreId,
   purchaseTxId,
   purchaseTime,
@@ -43,14 +45,30 @@ async function handleGrant(req, res) {
   }
 
   let purchases;
+  let productMap = null;
   try {
+    // 상품 맵: RC 내부 product_id → 스토어 상품ID. 실패해도 치명적이지 않다
+    // (구매 객체가 store_identifier 를 직접 주면 맵 없이도 매칭된다).
+    productMap = await fetchProductMap().catch((e) => {
+      console.error("revenuecat product map error", e);
+      return null;
+    });
     purchases = await fetchCustomerPurchases(user.id);
+    // /purchases 는 비구독만 준다 — 구독이거나 여기서 못 찾으면 /subscriptions 도 본다.
+    const isSub = /^rimikimi\.sub\.|^(rimikimi_)?plus_/.test(productId);
+    if (isSub || !(purchases || []).some((p) => purchaseStoreId(p, productMap) === productId)) {
+      const subs = await fetchCustomerSubscriptions(user.id).catch((e) => {
+        console.error("revenuecat subs fetch error", e);
+        return [];
+      });
+      purchases = [...(purchases || []), ...(subs || [])];
+    }
   } catch (e) {
     console.error("revenuecat fetch error", e);
     return res.status(502).json({ error: "결제 검증 실패. 잠시 후 다시 시도해 주세요." });
   }
 
-  const mine = (purchases || []).filter((p) => purchaseStoreId(p) === productId);
+  const mine = (purchases || []).filter((p) => purchaseStoreId(p, productMap) === productId);
   if (!mine.length) {
     return res.status(202).json({ pending: true, error: "구매 확인 중이에요. 잠시만요." });
   }

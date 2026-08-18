@@ -15,36 +15,100 @@ export const PRODUCT_CREDITS = Object.fromEntries(
   ALL_PACKAGES.map((p) => [p.id, p.credits])
 );
 
-// RevenueCat REST v2: 고객(=우리 user.id)의 구매 내역 조회
-//   GET /v2/projects/{project}/customers/{customer}/purchases?expand=items.product
-// 반환: 구매 배열(없거나 고객 미존재면 []).
-export async function fetchCustomerPurchases(appUserId) {
+// 🔴 2026-08-19 (claire 682c2ce 이식) 크레딧 지급 전면 불능의 근본원인:
+//    RevenueCat 이 v2 의 expand 허용값을 바꿔서 /purchases?expand=items.product 가
+//    400 parameter_error("'items.product' is not one of ['items.redemption']") 를 내기
+//    시작했다. fetchCustomerPurchases 가 throw → handleGrant 가 502 → 결제는 되는데
+//    크레딧이 안 들어간다. 실측: 2026-08-18 06:34~06:40 사이 사용자 3명이 당했다
+//    (Vercel 런타임 에러 그룹, /api/iap/[action]).
+//    ⇒ expand 에 의존하지 않는다. 상품 식별은 프로젝트 상품 목록으로 직접 해석한다.
+//    ⚠️ 여기에 expand 를 다시 추가하지 말 것 — RC 가 언제든 또 막을 수 있고, 막히는
+//       순간 매출이 통째로 0 이 된다.
+const RC_BASE = "https://api.revenuecat.com/v2";
+
+function rcEnv() {
   const key = process.env.RC_SECRET_KEY;
   const proj = process.env.RC_PROJECT_ID;
   if (!key || !proj) throw new Error("RC_SECRET_KEY / RC_PROJECT_ID 환경변수 누락");
-  const url =
-    `https://api.revenuecat.com/v2/projects/${proj}` +
-    `/customers/${encodeURIComponent(appUserId)}/purchases?expand=items.product`;
-  const r = await fetch(url, { headers: { Authorization: `Bearer ${key}` } });
-  if (r.status === 404) return []; // 아직 RevenueCat 에 고객/구매 없음
+  return { key, proj };
+}
+
+async function rcGet(path, { allow404 = false } = {}) {
+  const { key } = rcEnv();
+  const r = await fetch(RC_BASE + path, { headers: { Authorization: `Bearer ${key}` } });
+  if (allow404 && r.status === 404) return null;
   if (!r.ok) {
     const t = await r.text();
     throw new Error(`RevenueCat 조회 실패: ${r.status} ${t.slice(0, 200)}`);
   }
-  const j = await r.json();
+  return r.json();
+}
+
+// RC 내부 product_id(prod…) → 스토어 상품ID(rimikimi.pack.intro) 매핑.
+// 구매 객체가 store_identifier 를 직접 주지 않고 RC 내부 id 만 주는 경우가 있어서,
+// expand 없이도 상품을 특정하려면 이 표가 필요하다. 람다 1회 실행 동안만 캐시.
+let _productMapCache = null;
+export async function fetchProductMap() {
+  if (_productMapCache) return _productMapCache;
+  const { proj } = rcEnv();
+  const map = new Map();
+  let url = `/projects/${proj}/products?limit=100`;
+  for (let page = 0; page < 5 && url; page++) {
+    const j = await rcGet(url);
+    for (const p of j?.items || []) {
+      const store = p?.store_identifier || p?.identifier || null;
+      if (p?.id && store) map.set(p.id, store);
+    }
+    url = j?.next_page || null;
+  }
+  _productMapCache = map;
+  return map;
+}
+
+// RevenueCat REST v2: 고객의 비구독(소비형) 구매 조회.
+// 반환: 구매 배열(없거나 고객 미존재면 []).
+export async function fetchCustomerPurchases(appUserId) {
+  const { proj } = rcEnv();
+  const j = await rcGet(
+    `/projects/${proj}/customers/${encodeURIComponent(appUserId)}/purchases`,
+    { allow404: true }
+  );
+  return j?.items || [];
+}
+
+// 🔴 2026-08-19 (claire 이식) /purchases 는 비구독만 반환한다. 구독 상품
+//    (rimikimi.sub.plus.*)은 여기서 따로 읽어야 한다. 이게 없어서 구독 결제는
+//    grant 가 항상 202(pending) → 클라는 "구매 완료"를 띄우는데 크레딧은 0장이었다.
+//    (claire 는 2026-08-04 에 같은 버그를 고쳤다.)
+export async function fetchCustomerSubscriptions(appUserId) {
+  const { proj } = rcEnv();
+  const j = await rcGet(
+    `/projects/${proj}/customers/${encodeURIComponent(appUserId)}/subscriptions`,
+    { allow404: true }
+  );
   return j?.items || [];
 }
 
 // 구매 객체에서 스토어 상품ID(우리 productId) 추출 (방어적)
 // ⚠️ 구글플레이 구독은 `subId:basePlanId` 로 내려온다. 접미사를 안 떼면
 //    PRODUCT_CREDITS 조회가 빗나가 적립이 영원히 pending(202) 된다.
-export function purchaseStoreId(p) {
-  const raw =
+export function purchaseStoreId(p, productMap) {
+  const direct =
     p?.product?.store_identifier ||
     p?.store_identifier ||
     p?.product_identifier ||
     null;
-  return raw ? String(raw).split(":")[0] : null;
+  if (direct) return stripBasePlan(direct);
+  const rcId = p?.product_id || p?.product?.id || null;
+  if (rcId && productMap?.get) {
+    const mapped = productMap.get(rcId);
+    if (mapped) return stripBasePlan(mapped);
+  }
+  return rcId || null;
+}
+
+function stripBasePlan(id) {
+  return id ? String(id).split(":")[0] : null;
 }
 
 // 구매 객체에서 스토어 거래ID 추출 (멱등 키, 방어적)
