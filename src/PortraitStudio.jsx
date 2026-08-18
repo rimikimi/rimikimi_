@@ -8,6 +8,11 @@ import { getSavedSet, markSaved, syncExpiryNotifications, cancelExpiryNotice, sy
 import { initPush, attachPushHandlers, getPushToken } from "./push";
 import { t, useLang, getLang, localizedTitle, localizedCategory, getLangPreference, setLang } from "./i18n";
 import LoginGate from "./LoginGate";
+// ⚠️ 정적 import — 네이티브 WebView 에서 동적 import() 가 영원히 pending 되는
+//    버그 때문에(nativeBridge/ads/iap 주석 참고) OAuth 딥링크 처리가 통째로
+//    죽은 적이 있다. 로그인 경로에 동적 import 를 두지 않는다.
+import { App as CapApp } from "@capacitor/app";
+import { Browser } from "@capacitor/browser";
 import { shareImage, claimShareRewardApi } from "./share";
 import { track, setTrackUser } from "./track";
 import { noteGeneration, maybeRequestReview } from "./appReview";
@@ -806,7 +811,16 @@ export default function PortraitStudio() {
       setSession(data.session);
       setAuthChecked(true);
       setTrackUser(data.session?.user?.id || null);
+    }).catch(() => {
+      // ⚠️ .catch 가 없으면 앱 전체가 스플래시에서 영영 안 넘어간다
+      //    (렌더 게이트가 `if (booting || !authChecked) return <Splash/>`).
+      //    getSession 은 supabase-js 가 navigator.locks 를 잡거나 localStorage
+      //    접근이 막히면 실패·정지할 수 있다. 바로 위 주석대로 로그인은 게이트가
+      //    아니므로, 세션 확인이 실패하면 비로그인으로 보고 앱을 그린다.
+      if (mounted) setAuthChecked(true);
     });
+    // 그래도 안 돌아오는 경우(reject 가 아니라 영영 pending)를 위한 최후 방어.
+    const authGiveUp = setTimeout(() => { if (mounted) setAuthChecked(true); }, 6000);
     const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
       if (!mounted) return;
       setSession(s);
@@ -815,6 +829,7 @@ export default function PortraitStudio() {
     });
     return () => {
       mounted = false;
+      clearTimeout(authGiveUp);
       sub.subscription.unsubscribe();
     };
   }, []);
@@ -824,7 +839,7 @@ export default function PortraitStudio() {
     if (!isNative()) return;
     let listener, attListener;
     (async () => {
-      const { App } = await import("@capacitor/app");
+      const App = CapApp;
 
       // ATT is handled natively in AppDelegate.swift — do not call requestATT() from JS
       // (duplicate JS call caused a first-launch race that suppressed the popup: App Store §11).
@@ -844,21 +859,33 @@ export default function PortraitStudio() {
 
       listener = await App.addListener("appUrlOpen", async ({ url }) => {
         if (!url || !url.includes("login-callback")) return;
-        try {
-          const { Browser } = await import("@capacitor/browser");
-          await Browser.close();
-        } catch (_) {}
+        // ⚠️ 순서가 중요하다. 예전엔 Browser.close() 를 먼저 await 했는데, 그게
+        //    반환되지 않으면 **세션 교환이 아예 실행되지 않았다.** Supabase 로그엔
+        //    로그인 성공(/callback 302 → Login oauth)이 찍히는데 앱은 계속
+        //    비로그인 상태 — 2026-08-18 안드로이드 "구글 로그인 안 됨"의 정체다.
+        //    세션 확보가 본질이고 브라우저 닫기는 곁다리다. 본질을 먼저 한다.
+        let ok = false, why = "";
         try {
           const code = new URL(url).searchParams.get("code");
           if (code) {
-            await supabase.auth.exchangeCodeForSession(code);
+            const { error } = await supabase.auth.exchangeCodeForSession(code);
+            ok = !error; why = error?.message || "";
           } else if (url.includes("#")) {
             const h = new URLSearchParams(url.split("#")[1]);
             const at = h.get("access_token");
             const rt = h.get("refresh_token");
-            if (at && rt) await supabase.auth.setSession({ access_token: at, refresh_token: rt });
-          }
-        } catch (_) {}
+            if (at && rt) {
+              const { error } = await supabase.auth.setSession({ access_token: at, refresh_token: rt });
+              ok = !error; why = error?.message || "";
+            } else why = "no code, no tokens";
+          } else why = "no code in callback url";
+        } catch (e) {
+          why = String(e?.message || e);
+        }
+        // 조용히 삼키지 않는다 — 실패하면 남겨서 다음엔 로그로 잡는다.
+        if (!ok) track("login_callback_fail", { reason: why.slice(0, 120), platform: platform() });
+        // 브라우저 닫기는 await 하지 않는다(멈춰도 로그인에 영향 없게).
+        Browser.close().catch(() => {});
       });
     })();
     return () => { if (listener) listener.remove(); if (attListener) attListener.remove(); };
@@ -1366,6 +1393,14 @@ export default function PortraitStudio() {
 
   // 로그인 성공 시, "다음" 단계에서 멈췄던 흐름을 옵션 화면(confirm)으로 이어서 재개.
   // concepts 가 아직 로딩 중이면(앱 막 시작) 최소 정보로만 복원되니, 로딩이 끝날 때까지 기다린다.
+  // ⚠️ 로그인에 성공하면 어디서 시작했든 시트를 닫는다.
+  //    예전엔 "다음" 버튼에서 온 경우(pendingContinue 마커가 있을 때)만 닫아서,
+  //    프로필·갤러리·공유 CTA 로 연 로그인은 성공한 뒤에도 시트가 그대로 떠
+  //    있었다 — 사용자는 로그인이 안 된 줄 알고 다시 누른다.
+  useEffect(() => {
+    if (session) setShowLoginSheet(false);
+  }, [session]);
+
   useEffect(() => {
     if (!session || conceptsLoading) return;
     const pc = readPendingContinue();
@@ -3880,7 +3915,14 @@ function StoreScreen({ packs, credits, session, freeLimit = FREE_DAILY, onCredit
     setErrMsg(""); setOkMsg("");
     setRestoring(true);
     try {
-      await restoreIap();
+      // ⚠️ restoreIap 은 예외를 던지지 않는다 — 내부에서 잡고 {restored:false,
+      //    error} 를 돌려준다. 그래서 catch 는 죽은 코드였고, 복원이 실패해도
+      //    "복원 완료"가 떴다(아무것도 안 들어왔는데). 반환값을 봐야 한다.
+      const r = await restoreIap();
+      if (!r?.restored) {
+        setErrMsg(r?.error || t("store.restoreFail"));
+        return;
+      }
       onCredited && onCredited();
       setOkMsg(t("store.restoreOk"));
     } catch (e) {

@@ -8,6 +8,10 @@
 
 import React, { useState } from "react";
 import { supabase } from "./supabaseClient";
+// ⚠️ 정적 import 필수 — 네이티브 WebView 에서 동적 import() 가 영원히 pending 되면
+//    브라우저가 안 열려 로그인이 통째로 막힌다(2026-08-18 안드로이드 사고).
+import { Browser } from "@capacitor/browser";
+import { App as CapApp } from "@capacitor/app";
 import {
   detectInApp,
   tryEscapeKakaoAndroid,
@@ -99,10 +103,8 @@ export default function LoginGate({ Logo, embedded = false, message, onClose }) 
     let cleanup = () => {};
     (async () => {
       try {
-        const { Browser } = await import("@capacitor/browser");
-        const { App } = await import("@capacitor/app");
         const h1 = await Browser.addListener("browserFinished", () => setBusy(null));
-        const h2 = await App.addListener("appStateChange", ({ isActive }) => {
+        const h2 = await CapApp.addListener("appStateChange", ({ isActive }) => {
           if (isActive) setBusy(null);
         });
         cleanup = () => { h1.remove(); h2.remove(); };
@@ -123,10 +125,12 @@ export default function LoginGate({ Logo, embedded = false, message, onClose }) 
           options: { redirectTo: NATIVE_REDIRECT, skipBrowserRedirect: true },
         });
         if (error) throw error;
-        const { Browser } = await import("@capacitor/browser");
         await Browser.open({ url: data.url });
       } catch (e) {
         setError(e?.message || "로그인 시작에 실패했어요.");
+      } finally {
+        // ⚠️ finally 로 반드시 푼다. 예전엔 catch 에만 있어서, 성공 경로에서
+        //    브라우저가 안 열리면 버튼 4개가 영구 비활성으로 굳었다.
         setBusy(null);
       }
       return;
@@ -171,12 +175,9 @@ export default function LoginGate({ Logo, embedded = false, message, onClose }) 
       const startUrl =
         "https://rimikimi-app.vercel.app/api/auth/naver/start?redirectTo=" +
         encodeURIComponent(NATIVE_REDIRECT);
-      import("@capacitor/browser")
-        .then(({ Browser }) => Browser.open({ url: startUrl }))
-        .catch(() => {
-          setError("로그인 시작에 실패했어요.");
-          setBusy(null);
-        });
+      Browser.open({ url: startUrl })
+        .catch(() => setError("로그인 시작에 실패했어요."))
+        .finally(() => setBusy(null));
       return;
     }
     // 웹: 우리 백엔드가 처리. redirectTo 로 돌아갈 곳 알려줌.
