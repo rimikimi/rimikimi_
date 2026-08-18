@@ -144,11 +144,11 @@ export async function getIapPacks() {
   }
   const Purchases = getPurchases();
   try {
-    const { products } = await withTimeout(
-      Purchases.getProducts({ productIdentifiers: PRODUCT_IDS }),
-      15000,
-      "상품 조회"
-    );
+    // ⚠️ 안드로이드는 한 번에 한 종류만 조회된다. type 을 안 주면 기본값이
+    //    SUBSCRIPTION 이라 크레딧 팩(비구독)이 통째로 안 나온다 — 실제로
+    //    안드로이드에서만 결제가 안 됐던 원인(2026-08-18). iOS 는 이 값을
+    //    무시하므로 한 번만 부르면 되지만, 두 번 불러도 결과는 같다.
+    const products = await fetchAllProducts(Purchases);
     const mapped = (products || [])
       .filter((pr) => pr.identifier in IAP_PRODUCTS)
       .map((pr) => ({
@@ -165,6 +165,29 @@ export async function getIapPacks() {
     setDiag("getProducts", e);
     return [];
   }
+}
+
+// 구독·비구독을 각각 조회해 합친다.
+// 한쪽이 실패해도 다른 쪽은 살린다 — 팩은 되는데 구독만 안 되는 상황에서
+// 화면이 통째로 비는 것보다 낫다.
+async function fetchAllProducts(Purchases) {
+  const subIds = PRODUCT_IDS.filter(isSubscription);
+  const oneTimeIds = PRODUCT_IDS.filter((id) => !isSubscription(id));
+  const calls = [];
+  if (subIds.length) {
+    calls.push({ productIdentifiers: subIds, type: "SUBSCRIPTION" });
+  }
+  if (oneTimeIds.length) {
+    calls.push({ productIdentifiers: oneTimeIds, type: "NON_SUBSCRIPTION" });
+  }
+  const results = await Promise.all(
+    calls.map((opts) =>
+      withTimeout(Purchases.getProducts(opts), 15000, "상품 조회")
+        .then((r) => r?.products || [])
+        .catch((e) => { setDiag(`getProducts(${opts.type})`, e); return []; })
+    )
+  );
+  return results.flat();
 }
 
 function sortPacks(arr) {
