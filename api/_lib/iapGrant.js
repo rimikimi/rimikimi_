@@ -36,13 +36,15 @@ export async function fetchCustomerPurchases(appUserId) {
 }
 
 // 구매 객체에서 스토어 상품ID(우리 productId) 추출 (방어적)
+// ⚠️ 구글플레이 구독은 `subId:basePlanId` 로 내려온다. 접미사를 안 떼면
+//    PRODUCT_CREDITS 조회가 빗나가 적립이 영원히 pending(202) 된다.
 export function purchaseStoreId(p) {
-  return (
+  const raw =
     p?.product?.store_identifier ||
     p?.store_identifier ||
     p?.product_identifier ||
-    null
-  );
+    null;
+  return raw ? String(raw).split(":")[0] : null;
 }
 
 // 구매 객체에서 스토어 거래ID 추출 (멱등 키, 방어적)
@@ -98,18 +100,38 @@ export async function grantCreditsForTransaction(
   return { ok: true, credits, ...totals };
 }
 
+// ⚠️ 예전엔 credits_purchased 와 함께 **읽어온 credits_used 를 그대로 되썼다**.
+//    두 가지가 터진다:
+//      1) 읽기~쓰기 사이에 생성이 크레딧을 쓰면 그 차감이 지워진다. 묶음 생성은
+//         120초 넘게 걸리므로 그 사이 결제가 들어오면 실제로 발생한다.
+//      2) 같은 구매에 대해 grant 재시도(클라 최대 6회)와 웹훅이 동시에 오면
+//         둘 다 같은 current 를 읽고 current+delta 를 써서 **한쪽 구매가 증발한다.**
+//         iap_events 의 UNIQUE 는 이중 지급만 막지, 지급 유실은 못 막는다.
+//    → credits_used 는 건드리지 않고, credits_purchased 만 CAS 로 올린다.
 async function addCredits(admin, userId, delta) {
-  const { data } = await admin
+  await admin
     .from("user_credits")
-    .select("credits_purchased, credits_used")
-    .eq("user_id", userId)
-    .maybeSingle();
-  const current = data?.credits_purchased || 0;
-  const used = data?.credits_used || 0;
-  await admin.from("user_credits").upsert(
-    { user_id: userId, credits_purchased: current + delta, credits_used: used },
-    { onConflict: "user_id" }
-  );
+    .upsert({ user_id: userId }, { onConflict: "user_id", ignoreDuplicates: true });
+
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const { data: row, error } = await admin
+      .from("user_credits")
+      .select("credits_purchased")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (error || !row) return false;
+    const current = row.credits_purchased || 0;
+    const { data: updated, error: updErr } = await admin
+      .from("user_credits")
+      .update({ credits_purchased: current + delta })
+      .eq("user_id", userId)
+      .eq("credits_purchased", current)  // 동시 지급이 먼저 바꿨으면 0건 → 재시도
+      .select("credits_purchased");
+    if (updErr) return false;
+    if (updated && updated.length > 0) return true;
+  }
+  // 여기까지 오면 지급이 안 된 것 — 호출부가 200 을 주기 전에 알아야 한다.
+  throw new Error("크레딧 적립 경합 실패 (재시도 초과)");
 }
 
 export async function getTotals(admin, userId) {

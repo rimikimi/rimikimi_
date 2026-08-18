@@ -51,6 +51,13 @@ export const SUBSCRIPTION_IDS = [
   "plus_monthly", "plus_annual", "rimikimi_plus_monthly", "rimikimi_plus_annual",
 ];
 export const isSubscription = (id) => SUBSCRIPTION_IDS.includes(id);
+
+// 구글플레이는 구독 상품을 "기본 요금제(base plan)" 단위로 쪼개서 내려주고,
+// StoreProduct.identifier 가 `subId:basePlanId` 형태가 된다(RevenueCat 타입 문서:
+// "This will be subId:basePlanId", Google Play only). 우리 IAP_PRODUCTS 키는 맨
+// 상품ID 라, 이 접미사를 안 떼면 구독이 전부 필터에서 탈락한다 — 안드로이드에서
+// rimikimi+ 가 목록에 아예 안 뜬다. iOS 는 접미사가 없어 영향 없다.
+export const baseProductId = (id) => String(id || "").split(":")[0];
 export const PRODUCT_IDS = Object.keys(IAP_PRODUCTS);
 
 const RC_IOS_KEY = import.meta.env.VITE_RC_IOS_KEY || "";
@@ -150,13 +157,14 @@ export async function getIapPacks() {
     //    무시하므로 한 번만 부르면 되지만, 두 번 불러도 결과는 같다.
     const products = await fetchAllProducts(Purchases);
     const mapped = (products || [])
-      .filter((pr) => pr.identifier in IAP_PRODUCTS)
-      .map((pr) => ({
-        id: pr.identifier,
-        count: IAP_PRODUCTS[pr.identifier],
+      .map((pr) => ({ pr, base: baseProductId(pr.identifier) }))
+      .filter(({ base }) => base in IAP_PRODUCTS)
+      .map(({ pr, base }) => ({
+        id: base,                 // 우리 상품ID (서버 PACKAGES 와 맞춘다)
+        count: IAP_PRODUCTS[base],
         priceString: pr.priceString || "",
-        isSub: isSubscription(pr.identifier),
-        _product: pr,
+        isSub: isSubscription(base),
+        _product: pr,             // 결제에는 스토어가 준 원본 객체를 그대로 쓴다
       }));
     if (mapped.length) _lastError = null;
     else if (!_lastError) setDiag("getProducts", new Error("스토어가 상품 0개를 반환"));

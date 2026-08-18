@@ -931,14 +931,22 @@ export default async function handler(req, res) {
 
   // 6) 성공 → 사용 기록 (크레딧 사용 시 크레딧 차감, 아니면 오늘 한도 차감)
   //    Pro 혼잡 폴백(busyFallback)이면 무과금 — 크레딧/무료체험/하루한도 아무 것도 차감하지 않는다.
-  if (!unlimited && !busyFallback) {
+  if (!unlimited) {
     if (freeProSample) {
-      // 무료 Pro 체험: 차감·한도기록 없이 "1회 소진"만 표시
-      await markProSampleUsed(admin, user.id);
+      // 무료 Pro 체험: 차감·한도기록 없이 "1회 소진"만 표시.
+      // 폴백(base 로 나감)이면 체험을 안 쓴 것이므로 소진 처리하지 않는다.
+      if (!busyFallback) await markProSampleUsed(admin, user.id);
     } else if (useCredit) {
-      await consumeCredit(admin, user.id);
-      creditsLeft = Math.max(0, creditsLeft - 1);
+      // 크레딧은 폴백이면 면제 — 사용자에게 "차감되지 않았어요"라고 고지한다.
+      if (!busyFallback) {
+        await consumeCredit(admin, user.id);
+        creditsLeft = Math.max(0, creditsLeft - 1);
+      }
     } else {
+      // ⚠️ 무료 한도는 폴백이어도 차감한다. 예전엔 busyFallback 이면 이 insert 까지
+      //    건너뛰어서, Pro 가 혼잡한 동안(재시도 계층이 3겹일 만큼 흔하다) 무료
+      //    사용자가 하루 한도 없이 무제한 생성할 수 있었다 — 이미지는 실제로
+      //    나가므로 API 비용은 그대로 발생한다. 크레딧 면제와 한도 기록은 별개다.
       await admin
         .from("usage_log")
         .insert({ user_id: user.id })

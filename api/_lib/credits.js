@@ -135,19 +135,31 @@ export async function refundCredits(admin, userId, n) {
   return false;
 }
 
+// ⚠️ 예전엔 read-modify-write 였다(select → upsert, 조건 없음). 바로 위
+//    consumeCredits(복수)에는 낙관적 잠금이 있는데 단수형만 빠져 있어서,
+//    동시에 여러 번 생성하면 마지막 쓰기만 남아 1크레딧으로 N장이 나갔다.
+//    → 같은 CAS + 재시도로 통일한다.
 export async function consumeCredit(admin, userId) {
-  // 현재 사용량 읽기
-  const { data } = await admin
+  await admin
     .from("user_credits")
-    .select("credits_used")
-    .eq("user_id", userId)
-    .maybeSingle();
-  const used = data?.credits_used || 0;
-  const { error } = await admin
-    .from("user_credits")
-    .upsert(
-      { user_id: userId, credits_used: used + 1 },
-      { onConflict: "user_id" }
-    );
-  return !error;
+    .upsert({ user_id: userId }, { onConflict: "user_id", ignoreDuplicates: true });
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const { data: row, error } = await admin
+      .from("user_credits")
+      .select("credits_used")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (error || !row) return false;
+    const used = row.credits_used || 0;
+    const { data: updated, error: updErr } = await admin
+      .from("user_credits")
+      .update({ credits_used: used + 1 })
+      .eq("user_id", userId)
+      .eq("credits_used", used)   // 다른 요청이 먼저 바꿨으면 0건 → 재시도
+      .select("credits_used");
+    if (updErr) return false;
+    if (updated && updated.length > 0) return true;
+  }
+  return false;
 }
