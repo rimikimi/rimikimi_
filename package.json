@@ -5,8 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "prebuild": "bash scripts/clean-icloud-dupes.sh",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "clean:icloud": "bash scripts/clean-icloud-dupes.sh"
   },
   "dependencies": {
     "@capacitor-community/admob": "^8.0.0",
