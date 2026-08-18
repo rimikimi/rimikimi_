@@ -3756,6 +3756,15 @@ function StoreScreen({ packs, credits, session, freeLimit = FREE_DAILY, onCredit
       const map = {};
       list.forEach((p) => { map[p.id] = p; });
       setIapById(map);
+      // ⚠️ 이 계측이 없어서 안드로이드 결제가 출시 이후 한 번도 안 되는 걸
+      //    한 달 넘게 몰랐다(iap_events 9건 전부 APP_STORE, PLAY_STORE 0건).
+      //    "스토어에 팩이 몇 개 떴는가"가 결제 깔때기의 첫 칸이다.
+      track("store_open", {
+        platform: platform(),
+        packs: list.length,
+        subs: list.filter((p) => p.isSub).length,
+        diag: getIapDiag() || null,
+      });
     })();
     return () => { on = false; };
   }, [native]);
@@ -3782,12 +3791,21 @@ function StoreScreen({ packs, credits, session, freeLimit = FREE_DAILY, onCredit
     setErrMsg(""); setOkMsg("");
     if (!session?.access_token) { setErrMsg("로그인이 필요해요."); return; }
     const rc = iapById?.[pack.id];
-    if (!rc) { setErrMsg("스토어 상품을 불러오지 못했어요. 잠시 후 다시 시도해 주세요."); return; }
+    if (!rc) {
+      setErrMsg("스토어 상품을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.");
+      track("purchase_fail", { product: pack.id, platform: platform(), stage: "no_product", diag: getIapDiag() || null });
+      return;
+    }
     setBusyId(pack.id);
     const sub = isSubscription(pack.id);
+    track("purchase_start", { product: pack.id, platform: platform() });
     try {
       const res = await purchaseIap(rc);
-      if (res?.cancelled) { setBusyId(null); return; }
+      if (res?.cancelled) {
+        track("purchase_cancel", { product: pack.id, platform: platform() });
+        setBusyId(null);
+        return;
+      }
       try {
         await grantWithRetry(pack.id, res?.transactionId);
       } catch (e) {
@@ -3795,12 +3813,19 @@ function StoreScreen({ packs, credits, session, freeLimit = FREE_DAILY, onCredit
         if (!sub) throw e;
       }
       onCredited && onCredited();
-      track("purchase", { product: pack.id });
+      track("purchase", { product: pack.id, platform: platform() });
       setOkMsg(sub
         ? "rimikimi+ 구독 완료! 크레딧이 곧 충전되고 광고가 사라져요 ✨"
         : `크레딧 ${pack.count}개가 충전됐어요! 🎉`);
     } catch (e) {
       setErrMsg(e.message || String(e));
+      // 어디서 깨졌는지 남긴다 — 결제창(purchase)인지 서버 적립(grant)인지.
+      track("purchase_fail", {
+        product: pack.id, platform: platform(),
+        stage: e?.code === "NO_PRODUCT" ? "no_product" : "purchase_or_grant",
+        code: e?.code || null,
+        msg: String(e?.message || e).slice(0, 120),
+      });
     } finally {
       setBusyId(null);
     }
