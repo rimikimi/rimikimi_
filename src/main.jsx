@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { Capacitor } from "@capacitor/core";
 import PortraitStudio from "./PortraitStudio.jsx";
+import { installTouchRestore } from "./nativeBridge";
 
 // ── 네이티브 API 베이스 패치 ──
 // 네이티브(번들 모드)에서 webview origin 은 capacitor://localhost 라
@@ -24,6 +25,10 @@ if (Capacitor.isNativePlatform()) {
     return _fetch(input, init);
   };
 }
+
+// 안드로이드: 풀스크린 네이티브 액티비티(결제창·전면광고 등)에서 돌아올 때
+// WebView 가 터치를 못 받는 프리즈를 앱 전체 차원에서 막는다.
+installTouchRestore();
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>

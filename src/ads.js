@@ -4,7 +4,7 @@
 //   - 해당 플랫폼 광고단위 ID 가 비어 있으면 no-op (안전).
 //   - @capacitor-community/admob 플러그인 필요 (native 빌드에서 cap sync).
 // ============================================================
-import { isNative, platform } from "./nativeBridge";
+import { isNative, platform, restoreWebViewTouch } from "./nativeBridge";
 // ⚠️ 정적 import. (예전엔 동적 import(load())였는데 iOS WKWebView 에서 동적 청크
 // 로딩이 끝나지 않아 광고가 영영 안 뜨는 버그가 있었음 → timeout@load.)
 // registerPlugin 은 동기이고 native 메서드는 호출 전까지 아무것도 안 하므로,
@@ -35,26 +35,9 @@ function withTimeout(p, ms, label) {
   ]);
 }
 
-// 전면광고 종료 후 WebView 터치 복구.
-// Android(targetSdk 35/36 edge-to-edge)에서 풀스크린 광고 액티비티가 닫히고
-// WebView 로 복귀할 때, WebView 가 터치 이벤트를 못 받아 결과화면 버튼이
-// 전부 안 눌리는 프리즈가 있었음. 아래로 강제 리레이아웃/포커스 회수해서 복구.
-// (네이티브 MainActivity.onResume 의 requestFocus 와 이중 방어)
-function restoreWebViewTouch() {
-  try {
-    // 브라우저 리레이아웃 유도 → 레이아웃/히트테스트 갱신
-    window.dispatchEvent(new Event("resize"));
-    if (document.body) {
-      document.body.style.pointerEvents = "none";
-      requestAnimationFrame(() => {
-        try {
-          document.body.style.pointerEvents = "";
-          window.focus && window.focus();
-        } catch (_) {}
-      });
-    }
-  } catch (_) {}
-}
+// 터치 복구는 nativeBridge 로 옮겼다 — 광고뿐 아니라 결제창에서도 같은
+// 프리즈가 났고(2026-08-18), 앞으로 추가될 풀스크린 액티비티도 전부 겪는다.
+// 이제 "포그라운드 복귀" 자체에 걸려 있어 여기선 이중 방어로만 부른다.
 
 // 전면광고 생명주기 리스너는 한 번만 등록 (종료/실패 시 터치 복구).
 async function ensureListeners() {

@@ -14,13 +14,17 @@ public class MainActivity extends BridgeActivity {
         if (bridge != null) {
             final WebView wv = bridge.getWebView();
             if (wv != null) {
-                wv.post(new Runnable() {
+                final Runnable regain = new Runnable() {
                     @Override
                     public void run() {
                         wv.requestFocusFromTouch();
                         wv.requestFocus();
                     }
-                });
+                };
+                wv.post(regain);
+                // onResume 시점엔 앞 액티비티(결제창·광고)가 아직 완전히 안 떨어져
+                // 포커스 회수가 먹지 않는 경우가 있다 → 조금 뒤 한 번 더.
+                wv.postDelayed(regain, 350);
             }
         }
     }

@@ -15,7 +15,7 @@
 //   VITE_RC_ANDROID_KEY  = goog_xxx   (RevenueCat Google 공개키)
 // ============================================================
 
-import { isNative, platform } from "./nativeBridge";
+import { isNative, platform, restoreWebViewTouch } from "./nativeBridge";
 // ⚠️ 정적 임포트 필수 — 네이티브 WKWebView 에서 lazy chunk 동적 import() 가 영원히
 // pending 되는 버그(josephine 시뮬레이터 재현). configure 가 실행되지 않아 IAP 전체가
 // 죽고(무한 Processing / 상품 0개), RC 백엔드에 고객 0명이 되던 근본 원인.
@@ -225,6 +225,10 @@ export async function purchaseIap(pack) {
     }
     setDiag("purchase", e);
     throw e;
+  } finally {
+    // Play 결제 시트는 별도 액티비티라, 닫히고 돌아오면 안드로이드 WebView 가
+    // 터치를 못 받는 프리즈가 난다(취소·실패 포함이라 finally 에 둔다).
+    restoreWebViewTouch();
   }
 }
 

@@ -11,9 +11,51 @@ import { Capacitor } from "@capacitor/core";
 // 메서드는 호출 전까지 아무 것도 안 하므로 앱 시작 시 같이 로드해도 안전
 // (웹에서도 isNative 가드로 no-op).
 import { Media } from "@capacitor-community/media";
+import { App as CapApp } from "@capacitor/app";
 
 export const isNative = () => Capacitor.isNativePlatform();
 export const platform = () => Capacitor.getPlatform(); // "web" | "ios" | "android"
+
+/* ---------- 안드로이드 WebView 터치 복구 ---------- */
+// targetSdk 35/36(edge-to-edge)에서 풀스크린 네이티브 액티비티가 닫히고 WebView 로
+// 돌아올 때 WebView 가 터치를 못 받는 프리즈가 있다. 전면광고에서 먼저 발견해
+// 광고 경로에만 복구를 걸어놨었는데, **결제창(Play 결제 시트)도 똑같은 별도
+// 액티비티**라 같은 증상이 났다(2026-08-18 신고: "결제하면 터치가 아예 안 됨").
+//
+// → 개별 경로마다 붙이는 대신 "포그라운드 복귀" 자체에 건다. 광고·결제·권한창·
+//   공유시트·카메라 등 앞으로 뭐가 추가돼도 자동으로 커버된다.
+export function restoreWebViewTouch() {
+  if (platform() !== "android") return;
+  try {
+    window.dispatchEvent(new Event("resize"));
+    if (document.body) {
+      // 강제 리플로우 → 히트테스트 영역 갱신
+      document.body.style.pointerEvents = "none";
+      void document.body.offsetHeight;
+      requestAnimationFrame(() => {
+        try {
+          document.body.style.pointerEvents = "";
+          void document.body.offsetHeight;
+          window.focus && window.focus();
+        } catch (_) {}
+      });
+    }
+  } catch (_) {}
+}
+
+let touchRestoreReady = false;
+export function installTouchRestore() {
+  if (!isNative() || platform() !== "android" || touchRestoreReady) return;
+  touchRestoreReady = true;
+  try {
+    CapApp.addListener("appStateChange", ({ isActive }) => {
+      if (!isActive) return;
+      // 액티비티가 완전히 붙기 전에 부르면 소용없어서 한 번 더 늦게 시도한다.
+      restoreWebViewTouch();
+      setTimeout(restoreWebViewTouch, 350);
+    });
+  } catch (_) { /* 복구는 실패해도 앱 동작과 무관 */ }
+}
 
 // 네이티브 호출이 응답 없이 멈추는 것 방지 (ads.js/iap.js 와 동일 패턴)
 function withTimeout(promise, ms) {
