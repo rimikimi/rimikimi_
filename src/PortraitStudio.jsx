@@ -3449,12 +3449,21 @@ function ResultScreen({
     if (it.galleryId) markSaved(it.galleryId);
   }
 
+  // ⚠️ 이 버튼은 한 번도 동작한 적이 없었다(2026-08-18 발견).
+  //    nativeShare 는 ({title,text,url}) 를 받는데 문자열 두 개를 위치인자로
+  //    넘기고 있었다 — 문자열을 구조분해하면 세 필드가 전부 undefined 라
+  //    빈 공유가 나가고, 이미지는 애초에 첨부되지도 않았다. 그런데도 성공
+  //    토스트를 띄워서 사용자는 공유된 줄 알았다.
+  //    → 갤러리 공유(handleShare)와 같은 shareImage() 를 쓴다.
   async function onShareOne(it, i) {
     const hi = it.galleryId ? await fetchHiResDataUrl(it.galleryId) : null;
-    try {
-      await nativeShare(hi || it.imageDataUrl, t("share.caption"));
-      flashToast(t("share.doneToast"));
-    } catch (_) { /* 사용자가 취소한 경우 등은 무시 */ }
+    const r = await shareImage({
+      src: hi || it.imageDataUrl,
+      filename: `rimikimi_${it.conceptId || selected?.id || "photo"}_${i + 1}.png`,
+      title: t("invite.shareTitle"),
+      text: t("share.caption"),
+    });
+    if (r.ok) flashToast(t("share.doneToast")); // 취소면 토스트 없음
   }
 
   async function fetchHiResDataUrl(id = galleryId) {

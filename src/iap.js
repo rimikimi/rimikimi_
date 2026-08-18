@@ -237,7 +237,10 @@ export async function restoreIap() {
   if (!iapAvailable()) return { restored: false };
   try {
     const Purchases = getPurchases();
-    const { customerInfo } = await Purchases.restorePurchases();
+    // ⚠️ 이 파일의 다른 네이티브 호출은 전부 withTimeout 을 쓰는데 여기만 빠져
+    //    있었다. 멈추면 "복원 중…" 상태가 안 풀려 복원 버튼과 구매 버튼이 전부
+    //    비활성으로 굳는다 — 심사자가 반드시 눌러보는 버튼이라 리젝 사유가 된다.
+    const { customerInfo } = await withTimeout(Purchases.restorePurchases(), 30000, "구매 복원");
     return { restored: true, customerInfo };
   } catch (e) {
     console.warn("[iap] restorePurchases 실패", e);
