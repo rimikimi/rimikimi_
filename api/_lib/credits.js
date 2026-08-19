@@ -44,8 +44,14 @@ export async function getCreditInfo(admin, userId) {
     creditsUsed,
     creditsAvailable,
     perCredit: PER_CREDIT,
-    // 다음 크레딧까지 남은 초대 수 (홀수일 때 "한 명 더!" 유도)
-    untilNext: PER_CREDIT - (referralCount % PER_CREDIT || PER_CREDIT),
+    // 다음 크레딧까지 남은 초대 수 (0/2/4…명째엔 2, 1/3/5…명째엔 1 → "1명만 더!")
+    // 🔴 2026-08-19: 예전엔 `referralCount % PER_CREDIT || PER_CREDIT` 였다.
+    //    PER_CREDIT=2 에서 초대 0명 → 0%2=0 → `0 || 2` = 2 → untilNext = 2-2 = 0.
+    //    즉 짝수 구간(0·2·4명…)마다 UI 가 "0명만 더 초대하면"이라고 표시했다.
+    //    가장 흔한 상태인 "초대 0명"에서 항상 틀렸다는 뜻이다.
+    //    picbox:55 · josephine:55 · claire:47 은 전부 아래 식이라 정상이었다
+    //    (referral-audit-2026-08-19 §3-1, rimikimi 만 해당).
+    untilNext: PER_CREDIT - (referralCount % PER_CREDIT),
   };
 }
 
