@@ -8,6 +8,7 @@ import { getSavedSet, markSaved, syncExpiryNotifications, cancelExpiryNotice, sy
 import { initPush, attachPushHandlers, getPushToken } from "./push";
 import { t, useLang, getLang, localizedTitle, localizedCategory, getLangPreference, setLang } from "./i18n";
 import LoginGate from "./LoginGate";
+import Guide, { guideSeen, markGuideSeen } from "./Guide";
 // ⚠️ 정적 import — 네이티브 WebView 에서 동적 import() 가 영원히 pending 되는
 //    버그 때문에(nativeBridge/ads/iap 주석 참고) OAuth 딥링크 처리가 통째로
 //    죽은 적이 있다. 로그인 경로에 동적 import 를 두지 않는다.
@@ -715,6 +716,8 @@ export default function PortraitStudio() {
   // 로그인 시트 — 비로그인으로 컨셉·사진까지 고르고 "다음"을 누른 순간 뜬다.
   // 그 전(둘러보기·컨셉 선택·사진 업로드)까진 비로그인으로 전부 가능.
   const [showLoginSheet, setShowLoginSheet] = useState(false);
+  // null=닫힘 | "intro"=첫 실행 3장 | "photo"=사진 가이드만
+  const [guideMode, setGuideMode] = useState(null);
   const swipeRef = useRef(null); // 왼쪽 엣지 스와이프 추적
   const [query, setQuery] = useState("");
   const [activeCat, setActiveCat] = useState("전체");
@@ -760,6 +763,13 @@ export default function PortraitStudio() {
   useEffect(() => {
     track("app_open");
   }, []);
+
+  // 첫 실행이면 사용 안내를 한 번 띄운다. 스플래시가 걷힌 뒤에 뜨도록
+  // booting 을 기다린다(스플래시 위에 겹치면 아무것도 안 보인다).
+  useEffect(() => {
+    if (booting) return;
+    if (!guideSeen()) setGuideMode("intro");
+  }, [booting]);
 
   // 알림 설정. 두 가지가 서로 다른 경로로 간다.
   //   · 생성 완료 → 원격 푸시(FCM). 끝나는 시각을 미리 알 수 없으니 서버가 쏜다.
@@ -1967,6 +1977,7 @@ export default function PortraitStudio() {
           };
           return (
             <HomeScreen
+              onOpenGuide={() => setGuideMode("photo")}
               isArt={art}
               isCouple={couple}
               photo={currentPhoto}
@@ -2154,6 +2165,10 @@ export default function PortraitStudio() {
           </div>
         </div>
       )}
+
+      {guideMode && (
+        <Guide mode={guideMode} onClose={() => { markGuideSeen(); setGuideMode(null); }} />
+      )}
     </div>
   );
 }
@@ -2188,7 +2203,7 @@ function HomeScreen({
   photo, onPick, onClear,
   ageConfirmed, setAgeConfirmed, onContinue, onBack,
   isArt = false, showAds = false,
-  isCouple = false, partnerPhoto = null, onPickPartner,
+  isCouple = false, partnerPhoto = null, onPickPartner, onOpenGuide,
 }) {
   const ready = photo && (!isCouple || partnerPhoto) && ageConfirmed;
   return (
@@ -2269,6 +2284,12 @@ function HomeScreen({
             {t("step2.changePhoto")}
           </button>
         </>
+      )}
+
+      {onOpenGuide && (
+        <button type="button" style={S.guideLink} onClick={onOpenGuide}>
+          {t("guide.openPhoto")}
+        </button>
       )}
 
       <label style={S.consentRow}>
@@ -4486,6 +4507,13 @@ const S = {
   coupleHint: {
     fontSize: 11.5, lineHeight: 1.6, opacity: 0.55, fontWeight: 500,
     margin: "12px 0 0", textAlign: "center",
+  },
+  guideLink: {
+    display: "block", width: "100%", margin: "10px 0 0",
+    padding: "11px 12px", borderRadius: 12,
+    border: "1px dashed rgba(0,0,0,0.16)", background: "rgba(0,0,0,0.02)",
+    fontSize: 13.5, fontWeight: 600, color: "#6b6360",
+    cursor: "pointer", textAlign: "center",
   },
   consentRow: {
     display: "flex", gap: 10, alignItems: "flex-start",
