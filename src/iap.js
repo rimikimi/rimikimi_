@@ -260,8 +260,12 @@ export async function restoreIap() {
 function latestTxId(info, productId) {
   try {
     const txns = info?.nonSubscriptionTransactions || [];
+    // ⚠️ 구글플레이는 상품ID 에 `:기본요금제` 접미사를 붙여 내려준다. 그대로
+    //    비교하면 매칭이 0건이라 거래ID 가 null 이 되고, 서버가 "거래ID 없음"
+    //    으로 400 을 낸다 — 결제는 됐는데 크레딧이 안 들어가는 형태다.
+    const want = baseProductId(productId);
     const mine = txns.filter(
-      (t) => t.productIdentifier === productId || t.productId === productId
+      (t) => baseProductId(t.productIdentifier) === want || baseProductId(t.productId) === want
     );
     if (!mine.length) return null;
     const last = mine[mine.length - 1];

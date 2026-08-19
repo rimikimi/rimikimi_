@@ -11,6 +11,8 @@
 //     (supabase/migrations/20260723090000_viral_loop_funnel.sql 참고).
 // ============================================================
 import { supabase } from "./supabaseClient";
+import { Capacitor } from "@capacitor/core";
+import { App as CapApp } from "@capacitor/app";
 
 const ANON_KEY = "rimikimi_anon_id_v1";
 let cachedAnonId = null;
@@ -43,6 +45,16 @@ export function setTrackUser(userId) {
 
 // event: "app_open" | "signup" | "generate" | "share_done" | "invite_sent" | "purchase" | ...
 // props: 비식별 메타만(예: { engine, concept } / { product }). 개인정보 금지.
+// ⚠️ 모든 이벤트에 앱 버전을 붙인다. 이게 없어서 2026-08-19 에 "안드로이드 결제가
+//    안 된다"는 신고를 받고도 **사용자가 어떤 빌드를 쓰는지 알 수 없어** 진단이
+//    막혔다(계측이 있는 빌드인지조차 구분 못 함). 비식별 메타라 개인정보 아님.
+let _appVer = null;
+if (Capacitor.isNativePlatform()) {
+  CapApp.getInfo()
+    .then((i) => { _appVer = `${i?.version || "?"}(${i?.build || "?"})`; })
+    .catch(() => {});
+}
+
 export function track(event, props = {}) {
   try {
     supabase
@@ -51,7 +63,11 @@ export function track(event, props = {}) {
         user_id: currentUserId,
         anon_id: getAnonId(),
         event: String(event).slice(0, 64),
-        props: props || {},
+        props: {
+          ...(props || {}),
+          ...(_appVer ? { v: _appVer } : {}),
+          plat: Capacitor.getPlatform(),
+        },
       })
       .then(
         () => {},
