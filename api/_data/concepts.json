@@ -1,5 +1,16 @@
 [
 {
+"id": "782",
+"title": "유치원생 낙서",
+"title_en": "Kindergarten Scribble",
+"category": "🪄 매직 부스",
+"categories": [
+"🪄 매직 부스"
+],
+"sensitive": false,
+"text": "Re-draw the subject in the reference photo as a genuinely crude crayon drawing made by a five-year-old. Wobbly uneven outlines that don't quite meet at the corners, heavy scribbled colouring that runs well outside the lines with patches left unfilled, wonky proportions with an oversized head, simple dot eyes and a lopsided grin, stick-like limbs. Keep the dominant colours of the hair and clothing so the subject is still recognizable (e.g. long brown hair becomes a big brown scribble). Waxy crayon texture on plain rough sketch paper, visible smudges and press marks, slightly off-centre composition. Fill the frame with the drawing itself — no tape, no handwriting, no photo of paper on a wall. Charmingly bad, unpolished, drawn in two minutes with total confidence."
+},
+{
 "id": "781",
 "title": "새벽 우체국 만년필",
 "title_en": "Dawn Post Office Pen",
@@ -5168,13 +5179,14 @@
 },
 {
 "id": 351,
-"title": "흑백 펜슬 드로잉",
-"title_en": "B&W Pencil Sketch",
-"category": "예술 / 클래식",
+"title": "연필 드로잉",
+"title_en": "Pencil Drawing",
+"category": "🪄 매직 부스",
 "categories": [
+"🪄 매직 부스",
 "예술 / 클래식"
 ],
-"text": "Minimalist black-and-white fashion pencil drawing of a woman shown in perfect quarter profile, hair swept up into a casual messy updo, black rimmed glasses on her head, round earrings hanging from the ear, wearing an oversized relaxed-fit blazer with an open notched collar and draped silhouette, elegant upright quarter-profile pose, reading a fashion magazine and holding the magazine with one hand, the other hand is holding a glass of iced latte, pure flat white background with paper texture, rendered entirely in confident and rough flowing black pencil sketch with no shading, no colour fill, no cross- hatching, rough pencil lines of varying weight for contour and detail, lips suggested with a single curved line, delicate fine lines for hair texture, modern editorial fashion pencil sketch portrait, chic and minimal mood with effortless Parisian-cool confidence, edge-to-edge sharp focus throughout,",
+"text": "Re-render the subject in the reference photo as a minimalist black-and-white graphite pencil drawing. Flowing confident strokes, rough sketch energy, no shading and no colour fill, occasional breaks where the pencil lifts off the paper. Preserve the subject's identity, composition and recognizable features — if it is a person, keep the exact face, hairstyle and pose; if it is an animal, object or scene, keep its distinctive shape and character. Pure flat white background with paper texture and faint eraser marks. Elegant, spare, hand-drawn.",
 "sensitive": false
 },
 {
@@ -5598,13 +5610,14 @@
 },
 {
 "id": 314,
-"title": "네이비 펜 드로잉",
-"title_en": "Navy Pen Sketch",
-"category": "예술 / 클래식",
+"title": "만년필 드로잉",
+"title_en": "Fountain Pen Drawing",
+"category": "🪄 매직 부스",
 "categories": [
+"🪄 매직 부스",
 "예술 / 클래식"
 ],
-"text": "A realistic blue-navy fountain pen sketch by a fashion stylist with rough and irregular lines of a woman in the reference photo, lines varying in thickness and stroke lengths, long wavy hair falling and sweeping to one side, facial features in a fountain pen style line sketch with extremely rough and irregular strokes, sleek white tank top. seated on a wooden barbecue chair on porch of a street cafe, having conversation with another person outside of the frame, smiling expression, holding a cup of coffee in a tall glass, the other hand is holding the straw from the glass, upper-body framing, side profile, chin slightly tilted down natural confidence, warm facial expression. drawing on a rough white paper napkin, chic and sophisticated.",
+"text": "Re-render the subject in the reference photo as a blue-navy fountain pen sketch. Irregular ink lines varying in thickness and length, occasional ink pooling and dry-nib breaks, rough hatching where shadow falls, natural hand-drawn wobble. Preserve the subject's identity, composition and recognizable features — if it is a person, keep the exact face, hairstyle and pose; if it is an animal, object or scene, keep its distinctive shape and character. Navy-blue ink on off-white paper with visible paper tooth, no colour beyond the ink. Loose, confident, illustrative.",
 "sensitive": false
 },
 {
@@ -5620,13 +5633,14 @@
 },
 {
 "id": 312,
-"title": "흑백 펜 드로잉",
-"title_en": "Ink Pen Sketch",
-"category": "예술 / 클래식",
+"title": "라인 드로잉",
+"title_en": "Line Drawing",
+"category": "🪄 매직 부스",
 "categories": [
+"🪄 매직 부스",
 "예술 / 클래식"
 ],
-"text": "A chic black-and-white fine pen drawing by a fashion stylist with rough and exaggerated lines of a woman in the reference photo, fine lines varying in stroke lengths, long wavy hair in fine black lines falling to one side, facial features in a fine pen style drawing with extremely rough and exaggerated strokes, long slender neck and subtle collarbone indicated by clean lines, sleek white tank top. upper-body portrait framing, three-quarter view, chin slightly tilted down natural confidence, hair sweeping to one side, warm facial expression. flat white papery background, chic and sophisticated.",
+"text": "Re-render the subject in the reference photo as a chic black-and-white fine-pen fashion line drawing. Confident continuous contour lines with varying stroke weight, rough and slightly exaggerated strokes, minimal interior detail, no shading and no colour fill — describe the subject with as few lines as possible. Preserve the subject's identity, composition and recognizable features — if it is a person, keep the exact face, hairstyle and pose; if it is an animal, object or scene, keep its distinctive shape and character. Flat white paper background with subtle grain. Chic, sophisticated, effortless.",
 "sensitive": false
 },
 {
