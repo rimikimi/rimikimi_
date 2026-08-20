@@ -1344,12 +1344,22 @@ export default function PortraitStudio() {
       isArtConcept(next) !== isArtConcept(selected) ||
       isCoupleConcept(next) !== isCoupleConcept(selected);
     if (consentChanged) setAgeConfirmed(false);
-    if (isArtConcept(next)) setArtPhoto(null); // 매직 부스는 매번 새 사진
+    // 매직 부스 → 매직 부스로 넘어갈 때는 방금 올린 사진을 그대로 들고 간다.
+    // ⚠️ 예전엔 next 가 매직 부스면 무조건 artPhoto 를 비웠다. 그런데 매직 부스
+    //    카테고리 안에서는 이웃 컨셉이 항상 매직 부스라, 스와이프할 때마다 사진이
+    //    지워지고 아래 needsPhoto 에 걸려 업로드 화면으로 튕겨 나갔다 — 즉 확인화면의
+    //    "좌우로 밀면 다른 컨셉을 볼 수 있어요" 가 이 카테고리에서만 거짓말이었다
+    //    (실측 2026-08-20: 매직 부스에서 스와이프 2회 모두 STEP 02 로 이탈).
+    //    "같은 사진을 다른 스타일로" 는 애초에 매직 부스의 핵심 사용법이라 유지가 맞다.
+    //    밖에서 처음 들어올 때(pickPrompt)는 그대로 비운다 — 일회용 사진 원칙 유지.
+    if (isArtConcept(next) && !isArtConcept(selected)) setArtPhoto(null);
 
-    const needsPhoto =
-      isArtConcept(next) ||                              // 변환할 사진을 새로 받아야 함
-      (isCoupleConcept(next) && !partnerPhoto) ||        // 상대 사진 없음
-      !photo;                                            // 본인 사진 없음
+    // ⚠️ 매직 부스는 photo(프로필 사진)가 아니라 artPhoto 를 쓴다. 예전 조건은
+    //    두 슬롯을 구분하지 않아 매직 부스인데 프로필 사진 유무를 보고 있었다.
+    const needsPhoto = isArtConcept(next)
+      ? !artPhoto                                        // 변환할 사진이 없을 때만
+      : (!photo ||                                       // 본인 사진 없음
+         (isCoupleConcept(next) && !partnerPhoto));      // 상대 사진 없음
 
     setNavDir("fwd");
     setSelected(next);
