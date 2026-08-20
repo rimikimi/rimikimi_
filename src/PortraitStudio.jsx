@@ -56,6 +56,14 @@ const ASSET_BASE = isNative() ? LEGAL_BASE : "";
 const PENDING_GEN_KEY = "rimikimi_pending_gen";
 const PENDING_GEN_MAX_AGE = 10 * 60 * 1000; // 10분 지난 마커는 무효
 
+// 요청이 끊긴 뒤 결과를 기다려 주는 창.
+// 서버(api/generate.js)는 DEADLINE = 200초 예산으로 돌고, 그 뒤 축소·갤러리 저장까지
+// 마쳐야 하므로 maxDuration(300초)까지 갈 수 있다. 여유를 더해 5분까지 물어본다.
+const RECOVER_WINDOW_MS = 5 * 60 * 1000;
+const RECOVER_INTERVAL_MS = 5000;
+// 갤러리 조회'조차' 연속 실패하면 기기가 오프라인이라는 뜻 — 기다려도 소용없다.
+const RECOVER_OFFLINE_STRIKES = 3;
+
 function writePendingGen(p) {
   try { localStorage.setItem(PENDING_GEN_KEY, JSON.stringify(p)); } catch (_) {}
 }
@@ -513,7 +521,13 @@ async function generateImage(accessToken, dataUrl, promptText, conceptMeta = {})
       }),
     });
   } catch (e) {
-    throw new Error("네트워크 요청에 실패했어요. 잠시 후 다시 시도해 주세요.");
+    // ⚠️ fetch 자체가 던졌다 = 서버 판정을 못 받았다는 뜻이다. 서버가 거절한 것과
+    //    구분해야 한다. 앱을 백그라운드로 보내면 iOS 가 WebView 의 fetch 를 죽이는데,
+    //    그때도 서버는 계속 만들고 있다(최대 200초). 호출부는 이 표시를 보고
+    //    "실패 확정" 대신 갤러리를 폴링한다.
+    const err = new Error("네트워크 요청에 실패했어요. 잠시 후 다시 시도해 주세요.");
+    err.networkFail = true;
+    throw err;
   }
 
   let json;
@@ -736,6 +750,9 @@ export default function PortraitStudio() {
   const [untilNext, setUntilNext] = useState(2);
   const [inviteMsg, setInviteMsg] = useState("");
   const [generating, setGenerating] = useState(false);
+  // 요청은 끊겼는데 서버는 계속 만들고 있을 수 있어 갤러리를 폴링하는 중.
+  // 로딩 화면을 그대로 두되 안내 문구만 바꿔서, 멈춘 게 아님을 알린다.
+  const [genWaiting, setGenWaiting] = useState(false);
   const [resultImage, setResultImage] = useState(null);
   const [genError, setGenError] = useState(null);
   // 결과화면 "기본 vs Pro" 비교: 무료 Pro 체험 결과 + 진행상태
@@ -1223,17 +1240,29 @@ export default function PortraitStudio() {
   // 서버가 갤러리에 저장해 둔 방금 만든 결과를 찾아 결과화면에 자동으로 띄운다.
   // 리스너(한 번 등록)의 stale-closure 를 피하려고 최신 함수를 ref 로 들고 있는다.
   const recoverRef = useRef(() => {});
-  async function tryRecoverGeneration() {
+  const recoveringRef = useRef(false);
+
+  // 갤러리를 '한 번' 조회해 방금 만든 결과를 찾는다.
+  //   true      → 찾아서 결과화면까지 띄웠다
+  //   false     → 아직 없다 (서버가 계속 만들고 있을 수 있다)
+  //   "offline" → 조회 자체가 실패했다 (기기가 네트워크에 못 붙는 상태)
+  // 이 셋을 구분해야 "서버가 아직 만드는 중" 과 "기기가 오프라인" 을 가를 수 있다.
+  async function lookupPendingResult() {
     const p = readPendingGen();
     if (!p) return false;
     const accessToken = session?.access_token;
     if (!accessToken) return false;
+    let items;
     try {
       const r = await fetch("/api/gallery", {
         headers: { Authorization: "Bearer " + accessToken },
       });
       const j = await r.json();
-      const items = j?.items || [];
+      items = j?.items || [];
+    } catch (_) {
+      return "offline";
+    }
+    try {
       // 생성 시작 시점 이후에 만들어진, 같은 컨셉의 결과들.
       // ⚠️ 묶음 생성(3/6/12장)이면 여러 건이므로 전부 모은다 — 한 장만 되살리면
       //    앱을 닫았던 사용자는 나머지를 영영 못 본다(갤러리엔 있지만 결과화면엔 없음).
@@ -1274,7 +1303,39 @@ export default function PortraitStudio() {
     } catch (_) {}
     return false;
   }
-  recoverRef.current = tryRecoverGeneration;
+
+  // ⚠️ 예전엔 이 복구가 '한 번만' 조회했다. 생성은 100~200초가 걸리는데, 앱을 닫았다
+  //    다시 열면 그 순간 갤러리를 딱 한 번 보고 → 아직 비어 있으면 실패로 확정하고
+  //    마커까지 지웠다. 1분 뒤 결과가 갤러리에 들어와도 화면은 계속 "생성 실패" 였고,
+  //    다시 볼 방법도 없었다. (오너 신고 2026-08-20 "왜 앱을 닫으면 실패함?" —
+  //    로그상 21:52 요청은 status 0(클라이언트 끊김), 21:54 요청은 200 성공이었다.)
+  // → 서버가 아직 만들고 있을 수 있는 동안(RECOVER_WINDOW_MS)은 계속 물어본다.
+  //   기기가 진짜 오프라인이면 갤러리 조회도 실패하므로 그때만 일찍 접는다.
+  async function tryRecoverGeneration({ poll = false } = {}) {
+    if (recoveringRef.current) return false; // 폴링 중복 방지(앱 복귀 리스너와 겹칠 수 있다)
+    recoveringRef.current = true;
+    try {
+      let strikes = 0;
+      for (;;) {
+        const r = await lookupPendingResult();
+        if (r === true) return true;
+        if (r === "offline") {
+          if (++strikes >= RECOVER_OFFLINE_STRIKES) return false;
+        } else {
+          strikes = 0;
+        }
+        const p = readPendingGen();
+        if (!poll || !p || Date.now() - p.startedAt > RECOVER_WINDOW_MS) return false;
+        setGenWaiting(true);
+        await new Promise((res) => setTimeout(res, RECOVER_INTERVAL_MS));
+      }
+    } finally {
+      recoveringRef.current = false;
+      setGenWaiting(false);
+    }
+  }
+  // 앱 복귀 시에도 폴링으로 붙는다 — 완전히 종료했다 다시 켠 경우까지 커버된다.
+  recoverRef.current = () => tryRecoverGeneration({ poll: true });
 
   function handleFile(e) {
     const input = e.target;
@@ -1708,7 +1769,9 @@ export default function PortraitStudio() {
         }
         if (showAds) showInterstitial();
       } catch (err) {
-        const recovered = await tryRecoverGeneration();
+        // 서버 판정을 못 받은 경우(networkFail)만 기다려 준다. 402/429 같은
+        // 명시적 거절은 즉시 보여줘야 한다 — 기다린다고 달라지지 않는다.
+        const recovered = await tryRecoverGeneration({ poll: !!err?.networkFail });
         if (!recovered) {
           if (typeof err.quotaUsed === "number") setFreeUsed(err.quotaUsed);
           setGenError(err.message || "인생네컷 생성에 실패했어요.");
@@ -1717,6 +1780,7 @@ export default function PortraitStudio() {
         cancelGenDoneNotice();
       } finally {
         setGenerating(false);
+        setGenWaiting(false);
         setFourcutProgress("");
       }
       return;
@@ -1805,8 +1869,10 @@ export default function PortraitStudio() {
       // 무료 사용자 → 생성 후 전면광고 (네이티브에서만, 웹은 no-op)
       if (showAds) showInterstitial();
     } catch (err) {
-      // 요청이 끊겼어도 서버는 끝냈을 수 있음 → 갤러리에서 방금 결과를 되찾아 표시
-      const recovered = await tryRecoverGeneration();
+      // 요청이 끊겼어도 서버는 끝냈을 수 있음 → 갤러리에서 방금 결과를 되찾아 표시.
+      // 서버 판정을 못 받은 경우(networkFail = fetch 자체가 죽음, 앱을 닫았을 때가
+      // 대표적)만 폴링한다. 402/429/503 처럼 서버가 답을 준 실패는 즉시 보여준다.
+      const recovered = await tryRecoverGeneration({ poll: !!err?.networkFail });
       if (recovered) {
         cancelGenDoneNotice(); // 결과가 화면에 떴으니 알림 불필요
       } else {
@@ -1820,6 +1886,7 @@ export default function PortraitStudio() {
       }
     } finally {
       setGenerating(false);
+      setGenWaiting(false);
     }
   }
 
@@ -2064,6 +2131,7 @@ export default function PortraitStudio() {
         {screen === "result" && selected && (
           <ResultScreen
             generating={generating}
+            genWaiting={genWaiting}
             fourcutProgress={fourcutProgress}
             genCount={isFourcut(selected) ? fourcutCount : batchCount}
             prompt={selected}
@@ -3480,7 +3548,7 @@ function CompareSlider({ before, after }) {
 }
 
 function ResultScreen({
-  generating, fourcutProgress = "", prompt, resultImage, galleryId = null, accessToken = null,
+  generating, genWaiting = false, fourcutProgress = "", prompt, resultImage, galleryId = null, accessToken = null,
   genCount = 1,
   genError, onRetry, onAgain, onHome, showAds = false,
   canTryPro = false, proSampleImg = null, proSampleBusy = false, onTryPro, onUpgrade,
@@ -3673,7 +3741,12 @@ function ResultScreen({
               : `#${prompt.id} · ${localizedTitle(prompt)}`}
           </div>
           <div style={S.genHint}>
-            {genCount > 1
+            {/* 요청이 끊겨 갤러리를 폴링하는 중이면 그 사실을 말해준다. 예전엔 여기서
+                바로 "생성 실패" 로 넘어가 버려서, 실제로는 만들어지고 있는데도
+                사용자는 실패한 줄 알았다. */}
+            {genWaiting
+              ? t("result.generatingResume")
+              : genCount > 1
               ? t("result.generatingHintBatch", { n: genCount })
               : t("result.generatingHint")}
           </div>
