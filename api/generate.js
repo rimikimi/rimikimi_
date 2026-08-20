@@ -529,7 +529,14 @@ export default async function handler(req, res) {
     ? "Re-render the provided image in a new artistic style. " +
       "The subject can be a person, landscape, animal, object, or anything else. " +
       "Preserve the overall composition, subject identity, and recognizable features " +
-      "while transforming the medium/style. Apply the following style:\n" + prompt
+      "while transforming the medium/style. " +
+      // 프레이밍 규칙은 매직 부스 전체에 공통이라 컨셉 프롬프트가 아니라 여기에 둔다
+      // (컨셉 14개에 각각 적어 넣으면 새 컨셉을 추가할 때마다 빠뜨린다).
+      // 실측 2026-08-20: 405 소프트 클레이 3D 가 머리·가슴 사진을 전신 인형으로
+      // 바꿔 내놔서 원본과 결과의 프레이밍이 어긋났다.
+      "Keep the same framing and crop as the provided image — a head-and-shoulders photo stays " +
+      "head-and-shoulders, a full-body photo stays full-body. Do not zoom in or out, and do not " +
+      "re-pose the subject. Apply the following style:\n" + prompt
     : hasSecond
     ? "Using the TWO people in the two provided reference photos, generate a single new photograph " +
       "containing BOTH of them together. The FIRST reference image is the first person and the " +
