@@ -1689,7 +1689,7 @@
 "categories": [
 "🪄 매직 부스"
 ],
-"text": "Re-render the person in the reference photo as a soft-clay 3D character: matte pastel-colored plasticine or polymer clay, gentle rounded shapes, fingerprint texture on the clay surface, miniature handcrafted look (Aardman / Pixar short clay model aesthetic). Keep facial structure, gender, hair shape and clothing recognizable — clearly the same person, just sculpted in clay. Soft studio lighting, shallow depth of field, subtle clay shine, soft drop shadow. Cute, tactile, charming. No photorealism.",
+"text": "Re-render the subject in the reference photo as an obvious handmade plasticine clay model — a stop-motion puppet, not a real subject. Every part sculpted from matte pastel-colored modelling clay: smooth rounded blobby forms, simplified geometry, visible thumbprints and tool marks pressed into the clay surface, tiny glossy bead eyes, seams where clay pieces join, slightly lumpy and imperfect (Aardman / Pixar short clay model aesthetic). Keep the subject recognizable — if it is a person, keep facial structure, gender, hair shape and clothing; if it is an animal, keep its fur color, ear shape and pose. Soft studio lighting, plain pastel backdrop, subtle clay shine, soft drop shadow. Cute, tactile, charming. Absolutely no photorealistic skin or fur texture.",
 "sensitive": false
 },
 {
@@ -1711,7 +1711,7 @@
 "categories": [
 "🪄 매직 부스"
 ],
-"text": "Re-draw the person in the reference photo as if a 5-year-old kindergarten child drew it with chunky oil pastels on rough sketch paper. Big simple shapes, wonky proportions, crayon-thick lines, wax-like color smudges, deliberately childlike — head bigger than body, dot eyes or simple stars, wide smile. Keep the dominant colors of the hair and clothing recognizable so the person is still identifiable as the same subject (e.g, long brown hair → big brown scribble). Visible paper texture, color smears, slightly off-center composition. Joyful, naive, charming.",
+"text": "Re-draw the subject in the reference photo as if a 5-year-old kindergarten child drew it with chunky oil pastels on rough sketch paper. Big simple shapes, wonky proportions, crayon-thick lines, wax-like color smudges, deliberately childlike — oversized head, dot eyes or simple stars, wide smile. Keep the dominant colors and distinctive shape of the subject recognizable — if it is a person, keep the hair and clothing colors (e.g. long brown hair → big brown scribble); if it is an animal, keep its fur color, ear shape and markings. Visible paper texture, color smears, slightly off-center composition. Joyful, naive, charming.",
 "sensitive": false
 },
 {
