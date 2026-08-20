@@ -534,9 +534,12 @@ export default async function handler(req, res) {
       // (컨셉 14개에 각각 적어 넣으면 새 컨셉을 추가할 때마다 빠뜨린다).
       // 실측 2026-08-20: 405 소프트 클레이 3D 가 머리·가슴 사진을 전신 인형으로
       // 바꿔 내놔서 원본과 결과의 프레이밍이 어긋났다.
+      // ⚠️ 예외 조항이 필요하다. 여백을 크게 두는 스타일(787 여백 드로잉)은 피사체를
+      //    일부러 작게 그리는 게 핵심인데, 이 규칙이 그대로면 정면 충돌한다.
       "Keep the same framing and crop as the provided image — a head-and-shoulders photo stays " +
       "head-and-shoulders, a full-body photo stays full-body. Do not zoom in or out, and do not " +
-      "re-pose the subject. Apply the following style:\n" + prompt
+      "re-pose the subject, unless the style below explicitly asks for different framing, " +
+      "scale or negative space. Apply the following style:\n" + prompt
     : hasSecond
     ? "Using the TWO people in the two provided reference photos, generate a single new photograph " +
       "containing BOTH of them together. The FIRST reference image is the first person and the " +
