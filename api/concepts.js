@@ -11,6 +11,7 @@
 // ============================================================
 
 import ALL from "./_data/concepts.json" with { type: "json" };
+import { publishedConcepts } from "./_lib/conceptList.js";
 
 // 앞으로의 드롭 일정 — /api/drops 가 여기로 rewrite 된다.
 // ⚠️ 별도 파일로 두면 Vercel Hobby 의 서버리스 함수 12개 상한을 넘어 배포가
@@ -66,45 +67,10 @@ export default function handler(req, res) {
 
   let list;
   try {
-    list = ALL.filter((c) => {
-      if (!c || !c.publishAt) return true; // 예약 없는 건 이미 공개된 것
-      const t = Date.parse(c.publishAt);
-      return !Number.isFinite(t) || t <= now; // 날짜가 깨졌으면 숨기지 않는다
-    });
-
-    // ⚠️ 정렬은 여기(서버)가 결정한다. 앱은 이 배열 순서를 그대로 그린다.
-    //    정렬 규칙이 앱 안에 박혀 있으면 순서 하나 바꾸는 데도 스토어 심사를
-    //    거쳐야 한다(실제로 그래서 새 컨셉이 목록 뒤로 밀린 채 방치됐다).
-    //    → 규칙을 서버로 옮겨 데이터 배포만으로 바꿀 수 있게 한다.
-    const FEATURE_CATS = ["🪄 매직 부스", "🪪 증명사진", "📸 인생네컷"];
-    const isFeature = (c) => {
-      const cats = c.categories || (c.category ? [c.category] : []);
-      return cats.some((x) => FEATURE_CATS.includes(x)) ||
-        c.mode === "idphoto" || c.mode === "fourcut";
-    };
-    // 추천 줄 고정 자리. 앱은 이 값을 보고 해당 위치에 꽂는다(1 = 첫 번째).
-    // 데이터로만 바꿀 수 있게 서버에 둔다 — 순서 조정에 앱 빌드가 필요 없도록.
-    const PINNED = {
-      408: 2, // 사진 복원 — 추천 두 번째
-    };
-    for (const c of list) {
-      const at = PINNED[Number(c.id)];
-      if (at) c.pinFeatured = at;
-    }
-
-    const rank = (c) => (c.publishAt ? Date.parse(c.publishAt) : 0);
-    list.sort((a, b) => {
-      // 기능 컨셉(매직부스·증명사진·인생네컷)은 항상 뒤로
-      const fa = isFeature(a) ? 1 : 0, fb = isFeature(b) ? 1 : 0;
-      if (fa !== fb) return fa - fb;
-      // 실제 공개 시각이 늦은 것 = 최신 → 앞으로. 같으면 id 큰 순.
-      const ra = rank(a), rb = rank(b);
-      if (ra !== rb) return rb - ra;
-      return Number(b.id) - Number(a.id);
-    });
-
-    // publishAt 은 지우지 않고 그대로 내려준다 — 구버전 앱이 자체 정렬할 때
-    // 쓸 수 있고, 이미 지난 시각이라 숨길 이유도 없다.
+    // 필터·고정핀·정렬은 api/_lib/conceptList.js 에 있다. 빌드 때 오프라인 폴백
+    // (public/concepts.fallback.json)을 굽는 scripts/build-fallback.mjs 가 같은
+    // 함수를 쓰기 때문이다 — 로직이 두 벌이면 폴백이 조용히 어긋난다.
+    list = publishedConcepts(ALL, now);
   } catch (_) {
     list = ALL; // 필터가 어떤 이유로든 터지면 전부 내보낸다 (빈 갤러리보다 낫다)
   }

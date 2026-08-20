@@ -5,10 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "prebuild": "bash scripts/clean-icloud-dupes.sh",
+    "prebuild": "bash scripts/clean-icloud-dupes.sh && node scripts/build-fallback.mjs",
     "build": "vite build",
     "preview": "vite preview",
-    "clean:icloud": "bash scripts/clean-icloud-dupes.sh"
+    "clean:icloud": "bash scripts/clean-icloud-dupes.sh",
+    "build:fallback": "node scripts/build-fallback.mjs"
   },
   "dependencies": {
     "@capacitor-community/admob": "^8.0.0",
