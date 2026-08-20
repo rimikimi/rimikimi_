@@ -1,5 +1,16 @@
 [
 {
+"id": "786",
+"title": "피규러티브 유화",
+"title_en": "Figurative Oil Portrait",
+"category": "🪄 매직 부스",
+"categories": [
+"🪄 매직 부스"
+],
+"sensitive": false,
+"text": "Re-render the provided image as a stylized figurative oil painting in an expressionist manner. Broad gestural brushstrokes that flatten form into bold shapes, warm ochre and coral flesh tones, features suggested rather than detailed, edges left loose and unfinished in places, thick paint built up with visible palette-knife and wide brush marks. Preserve the subject's identity, composition and recognizable features — if it is a person, keep the exact face, hairstyle and pose; if it is an animal, object or scene, keep its distinctive shape and character. Matte deep-green background with no props. Oil on canvas, contemporary figurative painting, introspective and quietly powerful."
+},
+{
 "id": "783",
 "title": "라인 드로잉",
 "title_en": "Line Drawing",
@@ -5379,9 +5390,9 @@
 "id": 330,
 "title": "피규러티브 유화",
 "title_en": "Figurative Oil Portrait",
-"category": "🪄 매직 부스",
+"category": "예술 / 클래식",
 "categories": [
-"🪄 매직 부스"
+"예술 / 클래식"
 ],
 "text": "Stylized figurative oil painting portrait of a woman, face rendered in bold light ochre and coral-flesh toned brushstrokes, serene eyes with defined brows suggested in thick paint strokes, loosely rendered hair swept back in wide gestural marks, champagne gold dress with sculptural neckline built up in impasto paint layers, small earrings hinted at within the painted surface, upper-body portrait composition with eyes softly gazing and arms rest around her face, softly around her head in a resting pose, painted with matte #1f3f30 background with no props, oil on canvas medium, bold contemporary impasto brushwork, expressionist figurative painting style, thick textured paint application with visible palette-knife and wide brush marks, introspective and powerfully sensuous mood, feminine strength rendered in painted form,",
 "sensitive": false
