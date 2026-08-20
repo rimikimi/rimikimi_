@@ -4,7 +4,7 @@ import { isNative, platform, nativePickPhoto, nativeShare, nativeSaveToAlbum } f
 import { initAds, showInterstitial } from "./ads";
 import { initIap, loginIap, logoutIap, getIapPacks, purchaseIap, restoreIap, iapAvailable, isSubscription, getIapDiag } from "./iap";
 import { FOURCUT_COUNTS, FOURCUT_STYLES, fourcutStyle } from "./fourcut";
-import { getSavedSet, markSaved, syncExpiryNotifications, cancelExpiryNotice, syncConceptDropNotifications, cancelGenDoneNotice, notifyGenDoneNow } from "./notify";
+import { getSavedSet, markSaved, syncExpiryNotifications, cancelExpiryNotice, syncConceptDropNotifications, cancelGenDoneNotice, notifyGenDoneNow, getNotifyPermState } from "./notify";
 import { initPush, attachPushHandlers, getPushToken } from "./push";
 import { t, useLang, getLang, localizedTitle, localizedCategory, getLangPreference, setLang } from "./i18n";
 import LoginGate from "./LoginGate";
@@ -785,7 +785,15 @@ export default function PortraitStudio() {
     try {
       const r = await fetch(`${LEGAL_BASE}/api/drops?days=30`, { cache: "no-cache" });
       const drops = await r.json();
-      if (Array.isArray(drops)) await syncConceptDropNotifications(drops, { ask });
+      const n = Array.isArray(drops) ? await syncConceptDropNotifications(drops, { ask }) : 0;
+      // ⚠️ 이 계측이 없어서 "새 컨셉 알림이 안 온다"는 신고에 원인을 못 짚었다.
+      //    권한이 거부됐는지, 예약이 0건인지, 일정을 못 받았는지 구분이 안 됐다.
+      track("notif_state", {
+        perm: getNotifyPermState(),   // granted | denied | prompt | unknown
+        scheduled: n,                 // 예약한 알림 수 (-1 = 예약 자체 실패)
+        drops: Array.isArray(drops) ? drops.length : -1,
+        asked: !!ask,
+      });
     } catch (_) { /* 알림 예약 실패는 앱 동작과 무관 */ }
   }, []);
 

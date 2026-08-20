@@ -53,15 +53,22 @@ function getPlugin() {
 
 // ask=false 면 이미 허용된 경우에만 true 를 주고 팝업은 띄우지 않는다.
 // (앱 첫 화면에서 맥락 없이 묻지 않기 위해 — push.js 의 같은 이유)
+// 마지막으로 확인한 권한 상태 — 계측·안내용. "denied" 면 앱에서 다시 물어볼 수
+// 없고 사용자가 시스템 설정에서 직접 켜야 한다.
+let lastPermState = "unknown";
+export function getNotifyPermState() { return lastPermState; }
+
 export async function ensureNotifyPermission(ask = true) {
   const LN = await getPlugin();
   if (!LN) return false;
   try {
     let p = await LN.checkPermissions();
+    lastPermState = p.display || "unknown";
     if (p.display !== "granted") {
       if (!ask || permAsked) return false;
       permAsked = true;
       p = await LN.requestPermissions();
+      lastPermState = p.display || "unknown";
     }
     return p.display === "granted";
   } catch {
@@ -129,9 +136,9 @@ function localDropTime(publishMs) {
 // 일정이 바뀔 수 있으므로 예약을 매번 통째로 다시 깐다.
 export async function syncConceptDropNotifications(drops, { ask = true } = {}) {
   const LN = await getPlugin();
-  if (!LN) return;
+  if (!LN) return 0;
   const ok = await ensureNotifyPermission(ask);
-  if (!ok) return;
+  if (!ok) return 0;
 
   const now = Date.now();
   const notifications = [];
@@ -157,8 +164,10 @@ export async function syncConceptDropNotifications(drops, { ask = true } = {}) {
       notifications: Array.from({ length: DROP_ID_MAX }, (_, i) => ({ id: DROP_ID_BASE + i })),
     });
     if (notifications.length) await LN.schedule({ notifications });
+    return notifications.length;
   } catch {
     /* 예약 실패는 조용히 무시 — 컨셉 공개 자체와는 무관 */
+    return -1;
   }
 }
 
