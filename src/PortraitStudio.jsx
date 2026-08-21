@@ -2651,6 +2651,12 @@ function GalleryScreen({
                   </div>
                 )}
               </div>
+              {/* 썸네일만 있으면 그게 무슨 컨셉인지 알 수가 없다 — 특히 매직 부스처럼
+                  스타일 변환만 보여주는 카테고리에서 심했다(오너 신고 2026-08-22).
+                  이미지 아래에 제목을 붙인다. 길면 한 줄로 자른다. */}
+              <div style={{ ...S.cardTitle, fontSize: cols === 2 ? 12.5 : 10.5 }}>
+                {localizedTitle(p)}
+              </div>
             </button>
           ))}
         </div>
@@ -4929,6 +4935,12 @@ const S = {
   thumb: {
     aspectRatio: "3/4", position: "relative", overflow: "hidden",
     background: "#f0ece4",
+  },
+  cardTitle: {
+    padding: "7px 9px 8px",
+    fontWeight: 700, color: INK, lineHeight: 1.3,
+    // 제목이 길어도 카드 높이가 들쭉날쭉해지지 않게 한 줄로 자른다
+    whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
   },
   thumbImg: {
     width: "100%", height: "100%", objectFit: "cover", display: "block",
