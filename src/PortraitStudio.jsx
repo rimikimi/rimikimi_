@@ -4709,7 +4709,11 @@ const S = {
     margin: "0 -20px", paddingLeft: 20, paddingRight: 20,
   },
   railCard: {
-    flexShrink: 0, width: 110, aspectRatio: "3/4",
+    // featuredCard 와 같은 이유 — 고정 110px 이면 기기 폭에 따라 2.91~3.46 장으로
+    //    들쭉날쭉했고, iPhone 14(390pt)에서는 3.03 장이라 딱 세 장으로 떨어져
+    //    옆에 더 있다는 게 안 보였다. 어디서나 3.4 장이 보이게 고정한다.
+    //    24px = gap 8 × 3.
+    flexShrink: 0, width: "calc((100% - 24px) / 3.4)", aspectRatio: "3/4",
     background: "#f0ece4", borderRadius: 12, overflow: "hidden",
     border: "none", padding: 0, cursor: "pointer", position: "relative",
     scrollSnapAlign: "start",
@@ -4718,7 +4722,12 @@ const S = {
     width: "100%", height: "100%", objectFit: "cover", display: "block",
   },
   featuredCard: {
-    flexShrink: 0, width: 200, aspectRatio: "3/4",
+    // ⚠️ 예전엔 width:200 고정이었다. 컨텐츠 폭이 ~390 이라 두 장(200+12+200=412)이
+    //    거의 꽉 차서 세 번째가 5% 만 보였고, 사용자는 옆으로 넘어가는 줄을 몰랐다
+    //    (오너 신고 2026-08-21). 고정 px 은 기기 폭이 바뀌면 몇 장이 보일지도 바뀐다.
+    // → 컨테이너 비율로 잡아 어떤 폭에서도 2.4장이 보이게 한다. 0.4장이 잘려 보이는
+    //    것 자체가 "옆에 더 있다" 는 신호다. 24px = gap 12 × 2.
+    flexShrink: 0, width: "calc((100% - 24px) / 2.4)", aspectRatio: "3/4",
     background: "#f0ece4", borderRadius: 16, overflow: "hidden",
     border: "none", padding: 0, cursor: "pointer", position: "relative",
     scrollSnapAlign: "start",
