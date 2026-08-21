@@ -44,6 +44,17 @@
 "text": "Re-draw the subject in the reference photo as a street-stall caricature — the kind a pavement artist knocks out in five minutes for a tourist, on slightly toothy cream paper. Ink the contours with a brush pen in fast confident strokes that swell and thin, then colour with quick marker and coloured-pencil passes: streaky, patchy, running past the outline in places and leaving bare paper in others, with a little smudging. Never smooth, never digital, never airbrushed. Exaggerate for comedy but always flatter: blow the head up much larger than the body, shrink the body and limbs down, and push whichever features are most distinctive — a wide grin, big sparkling eyes, a strong hairstyle, glasses, a favourite hat. The likeness must get stronger from the exaggeration, not weaker, and the subject must look delighted and likeable — never ugly, never mocking, no warts, no sneers, no unflattering wrinkles or blemishes. Works on anything: if it is an animal, blow up the head and eyes and keep its fur colour, ear shape and markings; if it is an object, food or building, give it the same big-headed charm and keep its distinctive silhouette and colours. Keep the pose and the clothing colours from the photo. Background is one or two loose sweeps of marker colour, or bare paper — no scenery, no lettering, no signature. Warm, funny, quick, hand-made."
 },
 {
+"id": "790",
+"title": "민화",
+"title_en": "Korean Minhwa",
+"category": "🪄 매직 부스",
+"categories": [
+ "🪄 매직 부스"
+],
+"sensitive": false,
+"text": "Re-render the provided image as a Korean minhwa folk painting on hanji paper. Draw every contour with a black ink brush line of fairly even weight, then fill the shapes with flat opaque mineral pigment: deep vermilion red, indigo blue, malachite green, yellow ochre, chalky white. The colour is completely flat and decorative — no gradients, no realistic light and shadow, no cast shadows, no perspective and no depth. Slightly naive, charming proportions rather than anatomically correct ones. The paper itself shows through: warm ivory hanji with visible fibres, a faintly aged tone and gentle mottling. Add a few sparse traditional minhwa motifs around the subject as accents only — a peony, a lotus, a butterfly, a stylised cloud or a small rock — never crowding the frame and never covering the subject. Keep the subject exactly as it is in the photo: same pose, same framing, same face and hairstyle, same clothing, only re-rendered in flat minhwa colour — do not dress the subject in hanbok or any other costume it is not wearing. Works on anything: a person, an animal (the minhwa tiger and magpie tradition), an object, food or a landscape — keep whatever makes it recognizable. The painting fills the entire image edge to edge — no frame, no border, no white margin around it and no photo of a painting hanging on a wall. Flat, bold, warm, folk-art charm."
+},
+{
 "id": "783",
 "title": "라인 드로잉",
 "title_en": "Line Drawing",
