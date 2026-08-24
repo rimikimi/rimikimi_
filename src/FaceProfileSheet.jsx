@@ -34,8 +34,11 @@ const REGEN_MAX = 2;
 
 const INK = "#231f20";
 
-// 촬영본은 저장·전송 모두 장변 1024px 로 줄인다 (§2-3 "장변 1024px로 축소 후 전송").
-function shrink(dataUrl, max = 1024, q = 0.88) {
+// 촬영본은 전송 전에 장변 1280px 로 줄인다. (기기·서버 어디에도 저장하지 않는다 —
+// 앵커를 만드는 데 한 번 쓰이고 버려진다.)
+// 1024/q0.88 이었는데, 그 해상도면 셀카에서 얼굴이 차지하는 픽셀이 400px 남짓이라
+// 눈매·피부결 같은 정체성 디테일이 모델에 도달하기 전에 이미 뭉갠 상태로 올라갔다.
+function shrink(dataUrl, max = 1280, q = 0.92) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
@@ -436,8 +439,11 @@ const S = {
   },
   previewRow: { display: "flex", gap: 8, justifyContent: "center", marginBottom: 12, flexWrap: "wrap" },
   preview: { width: 84, aspectRatio: "3/4", objectFit: "cover", borderRadius: 12 },
+  // "이 얼굴이 맞아요?" 는 화질까지 보고 판단하는 화면이다. 190px 짜리 썸네일로는
+  // 판단이 불가능해서 크게 띄운다. aspectRatio+cover 로 자르면 모델이 정사각으로
+  // 돌려줬을 때 머리가 잘리므로 원본 비율 그대로 둔다.
   anchorImg: {
-    width: 190, aspectRatio: "3/4", objectFit: "cover", borderRadius: 16,
+    width: "100%", maxWidth: 300, height: "auto", display: "block", borderRadius: 16,
     border: "3px solid #1a7f4b", boxShadow: "0 10px 28px -12px rgba(35,31,32,0.35)",
   },
   anchorLoading: {

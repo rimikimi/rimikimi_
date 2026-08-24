@@ -1,4 +1,5 @@
-import React, { useState, useRef, useMemo, useEffect, useCallback } from "react";
+import React, { useState, useRef, useMemo, useEffect, useLayoutEffect, useCallback } from "react";
+import * as nav from "./navTransition";
 import { supabase } from "./supabaseClient";
 import { isNative, platform, nativePickPhoto, nativeShare, nativeSaveToAlbum } from "./nativeBridge";
 import { initAds, showInterstitial } from "./ads";
@@ -709,7 +710,36 @@ function BottomNav({ screen, go }) {
 export default function PortraitStudio() {
   useLang(); // 언어 변경 시 컴포넌트 트리 리렌더
   const [booting, setBooting] = useState(true);
-  const [screen, setScreen] = useState("gallery");
+  const [screen, _setScreen] = useState("gallery");
+  // ── 화면 전환 ──
+  // setScreen 은 래핑돼 있다: 화면을 떠나기 **직전에** 현재 화면의 DOM 스냅샷을 떠서
+  // navTransition 에 넘긴다(리렌더 후엔 이전 화면이 이미 사라져 못 뜬다).
+  // 방향은 ref 로 읽는다 — setNavDir 은 비동기라 같은 핸들러 안에서 바로 못 읽는다.
+  const appRef = useRef(null);
+  const mainRef = useRef(null);
+  const screenRef = useRef("gallery");
+  const navDirRef = useRef("fwd");
+  const lastDirRef = useRef("fwd");
+  const setScreen = useCallback((next) => {
+    const cur = screenRef.current;
+    if (next === cur) return;
+    const dir = navDirRef.current;
+    navDirRef.current = "fwd"; // "back" 은 1회용
+    lastDirRef.current = dir;  // 전환 재생 시점(useLayoutEffect)에서 읽는다
+    nav.capture(appRef.current, mainRef.current, cur, dir);
+    screenRef.current = next;
+    _setScreen(next);
+  }, []);
+  // 뒤로 가는 화면 이동(헤더 뒤로 버튼 등) — pop 으로 재생된다
+  const popTo = useCallback((next) => {
+    navDirRef.current = "back";
+    setScreen(next);
+  }, [setScreen]);
+  // 탭바 이동 — iOS 탭 전환에는 방향이 없다. 가로로 밀지 않고 부드럽게 바뀐다.
+  const goTab = useCallback((next) => {
+    navDirRef.current = "tab";
+    setScreen(next);
+  }, [setScreen]);
   // photo: 사용자가 업로드한 본인 사진 (프로필 = 입력 사진, 같은 값)
   // localStorage 에 자동 저장돼서 다음 방문 / 새 탭에서도 그대로 살아있음
   const [photo, setPhoto] = useState(() => {
@@ -737,7 +767,10 @@ export default function PortraitStudio() {
   const [batchCount, setBatchCount] = useState(1);
   const [resultBatch, setResultBatch] = useState(null);
   const [selected, setSelected] = useState(null);
-  const [navDir, setNavDir] = useState("fwd"); // 화면 전환 방향 (뒤로가기 애니메이션용)
+  // 화면 전환 방향. 실제 재생은 navDirRef 를 읽는 setScreen 이 하고,
+  // 이 state 는 data-navdir 속성(스타일 훅)만 담당한다.
+  const [navDir, _setNavDir] = useState("fwd");
+  const setNavDir = useCallback((d) => { navDirRef.current = d; _setNavDir(d); }, []);
   const [showBrooklyn, setShowBrooklyn] = useState(false); // 증명사진 → Brooklyn 유도 모달
   // 로그인 시트 — 비로그인으로 컨셉·사진까지 고르고 "다음"을 누른 순간 뜬다.
   // 그 전(둘러보기·컨셉 선택·사진 업로드)까진 비로그인으로 전부 가능.
@@ -778,7 +811,6 @@ export default function PortraitStudio() {
   const [resultGalleryId, setResultGalleryId] = useState(null);
   const lastGenRef = useRef(null); // { photo, promptText, meta } — 무료 Pro 체험 재호출용
   const fileRef = useRef(null);
-  const mainRef = useRef(null);
 
   // ─── 로그인 세션 ───
   // ⚠️ 로그인은 게이트가 아니다 — 둘러보기·컨셉 선택·사진 업로드까지는 session 없이도 전부 된다.
@@ -1232,9 +1264,13 @@ export default function PortraitStudio() {
     if (!categories.some((c) => c.name === activeCat)) setActiveCat("전체");
   }, [categories, activeCat]);
 
-  // 화면 전환 시 내부 스크롤을 맨 위로 (이전 화면 스크롤 위치 잔존 방지)
-  useEffect(() => {
-    if (mainRef.current) mainRef.current.scrollTop = 0;
+  // 화면이 바뀐 직후 — 페인트 전에 (1) 스크롤 위치를 잡고 (2) push/pop 전환을 재생한다.
+  // useEffect(페인트 후)로 하면 새 화면이 제자리에 한 프레임 보였다가 튀어 들어간다.
+  // 뒤로 갈 때는 iOS 처럼 그 화면에서 보던 스크롤 위치를 복원한다(앞으로 갈 땐 맨 위).
+  useLayoutEffect(() => {
+    const el = mainRef.current;
+    if (el) el.scrollTop = lastDirRef.current === "back" ? nav.savedScroll(screen) : 0;
+    nav.run(appRef.current, el);
   }, [screen]);
 
   function resetFilters() {
@@ -1529,6 +1565,19 @@ export default function PortraitStudio() {
     setScreen("store");
   }
 
+  // 뒤로가기 목적지만 계산 (엣지 스와이프가 시작 시점에 "뒤에 깔 화면"을 알아야 한다)
+  function backTarget() {
+    if (screen === "confirm") return "home";
+    if (screen === "home" || screen === "result" || screen === "profile") return "gallery";
+    if (screen === "mygallery") return "profile";
+    if (screen === "store") {
+      const from = storeFromRef.current;
+      if (from && from !== "store" && (from !== "confirm" || selected)) return from;
+      return selected ? "confirm" : "gallery";
+    }
+    return null;
+  }
+
   // ── 화면별 뒤로가기 목적지 (뒤로가기 애니메이션 방향도 설정) ──
   function goBack() {
     setNavDir("back");
@@ -1561,19 +1610,21 @@ export default function PortraitStudio() {
     return !showBrooklyn && !showLoginSheet && screen !== "gallery";
   }
 
-  // 끄는 동안 본문을 따라 움직이게 (리렌더 없이 DOM 직접 조작 — 60fps 유지)
+  // 컨셉 넘기기(좌우 스와이프)용 단순 드래그. 뒤로가기는 아래 popRef(인터랙티브 pop)가 맡는다.
   function paintDrag(px, animate) {
     const el = mainRef.current;
     if (!el) return;
-    // 두 속성의 이징을 맞춘다 — 예전엔 opacity 만 기본 ease 라 미묘하게 어긋났다.
     el.style.transition = animate
       ? "transform var(--d-enter) var(--ease-out), opacity var(--d-enter) var(--ease-out)"
       : "";
     el.style.transform = px ? `translateX(${px}px)` : "";
-    el.style.opacity = px ? String(Math.max(0.35, 1 - px / 520)) : "";
+    el.style.opacity = px ? String(Math.max(0.35, 1 - Math.abs(px) / 520)) : "";
   }
+  // 진행 중인 인터랙티브 pop 컨트롤러 (navTransition.beginPop 반환값)
+  const popRef = useRef(null);
   function endDrag() {
     swipeRef.current = null;
+    if (popRef.current) { popRef.current.cancelNow(); popRef.current = null; return; }
     paintDrag(0, true);
     setTimeout(() => { const el = mainRef.current; if (el) el.style.transition = ""; }, 240);
   }
@@ -1611,9 +1662,21 @@ export default function PortraitStudio() {
       if (s.axis === "y") { swipeRef.current = null; return; }
     }
     s.dx = dx;
+    // 손가락 속도는 마지막 구간으로 잰다 — 전체 평균으로 재면 천천히 끌다 튕겨도 느리게 판정된다
+    const now = Date.now();
+    if (s.lastT && now > s.lastT) s.v = (dx - s.lastX) / (now - s.lastT);
+    s.lastX = dx; s.lastT = now;
+
     if (s.mode === "back") {
-      // 왼쪽으로 되돌리면 0 에 붙임
-      paintDrag(dx <= 0 ? 0 : Math.min(dx, s.w * 0.9), false);
+      // 첫 유효 이동에서 인터랙티브 pop 시작 — 이전 화면 스냅샷을 뒤에 깐다
+      if (!s.popStarted) {
+        s.popStarted = true;
+        const target = backTarget();
+        popRef.current = target ? nav.beginPop(appRef.current, mainRef.current, target) : null;
+      }
+      const px = dx <= 0 ? 0 : dx;
+      if (popRef.current) popRef.current.move(px);
+      else paintDrag(Math.min(px, s.w * 0.9), false); // 스냅샷이 없으면 예전 방식
     } else {
       // 컨셉 넘기기는 양방향 — 끝에서 고무줄처럼 저항
       paintDrag(Math.max(-s.w * 0.5, Math.min(dx, s.w * 0.5)) * 0.9, false);
@@ -1624,13 +1687,21 @@ export default function PortraitStudio() {
     const s = swipeRef.current;
     if (!s) return;
     const dx = s.dx || 0;
-    const v = Math.abs(dx) / Math.max(1, Date.now() - s.t0); // px/ms
+    // 마지막 구간 속도가 있으면 그걸, 없으면 전체 평균 (px/ms)
+    const vLast = s.v || 0;
+    const v = Math.abs(vLast) > 0.05 ? Math.abs(vLast) : Math.abs(dx) / Math.max(1, Date.now() - s.t0);
     swipeRef.current = null;
 
     if (s.mode === "back") {
       // 충분히 끌었거나(32%) 짧아도 빠르게 튕겼으면(60px + 속도) 뒤로
-      if (dx > s.w * 0.32 || (dx > 60 && v > 0.35)) {
-        paintDrag(0, false); // slideBack 애니메이션과 겹치지 않게 즉시 원위치
+      const commit = dx > s.w * 0.32 || (dx > 60 && vLast > 0.35);
+      const ctrl = popRef.current;
+      if (ctrl) {
+        // 남은 거리를 손가락 속도에 맞춘 시간으로 마저 재생 → 손에서 안 떨어진 느낌
+        popRef.current = null;
+        ctrl.finish(commit, v, () => goBack());
+      } else if (commit) {
+        paintDrag(0, false);
         const el = mainRef.current;
         if (el) el.style.opacity = "";
         goBack();
@@ -1683,14 +1754,11 @@ export default function PortraitStudio() {
     return () => { if (sub) sub.remove(); clearTimeout(timer); };
   }, []);
 
-  // 화면이 바뀌면 스와이프 중 남은 인라인 스타일을 반드시 지운다.
-  // (main 엘리먼트는 화면이 바뀌어도 그대로라, 남으면 다음 화면이 밀려 보인다)
+  // 화면이 바뀌면 스와이프 중 남은 상태를 버린다.
+  // ⚠️ main 의 인라인 스타일은 여기서 지우지 않는다 — 전환 애니메이션이 그 스타일
+  //    (z-index/배경/그림자)로 두 겹을 겹쳐놓는 중이라, 지우면 레이어가 깨진다.
+  //    정리는 navTransition 의 endTransition 이 애니메이션이 끝난 뒤에 한다.
   useEffect(() => {
-    const el = mainRef.current;
-    if (!el) return;
-    el.style.transition = "";
-    el.style.transform = "";
-    el.style.opacity = "";
     swipeRef.current = null;
   }, [screen]);
 
@@ -2009,6 +2077,7 @@ export default function PortraitStudio() {
 
   return (
     <div
+      ref={appRef}
       style={S.app}
       data-navdir={navDir}
       onTouchStart={onTouchStartRoot}
@@ -2030,7 +2099,7 @@ export default function PortraitStudio() {
       <header style={S.header}>
         <button
           style={S.logoBtn}
-          onClick={() => setScreen("gallery")}
+          onClick={() => popTo("gallery")}
           aria-label="홈"
         >
           <Logo height={35} />
@@ -2091,7 +2160,7 @@ export default function PortraitStudio() {
               ageConfirmed={ageConfirmed}
               setAgeConfirmed={setAgeConfirmed}
               onContinue={handleContinueFromHome}
-              onBack={() => setScreen("gallery")}
+              onBack={() => popTo("gallery")}
               showAds={showAds}
             />
           );
@@ -2141,7 +2210,7 @@ export default function PortraitStudio() {
             fourcut={isFourcut(selected)}
             fourcutCount={fourcutCount} setFourcutCount={setFourcutCount}
             fourcutStyleKey={fourcutStyleKey} setFourcutStyleKey={setFourcutStyleKey}
-            onBack={() => setScreen("home")}
+            onBack={() => popTo("home")}
             onGenerate={startGenerate}
             onStore={PAYMENTS_ENABLED ? openStore : () => { setPayToast("오늘 무료 횟수를 다 썼어요. 친구 초대로 크레딧을 받아보세요 🙂"); setTimeout(() => setPayToast(""), 3500); }}
           />
@@ -2158,7 +2227,7 @@ export default function PortraitStudio() {
             accessToken={session?.access_token}
             genError={genError}
             onRetry={startGenerate}
-            onAgain={() => setScreen("gallery")}
+            onAgain={() => popTo("gallery")}
             onHome={resetToHome}
             showAds={showAds}
             canTryPro={canTryPro}
@@ -2192,7 +2261,7 @@ export default function PortraitStudio() {
             untilNext={untilNext}
             onInvite={shareInvite}
             inviteMsg={inviteMsg}
-            onBack={() => setScreen("gallery")}
+            onBack={() => popTo("gallery")}
             onOpenGallery={() => setScreen("mygallery")}
             onOpenStore={PAYMENTS_ENABLED ? openStore : null}
             onLogout={handleLogout}
@@ -2203,7 +2272,7 @@ export default function PortraitStudio() {
         {screen === "mygallery" && (
           <MyGalleryScreen
             accessToken={session?.access_token}
-            onBack={() => setScreen("profile")}
+            onBack={() => popTo("profile")}
             onShared={() => setRefreshTick((n) => n + 1)}
             onLoginRequest={() => setShowLoginSheet(true)}
           />
@@ -2215,7 +2284,7 @@ export default function PortraitStudio() {
             session={session}
             freeLimit={freeLimit}
             onCredited={() => setRefreshTick((n) => n + 1)}
-            onBack={() => setScreen(selected ? "confirm" : "gallery")}
+            onBack={() => popTo(selected ? "confirm" : "gallery")}
           />
         )}
       </main>
@@ -2240,7 +2309,7 @@ export default function PortraitStudio() {
         </footer>
       )}
 
-      <BottomNav screen={screen} go={setScreen} />
+      <BottomNav screen={screen} go={goTab} />
 
       {showBrooklyn && (
         <div style={S.bkBackdrop} onClick={() => setShowBrooklyn(false)}>
@@ -4837,13 +4906,14 @@ const S = {
     background: "rgba(20,16,16,0.44)",
     backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)",
     display: "flex", alignItems: "center", justifyContent: "center",
-    padding: 24, animation: "fadeIn var(--d-swap) var(--ease-out)",
+    // ⚠️ 전체화면 딤에 fadeIn(translateY 포함)을 쓰면 안 된다 — 화면 전체가 8px 밀려 올라온다.
+    padding: 24, animation: "dimIn var(--d-swap) var(--ease-out)",
   },
   bkCard: {
     width: "100%", maxWidth: 340, background: "#fff",
     borderRadius: 24, padding: "30px 24px 20px", textAlign: "center",
     boxShadow: "0 24px 60px -12px rgba(20,16,16,0.5)",
-    animation: "bkPop var(--d-enter) var(--ease-out) both",
+    animation: "bkPop var(--d-swap) var(--ease-out) both",
   },
   bkBadge: { fontSize: 40, marginBottom: 12, lineHeight: 1 },
   bkTitle: { fontFamily: "'Jua', sans-serif", fontSize: 21, color: INK, marginBottom: 10 },
@@ -4866,7 +4936,8 @@ const S = {
     background: "rgba(20,16,16,0.44)",
     backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)",
     display: "flex", alignItems: "flex-end", justifyContent: "center",
-    animation: "fadeIn var(--d-swap) var(--ease-out)",
+    // 딤은 시트가 올라오는 시간에 맞춰 같이 들어온다 (따로 놀면 두 동작으로 보인다)
+    animation: "dimIn var(--d-sheet) var(--ease-drawer)",
   },
   loginSheetCard: {
     width: "100%", maxWidth: 440, background: "#fffdf9",
@@ -5282,21 +5353,27 @@ body { margin: 0; background: ${BG}; }
    진입·반응은 전부 --ease-out 하나로 통일하고, duration 도 척도로 묶는다.
    ⚠️ 새 애니메이션을 넣을 때 숫자를 직접 쓰지 말고 이 토큰을 쓸 것. */
 :root {
-  --ease-out: cubic-bezier(0.23,1,0.32,1);      /* 진입·반응 = 기본값 */
-  --ease-drawer: cubic-bezier(0.32,0.72,0,1);   /* 시트·드로어 */
+  /* iOS 곡선 한 벌. easeOutQuint(0.23,1,0.32,1) 를 쓰던 때는 초반이 너무 급해서
+     "탁 튀고 멈추는" 웹 느낌이 났다. UIKit 이 쓰는 감속 곡선에 가깝게 맞춘다. */
+  --ease-out: cubic-bezier(0.32,0.72,0,1);      /* 진입·반응·전환 = 기본값 */
+  --ease-drawer: cubic-bezier(0.32,0.72,0,1);   /* 시트·드로어 (동일) */
   --ease-pop: cubic-bezier(.34,1.4,.64,1);      /* 스플래시 등 튕김이 의도된 곳만 */
-  --d-press: 110ms;   /* 눌림 */
-  --d-swap: 140ms;    /* 짧은 교체·페이드 */
-  --d-enter: 260ms;   /* 화면·카드 진입 */
-  --d-reveal: 320ms;  /* 결과 등장 */
-  --d-sheet: 320ms;   /* 시트 올라옴 */
+  --d-press: 90ms;    /* 눌림 */
+  --d-swap: 180ms;    /* 짧은 교체·페이드 */
+  --d-enter: 300ms;   /* 카드·콘텐츠 진입 */
+  --d-reveal: 340ms;  /* 결과 등장 */
+  --d-sheet: 420ms;   /* 시트 올라옴 — iOS 시트는 생각보다 길다 */
 }
 
 .fade { animation: fadeIn var(--d-enter) var(--ease-out) both; padding-top: 18px; }
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(12px); }
+  from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
+/* push/pop 전환 중에는 화면 자체 진입 애니메이션을 끈다.
+   화면이 오른쪽에서 들어오는 동시에 내용이 또 위로 떠오르면 두 번 움직여 어지럽다. */
+[data-navanim="1"] .fade,
+[data-navanim="1"] .cardIn { animation: none !important; }
 /* ⚠️ filter: blur() 를 애니메이션하면 안 된다 — 합성이 아니라 매 프레임 리페인트라
    결과 이미지(2K)에서 프레임이 눈에 띄게 드랍됐다. transform/opacity 만 쓴다. */
 .resultReveal { animation: resultReveal var(--d-reveal) var(--ease-out) both; }
@@ -5309,15 +5386,15 @@ body { margin: 0; background: ${BG}; }
   from { opacity: 0; transform: translateY(12px) scale(.97); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
-/* 뒤로가기(엣지 스와이프) — 이전 화면이 왼쪽에서 들어옴 */
-[data-navdir="back"] .fade { animation: slideBack var(--d-enter) var(--ease-out) both; }
-@keyframes slideBack {
-  from { opacity: 0; transform: translateX(-20px); }
-  to { opacity: 1; transform: translateX(0); }
-}
+/* 뒤로가기는 navTransition 의 진짜 pop(두 화면이 같이 움직임)이 담당한다.
+   예전엔 .fade 를 translateX(-20px) 로 흉내냈는데, 나가는 화면이 그냥 사라져서
+   "슬쩍 밀린 새 페이지" 로만 보였다. */
+/* 전체화면 딤 전용 — 위치는 그대로 두고 불투명도만 (fadeIn 은 translateY 가 섞여 있다) */
+@keyframes dimIn { from { opacity: 0; } to { opacity: 1; } }
+/* iOS 얼럿 등장 — 살짝 큰 상태에서 제자리로 줄어든다 (작은 데서 커지면 안드로이드/웹 느낌) */
 @keyframes bkPop {
-  from { opacity: 0; transform: scale(.9) translateY(8px); }
-  to { opacity: 1; transform: scale(1) translateY(0); }
+  from { opacity: 0; transform: scale(1.08); }
+  to { opacity: 1; transform: scale(1); }
 }
 /* 로그인 시트 — iOS 느낌의 드로어 곡선(transform 만, GPU) */
 @keyframes sheetUp {
@@ -5348,14 +5425,19 @@ body { margin: 0; background: ${BG}; }
   animation: bounce 1s ease-in-out infinite;
 }
 input[type=checkbox] { cursor: pointer; }
-/* ⚠️ box-shadow 트랜지션을 빼야 한다 — 페인트 속성이라 버튼을 누를 때마다
-   리페인트가 걸린다. 합성 가능한 transform/opacity 만 남긴다. */
+/* 눌림 반응 — iOS 규칙:
+   ① 누르는 순간은 **즉시** 반응하고(transition-duration:0), 뗄 때만 부드럽게 돌아온다.
+      예전엔 눌림에도 110ms 이징이 걸려서 탭이 한 박자 늦게 먹는 느낌이었다.
+   ② 기본은 스케일이 아니라 **딤(opacity)** 이다. 바 버튼·텍스트 링크까지 전부 쪼그라들면
+      네이티브가 아니라 CSS 프레임워크처럼 보인다. 타일(컨셉 카드)만 살짝 눌린다.
+   ⚠️ box-shadow 트랜지션은 넣지 않는다 — 페인트 속성이라 누를 때마다 리페인트가 걸린다. */
 button {
   -webkit-touch-callout: none;
   -webkit-user-select: none; user-select: none;
-  transition: transform var(--d-press) var(--ease-out), opacity var(--d-press) var(--ease-out);
+  transition: transform 260ms var(--ease-out), opacity 260ms var(--ease-out);
 }
-button:active { transform: scale(0.965); opacity: 0.92; }
+button:active { transition-duration: 0s; opacity: 0.62; }
+.cardIn:active { transform: scale(0.965); opacity: 0.9; }
 ::-webkit-scrollbar { height: 0; width: 0; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }

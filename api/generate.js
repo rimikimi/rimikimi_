@@ -41,6 +41,26 @@ async function shrinkOutput(base64, mime) {
   }
 }
 
+// 페이스 프로필 앵커 전용 축소.
+// 일반 결과물(1024/q82)보다 크고 곱게 남긴다 — 앵커는 사용자가 화질을 직접 확인하고,
+// 이후 모든 생성에 얼굴 참조로 다시 올라가는 원본이기 때문이다.
+// 4:4:4(색 서브샘플링 없음) = 피부/입술 경계 색번짐 방지, mozjpeg = 같은 화질에 더 작은 용량.
+// 1536 은 매 생성 요청에 다시 실려도 본문 용량이 안전한 상한선이다.
+async function shrinkAnchor(base64, mime) {
+  try {
+    const sharp = (await import("sharp")).default;
+    const out = await sharp(Buffer.from(base64, "base64"))
+      .rotate()
+      .resize(1536, 2048, { fit: "inside", withoutEnlargement: true })
+      .jpeg({ quality: 92, mozjpeg: true, chromaSubsampling: "4:4:4" })
+      .toBuffer();
+    return { base64: out.toString("base64"), mime: "image/jpeg", bytes: out.length };
+  } catch (e) {
+    console.error("[shrinkAnchor failed, using original]", e?.message || e);
+    return { base64, mime, bytes: 0 };
+  }
+}
+
 // 입력 사진의 가로세로 비율(w/h). 헤더 파싱 실패 시 null.
 function srcAspect(base64, mime) {
   try {
@@ -320,11 +340,19 @@ export default async function handler(req, res) {
       "Create ONE neutral front-facing portrait of this person, like a casual ID reference photo: " +
       "facing the camera directly, neutral relaxed expression, shoulders-up framing, " +
       "plain light neutral wall background, soft even indoor light. " +
+      // 정체성(=골격/이목구비 배치)은 절대 건드리지 않고, 피부는 화보 리터처가 하는
+      // 수준으로 정리한다. 앵커는 이후 모든 생성의 얼굴 원본이 되기 때문에, 여기에
+      // 여드름·잡티가 박히면 만드는 사진마다 그대로 따라간다. (본문 SKIN 규칙과 동일 기준)
       "CRITICAL — reproduce this person's real facial identity EXACTLY as seen in the " +
-      (n > 1 ? "references" : "reference") + ": same bone structure, eye shape, nose, lips, jaw, " +
-      "and keep their real skin as it is — including freckles, moles and texture. " +
-      "Do NOT beautify, do NOT add makeup, do NOT retouch or smooth the skin, do NOT slim the face. " +
-      "It must look like a plain honest photo of this exact person, not a glamour shot.";
+      (n > 1 ? "references" : "reference") + ": same bone structure, eye shape and spacing, nose, " +
+      "lips, jawline, face width and proportions, hairline, and their real skin tone and undertone. " +
+      "Do NOT slim the face, do NOT enlarge the eyes, do NOT change any facial proportion, " +
+      "do NOT add makeup, do NOT turn it into a glamour shot. " +
+      "SKIN — retouch it the way a professional retoucher would: cleanly remove acne, pimples, " +
+      "temporary spots, blemishes, blotchy redness and dark under-eye circles, and even out the " +
+      "skin tone into clear healthy skin. Keep pore texture and fine skin detail visible — " +
+      "never blurred, plastic, waxy or airbrushed flat. " +
+      "It must look like this exact person on a good skin day, in plain honest lighting.";
 
     const anchorBody = {
       contents: [{
@@ -355,10 +383,12 @@ export default async function handler(req, res) {
 
     // 앵커는 이후 모든 생성의 기준이라 품질이 중요 → Pro 우선, 실패 시 base 폴백.
     // (base 는 2K 설정을 안 받으므로 generationConfig 를 뺀 본문으로 호출)
+    let anchorModel = "gemini-3-pro-image";
     let inline = await callAnchor("gemini-3-pro-image", 60000);
     if (!inline) inline = await callAnchor("gemini-3-pro-image", 40000);
     if (!inline) {
       const { generationConfig, ...baseBody } = anchorBody;
+      anchorModel = "gemini-3.1-flash-image";
       inline = await callAnchor("gemini-3.1-flash-image", 30000, baseBody);
     }
     if (!inline) {
@@ -370,10 +400,14 @@ export default async function handler(req, res) {
 
     admin.from("usage_log").insert({ user_id: user.id, kind: "face_anchor" })
       .then(() => {}).catch(() => {});
-    // 비보관 증명 로그 — 장수만 남긴다 (§2-3).
-    console.log(`[generate] faceAnchor shots=${n} stored=never`);
-    const small = await shrinkOutput(inline.data, inline.mimeType || inline.mime_type || "image/png");
-    return res.status(200).json({ ok: true, mimeType: small.mime, base64: small.base64 });
+    // ⚠️ 앵커에는 일반 결과물용 shrinkOutput(1024/q82)을 쓰면 안 된다.
+    //    앵커는 (1) 사용자가 "이 얼굴 맞아요?" 로 화질을 직접 판단하는 이미지이고
+    //    (2) 이후 모든 생성의 얼굴 원본이라, 여기서 뭉개면 만드는 사진마다 뭉개진다.
+    //    실제로 2K 로 만들어 놓고 1024/q82 로 깎아 돌려주고 있었다.
+    const anchorOut = await shrinkAnchor(inline.data, inline.mimeType || inline.mime_type || "image/png");
+    // 비보관 증명 로그 — 장수와 모델만 남긴다 (§2-3).
+    console.log(`[generate] faceAnchor shots=${n} model=${anchorModel} bytes=${anchorOut.bytes} stored=never`);
+    return res.status(200).json({ ok: true, mimeType: anchorOut.mime, base64: anchorOut.base64 });
   }
 
   // (정식 오픈: 베타 차단 제거 — 모든 로그인 사용자가 하루 무료 1장 + 크레딧 사용 가능)
