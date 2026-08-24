@@ -2041,13 +2041,18 @@ export default function PortraitStudio() {
     // 네이티브 앱에선 origin이 capacitor://localhost(iOS)·http://localhost(안드) 라
     // 초대 링크가 localhost로 나가는 버그가 있음 → 정식 도메인(LEGAL_BASE) 사용
     const base = isNative() ? LEGAL_BASE : window.location.origin;
-    // 링크에 uuid(36자) 대신 6자 코드를 싣는다. 받는 사람 눈에 보이는 게
-    // ?ref=8f3c1a2e-… 대신 ?ref=A3F9K2 라 정체불명으로 안 보이고, 링크가 깨져도
-    // 사람이 읽어서 옮길 수 있다. 서버는 둘 다 받는다(이미 뿌려진 uuid 링크 보호).
-    const link = base + "/?ref=" + (referralCode || uid);
+    // 스마트링크(/i/CODE) — 누르면 쓰는 기기의 스토어로 바로 간다.
+    // 코드가 아직 안 왔으면(quota 응답 전) 예전 웹 링크로 폴백한다. 서버는 uuid 도 받는다.
+    const link = referralCode ? base + "/i/" + referralCode : base + "/?ref=" + uid;
+    // ⚠️ 코드를 **본문에도** 넣는다. 스토어를 거치면 링크의 코드가 사라지는데(iOS 는
+    //    복구 경로가 아예 없다), 대화방에 남은 이 문장이 마지막 안전망이다 —
+    //    친구가 설치 후 스크롤을 올려 코드를 보고 앱에 직접 입력할 수 있다.
+    const text = referralCode
+      ? t("invite.shareText") + "\n" + t("invite.shareCode", { code: referralCode })
+      : t("invite.shareText");
     const shareData = {
       title: t("invite.shareTitle"),
-      text: t("invite.shareText"),
+      text,
       url: link,
     };
     try {
@@ -2060,7 +2065,7 @@ export default function PortraitStudio() {
         return;
       }
       // 3) 클립보드 fallback
-      await navigator.clipboard.writeText(link);
+      await navigator.clipboard.writeText(text + "\n" + link);
       setInviteMsg(t("invite.copied"));
       setTimeout(() => setInviteMsg(""), 4000);
       track("invite_sent", { via: "clipboard" });
@@ -2283,6 +2288,9 @@ export default function PortraitStudio() {
             untilNext={untilNext}
             onInvite={shareInvite}
             inviteMsg={inviteMsg}
+            referralCode={referralCode}
+            onRefreshQuota={() => setRefreshTick((n) => n + 1)}
+            onInviteToast={(m) => { setInviteMsg(m); setTimeout(() => setInviteMsg(""), 3500); }}
             onBack={() => popTo("gallery")}
             onOpenGallery={() => setScreen("mygallery")}
             onOpenStore={PAYMENTS_ENABLED ? openStore : null}
@@ -2926,10 +2934,75 @@ function HomeLayout({ data, onPick, onMore, onBrooklyn }) {
 /* ============================================================
    프로필
    ============================================================ */
+// 초대 코드 — 내 코드 표시(탭하면 복사) + 친구 코드 입력.
+//
+// 왜 입력칸이 필요한가: 초대 링크를 눌러 스토어로 가서 앱을 설치하면 링크에 실렸던
+// 코드가 통째로 사라진다(deferred deep link). 안드로이드는 Play install referrer 로
+// 살릴 수 있지만 **iOS 는 그 경로가 아예 없다**. 그래서 대화방에 남은 코드를 보고
+// 직접 입력하는 이 칸이 iOS 초대의 유일한 완결 경로다.
+function InviteCode({ code, accessToken, onClaimed, onToast }) {
+  const [input, setInput] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function copyMine() {
+    if (!code) return;
+    try { await navigator.clipboard.writeText(code); onToast(t("invite.codeCopied")); } catch (_) {}
+  }
+  async function submit() {
+    if (input.length !== 6 || busy) return;
+    setBusy(true);
+    try {
+      const r = await fetch("/api/referral/claim", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + accessToken },
+        body: JSON.stringify({ ref: input }),
+      });
+      const j = await r.json().catch(() => null);
+      if (j?.ok) { setInput(""); onToast(t("invite.codeOk")); onClaimed && onClaimed(); }
+      else onToast(t("invite.codeFail." + (j?.reason || "invalid_code")));
+    } catch (_) {
+      onToast(t("invite.codeFail.db_error"));
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <div style={S.inviteCodeWrap}>
+      {code && (
+        <button style={S.myCodeBtn} onClick={copyMine}>
+          <span style={S.myCodeLb}>{t("invite.myCode")}</span>
+          <span style={S.myCodeVal}>{code}</span>
+          <span style={S.myCodeHint}>{t("invite.tapToCopy")}</span>
+        </button>
+      )}
+      <div style={S.codeRow}>
+        <input
+          style={S.codeInput}
+          value={input}
+          // 발급되지 않는 문자(0 O 1 I L)는 아예 못 넣게 막는다 — 오타로 실패하는 걸 줄인다
+          onChange={(e) => setInput(e.target.value.toUpperCase().replace(/[^2-9ABCDEFGHJKMNPQRSTUVWXYZ]/g, "").slice(0, 6))}
+          placeholder={t("invite.enterCode")}
+          inputMode="text"
+          autoCapitalize="characters"
+          autoCorrect="off"
+          spellCheck={false}
+          maxLength={6}
+        />
+        <button
+          style={{ ...S.codeGo, opacity: input.length === 6 && !busy ? 1 : 0.4 }}
+          disabled={input.length !== 6 || busy}
+          onClick={submit}
+        >
+          {t("invite.codeApply")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function ProfileScreen({
   session, photo, onPickPhoto, onClearPhoto,
   unlimited, blocked, freeUsed, freeLeft, credits,
-  referralCount, untilNext,
+  referralCount, untilNext, referralCode, onRefreshQuota, onInviteToast,
   onInvite, inviteMsg = "",
   onBack, onLogout, onDeleteAccount, onOpenGallery, onOpenStore,
   onLoginRequest,
@@ -3083,6 +3156,14 @@ function ProfileScreen({
         </div>
         <div style={S.inviteBannerBtn}>{t("common.share")}</div>
       </button>
+      {session && (
+        <InviteCode
+          code={referralCode}
+          accessToken={session?.access_token}
+          onClaimed={onRefreshQuota}
+          onToast={onInviteToast}
+        />
+      )}
       {inviteMsg && <div style={S.inviteToast}>{inviteMsg}</div>}
 
       {/* 로그아웃 */}
@@ -4905,6 +4986,30 @@ const S = {
     fontFamily: "'Quicksand', sans-serif", letterSpacing: "-0.01em",
     textShadow: "0 1px 2px rgba(0,0,0,0.3)",
     overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+  },
+  inviteCodeWrap: { marginTop: 10, display: "flex", flexDirection: "column", gap: 8 },
+  myCodeBtn: {
+    display: "flex", alignItems: "center", gap: 10, width: "100%",
+    background: "#fff", border: "1px solid rgba(35,31,32,0.09)", borderRadius: 14,
+    padding: "12px 14px", fontFamily: "'Quicksand', sans-serif", cursor: "pointer",
+  },
+  myCodeLb: { fontSize: 12, fontWeight: 600, color: "#8a7f6e" },
+  myCodeVal: {
+    fontSize: 19, fontWeight: 800, letterSpacing: "0.14em", color: INK,
+    fontVariantNumeric: "tabular-nums", marginLeft: "auto",
+  },
+  myCodeHint: { fontSize: 11, color: "#b3a894" },
+  codeRow: { display: "flex", gap: 8 },
+  codeInput: {
+    flex: 1, minWidth: 0, borderRadius: 12, border: "1px solid rgba(35,31,32,0.12)",
+    padding: "12px 14px", fontSize: 15, fontWeight: 700, letterSpacing: "0.12em",
+    fontFamily: "'Quicksand', sans-serif", color: INK, background: "#fff", outline: "none",
+  },
+  codeGo: {
+    flex: "0 0 auto", border: "none", borderRadius: 12, padding: "12px 18px",
+    fontSize: 14, fontWeight: 800, color: "#fff",
+    background: "linear-gradient(180deg,#2c2723," + INK + ")",
+    fontFamily: "'Quicksand', sans-serif", cursor: "pointer",
   },
   inviteBanner: {
     width: "100%", display: "flex", alignItems: "center",

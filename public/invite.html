@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>rimikimi 초대</title>
+<meta name="theme-color" content="#fffdf9" />
+<meta name="description" content="친구가 rimikimi에 초대했어요. 앱을 설치하고 가입하면 초대가 완료돼요." />
+<meta name="robots" content="noindex" />
+<meta property="og:title" content="rimikimi에 초대받았어요 🎁" />
+<meta property="og:description" content="셀카 한 장으로 만드는 인생 프로필" />
+<meta property="og:image" content="/og.png" />
+<meta property="og:type" content="website" />
+<link rel="icon" href="/icons/favicon-64.png" />
+<style>
+  @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css');
+  :root{ --primary:#B8860B; --ink:#231f20; --muted:#8a7f6e; --hair:rgba(35,31,32,.09); }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased;}
+  body{font-family:'Pretendard','Apple SD Gothic Neo',sans-serif;color:var(--ink);
+    background:radial-gradient(130% 90% at 50% -10%,#FFFDF9 0%,#F6EEDC 60%,#F0E5CE 100%);
+    min-height:100vh;display:flex;align-items:center;justify-content:center;
+    padding:calc(env(safe-area-inset-top,0px) + 28px) 22px calc(env(safe-area-inset-bottom,0px) + 28px);}
+  .wrap{max-width:400px;width:100%;text-align:center;}
+  .logo{width:72px;height:72px;border-radius:18px;box-shadow:0 12px 30px -10px rgba(184,134,11,.45);margin-bottom:16px;}
+  .kicker{font-size:13px;font-weight:700;color:var(--primary);margin-bottom:6px;}
+  .title{font-size:20px;font-weight:800;line-height:1.4;margin-bottom:18px;}
+  .spin{width:30px;height:30px;border-radius:50%;border:3px solid rgba(35,31,32,.12);
+    border-top-color:var(--ink);margin:0 auto 12px;animation:sp .9s linear infinite;}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .note{font-size:13px;color:var(--muted);line-height:1.7;}
+  .code{display:inline-block;margin-top:14px;font-size:26px;font-weight:800;letter-spacing:.16em;
+    background:#fff;border:1px solid var(--hair);border-radius:14px;padding:12px 20px;
+    box-shadow:0 1px 2px rgba(35,31,32,.05),0 12px 26px -18px rgba(35,31,32,.35);}
+  .codeLb{font-size:11.5px;color:var(--muted);margin-top:12px;}
+  .manual{display:none;margin-top:20px;}
+  .manual a{display:block;background:linear-gradient(180deg,#2c2723,var(--ink));color:#fff;
+    font-size:16px;font-weight:800;border-radius:15px;padding:16px;text-decoration:none;
+    box-shadow:0 12px 26px -8px rgba(35,31,32,.5);margin-bottom:10px;}
+  .manual .sub{font-size:13px;font-weight:600;color:var(--primary);text-decoration:none;display:inline-block;margin-top:6px;}
+  @media (prefers-reduced-motion: reduce){ .spin{animation:none;} }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <img class="logo" src="/icons/icon-512.png" alt="rimikimi" />
+    <div class="kicker">🎁 친구가 초대했어요</div>
+    <div class="title" id="title">스토어로 이동 중…</div>
+    <div class="spin" id="spin"></div>
+    <div class="note" id="note">잠시만 기다려 주세요</div>
+    <div id="codeBox" style="display:none">
+      <div class="code" id="codeVal">······</div>
+      <div class="codeLb">설치 후 앱에서 이 코드를 입력하면 초대가 완료돼요</div>
+    </div>
+    <div class="manual" id="manual">
+      <a id="manualCta" href="/download">스토어가 안 열리면 여기를 눌러주세요</a>
+      <a class="sub" id="webLink" href="/">설치 없이 웹에서 해보기 →</a>
+    </div>
+  </div>
+
+<script>
+(function () {
+  // ── 스마트링크 ──
+  // 초대 링크를 누르면 쓰는 기기의 스토어로 바로 보낸다.
+  //
+  // ⚠️ 스토어를 거치면 링크에 실린 코드가 사라진다(deferred deep link).
+  //    안드로이드: Play 의 install referrer 로 설치 후까지 전달된다 → &referrer= 에 싣는다.
+  //    iOS: App Store 에는 그런 경로가 없다. 그래서 코드를 화면에 크게 남겨두고
+  //         (뒤로 돌아오면 보이게), 앱 안의 코드 입력칸이 최종 안전망이 된다.
+  var m = location.pathname.match(/\/i\/([^/?#]+)/);
+  var code = (m ? m[1] : (new URLSearchParams(location.search).get("c") || "")).toUpperCase();
+  // 발급되지 않는 문자(0 O 1 I L)가 섞였으면 오타 → 코드 없이 일반 설치로 보낸다.
+  var valid = /^[2-9ABCDEFGHJKMNPQRSTUVWXYZ]{6}$/.test(code);
+
+  var ua = navigator.userAgent || navigator.vendor || "";
+  var isIPadOSAsMac = /Macintosh/.test(ua) && navigator.maxTouchPoints > 1;
+  var isIOS = (/iPad|iPhone|iPod/.test(ua) && !window.MSStream) || isIPadOSAsMac;
+  var isAndroid = /android/i.test(ua);
+
+  var APP_STORE = "https://apps.apple.com/app/id6782776518";
+  var PLAY = "https://play.google.com/store/apps/details?id=com.rimikimi.app";
+  // Play 는 referrer 를 설치 후 앱에 전달한다(Install Referrer API). 여기에 코드를 싣는다.
+  var playUrl = PLAY + (valid ? "&referrer=" + encodeURIComponent("utm_source=invite&utm_content=" + code) : "");
+
+  if (valid) {
+    document.getElementById("codeVal").textContent = code;
+    document.getElementById("codeBox").style.display = "";
+    document.getElementById("webLink").href = "/?ref=" + code;
+    // 스토어를 거쳐도 살아남게 클립보드에도 심어둔다. 앱은 이 접두사가 붙은 내용일 때만
+    // 읽는다 — 남의 클립보드 내용을 읽지 않기 위해서다. 제스처 없이 막히면 그냥 실패한다.
+    try { navigator.clipboard && navigator.clipboard.writeText("rimikimi-invite:" + code); } catch (e) {}
+  } else {
+    document.getElementById("codeBox").style.display = "none";
+    document.querySelector(".kicker").textContent = "rimikimi";
+  }
+
+  var target = isIOS ? APP_STORE : isAndroid ? playUrl : "/download";
+  document.getElementById("manualCta").href = target;
+
+  // 데스크톱은 스토어로 튕겨봐야 의미가 없다 — 안내 페이지를 그대로 보여준다.
+  if (!isIOS && !isAndroid) {
+    document.getElementById("title").textContent = "휴대폰에서 열어주세요";
+    document.getElementById("note").textContent = "앱은 iPhone · Android 에서 설치할 수 있어요";
+    document.getElementById("spin").style.display = "none";
+    document.getElementById("manual").style.display = "block";
+    document.getElementById("manualCta").textContent = "설치 안내 보기";
+    return;
+  }
+
+  // 바로 이동. replace 라 뒤로가기를 눌렀을 때 이 페이지가 아니라 채팅방으로 돌아간다…
+  // 가 아니라, 코드를 다시 봐야 하는 경우가 있어 history 를 남기는 assign 을 쓴다.
+  location.href = target;
+
+  // 스토어 앱이 안 열리거나 리다이렉트가 막히는 경우(일부 인앱 브라우저)의 안전망 —
+  // 1.2초 뒤에도 이 페이지가 살아 있으면 수동 버튼을 띄운다.
+  setTimeout(function () {
+    document.getElementById("title").textContent = valid ? "설치하고 코드를 입력해 주세요" : "앱을 설치해 주세요";
+    document.getElementById("note").textContent = "";
+    document.getElementById("spin").style.display = "none";
+    document.getElementById("manual").style.display = "block";
+  }, 1200);
+})();
+</script>
+</body>
+</html>
