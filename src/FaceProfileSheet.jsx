@@ -116,8 +116,10 @@ export default function FaceProfile({ accessToken, onClose, onSaved }) {
             <div style={S.emoji}>🙂</div>
             <h2 style={S.title}>내 얼굴 등록하기</h2>
             <p style={S.lead}>
+              {/* "여러 각도라 더 잘 나온다" 는 문구를 뺐다 — 스펙 §6 A/B 실측(1장 vs 3장, 총 10장,
+                  블라인드 판정 6회)에서 정확도 차이가 확인되지 않았다. 근거 없는 효과 주장은 하지 않는다.
+                  자세한 수치는 docs/face-profile-ab.md. */}
               셀카 3장을 등록해두면, 다음부터는 사진을 올리지 않아도 바로 만들 수 있어요.
-              여러 각도를 함께 보기 때문에 얼굴이 더 잘 살아나요.
             </p>
             {/* 권한 사전고지 (legal §6-7) — OS 프롬프트 전에 왜 필요한지 먼저 설명 */}
             <div style={S.noteBox}>
