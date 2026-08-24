@@ -3349,14 +3349,20 @@ function MyGalleryScreen({ accessToken, onBack, onShared, onLoginRequest }) {
                   {isSaved && (
                     <div style={S.myGallerySavedBadge}>{t("gallery.savedBadge")}</div>
                   )}
-                  <div
-                    style={{
-                      ...S.myGalleryTimer,
-                      ...(isExpiring ? S.myGalleryTimerWarn : {}),
-                    }}
-                  >
-                    {remainingLabel(it.expiresAt)}
-                  </div>
+                  {/* 카운트다운은 "사라지기 전에 저장하세요" 라는 행동 요청이다.
+                      이미 앨범에 저장한 사진에까지 빨간 타이머가 돌아가면, 할 일이
+                      없는데 불안만 준다 → 저장한 것에는 표시하지 않는다.
+                      (서버 보관 기간 안내는 위 galleryNotice 가 이미 하고 있다) */}
+                  {!isSaved && (
+                    <div
+                      style={{
+                        ...S.myGalleryTimer,
+                        ...(isExpiring ? S.myGalleryTimerWarn : {}),
+                      }}
+                    >
+                      {remainingLabel(it.expiresAt)}
+                    </div>
+                  )}
                 </div>
                 <div style={S.myGalleryFooter}>
                   <div style={S.myGalleryTitle}>
@@ -3684,6 +3690,9 @@ function ResultScreen({
   const [sharing, setSharing] = useState(false);
   const [toast, setToast] = useState("");
   const toastTimer = useRef(null);
+  // 묶음 결과에서 어떤 장을 이미 저장했는지. 내 사진 화면과 같은 저장 기록(notify)을
+  // 본다 — 결과화면에서만 눌러도 여기 상태가 남아야 "저장됨" 으로 바뀐다.
+  const [savedIds, setSavedIds] = useState(() => getSavedSet());
   // 결과의 실제 비율. 3:4 로 고정해 두면 가로 사진(복원)이나 세로로 긴
   // 인생네컷 스트립이 화면에서 잘려 보인다 → 로드되면 진짜 비율로 바꾼다.
   const [imgRatio, setImgRatio] = useState(null);
@@ -3723,6 +3732,7 @@ function ResultScreen({
     if (ok && it.galleryId) {
       markSaved(it.galleryId);
       cancelExpiryNotice(it.galleryId);
+      setSavedIds(getSavedSet());
     }
   }
 
@@ -3923,8 +3933,13 @@ function ResultScreen({
                     />
                     <div style={S.batchBar}>
                       <span style={S.batchIdx}>{i + 1} / {resultBatch.length}</span>
-                      <button type="button" style={S.batchBtn}
-                        onClick={() => onSaveOne && onSaveOne(it, i)}>{t("common.save")}</button>
+                      <button
+                        type="button"
+                        style={{ ...S.batchBtn, ...(savedIds.has(it.galleryId) ? S.batchBtnDone : null) }}
+                        onClick={() => onSaveOne && onSaveOne(it, i)}
+                      >
+                        {savedIds.has(it.galleryId) ? t("gallery.action.saved") : t("common.save")}
+                      </button>
                       <button type="button" style={S.batchBtn}
                         onClick={() => onShareOne && onShareOne(it, i)}>{t("common.share")}</button>
                     </div>
@@ -4703,6 +4718,7 @@ const S = {
   batchBar: {
     display: "flex", alignItems: "center", gap: 8, marginTop: 8,
   },
+  batchBtnDone: { borderColor: "#1a7f4b", color: "#1a7f4b" },
   batchIdx: { fontSize: 11.5, fontWeight: 700, opacity: 0.5, marginRight: "auto" },
   batchBtn: {
     background: "#fff", color: INK, border: "2px solid " + INK + "18",
@@ -4932,7 +4948,7 @@ const S = {
     width: "100%", maxWidth: 340, background: "#fff",
     borderRadius: 24, padding: "30px 24px 20px", textAlign: "center",
     boxShadow: "0 24px 60px -12px rgba(20,16,16,0.5)",
-    animation: "bkPop var(--d-swap) var(--ease-out) both",
+    animation: "bkPop var(--d-swap) var(--ease-out) backwards",
   },
   bkBadge: { fontSize: 40, marginBottom: 12, lineHeight: 1 },
   bkTitle: { fontFamily: "'Jua', sans-serif", fontSize: 21, color: INK, marginBottom: 10 },
@@ -4962,7 +4978,7 @@ const S = {
     width: "100%", maxWidth: 440, background: "#fffdf9",
     borderRadius: "24px 24px 0 0", padding: "22px 24px calc(env(safe-area-inset-bottom, 0px) + 22px)",
     boxShadow: "0 -24px 60px -12px rgba(20,16,16,0.35)",
-    animation: "sheetUp var(--d-sheet) var(--ease-drawer) both",
+    animation: "sheetUp var(--d-sheet) var(--ease-drawer) backwards",
     maxHeight: "88vh", overflowY: "auto", overscrollBehavior: "contain",
     WebkitOverflowScrolling: "touch",
   },
@@ -5385,7 +5401,15 @@ body { margin: 0; background: ${BG}; }
   --d-sheet: 420ms;   /* 시트 올라옴 — iOS 시트는 생각보다 길다 */
 }
 
-.fade { animation: fadeIn var(--d-enter) var(--ease-out) both; padding-top: 18px; }
+/* ⚠️ fill-mode 는 backwards 다. both 를 쓰면 안 된다.
+   both 는 애니메이션이 끝난 뒤에도 마지막 키프레임(transform: translateY(0) 등)을
+   **영구히 남긴다**. transform 이 있는 엘리먼트는 자손 position:fixed 의 기준이
+   되므로, 이 안에 있는 토스트의 top:70px 이 "화면 위 70px" 이 아니라 "스크롤된
+   콘텐츠 위 70px" 이 된다 → 스크롤을 내린 상태에서 저장하면 토스트가 화면 밖(위)에
+   그려져 안 보였다(실측: top = -1070px).
+   여기 애니메이션들은 마지막 키프레임이 곧 기본 상태라 forwards 가 필요 없다.
+   backwards 는 지연/시작 전 상태만 담당하고 끝나면 잔여 스타일을 남기지 않는다. */
+.fade { animation: fadeIn var(--d-enter) var(--ease-out) backwards; padding-top: 18px; }
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
@@ -5395,12 +5419,12 @@ body { margin: 0; background: ${BG}; }
    전환마다 화면이 한 번씩 깜빡였다. navTransition 이 인라인으로 박는다. */
 /* ⚠️ filter: blur() 를 애니메이션하면 안 된다 — 합성이 아니라 매 프레임 리페인트라
    결과 이미지(2K)에서 프레임이 눈에 띄게 드랍됐다. transform/opacity 만 쓴다. */
-.resultReveal { animation: resultReveal var(--d-reveal) var(--ease-out) both; }
+.resultReveal { animation: resultReveal var(--d-reveal) var(--ease-out) backwards; }
 @keyframes resultReveal {
   from { opacity: 0; transform: scale(.94); }
   to { opacity: 1; transform: scale(1); }
 }
-.cardIn { animation: cardIn var(--d-enter) var(--ease-out) both; }
+.cardIn { animation: cardIn var(--d-enter) var(--ease-out) backwards; }
 @keyframes cardIn {
   from { opacity: 0; transform: translateY(12px) scale(.97); }
   to { opacity: 1; transform: translateY(0) scale(1); }
