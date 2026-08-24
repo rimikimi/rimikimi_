@@ -81,7 +81,7 @@
       <h2>3. 보관 기간 및 파기</h2>
       <ul>
         <li><strong>업로드한 원본 사진</strong>: 서버에 저장하지 않으며, 이미지 생성 요청 시 일시적으로 전송되어 처리 후 즉시 폐기됩니다.</li>
-        <li><strong>얼굴 프로필(선택 기능)</strong>: 이용자가 등록한 얼굴 사진 3~5장은 <strong>이용자 기기 내부에만</strong> 저장되며 회사 서버·클라우드에는 보관하지 않습니다. 이미지 생성 시에만 위 원본 사진과 동일한 경로로 일시 전송되어 처리 후 즉시 폐기됩니다. 회사는 이 사진으로 본인 인증·신원 확인을 하지 않으며, 얼굴인식 특징정보(임베딩)를 생성하거나 보관하지 않습니다. 앱 내 [프로필 &gt; 얼굴 프로필]에서 언제든 교체·삭제할 수 있고 삭제 시 기기에서 즉시 제거되며, 앱 삭제·기기 변경 시에도 함께 사라집니다.</li>
+        <li><strong>얼굴 프로필(선택 기능)</strong>: 이용자가 올린 얼굴 사진(1~3장)은 기준 사진 1장을 생성하는 데에만 일시 사용되고 <strong>저장되지 않습니다</strong>. 이용자가 확인·동의한 기준 사진 1장은 <strong>이용자 기기 내부에만</strong> 저장되며 회사 서버·클라우드에는 보관하지 않습니다. 이미지 생성 시에만 기준 사진이 위 원본 사진과 동일한 경로로 일시 전송되어 처리 후 즉시 폐기됩니다. 회사는 이 사진으로 본인 인증·신원 확인을 하지 않으며, 얼굴인식 특징정보(임베딩)를 생성하거나 보관하지 않습니다. 앱 내 [프로필 &gt; 얼굴 프로필]에서 언제든 교체·삭제할 수 있고 삭제 시 기기에서 즉시 제거되며, 앱 삭제·기기 변경 시에도 함께 사라집니다.</li>
         <li><strong>생성된 결과 이미지</strong>: 이용자의 갤러리에 <strong>1시간</strong> 동안 보관된 뒤 자동 삭제됩니다.</li>
         <li><strong>회원 정보(이메일, 닉네임 등)</strong>: 회원 탈퇴 시까지 보관 후 즉시 파기.</li>
         <li><strong>사용 기록(생성 시각, 친구 초대)</strong>: 회원 탈퇴 후 30일 내 파기.</li>
@@ -159,7 +159,7 @@
       <ul>
         <li><strong>Account info</strong>: email, display name, and profile identifier from Kakao / Naver / Google when you sign in.</li>
         <li><strong>Photos you upload</strong>: only sent to our image-generation service in memory, never stored on our servers.</li>
-        <li><strong>Face profile (optional)</strong>: the 3–5 selfies you register are stored <strong>only on your own device</strong> — never on our servers or in the cloud. They are sent to the image-generation service in memory each time you create an image and discarded immediately after, exactly like a one-off upload. We do not use them to authenticate or identify you, and we never create or keep face-recognition embeddings. You can replace or delete them at any time in [Profile &gt; Face profile]; deleting removes them from your device immediately, and they are lost if you delete the app or change devices.</li>
+        <li><strong>Face profile (optional)</strong>: the 1–3 photos you upload are used only once, in memory, to generate a single reference portrait and are <strong>not stored</strong>. The reference portrait you review and approve is stored <strong>only on your own device</strong> — never on our servers or in the cloud. It is sent to the image-generation service in memory each time you create an image and discarded immediately after, exactly like a one-off upload. We do not use it to authenticate or identify you, and we never create or keep face-recognition embeddings. You can replace or delete it at any time in [Profile &gt; Face profile]; deleting removes it from your device immediately, and it is lost if you delete the app or change devices.</li>
         <li><strong>Generation history</strong>: time of generation, concept used, daily count (for free-tier limits).</li>
         <li><strong>Referral relationships</strong>: who invited whom, for credit rewards.</li>
         <li><strong>Advertising identifiers</strong> (IDFA/ADID), device/app info, and approximate (IP-based) location, used by Google AdMob / AdSense when ads are shown.</li>

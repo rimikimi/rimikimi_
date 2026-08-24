@@ -101,6 +101,9 @@ export async function countTodayUsage(admin, userId) {
     .from("usage_log")
     .select("*", { count: "exact", head: true })
     .eq("user_id", userId)
+    // 페이스 프로필 앵커 생성(kind='face_anchor')은 무료 한도를 먹지 않는다.
+    // 기존 행은 마이그레이션 default 로 전부 'gen'.
+    .eq("kind", "gen")
     .gte("created_at", fromTime.toISOString());
   if (error) return { error: error.message };
   return { count: count || 0 };

@@ -19,13 +19,13 @@ const KEY = "rimikimi_face_profile";
 // 동의 문구가 바뀌면 이 값을 올린다 → 기존 프로필은 재동의를 받는다.
 export const CONSENT_VERSION = 1;
 
-// 촬영 슬롯. 앞 3개가 필수(§1: 정면·좌45·우45), 뒤 2개는 선택.
+// 촬영 슬롯 (v1.1 개정: 2026-08-24 오너 지시 "한 장만 올려도 가능하도록").
+// 정면 1장만 필수, 나머지는 선택. 이 사진들은 앵커(기준 정면 사진)를 만드는 데만
+// 쓰이고 저장되지 않는다 — 기기에 저장되는 건 사용자가 확인한 앵커 1장뿐.
 export const ANGLES = [
-  { key: "front",   label: "정면",     hint: "카메라를 똑바로 봐주세요",       required: true },
-  { key: "left45",  label: "왼쪽 45°", hint: "고개를 왼쪽으로 살짝 돌려주세요", required: true },
-  { key: "right45", label: "오른쪽 45°", hint: "고개를 오른쪽으로 살짝 돌려주세요", required: true },
-  { key: "smile",   label: "미소",     hint: "웃는 얼굴도 한 장 (선택)",       required: false },
-  { key: "up15",    label: "살짝 위",  hint: "턱을 조금 들어주세요 (선택)",     required: false },
+  { key: "front",   label: "정면",       hint: "카메라를 똑바로 봐주세요",      required: true },
+  { key: "left45",  label: "왼쪽 45°",   hint: "고개를 왼쪽으로 살짝 (선택)",   required: false },
+  { key: "right45", label: "오른쪽 45°", hint: "고개를 오른쪽으로 살짝 (선택)", required: false },
 ];
 export const REQUIRED_ANGLES = ANGLES.filter((a) => a.required).map((a) => a.key);
 
@@ -47,7 +47,9 @@ function readRecord() {
   try {
     const raw = localStorage.getItem(KEY);
     const p = raw ? JSON.parse(raw) : null;
-    if (!p || !Array.isArray(p.shots) || !p.shots.length) return null;
+    // v1.1 앵커 구조만 유효. 구버전(shots 배열) 레코드는 출시 전 개발 잔재라
+    // 그냥 무시한다 — 실사용자 프로필은 아직 존재하지 않는다.
+    if (!p || !p.anchor || !(p.anchor.path || p.anchor.dataUrl)) return null;
     return p;
   } catch {
     return null;
@@ -70,8 +72,8 @@ export function getProfileMeta() {
   return {
     consentVersion: p.consentVersion,
     consentAt: p.consentAt,
-    count: p.shots.length,
-    angles: p.shots.map((s) => s.angle),
+    count: 1, // 앵커 1장 구조
+    angles: ["anchor"],
     // 동의 문구가 개정되면 재동의가 필요하다
     stale: p.consentVersion !== CONSENT_VERSION,
   };
@@ -82,28 +84,27 @@ export function hasProfile() {
   return !!m && !m.stale;
 }
 
-// shots: [{ angle, dataUrl }] → 기기에 저장
-export async function saveProfile(shots) {
-  await deleteProfile(); // 교체는 항상 전체 교체 — 각도가 섞이면 정체성이 흐려진다
+// 사용자가 확인한 앵커(기준 정면 사진) 1장을 기기에 저장.
+// 앵커를 만들 때 쓴 셀카들은 저장하지 않는다 — 세션이 끝나면 사라진다.
+export async function saveProfile(anchorDataUrl) {
+  await deleteProfile(); // 교체는 항상 전체 교체
 
-  const rec = { consentVersion: CONSENT_VERSION, consentAt: new Date().toISOString(), shots: [] };
+  const rec = { consentVersion: CONSENT_VERSION, consentAt: new Date().toISOString(), anchor: {} };
 
   if (isNative()) {
     const { Filesystem, Directory } = await fs();
     try { await Filesystem.mkdir({ path: DIR, directory: Directory.Data, recursive: true }); }
     catch { /* 이미 있으면 무시 */ }
-    for (const s of shots) {
-      const name = `${DIR}/${s.angle}.jpg`;
-      await Filesystem.writeFile({
-        path: name,
-        directory: Directory.Data,
-        data: stripDataUrl(s.dataUrl),
-      });
-      rec.shots.push({ angle: s.angle, path: name });
-    }
+    const name = `${DIR}/anchor.jpg`;
+    await Filesystem.writeFile({
+      path: name,
+      directory: Directory.Data,
+      data: stripDataUrl(anchorDataUrl),
+    });
+    rec.anchor = { path: name };
   } else {
     // 웹은 파일시스템이 없으니 레코드에 그대로 담는다(localStorage 할당량 안에서).
-    for (const s of shots) rec.shots.push({ angle: s.angle, dataUrl: s.dataUrl });
+    rec.anchor = { dataUrl: anchorDataUrl };
   }
 
   if (!writeRecord(rec)) {
@@ -113,62 +114,71 @@ export async function saveProfile(shots) {
   return getProfileMeta();
 }
 
-// 생성에 보낼 형태로 읽는다 — [{ mimeType, base64, angle }]
+// 생성에 보낼 형태로 읽는다 — [{ mimeType, base64, angle }] (앵커 1장).
 // 여기서 읽은 값은 요청 1회에만 쓰이고 서버에 저장되지 않는다.
 export async function loadProfileRefs() {
   const p = readRecord();
   if (!p || p.consentVersion !== CONSENT_VERSION) return [];
-  const out = [];
   if (isNative()) {
-    const { Filesystem, Directory } = await fs();
-    for (const s of p.shots) {
-      try {
-        const r = await Filesystem.readFile({ path: s.path, directory: Directory.Data });
-        out.push({ mimeType: "image/jpeg", base64: r.data, angle: s.angle });
-      } catch {
-        // 파일이 사라졌으면(기기 정리 등) 그 컷만 건너뛴다 — 나머지로도 생성은 된다
-      }
-    }
-  } else {
-    for (const s of p.shots) {
-      const m = /^data:(image\/[a-zA-Z+]+);base64,(.+)$/.exec(s.dataUrl || "");
-      if (m) out.push({ mimeType: m[1], base64: m[2], angle: s.angle });
+    try {
+      const { Filesystem, Directory } = await fs();
+      const r = await Filesystem.readFile({ path: p.anchor.path, directory: Directory.Data });
+      return [{ mimeType: "image/jpeg", base64: r.data, angle: "anchor" }];
+    } catch {
+      return []; // 파일이 사라졌으면(기기 정리 등) 프로필 없이 생성한다
     }
   }
-  return out;
+  const m = /^data:(image\/[a-zA-Z+]+);base64,(.+)$/.exec(p.anchor.dataUrl || "");
+  return m ? [{ mimeType: m[1], base64: m[2], angle: "anchor" }] : [];
 }
 
 // 미리보기용 data URL (프로필 화면 썸네일)
 export async function loadProfilePreviews() {
   const p = readRecord();
   if (!p) return [];
-  if (!isNative()) return p.shots.map((s) => ({ angle: s.angle, dataUrl: s.dataUrl }));
-  const { Filesystem, Directory } = await fs();
-  const out = [];
-  for (const s of p.shots) {
-    try {
-      const r = await Filesystem.readFile({ path: s.path, directory: Directory.Data });
-      out.push({ angle: s.angle, dataUrl: "data:image/jpeg;base64," + r.data });
-    } catch { /* 무시 */ }
+  if (!isNative()) return [{ angle: "anchor", dataUrl: p.anchor.dataUrl }];
+  try {
+    const { Filesystem, Directory } = await fs();
+    const r = await Filesystem.readFile({ path: p.anchor.path, directory: Directory.Data });
+    return [{ angle: "anchor", dataUrl: "data:image/jpeg;base64," + r.data }];
+  } catch {
+    return [];
   }
-  return out;
 }
 
 // 삭제 — 파일과 레코드를 함께 지운다(legal §6-4 "원자적 파기"의 기기판).
 // 서버에는 애초에 사본이 없으므로 이걸로 완전 삭제다.
 export async function deleteProfile() {
-  const p = readRecord();
-  if (p && isNative()) {
+  if (isNative()) {
     try {
       const { Filesystem, Directory } = await fs();
-      for (const s of p.shots) {
-        if (!s.path) continue;
-        try { await Filesystem.deleteFile({ path: s.path, directory: Directory.Data }); }
-        catch { /* 이미 없으면 무시 */ }
-      }
+      // 앵커 + 구버전 각도 파일까지 싹 지운다 (개발 중 잔재 정리 겸)
+      try { await Filesystem.rmdir({ path: DIR, directory: Directory.Data, recursive: true }); }
+      catch { /* 폴더가 없으면 무시 */ }
     } catch { /* 플러그인 로드 실패해도 레코드는 지운다 */ }
   }
   try { localStorage.removeItem(KEY); } catch { /* 무시 */ }
+}
+
+// 앵커 생성 요청 — 셀카 1~5장(dataUrl)을 보내면 기준 정면 사진 dataUrl 을 돌려받는다.
+// 서버(api/generate.js faceAnchor 브랜치)는 셀카를 저장하지 않는다.
+export async function requestAnchor(accessToken, dataUrls) {
+  const shots = [];
+  for (const [i, d] of dataUrls.entries()) {
+    const m = /^data:(image\/[a-zA-Z+]+);base64,(.+)$/.exec(d || "");
+    if (m) shots.push({ mimeType: m[1], base64: m[2], angle: "shot" + (i + 1) });
+  }
+  if (!shots.length) throw new Error("사진을 읽을 수 없어요.");
+  const r = await fetch("/api/generate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: "Bearer " + accessToken },
+    body: JSON.stringify({ faceAnchor: true, shots }),
+  });
+  const j = await r.json().catch(() => null);
+  if (!r.ok || !j || !j.base64) {
+    throw new Error((j && j.error) || "기준 사진을 만들지 못했어요. 잠시 뒤 다시 시도해 주세요.");
+  }
+  return "data:" + (j.mimeType || "image/jpeg") + ";base64," + j.base64;
 }
 
 function stripDataUrl(d) {

@@ -281,6 +281,101 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: !!r.hasFace, reason: r.hasFace ? null : "no_face" });
   }
 
+  // ── 페이스 프로필 앵커 생성 (v1.1 개정: 2026-08-24 오너 지시) ──────────────
+  // 사용자가 올린 셀카 1~5장으로 "기준 정면 사진"(앵커) 한 장을 생성해 돌려준다.
+  // 클라는 앵커를 사용자에게 확인받은 뒤("이 얼굴이 맞아요?") 기기에만 저장하고,
+  // 이후 모든 생성의 얼굴 참조로 앵커 1장을 쓴다.
+  //   근거(docs/face-profile-ab.md 실측): 참조 3장은 1장 대비 정확도 이득이 없고
+  //   포즈 누출(3/4측면)만 생겼다 → 깨끗한 정면 1장으로 수렴시키는 게 맞다.
+  // 셀카는 이 요청에서만 쓰고 저장하지 않는다(§2-3 비보관 원칙 동일).
+  // 크레딧 차감 없음. 대신 계정당 24시간 6회 캡 — 클라 UX는 재생성 2회로 묶지만
+  // 서버 캡이 없으면 공짜 Pro 생성 루프가 된다.
+  if (req.body && req.body.faceAnchor) {
+    const key = process.env.GEMINI_API_KEY;
+    if (!key) return res.status(500).json({ error: "서버에 GEMINI_API_KEY 가 없습니다." });
+    const shots = (Array.isArray(req.body.shots) ? req.body.shots : [])
+      .filter((s) => s && typeof s.base64 === "string" && /^image\//.test(s.mimeType || ""))
+      .slice(0, 5);
+    if (!shots.length) {
+      return res.status(400).json({ error: "shots(셀카 1~5장)가 필요합니다." });
+    }
+
+    const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+    const { count: anchorCount, error: cntErr } = await admin
+      .from("usage_log")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", user.id).eq("kind", "face_anchor").gte("created_at", since);
+    if (!cntErr && (anchorCount || 0) >= 6 && !unlimited) {
+      return res.status(429).json({
+        error: "얼굴 등록 생성을 오늘은 다 사용했어요. 내일 다시 시도해 주세요 🙂",
+        anchorLimit: true,
+      });
+    }
+
+    const n = shots.length;
+    const anchorPrompt =
+      (n > 1
+        ? `The ${n} reference photos show the SAME person from different angles. `
+        : "The reference photo shows a person. ") +
+      "Create ONE neutral front-facing portrait of this person, like a casual ID reference photo: " +
+      "facing the camera directly, neutral relaxed expression, shoulders-up framing, " +
+      "plain light neutral wall background, soft even indoor light. " +
+      "CRITICAL — reproduce this person's real facial identity EXACTLY as seen in the " +
+      (n > 1 ? "references" : "reference") + ": same bone structure, eye shape, nose, lips, jaw, " +
+      "and keep their real skin as it is — including freckles, moles and texture. " +
+      "Do NOT beautify, do NOT add makeup, do NOT retouch or smooth the skin, do NOT slim the face. " +
+      "It must look like a plain honest photo of this exact person, not a glamour shot.";
+
+    const anchorBody = {
+      contents: [{
+        role: "user",
+        parts: [
+          { text: anchorPrompt },
+          ...shots.map((s) => ({ inline_data: { mime_type: s.mimeType, data: s.base64 } })),
+        ],
+      }],
+      generationConfig: { imageConfig: { imageSize: "2K" } },
+    };
+    const callAnchor = async (model, timeoutMs, cfg = anchorBody) => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const up = await fetch(
+          "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent",
+          { method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+            body: JSON.stringify(cfg), signal: controller.signal }
+        );
+        if (!up.ok) return null;
+        const j = await up.json().catch(() => null);
+        const part = (j?.candidates?.[0]?.content?.parts || [])
+          .find((x) => x.inlineData || x.inline_data);
+        return part ? (part.inlineData || part.inline_data) : null;
+      } catch (_) { return null; } finally { clearTimeout(timer); }
+    };
+
+    // 앵커는 이후 모든 생성의 기준이라 품질이 중요 → Pro 우선, 실패 시 base 폴백.
+    // (base 는 2K 설정을 안 받으므로 generationConfig 를 뺀 본문으로 호출)
+    let inline = await callAnchor("gemini-3-pro-image", 60000);
+    if (!inline) inline = await callAnchor("gemini-3-pro-image", 40000);
+    if (!inline) {
+      const { generationConfig, ...baseBody } = anchorBody;
+      inline = await callAnchor("gemini-3.1-flash-image", 30000, baseBody);
+    }
+    if (!inline) {
+      return res.status(503).json({
+        error: "지금 이미지 서버가 붐비고 있어요.\n잠시 뒤 다시 시도해 주세요 🙂",
+        busy: true,
+      });
+    }
+
+    admin.from("usage_log").insert({ user_id: user.id, kind: "face_anchor" })
+      .then(() => {}).catch(() => {});
+    // 비보관 증명 로그 — 장수만 남긴다 (§2-3).
+    console.log(`[generate] faceAnchor shots=${n} stored=never`);
+    const small = await shrinkOutput(inline.data, inline.mimeType || inline.mime_type || "image/png");
+    return res.status(200).json({ ok: true, mimeType: small.mime, base64: small.base64 });
+  }
+
   // (정식 오픈: 베타 차단 제거 — 모든 로그인 사용자가 하루 무료 1장 + 크레딧 사용 가능)
 
   // 무료 Pro 체험(계정당 1회): 결과화면에서 "같은 사진 Pro로 무료 1회" 버튼이 보냄.
@@ -599,12 +694,17 @@ export default async function handler(req, res) {
   //
   // 매직 부스(skipFacePrecheck)에는 붙이지 않는다 — 사람이 아닌 사진도 받는 모드라
   // "이 사람의 얼굴" 지시가 오히려 방해가 된다.
+  // 표준 경로는 앵커 1장(angle="anchor")이지만, 혹시 여러 장이 와도 문장이 성립해야 한다.
   const faceClause =
     faceRefList.length && !skipFacePrecheck
-      ? `\n\nThe final ${faceRefList.length} reference image${faceRefList.length > 1 ? "s are" : " is"} ` +
-        `the SAME person's face from multiple angles — reproduce this person's facial identity exactly. ` +
-        `They are provided only to fix the face; they never change the composition, framing, pose, ` +
-        `clothing or background decided above.`
+      ? (faceRefList.length > 1
+          ? `\n\nThe final ${faceRefList.length} reference images are ` +
+            `the SAME person's face from multiple angles — reproduce this person's facial identity exactly. ` +
+            `They are provided only to fix the face; they never change the composition, framing, pose, ` +
+            `clothing or background decided above.`
+          : `\n\nThe final reference image shows this person's face — reproduce this person's ` +
+            `facial identity exactly. It is provided only to fix the face; it never changes the ` +
+            `composition, framing, pose, clothing or background decided above.`)
       : "";
 
   // 비보관 증명용 로그 (face-profile-v1.md §2-3: "서버 코드로 비보관을 보장하고 로그로 증명").
