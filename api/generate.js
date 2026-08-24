@@ -259,6 +259,28 @@ export default async function handler(req, res) {
   const unlimited = isUnlimited(user);
   const dailyLimit = dailyLimitFor(user); // 테스터 3 / 일반 1
 
+  // ── 페이스 프로필 품질 게이트 2차(서버) ──────────────────────────────
+  // face-profile-v1.md §1: "품질 게이트(클라 1차 + 서버 2차) … 미달 컷은 그 자리에서
+  // 사유와 함께 재촬영 요구". 클라는 밝기·블러·해상도만 보고, 얼굴이 실제로 한 명
+  // 잡히는지는 여기서 판정한다.
+  //
+  // ⚠️ 별도 엔드포인트를 만들지 않고 generate 안의 분기로 둔다. Vercel Hobby 의
+  //    서버리스 함수 상한이 12개인데 지금 정확히 12개라, 파일을 하나라도 더 만들면
+  //    배포가 통째로 실패한다(api/concepts.js 의 drops 합침과 같은 이유).
+  //
+  // 생성이 아니므로 한도·크레딧·차감 로직에 닿기 전에 반환한다. 사진은 검사에만
+  // 쓰이고 저장하지 않는다.
+  if (req.body && req.body.faceCheck) {
+    const key = process.env.GEMINI_API_KEY;
+    const { mimeType: fcMime, base64: fcData } = req.body;
+    if (!key) return res.status(500).json({ error: "서버에 GEMINI_API_KEY 가 없습니다." });
+    if (!fcData || !/^image\//.test(fcMime || "")) {
+      return res.status(400).json({ error: "mimeType, base64 가 필요합니다." });
+    }
+    const r = await precheckHasFace(key, fcMime, fcData);
+    return res.status(200).json({ ok: !!r.hasFace, reason: r.hasFace ? null : "no_face" });
+  }
+
   // (정식 오픈: 베타 차단 제거 — 모든 로그인 사용자가 하루 무료 1장 + 크레딧 사용 가능)
 
   // 무료 Pro 체험(계정당 1회): 결과화면에서 "같은 사진 Pro로 무료 1회" 버튼이 보냄.

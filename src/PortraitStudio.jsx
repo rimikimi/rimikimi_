@@ -18,6 +18,8 @@ import { shareImage, claimShareRewardApi } from "./share";
 import { track, setTrackUser } from "./track";
 import { noteGeneration, maybeRequestReview } from "./appReview";
 import { perUnitKrw, perUnitUsd, packDiscountPercent } from "./packPricing";
+import { loadProfileRefs, getProfileMeta } from "./faceProfile";
+import FaceProfileSheet, { FaceProfileCard } from "./FaceProfileSheet";
 
 // ── 퍼널 계측: signup 은 로그인 이벤트만으로 구분 불가(OAuth 도 최초 1회는 SIGNED_IN) —
 // user.created_at 과 last_sign_in_at 이 아주 가까우면(첫 로그인) signup 으로 판정한다.
@@ -463,6 +465,13 @@ async function generateImage(accessToken, dataUrl, promptText, conceptMeta = {})
   if (!dataUrl) throw new Error("사진이 없어요. 먼저 사진을 올려주세요.");
   if (!accessToken) throw new Error("로그인이 필요해요.");
 
+  // 페이스 프로필이 등록돼 있으면 얼굴 참조를 함께 보낸다(기본값이지 강제가 아니다 — §3).
+  // 읽기 실패는 조용히 넘긴다: 프로필이 깨져도 기존 1회 셀카 경로로 생성은 되어야 한다.
+  let faceRefs = [];
+  if (!conceptMeta.skipFacePrecheck) {
+    try { faceRefs = await loadProfileRefs(); } catch (_) { faceRefs = []; }
+  }
+
   // API로 보내기 전 사진을 적당한 크기로 축소 (요청 용량 줄이기)
   let sendUrl;
   try {
@@ -518,6 +527,9 @@ async function generateImage(accessToken, dataUrl, promptText, conceptMeta = {})
         // 이 기기의 푸시 토큰. 서버가 생성을 마치면 여기로 "완성됐어요"를 쏜다.
         // 앱을 완전히 종료해도 알림이 온다 — 로컬 알림으로는 안 되던 부분.
         ...(getPushToken() ? { pushToken: getPushToken() } : {}),
+        // 페이스 프로필(등록돼 있을 때만). 기기에 보관된 셀카 3~5장을 이 요청에만
+        // 실어 보낸다 — 서버는 참조로만 쓰고 저장하지 않는다(api/generate.js).
+        ...(faceRefs && faceRefs.length ? { faceRefs } : {}),
       }),
     });
   } catch (e) {
@@ -753,6 +765,9 @@ export default function PortraitStudio() {
   // 요청은 끊겼는데 서버는 계속 만들고 있을 수 있어 갤러리를 폴링하는 중.
   // 로딩 화면을 그대로 두되 안내 문구만 바꿔서, 멈춘 게 아님을 알린다.
   const [genWaiting, setGenWaiting] = useState(false);
+  // 페이스 프로필 — 시트 표시 여부와 등록 메타(사진 데이터는 여기 안 담는다)
+  const [showFace, setShowFace] = useState(false);
+  const [faceMeta, setFaceMeta] = useState(() => getProfileMeta());
   const [resultImage, setResultImage] = useState(null);
   const [genError, setGenError] = useState(null);
   // 결과화면 "기본 vs Pro" 비교: 무료 Pro 체험 결과 + 진행상태
@@ -2159,6 +2174,9 @@ export default function PortraitStudio() {
         {screen === "profile" && (
           <ProfileScreen
             session={session}
+            faceMeta={faceMeta}
+            onEditFace={() => (session ? setShowFace(true) : setShowLoginSheet(true))}
+            onFaceDeleted={() => setFaceMeta(null)}
             photo={photo}
             onPickPhoto={() => pickPhoto("profile")}
             onClearPhoto={() => setPhoto(null)}
@@ -2238,6 +2256,14 @@ export default function PortraitStudio() {
             </button>
           </div>
         </div>
+      )}
+
+      {showFace && (
+        <FaceProfileSheet
+          accessToken={session?.access_token}
+          onClose={() => setShowFace(false)}
+          onSaved={() => setFaceMeta(getProfileMeta())}
+        />
       )}
 
       {showLoginSheet && (
@@ -2811,6 +2837,7 @@ function ProfileScreen({
   onInvite, inviteMsg = "",
   onBack, onLogout, onDeleteAccount, onOpenGallery, onOpenStore,
   onLoginRequest,
+  faceMeta, onEditFace, onFaceDeleted,
 }) {
   // 비로그인 — 계정 정보/크레딧/내 갤러리/초대는 전부 로그인 후에만 의미가 있으므로
   // 가짜 값(0/0 등)을 보여주는 대신 로그인 CTA 로 대체한다. 언어 설정만 기기 값이라 그대로 둔다.
@@ -2897,6 +2924,9 @@ function ProfileScreen({
           {t("profile.photo.hint2")}
         </div>
       </div>
+
+      {/* 얼굴 프로필 (기기 전용) — face-profile-v1.md §2-4 관리 진입점 */}
+      <FaceProfileCard meta={faceMeta} onEdit={onEditFace} onDeleted={onFaceDeleted} />
 
       {/* 사용량 / 크레딧 */}
       <div style={S.statRow}>
