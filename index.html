@@ -11,6 +11,16 @@
     <link rel="canonical" href="https://rimikimi-app.vercel.app/" />
     <meta name="robots" content="index, follow" />
 
+    <!-- 폰트 — 예전엔 런타임 주입 <style> 맨 위의 @import 였다. @import 는 그 스타일시트
+         파싱을 멈추고 네트워크를 기다리므로 첫 페인트가 늦어져 진입이 덜컥거렸다(특히 웹뷰).
+         preconnect + display=swap 링크로 올려 렌더를 막지 않게 한다. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" media="print" onload="this.media='all'"
+      href="https://fonts.googleapis.com/css2?family=Jua&family=Quicksand:wght@400;500;600;700&display=swap" />
+    <noscript><link rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Jua&family=Quicksand:wght@400;500;600;700&display=swap" /></noscript>
+
     <!-- 안전영역/오버스크롤 시 흰 테두리 방지 + 기종 자동 대응 -->
     <style>
       /* 문서 자체는 절대 스크롤/바운스하지 않음 (스플래시·로그인 포함 모든 화면 공통).

@@ -1565,7 +1565,10 @@ export default function PortraitStudio() {
   function paintDrag(px, animate) {
     const el = mainRef.current;
     if (!el) return;
-    el.style.transition = animate ? "transform .22s cubic-bezier(0.16,1,0.3,1), opacity .22s" : "";
+    // 두 속성의 이징을 맞춘다 — 예전엔 opacity 만 기본 ease 라 미묘하게 어긋났다.
+    el.style.transition = animate
+      ? "transform var(--d-enter) var(--ease-out), opacity var(--d-enter) var(--ease-out)"
+      : "";
     el.style.transform = px ? `translateX(${px}px)` : "";
     el.style.opacity = px ? String(Math.max(0.35, 1 - px / 520)) : "";
   }
@@ -2637,8 +2640,10 @@ function GalleryScreen({
             gap: cols === 2 ? 13 : 8,
           }}
         >
+          {/* stagger 는 짧게 — 예전엔 12장 × 35ms = 420ms 라 진입(260ms)보다 오래 끌어
+              화면이 언제 안정되는지 알 수 없었다. 8장까지만, 총 144ms. */}
           {prompts.map((p, i) => (
-            <button key={p.id} className="cardIn" style={{ ...S.card, animationDelay: (i < 12 ? i * 0.035 : 0) + "s" }} onClick={() => onPick(p)}>
+            <button key={p.id} className="cardIn" style={{ ...S.card, animationDelay: (i < 8 ? i * 0.018 : 0) + "s" }} onClick={() => onPick(p)}>
               <div style={S.thumb}>
                 <img
                   src={`${ASSET_BASE}/thumbs/${p.id}.webp`}
@@ -3614,9 +3619,14 @@ function ResultScreen({
     const hi = it.galleryId ? await fetchHiResDataUrl(it.galleryId) : null;
     const data = hi || it.imageDataUrl;
     const filename = "rimikimi_" + (prompt?.id ?? "art") + "_" + (i + 1);
+    // ⚠️ 예전엔 저장 성공 여부와 무관하게 markSaved 를 불렀다 — 네이티브 저장이
+    //    실패해도 "저장됨" 배지가 붙어, 사진첩엔 없는데 저장된 걸로 보였다.
+    //    단건 경로(handleSaveResult)와 같은 규칙으로 맞춘다: 성공했을 때만 표시.
+    let ok = true;
     if (isNative()) {
       const r = await nativeSaveToAlbum(data, filename);
-      flashToast(r?.ok ? t("save.toast.done") : t("save.toast.fail"));
+      ok = !!r?.ok;
+      flashToast(ok ? t("save.toast.done") : t("save.toast.fail"));
     } else {
       const a = document.createElement("a");
       a.href = data;
@@ -3624,7 +3634,10 @@ function ResultScreen({
       document.body.appendChild(a); a.click(); a.remove();
       flashToast(t("save.toast.done"));
     }
-    if (it.galleryId) markSaved(it.galleryId);
+    if (ok && it.galleryId) {
+      markSaved(it.galleryId);
+      cancelExpiryNotice(it.galleryId);
+    }
   }
 
   // ⚠️ 이 버튼은 한 번도 동작한 적이 없었다(2026-08-18 발견).
@@ -4500,7 +4513,7 @@ const S = {
     justifyContent: "center", gap: 3,
     color: "#8a827b", padding: "6px 0", borderRadius: 20, minHeight: 44,
     fontFamily: "'Quicksand', sans-serif",
-    transition: "color .18s ease",
+    transition: "color var(--d-swap) var(--ease-out)",
   },
   tabBtnOn: { color: ACCENT },
   tabLabel: { fontSize: 10.5, fontWeight: 600, letterSpacing: "0.02em" },
@@ -4812,7 +4825,7 @@ const S = {
   payToast: {
     position: "fixed", top: 70, left: "50%",
     transform: "translateX(-50%)",
-    animation: "toastIn .22s cubic-bezier(0.16,1,0.3,1)",
+    animation: "toastIn var(--d-swap) var(--ease-out)",
     background: INK, color: "#fff", borderRadius: 999,
     padding: "11px 22px", fontSize: 13, fontWeight: 700,
     boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
@@ -4824,13 +4837,13 @@ const S = {
     background: "rgba(20,16,16,0.44)",
     backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)",
     display: "flex", alignItems: "center", justifyContent: "center",
-    padding: 24, animation: "fadeIn .2s ease",
+    padding: 24, animation: "fadeIn var(--d-swap) var(--ease-out)",
   },
   bkCard: {
     width: "100%", maxWidth: 340, background: "#fff",
     borderRadius: 24, padding: "30px 24px 20px", textAlign: "center",
     boxShadow: "0 24px 60px -12px rgba(20,16,16,0.5)",
-    animation: "bkPop .3s cubic-bezier(.34,1.3,.5,1) both",
+    animation: "bkPop var(--d-enter) var(--ease-out) both",
   },
   bkBadge: { fontSize: 40, marginBottom: 12, lineHeight: 1 },
   bkTitle: { fontFamily: "'Jua', sans-serif", fontSize: 21, color: INK, marginBottom: 10 },
@@ -4853,13 +4866,13 @@ const S = {
     background: "rgba(20,16,16,0.44)",
     backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)",
     display: "flex", alignItems: "flex-end", justifyContent: "center",
-    animation: "fadeIn .2s ease",
+    animation: "fadeIn var(--d-swap) var(--ease-out)",
   },
   loginSheetCard: {
     width: "100%", maxWidth: 440, background: "#fffdf9",
     borderRadius: "24px 24px 0 0", padding: "22px 24px calc(env(safe-area-inset-bottom, 0px) + 22px)",
     boxShadow: "0 -24px 60px -12px rgba(20,16,16,0.35)",
-    animation: "sheetUp .32s cubic-bezier(.32,.72,0,1) both",
+    animation: "sheetUp var(--d-sheet) var(--ease-drawer) both",
     maxHeight: "88vh", overflowY: "auto", overscrollBehavior: "contain",
     WebkitOverflowScrolling: "touch",
   },
@@ -5259,29 +5272,47 @@ const S = {
 };
 
 const CSS = `
-@import url('https://fonts.googleapis.com/css2?family=Jua&family=Quicksand:wght@400;500;600;700&display=swap');
+/* 폰트 @import 는 index.html 의 preconnect + 비차단 link 로 옮겼다 (첫 페인트 차단 제거) */
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 body { margin: 0; background: ${BG}; }
-.fade { animation: fadeIn .4s cubic-bezier(0.16,1,0.3,1) both; padding-top: 18px; }
+
+/* ── 모션 토큰 ────────────────────────────────────────────────
+   예전엔 일회성 cubic-bezier 5종 + .1s~.65s 가 화면마다 흩어져 있었다.
+   같은 앱인데 화면마다 리듬이 달라 "정리 안 된" 느낌이 났다.
+   진입·반응은 전부 --ease-out 하나로 통일하고, duration 도 척도로 묶는다.
+   ⚠️ 새 애니메이션을 넣을 때 숫자를 직접 쓰지 말고 이 토큰을 쓸 것. */
+:root {
+  --ease-out: cubic-bezier(0.23,1,0.32,1);      /* 진입·반응 = 기본값 */
+  --ease-drawer: cubic-bezier(0.32,0.72,0,1);   /* 시트·드로어 */
+  --ease-pop: cubic-bezier(.34,1.4,.64,1);      /* 스플래시 등 튕김이 의도된 곳만 */
+  --d-press: 110ms;   /* 눌림 */
+  --d-swap: 140ms;    /* 짧은 교체·페이드 */
+  --d-enter: 260ms;   /* 화면·카드 진입 */
+  --d-reveal: 320ms;  /* 결과 등장 */
+  --d-sheet: 320ms;   /* 시트 올라옴 */
+}
+
+.fade { animation: fadeIn var(--d-enter) var(--ease-out) both; padding-top: 18px; }
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(18px) scale(.985); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
 }
-.resultReveal { animation: resultReveal .65s cubic-bezier(.34,1.28,.5,1) both; }
+/* ⚠️ filter: blur() 를 애니메이션하면 안 된다 — 합성이 아니라 매 프레임 리페인트라
+   결과 이미지(2K)에서 프레임이 눈에 띄게 드랍됐다. transform/opacity 만 쓴다. */
+.resultReveal { animation: resultReveal var(--d-reveal) var(--ease-out) both; }
 @keyframes resultReveal {
-  0% { opacity: 0; transform: scale(.82); filter: blur(12px); }
-  60% { filter: blur(0); }
-  100% { opacity: 1; transform: scale(1); filter: blur(0); }
+  from { opacity: 0; transform: scale(.94); }
+  to { opacity: 1; transform: scale(1); }
 }
-.cardIn { animation: cardIn .5s cubic-bezier(0.16,1,0.3,1) both; }
+.cardIn { animation: cardIn var(--d-enter) var(--ease-out) both; }
 @keyframes cardIn {
-  from { opacity: 0; transform: translateY(16px) scale(.93); }
+  from { opacity: 0; transform: translateY(12px) scale(.97); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 /* 뒤로가기(엣지 스와이프) — 이전 화면이 왼쪽에서 들어옴 */
-[data-navdir="back"] .fade { animation: slideBack .4s cubic-bezier(0.16,1,0.3,1) both; }
+[data-navdir="back"] .fade { animation: slideBack var(--d-enter) var(--ease-out) both; }
 @keyframes slideBack {
-  from { opacity: 0; transform: translateX(-26px); }
+  from { opacity: 0; transform: translateX(-20px); }
   to { opacity: 1; transform: translateX(0); }
 }
 @keyframes bkPop {
@@ -5297,7 +5328,7 @@ body { margin: 0; background: ${BG}; }
   from { opacity: 0; transform: translateX(-50%) translateY(-8px); }
   to { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
-.splashLogo { animation: pop .6s cubic-bezier(.34,1.56,.64,1); }
+.splashLogo { animation: pop .5s var(--ease-pop); }
 @keyframes pop {
   0% { opacity: 0; transform: scale(.7); }
   100% { opacity: 1; transform: scale(1); }
@@ -5317,10 +5348,12 @@ body { margin: 0; background: ${BG}; }
   animation: bounce 1s ease-in-out infinite;
 }
 input[type=checkbox] { cursor: pointer; }
+/* ⚠️ box-shadow 트랜지션을 빼야 한다 — 페인트 속성이라 버튼을 누를 때마다
+   리페인트가 걸린다. 합성 가능한 transform/opacity 만 남긴다. */
 button {
   -webkit-touch-callout: none;
   -webkit-user-select: none; user-select: none;
-  transition: transform .1s ease-out, opacity .12s ease-out, box-shadow .12s ease-out;
+  transition: transform var(--d-press) var(--ease-out), opacity var(--d-press) var(--ease-out);
 }
 button:active { transform: scale(0.965); opacity: 0.92; }
 ::-webkit-scrollbar { height: 0; width: 0; }

@@ -187,12 +187,13 @@ export default function FaceProfile({ accessToken, onClose, onSaved }) {
         {step === "intro" && (
           <>
             <div style={S.emoji}>🙂</div>
-            <h2 style={S.title}>내 얼굴 등록하기</h2>
+            <h2 style={S.title}>앱에서 사용할 사진 만들기</h2>
             <p style={S.lead}>
-              {/* "여러 각도라 더 잘 나온다" 는 문구를 뺐다 — 스펙 §6 A/B 실측(1장 vs 3장, 총 10장,
-                  블라인드 판정 6회)에서 정확도 차이가 확인되지 않았다. 근거 없는 효과 주장은 하지 않는다.
+              {/* "여러 각도라 더 잘 나온다" 는 문구를 쓰지 않는다 — 스펙 §6 A/B 실측(1장 vs 3장,
+                  총 10장, 블라인드 판정 6회)에서 정확도 차이가 확인되지 않았다.
                   자세한 수치는 docs/face-profile-ab.md. */}
-              셀카 3장을 등록해두면, 다음부터는 사진을 올리지 않아도 바로 만들 수 있어요.
+              사진 1장만 있으면 돼요. 기준 사진을 만들어 두면 다음부터는
+              사진을 올리지 않아도 바로 만들 수 있어요.
             </p>
             {/* 권한 사전고지 (legal §6-7) — OS 프롬프트 전에 왜 필요한지 먼저 설명 */}
             <div style={S.noteBox}>
@@ -380,7 +381,7 @@ export function FaceProfileCard({ meta, onEdit, onDeleted }) {
             사진 1~3장으로 내 기준 사진을 만들어두면 매번 사진을 올리지 않아도 돼요.
             기준 사진은 이 폰에만 저장돼요.
           </div>
-          <button style={S.primary} onClick={onEdit}>얼굴 등록하기</button>
+          <button style={S.primary} onClick={onEdit}>앱에서 사용할 사진 만들기</button>
         </>
       )}
     </div>
