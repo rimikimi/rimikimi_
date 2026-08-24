@@ -24,7 +24,7 @@ export default async function handler(req, res) {
   // 크레딧 정보는 모든 로그인 사용자에게 공통으로 계산
   const credit = await getCreditInfo(admin, user.id);
   const creditFields = credit.error
-    ? { credits: 0, referralCount: 0, untilNext: 2 }
+    ? { credits: 0, referralCount: 0, untilNext: 1 }
     : {
         credits: credit.creditsAvailable,
         referralCount: credit.referralCount,

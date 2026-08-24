@@ -1,12 +1,17 @@
 // ============================================================
 // 초대 크레딧 계산
-//   - 적립 크레딧 = floor(내가 초대한 사람 수 / 2)   (2명당 1개)
+//   - 적립 크레딧 = 내가 초대한 사람 수 × 3   (1명당 3개)
 //   - 사용 크레딧 = user_credits.credits_used
 //   - 잔여 크레딧 = max(0, 적립 - 사용)
 // referrals 테이블이 "단일 진실원"이라 레이스 컨디션에 안전.
 // ============================================================
 
-const PER_CREDIT = 2; // 초대 N명당 크레딧 1개
+// 초대 1명당 지급 크레딧.
+// 2026-08-24 이전엔 "2명당 1개"(PER_CREDIT=2)였다 → 1명당 3개로 변경(오너 지시).
+// ⚠️ 적립은 referrals 행 수에서 **매번 계산**하므로, 이 상수를 바꾸면 기존 초대분에도
+//    소급 적용된다(10명 초대한 사용자: 5개 → 30개). 의도된 동작이다 — 적립을 스냅샷으로
+//    저장하지 않는 설계라 과거분만 옛 비율로 두려면 스키마 변경이 필요하다.
+const CREDITS_PER_REFERRAL = 3;
 
 // 공유 리워드 일일 상한 (viral-loop-and-funnel-standard.md §A) — 어뷰즈 캡.
 export const SHARE_DAILY_CAP = 3;
@@ -19,7 +24,7 @@ export async function getCreditInfo(admin, userId) {
     .eq("referrer_id", userId);
   if (cErr) return { error: cErr.message };
   const referralCount = count || 0;
-  const creditsEarned = Math.floor(referralCount / PER_CREDIT);
+  const creditsEarned = referralCount * CREDITS_PER_REFERRAL;
 
   // 2) 사용한 크레딧 + 결제로 적립한 크레딧 + 공유 리워드로 적립한 크레딧
   const { data, error: uErr } = await admin
@@ -43,15 +48,12 @@ export async function getCreditInfo(admin, userId) {
     creditsShared,        // 공유 리워드로 얻은 누적
     creditsUsed,
     creditsAvailable,
-    perCredit: PER_CREDIT,
-    // 다음 크레딧까지 남은 초대 수 (0/2/4…명째엔 2, 1/3/5…명째엔 1 → "1명만 더!")
-    // 🔴 2026-08-19: 예전엔 `referralCount % PER_CREDIT || PER_CREDIT` 였다.
-    //    PER_CREDIT=2 에서 초대 0명 → 0%2=0 → `0 || 2` = 2 → untilNext = 2-2 = 0.
-    //    즉 짝수 구간(0·2·4명…)마다 UI 가 "0명만 더 초대하면"이라고 표시했다.
-    //    가장 흔한 상태인 "초대 0명"에서 항상 틀렸다는 뜻이다.
-    //    picbox:55 · josephine:55 · claire:47 은 전부 아래 식이라 정상이었다
-    //    (referral-audit-2026-08-19 §3-1, rimikimi 만 해당).
-    untilNext: PER_CREDIT - (referralCount % PER_CREDIT),
+    perCredit: CREDITS_PER_REFERRAL,
+    // 이제 초대 1명마다 바로 크레딧이 붙으므로 "다음 크레딧까지 N명" 개념이 없다.
+    // 옛 클라이언트가 이 값을 읽어 "N명만 더" 를 표시하므로 항상 1로 내려보낸다.
+    // (예전엔 `PER_CREDIT - (referralCount % PER_CREDIT)`. 그 전 세대 식은 초대 0명일 때
+    //  "0명만 더 초대하면" 이라고 표시하는 버그가 있었다 — referral-audit-2026-08-19 §3-1)
+    untilNext: 1,
   };
 }
 
@@ -104,7 +106,7 @@ export async function consumeCredits(admin, userId, n) {
 
     const used = row.credits_used || 0;
     const totalEarned =
-      Math.floor((referralCount || 0) / PER_CREDIT) +
+      (referralCount || 0) * CREDITS_PER_REFERRAL +
       (row.credits_purchased || 0) +
       (row.credits_shared || 0);
     if (totalEarned - used < need) return false; // 잔액 부족 — 부분 차감 없이 거절

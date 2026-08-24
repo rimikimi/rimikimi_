@@ -182,15 +182,15 @@ export const STR = {
 
     // === 친구 초대 ===
     "invite.adminTitle": "🎁 친구에게 공유하기",
-    "invite.testerTitle": "🎟 친구 초대하고 크레딧 받기",
+    "invite.testerTitle": "🎟 친구 초대하면 크레딧 3개",
     "invite.adminDesc": "친구에게 rimikimi를 공유해 보세요!",
     "invite.testerDesc":
-      "친구 {n}명만 더 초대하면 크레딧 1개! (현재 {now}명 초대)",
+      "친구 1명 초대할 때마다 크레딧 3개! (현재 {now}명 초대)",
     "invite.testerDescWithCredits":
-      "보유 크레딧 {credits}개 · 친구 {n}명만 더 초대하면 크레딧 1개! (현재 {now}명 초대)",
+      "보유 크레딧 {credits}개 · 친구 1명 초대할 때마다 크레딧 3개! (현재 {now}명 초대)",
     "invite.btn": "공유하기",
     "invite.shareTitle": "rimikimi",
-    "invite.shareText": "내 얼굴로 인생 프로필 만들기 ✨ rimikimi 같이 해요!",
+    "invite.shareText": "내 얼굴로 인생 프로필 만들기 ✨ rimikimi 같이 해요! 이 링크로 시작하면 저도 크레딧을 받아요 🙌",
     "invite.copied": "초대 링크가 복사됐어요! 친구에게 붙여넣어 보내주세요 📋",
 
     // === 내 갤러리 ===
@@ -475,12 +475,12 @@ export const STR = {
     "profile.provider.email": "Email",
 
     "invite.adminTitle": "🎁 Share with friends",
-    "invite.testerTitle": "🎟 Invite friends, earn credits",
+    "invite.testerTitle": "🎟 Invite a friend, get 3 credits",
     "invite.adminDesc": "Share rimikimi with your friends!",
     "invite.testerDesc":
-      "Invite {n} more friend(s) to earn 1 credit! (currently {now} invited)",
+      "Get 3 credits for every friend you invite! ({now} invited so far)",
     "invite.testerDescWithCredits":
-      "{credits} credits in hand · Invite {n} more friend(s) for 1 more! (currently {now} invited)",
+      "{credits} credits in hand · Get 3 credits for every friend you invite! ({now} invited so far)",
     "invite.btn": "Share",
     "invite.shareTitle": "rimikimi",
     "invite.shareText": "Turn your face into a dream portrait ✨ Try rimikimi with me!",

@@ -2565,7 +2565,7 @@ function GalleryScreen({
   onResetFilters,
   prompts, total, totalFiltered, visibleCount, onShowMore,
   poolTotal, onPick, onBack,
-  credits = 0, referralCount = 0, untilNext = 2,
+  credits = 0, referralCount = 0, untilNext = 1,
   onInvite, inviteMsg = "", unlimited = false,
   fullPool = [], popular = [], onBrooklyn,
 }) {

@@ -447,7 +447,7 @@ export default async function handler(req, res) {
       } else {
         return res.status(429).json({
           error:
-            "오늘의 무료 한도를 모두 사용했어요.\n친구 2명을 초대하면 크레딧 1개가 생겨요!",
+            "오늘의 무료 한도를 모두 사용했어요.\n친구를 초대하면 1명당 크레딧 3개가 생겨요!",
           quotaUsed: usage.count,
           quotaLimit: dailyLimit,
           credits: 0,
