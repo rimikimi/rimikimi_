@@ -21,6 +21,7 @@ import { noteGeneration, maybeRequestReview } from "./appReview";
 import { perUnitKrw, perUnitUsd, packDiscountPercent } from "./packPricing";
 import { loadProfileRefs, getProfileMeta } from "./faceProfile";
 import FaceProfileSheet, { FaceProfileCard } from "./FaceProfileSheet";
+import * as hap from "./haptics";
 
 // ── 퍼널 계측: signup 은 로그인 이벤트만으로 구분 불가(OAuth 도 최초 1회는 SIGNED_IN) —
 // user.created_at 과 last_sign_in_at 이 아주 가까우면(첫 로그인) signup 으로 판정한다.
@@ -694,6 +695,7 @@ function BottomNav({ screen, go }) {
             <button
               key={tb.key}
               style={{ ...S.tabBtn, ...(on ? S.tabBtnOn : {}) }}
+              data-tabbtn=""
               onClick={() => go(tb.key)}
               aria-current={on ? "page" : undefined}
             >
@@ -737,6 +739,7 @@ export default function PortraitStudio() {
   }, [setScreen]);
   // 탭바 이동 — iOS 탭 전환에는 방향이 없다. 가로로 밀지 않고 부드럽게 바뀐다.
   const goTab = useCallback((next) => {
+    if (next !== screenRef.current) hap.tap();
     navDirRef.current = "tab";
     setScreen(next);
   }, [setScreen]);
@@ -803,6 +806,18 @@ export default function PortraitStudio() {
   const [faceMeta, setFaceMeta] = useState(() => getProfileMeta());
   const [resultImage, setResultImage] = useState(null);
   const [genError, setGenError] = useState(null);
+  // 생성 시작/성공/실패 햅틱.
+  // 호출 경로가 여러 개(일반·인생네컷·백그라운드 복구)라 각 경로에 흩뿌리지 않고
+  // 상태 전이 한 곳에서 처리한다 — 새 경로가 생겨도 자동으로 커버된다.
+  const genWasRunning = useRef(false);
+  useEffect(() => {
+    if (generating && !genWasRunning.current) hap.bump(); // 무거운 동작이 시작됨
+    else if (!generating && genWasRunning.current) {
+      if (genError) hap.warn();
+      else if (resultImage || resultBatch) hap.done();
+    }
+    genWasRunning.current = generating;
+  }, [generating, resultImage, resultBatch, genError]);
   // 결과화면 "기본 vs Pro" 비교: 무료 Pro 체험 결과 + 진행상태
   const [proSampleImg, setProSampleImg] = useState(null);
   const [proSampleBusy, setProSampleBusy] = useState(false);
@@ -1412,6 +1427,7 @@ export default function PortraitStudio() {
   function pickPrompt(p) {
     // 증명사진은 전문앱 Brooklyn 으로 유도 (rimikimi 는 화보/프로필 집중)
     if (isIdPhoto(p)) { setShowBrooklyn(true); return; }
+    hap.tap(); // 커밋 시점에만 — 누르는 순간이 아니라 실제로 넘어갈 때
     setNavDir("fwd");
     setSelected(p);
     // 인생네컷 프리셋 카드(스타일이 지정된 컨셉)면 그 스타일을 미리 선택해 준다
@@ -3453,7 +3469,7 @@ function ConfirmScreen({
                   type="button"
                   disabled={locked}
                   aria-pressed={on}
-                  onClick={() => { if (!locked) setBatchCount(b.count); }}
+                  onClick={() => { if (!locked) { hap.tap(); setBatchCount(b.count); } }}
                   style={{
                     ...S.batchChip,
                     ...(on ? S.batchChipOn : null),
@@ -3482,7 +3498,7 @@ function ConfirmScreen({
             {FOURCUT_COUNTS.map((n) => (
               <button
                 key={n}
-                onClick={() => setFourcutCount(n)}
+                onClick={() => { hap.tap(); setFourcutCount(n); }}
                 style={{
                   ...S.idSuitChip,
                   ...(fourcutCount === n ? S.idSuitChipOn : null),
@@ -3695,6 +3711,7 @@ function ResultScreen({
     if (isNative()) {
       const r = await nativeSaveToAlbum(data, filename);
       ok = !!r?.ok;
+      ok ? hap.done() : hap.warn();
       flashToast(ok ? t("save.toast.done") : t("save.toast.fail"));
     } else {
       const a = document.createElement("a");
@@ -4582,7 +4599,9 @@ const S = {
     justifyContent: "center", gap: 3,
     color: "#8a827b", padding: "6px 0", borderRadius: 20, minHeight: 44,
     fontFamily: "'Quicksand', sans-serif",
-    transition: "color var(--d-swap) var(--ease-out)",
+    // ⚠️ 탭 활성 색은 트랜지션 없이 즉시 바뀐다. 한 세션에 수십 번 누르는 곳이라
+    //    180ms 짜리 색 전환이 붙으면 그만큼 앱이 굼떠 보인다(빈도 테스트).
+    transition: "none",
   },
   tabBtnOn: { color: ACCENT },
   tabLabel: { fontSize: 10.5, fontWeight: 600, letterSpacing: "0.02em" },
@@ -5358,7 +5377,8 @@ body { margin: 0; background: ${BG}; }
   --ease-out: cubic-bezier(0.32,0.72,0,1);      /* 진입·반응·전환 = 기본값 */
   --ease-drawer: cubic-bezier(0.32,0.72,0,1);   /* 시트·드로어 (동일) */
   --ease-pop: cubic-bezier(.34,1.4,.64,1);      /* 스플래시 등 튕김이 의도된 곳만 */
-  --d-press: 90ms;    /* 눌림 */
+  --d-press: 110ms;     /* 눌림(누를 때) */
+  --d-press-out: 140ms; /* 눌림 복귀(뗄 때) — 복귀가 더 길어야 반응이 붙어 있다 */
   --d-swap: 180ms;    /* 짧은 교체·페이드 */
   --d-enter: 300ms;   /* 카드·콘텐츠 진입 */
   --d-reveal: 340ms;  /* 결과 등장 */
@@ -5424,19 +5444,25 @@ body { margin: 0; background: ${BG}; }
   animation: bounce 1s ease-in-out infinite;
 }
 input[type=checkbox] { cursor: pointer; }
-/* 눌림 반응 — iOS 규칙:
-   ① 누르는 순간은 **즉시** 반응하고(transition-duration:0), 뗄 때만 부드럽게 돌아온다.
-      예전엔 눌림에도 110ms 이징이 걸려서 탭이 한 박자 늦게 먹는 느낌이었다.
-   ② 기본은 스케일이 아니라 **딤(opacity)** 이다. 바 버튼·텍스트 링크까지 전부 쪼그라들면
-      네이티브가 아니라 CSS 프레임워크처럼 보인다. 타일(컨셉 카드)만 살짝 눌린다.
+/* 눌림 반응 — 네이티브 앱(저스틴 프로젝트)의 계약을 그대로 가져왔다.
+   ① **transform 만** 쓴다. opacity 0.62 로 확 어둡게 하던 걸 뺐다 — 그건 웹 링크의
+      반응이지 버튼의 반응이 아니다. 스케일은 "물리적으로 눌렸다" 로 읽힌다.
+   ② **비대칭**: 누를 때 110ms, 뗄 때 140ms. 눌림이 복귀보다 빨라야 반응이 붙어 있다.
+   ③ **폭에 따라 세기가 다르다**: 전체폭 버튼을 0.97 로 누르면 가장자리가 5px 넘게
+      움직여서 "출렁" 인다. 그래서 기본은 0.985(전체폭 안전), 작은 타일·칩만 0.97.
+      → 시각적 세기를 줄인 대신, 확실한 확인은 **햅틱**이 준다(haptics.js).
    ⚠️ box-shadow 트랜지션은 넣지 않는다 — 페인트 속성이라 누를 때마다 리페인트가 걸린다. */
 button {
   -webkit-touch-callout: none;
   -webkit-user-select: none; user-select: none;
-  transition: transform 260ms var(--ease-out), opacity 260ms var(--ease-out);
+  transition: transform var(--d-press-out) var(--ease-out);
 }
-button:active { transition-duration: 0s; opacity: 0.62; }
-.cardIn:active { transform: scale(0.965); opacity: 0.9; }
+button:active { transition-duration: var(--d-press); transform: scale(0.985); }
+.cardIn:active { transition-duration: var(--d-press); transform: scale(0.97); }
+/* 자주 쓰는 것은 애니메이션하지 않는다 (빈도 테스트).
+   탭 전환은 한 세션에 수십 번 일어난다 — 여기에 전환이 걸리면 앱이 느리게 느껴진다. */
+[data-tabbtn] { transition: none !important; }
+[data-tabbtn]:active { transform: none; }
 ::-webkit-scrollbar { height: 0; width: 0; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
