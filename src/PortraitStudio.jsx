@@ -795,6 +795,8 @@ export default function PortraitStudio() {
   const [conceptsLoading, setConceptsLoading] = useState(true);
   const [credits, setCredits] = useState(0);
   const [referralCount, setReferralCount] = useState(0);
+  // 내 초대 코드(6자). 서버(quota)가 발급해 내려준다. 못 받으면 uuid 링크로 폴백한다.
+  const [referralCode, setReferralCode] = useState(null);
   const [untilNext, setUntilNext] = useState(2);
   const [inviteMsg, setInviteMsg] = useState("");
   const [generating, setGenerating] = useState(false);
@@ -1108,6 +1110,7 @@ export default function PortraitStudio() {
         if (typeof j?.limit === "number" && !j?.unlimited) setFreeLimit(j.limit);
         if (typeof j?.credits === "number") setCredits(j.credits);
         if (typeof j?.referralCount === "number") setReferralCount(j.referralCount);
+        if (typeof j?.referralCode === "string") setReferralCode(j.referralCode);
         if (typeof j?.untilNext === "number") setUntilNext(j.untilNext);
         setQuotaLoaded(true);
       })
@@ -2038,7 +2041,10 @@ export default function PortraitStudio() {
     // 네이티브 앱에선 origin이 capacitor://localhost(iOS)·http://localhost(안드) 라
     // 초대 링크가 localhost로 나가는 버그가 있음 → 정식 도메인(LEGAL_BASE) 사용
     const base = isNative() ? LEGAL_BASE : window.location.origin;
-    const link = base + "/?ref=" + uid;
+    // 링크에 uuid(36자) 대신 6자 코드를 싣는다. 받는 사람 눈에 보이는 게
+    // ?ref=8f3c1a2e-… 대신 ?ref=A3F9K2 라 정체불명으로 안 보이고, 링크가 깨져도
+    // 사람이 읽어서 옮길 수 있다. 서버는 둘 다 받는다(이미 뿌려진 uuid 링크 보호).
+    const link = base + "/?ref=" + (referralCode || uid);
     const shareData = {
       title: t("invite.shareTitle"),
       text: t("invite.shareText"),
