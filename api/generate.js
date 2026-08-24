@@ -324,7 +324,23 @@ export default async function handler(req, res) {
     // 이 기기의 FCM 토큰(네이티브만). 생성이 끝나면 여기로 "완성됐어요"를 쏜다.
     // 앱이 완전히 종료돼도 도착한다 — 로컬 알림으로는 안 되던 부분.
     pushToken,
+    // 페이스 프로필 v1.1 — 같은 사람의 얼굴을 여러 각도로 담은 참조 사진 3~5장.
+    // [{ mimeType, base64, angle }] 형태이며 angle 은 로깅·정렬용 메타다.
+    //
+    // ⚠️ 서버는 이것을 절대 저장하지 않는다. 프로필의 정본은 사용자 기기이고
+    //    (face-profile-v1.md §2-3, v1.1 오너 개정), 서버는 이 요청 한 번의
+    //    참조로만 받아 응답 후 폐기한다 — 기존 1회 셀카 경로와 같은 데이터 경로다.
+    //    DB 테이블도, 스토리지 업로드도 없다. 이 함수 밖으로 나가는 곳은
+    //    Gemini/Vertex 호출뿐이며 그건 방침에 고지된 국외이전 경로다.
+    faceRefs,
   } = req.body || {};
+
+  // 얼굴 참조 정규화 — 최대 5장(스펙 §1: 필수 3 + 선택 2), 형식 불량은 조용히 버린다.
+  // 조용히 버리는 이유: 프로필이 깨져도 생성 자체는 1회 셀카로 성공해야 한다.
+  const FACE_REF_MAX = 5;
+  const faceRefList = (Array.isArray(faceRefs) ? faceRefs : [])
+    .filter((r) => r && typeof r.base64 === "string" && /^image\//.test(r.mimeType || ""))
+    .slice(0, FACE_REF_MAX);
 
   const batchCount = BATCH_COST[Number(count)] ? Number(count) : 1;
   const batchCost = BATCH_COST[batchCount];
@@ -550,10 +566,40 @@ export default async function handler(req, res) {
       "Keep the same face, identity, and facial features clearly recognizable. " +
       "Apply the following concept:\n" + prompt;
 
+  // ── 페이스 프로필: 얼굴 참조 절 (face-profile-v1.md §3) ──
+  //
+  // ⚠️ 개수 기반으로 서술하고 고정 서수("the second reference")를 쓰지 않는다.
+  //    커플이면 앞에 사진이 2장, 아니면 1장이라 얼굴 참조의 시작 위치가 달라지는데,
+  //    위치를 못박으면 한쪽에서 반드시 틀린 말이 된다. justin gemini.ts
+  //    buildGenEditPrompt 가 같은 이유로 참조 수 기반 서술을 쓴다(스튜디오 실증본).
+  //    이 문자열은 아래 bodyFor 가 실제로 붙이는 배열과 같은 값에서 계산되므로
+  //    프롬프트와 이미지 순서가 어긋날 수 없다.
+  //
+  // 매직 부스(skipFacePrecheck)에는 붙이지 않는다 — 사람이 아닌 사진도 받는 모드라
+  // "이 사람의 얼굴" 지시가 오히려 방해가 된다.
+  const faceClause =
+    faceRefList.length && !skipFacePrecheck
+      ? `\n\nThe final ${faceRefList.length} reference image${faceRefList.length > 1 ? "s are" : " is"} ` +
+        `the SAME person's face from multiple angles — reproduce this person's facial identity exactly. ` +
+        `They are provided only to fix the face; they never change the composition, framing, pose, ` +
+        `clothing or background decided above.`
+      : "";
+
+  // 비보관 증명용 로그 (face-profile-v1.md §2-3: "서버 코드로 비보관을 보장하고 로그로 증명").
+  // 장수와 각도만 남긴다 — 이미지 바이트도, 사용자 식별자도 찍지 않는다.
+  if (faceRefList.length) {
+    console.log(
+      `[generate] faceProfile refs=${faceRefList.length} ` +
+        `angles=${faceRefList.map((r) => r.angle || "?").join(",")} ` +
+        `used=${faceClause ? "yes" : "no(skipFacePrecheck)"} stored=never`
+    );
+  }
+
   // PHOTOREALISM(AI 티 억제)은 아트 스타일 변환 모드(skipFacePrecheck)만 제외하고 전 모드에 적용.
   //   제외 이유: 그 모드는 "일러스트/회화 등 다른 매체로 재해석"이 목적이라 "반드시 실제 사진처럼
   //   보여야 한다(not an illustration, not a digital painting)"는 지시와 정면 충돌한다.
-  const instruction = skipFacePrecheck ? conceptInstruction : PHOTOREALISM + conceptInstruction;
+  const instruction =
+    (skipFacePrecheck ? conceptInstruction : PHOTOREALISM + conceptInstruction) + faceClause;
 
   // usePro: 과금/쿼터/CTA 판정 전용 플래그(그대로 유지) — 유료(크레딧 사용) / 무제한(어드민) /
   //   무료 Pro 체험일 때 true. ⚠️ 아래 로직에서 참조하지 않는다(과금 3경로 불변 유지) — "어떤
@@ -583,6 +629,13 @@ export default async function handler(req, res) {
           // 커플: 두 번째 참조 사진 (순서가 곧 "first/second reference image")
           ...(hasSecond
             ? [{ inline_data: { mime_type: mimeType2, data: base64_2 } }]
+            : []),
+          // 페이스 프로필 참조는 항상 맨 뒤 블록 (§3 "얼굴 참조는 항상 마지막 블록").
+          // 위 faceClause 의 "The final N reference images" 가 이 위치를 가리킨다.
+          ...(faceClause
+            ? faceRefList.map((r) => ({
+                inline_data: { mime_type: r.mimeType, data: r.base64 },
+              }))
             : []),
         ],
       },
