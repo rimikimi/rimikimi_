@@ -51,3 +51,6 @@ android/keystore.properties
 release/
 *.aab
 *.apk
+
+# iCloud Drive 충돌 사본 ("config 2.xml") — 안드로이드 리소스 이름 규칙을 깨서 빌드가 죽는다
+*\ [0-9].*
