@@ -5370,10 +5370,9 @@ body { margin: 0; background: ${BG}; }
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
-/* push/pop 전환 중에는 화면 자체 진입 애니메이션을 끈다.
-   화면이 오른쪽에서 들어오는 동시에 내용이 또 위로 떠오르면 두 번 움직여 어지럽다. */
-[data-navanim="1"] .fade,
-[data-navanim="1"] .cardIn { animation: none !important; }
+/* ⚠️ 전환 중 진입 애니메이션 끄기를 여기(CSS 속성 토글)에서 하면 안 된다.
+   전환이 끝나고 속성을 지우는 순간 애니메이션이 처음부터 다시 재생돼서
+   전환마다 화면이 한 번씩 깜빡였다. navTransition 이 인라인으로 박는다. */
 /* ⚠️ filter: blur() 를 애니메이션하면 안 된다 — 합성이 아니라 매 프레임 리페인트라
    결과 이미지(2K)에서 프레임이 눈에 띄게 드랍됐다. transform/opacity 만 쓴다. */
 .resultReveal { animation: resultReveal var(--d-reveal) var(--ease-out) both; }

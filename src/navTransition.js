@@ -29,7 +29,21 @@ const snaps = new Map(); // screen -> { node, scrollTop }
 let layers = []; // 현재 떠 있는 고스트/딤 엘리먼트
 let pending = null; // capture() 가 남긴 "다음 렌더에서 재생할 전환"
 let suppressOnce = false; // 제스처가 이미 애니메이션을 끝냈으면 재생 생략
+let stampNext = false; // 다음 렌더에서 화면 내부 진입 애니메이션을 꺼야 하는가
 let endTimer = null;
+
+// 전환으로 들어온 화면은 내부 진입 애니메이션(.fade/.cardIn)을 재생하지 않는다.
+// 화면이 오른쪽에서 들어오는 동시에 내용이 또 떠오르면 두 번 움직여 어지럽다.
+//
+// ⚠️ 이걸 CSS(부모 속성 → animation:none)로 끄면 안 된다. 전환이 끝나고 속성을 지우는
+//    순간 그 애니메이션이 **처음부터 다시 재생**돼서, 자리 잡은 화면이 opacity 0 부터
+//    다시 올라온다 = 전환마다 한 번씩 깜빡인다. 실제로 그 버그가 났었다.
+//    되돌릴 일이 없도록 해당 엘리먼트에 인라인으로 박는다(다음 화면은 새 엘리먼트라 무관).
+function stampNoEnterAnim(mainEl) {
+  if (!mainEl) return;
+  const els = mainEl.querySelectorAll(".fade, .cardIn");
+  for (const el of els) el.style.animation = "none";
+}
 
 export function prefersReduced() {
   try {
@@ -74,7 +88,6 @@ function endTransition(appEl, mainEl) {
   endTimer = null;
   killLayers();
   resetMain(mainEl);
-  if (appEl) delete appEl.dataset.navanim;
 }
 
 function boxOf(appEl, mainEl) {
@@ -149,20 +162,22 @@ export function capture(appEl, mainEl, fromScreen, dir) {
   node.style.cssText +=
     ";position:absolute;left:0;top:0;width:100%;height:100%;flex:none;overflow:hidden;";
   snaps.set(fromScreen, { node, scrollTop: mainEl.scrollTop });
-  if (suppressOnce) {
-    suppressOnce = false;
-    pending = null;
-    return;
-  }
   // 탭바 전환은 가로로 밀지 않는다 — iOS 탭 전환에는 방향이 없다.
   // 스냅샷만 남기고(뒤로가기 제스처가 나중에 쓴다) 화면은 .fade 로 부드럽게 바뀐다.
   if (dir === "tab") {
     pending = null;
+    stampNext = false;
+    return;
+  }
+  // 방향이 있는 전환(push/pop/제스처 pop)은 내부 진입 애니메이션을 끈다.
+  stampNext = true;
+  if (suppressOnce) {
+    // 제스처가 이미 끝까지 재생했다 — 화면만 갈아끼우면 된다
+    suppressOnce = false;
+    pending = null;
     return;
   }
   pending = { dir, from: fromScreen };
-  // 화면 자체 진입 애니메이션(.fade)을 끈다 — push 와 겹치면 두 번 움직인다
-  if (appEl) appEl.dataset.navanim = "1";
 }
 
 export function savedScroll(screen) {
@@ -179,6 +194,8 @@ export function run(appEl, mainEl) {
   const p = pending;
   pending = null;
   if (!appEl || !mainEl) return;
+  // 페인트 전에 박아야 한 프레임도 재생되지 않는다 (run 은 useLayoutEffect 에서 호출된다)
+  if (stampNext) { stampNoEnterAnim(mainEl); stampNext = false; }
   const snap = p && snaps.get(p.from);
   if (!snap) {
     endTransition(appEl, mainEl);
@@ -230,7 +247,6 @@ export function beginPop(appEl, mainEl, targetScreen) {
 
   killLayers();
   clearTimeout(endTimer);
-  appEl.dataset.navanim = "1"; // 커밋된 뒤 새 화면이 또 페이드업하지 않게
   const w = mainEl.getBoundingClientRect().width || 1;
   const b = boxOf(appEl, mainEl);
 
