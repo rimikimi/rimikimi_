@@ -33,15 +33,33 @@ export async function saveToGallery(admin, user, { conceptId, conceptTitle, base
   } catch (_) { /* 청소 실패는 저장 자체엔 영향 없음 */ }
 
   // 1) base64 -> Uint8Array
-  const bin = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+  let bin = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+  let outMime = mimeType || "image/png";
+
+  // 버킷 한도(10MiB) 초과분은 JPEG 로 재인코딩해서 살린다.
+  // 실측 2026-08-25: 드레스룸 2K PNG 원본이 10MiB 를 넘어 upload 가
+  // "The object exceeded the maximum allowed size" 로 실패 — 화면엔 떴는데
+  // 내 사진엔 안 남았다. q92 JPEG 면 2~4MB 로 줄고 화질 손실은 미미하다.
+  const BUCKET_LIMIT = 10 * 1024 * 1024;
+  if (bin.length > BUCKET_LIMIT - 256 * 1024) {
+    try {
+      const sharp = (await import("sharp")).default;
+      const out = await sharp(Buffer.from(bin)).jpeg({ quality: 92 }).toBuffer();
+      bin = new Uint8Array(out);
+      outMime = "image/jpeg";
+      console.log(`[gallery] oversized original re-encoded: ${base64.length} b64 → ${out.length} bytes jpeg`);
+    } catch (e) {
+      console.error("[gallery re-encode failed]", e?.message || e);
+    }
+  }
 
   // 2) Storage 경로: <user_id>/<timestamp>_<conceptId>.<ext>
-  const ext = (mimeType || "image/png").split("/")[1] || "png";
+  const ext = outMime.split("/")[1] || "png";
   const path = `${user.id}/${Date.now()}_${conceptId}.${ext}`;
 
   const up = await admin.storage
     .from("gallery")
-    .upload(path, bin, { contentType: mimeType || "image/png", upsert: false });
+    .upload(path, bin, { contentType: outMime, upsert: false });
 
   if (up.error) return { error: "upload: " + up.error.message };
 
@@ -52,7 +70,7 @@ export async function saveToGallery(admin, user, { conceptId, conceptTitle, base
     concept_id: conceptId,
     concept_title: conceptTitle || null,
     storage_path: path,
-    mime_type: mimeType || "image/png",
+    mime_type: outMime,
     expires_at: expiresAt,
   }).select("id").single();
 

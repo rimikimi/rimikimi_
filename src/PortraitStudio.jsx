@@ -1999,7 +1999,9 @@ export default function PortraitStudio() {
         // 사진 복원: 768×1024 로 강제 크롭하지 말고 올린 사진의 비율을 그대로 유지
         keepRatio: isRestoreConcept(selected),
           // 묶음 생성 장수. 인생네컷은 자체 컷 수가 있고, 매직부스는 일회용 사진이라 1장 고정.
-        count: (isFourcut(selected) || isArtConcept(selected)) ? 1 : batchCount,
+        // ⚠️ 드레스룸은 매직부스 카테고리지만 묶음 생성이 된다 — isArtConcept 만 보면
+        //    UI 에선 3/6/12 를 골랐는데 요청은 1장으로 나간다(실사용 2회 재현된 버그).
+        count: (isFourcut(selected) || (isArtConcept(selected) && !isDressroom(selected))) ? 1 : batchCount,
         // 커플: 두 번째 참조 사진(상대)
         ...(isCoupleConcept(selected) && partnerPhoto ? { photo2: partnerPhoto } : {}),
         // 드레스룸: 의상 1~5장 + 스타일(mirror|model)
