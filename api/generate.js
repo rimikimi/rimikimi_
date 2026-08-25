@@ -1159,10 +1159,6 @@ export default async function handler(req, res) {
       const inline = part.inlineData || part.inline_data;
       let rawMime = inline.mimeType || inline.mime_type || "image/png";
       let rawOut = inline.data;
-      // 드레스룸: 최종 5:7 크롭 (단건 경로와 동일 — 워터마크 전에)
-      if (isDressroom) {
-        rawOut = await cropToRatio(rawOut, 5 / 7);
-      }
       // 결제로 만든 것만 깨끗하다 — 원본에 찍어야 갤러리 다운로드로 우회되지 않는다
       if (!useCredit) {
         const wm = await applyWatermark(rawOut, rawMime);
@@ -1345,11 +1341,6 @@ export default async function handler(req, res) {
   let rawData = inline.data;
   if (isRestore) {
     rawData = await cropToRatio(rawData, srcAspect(base64, mimeType));
-  }
-  // 드레스룸: 최종 5:7 (오너 지정). API 비율 옵션에 5:7 이 없어서 3:4 로 생성한 뒤
-  // 좌우를 살짝 다듬는다 (0.75 → 0.714, 손실 미미). 워터마크 전에 잘라야 로고가 안 잘린다.
-  if (isDressroom) {
-    rawData = await cropToRatio(rawData, 5 / 7);
   }
 
   // 6.4) 워터마크 — 결제(크레딧)로 만든 것만 깨끗하다.
