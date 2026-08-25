@@ -769,9 +769,11 @@ export default async function handler(req, res) {
     "items be the focus. If a dress or a full set is uploaded, no extra garments are needed.\n\n" +
     (dressMirror
       ? "SCENE — full-body MIRROR SELFIE in a clothing-store fitting room. The picture IS the " +
-        "view in the single mirror the person is shooting into — the frame shows simply: the " +
-        "person, the curtain behind, and the floor. NO other mirrors anywhere: no mirror frames " +
-        "at the edges, no mirror-within-mirror reflection, no repeated copies of the person. " +
+        "view in the single mirror the person is shooting into — the frame shows ONLY three " +
+        "things: the person, the taupe curtain behind them, and the wooden floor. THERE IS NO " +
+        "OTHER MIRROR IN THE ROOM. Nothing reflective appears at either side edge of the " +
+        "picture: no mirror frame, no glass panel, no metal trim, no second reflection, no " +
+        "repeated copy of the person, no infinite-mirror effect. The side walls are plain. " +
         "BEHIND: a floor-length TAUPE SUEDE fitting-room curtain — soft greige-taupe, heavy " +
         "matte suede texture with soft vertical folds, drawn mostly closed, filling the " +
         "background — and a light wooden floor. The person holds their phone at chest height, " +
