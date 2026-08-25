@@ -68,17 +68,38 @@ async function applyWatermark(base64, mime) {
     const markH = Math.round(markW * (400 / 1200)); // 원본 뷰박스 비율
     const pad = Math.round(W * 0.035);
 
-    const mark = await sharp(Buffer.from(WORDMARK_SVG))
+    const left = W - markW - pad;
+    const top = H - markH - pad;
+
+    // 배경 밝기에 맞춰 워드마크 색을 뒤집는다.
+    // 흰 워드마크 고정이면 흰 옷·하이키 배경 위에서 거의 안 보인다(실측: 흰 티셔츠 위에서
+    // 읽히긴 하나 흐림). 그 자리 평균 밝기를 재서 밝으면 잉크색, 어두우면 흰색을 쓴다.
+    let bright = false;
+    try {
+      const stat = await sharp(Buffer.from(base64, "base64"))
+        .rotate()
+        .extract({ left, top, width: markW, height: markH })
+        .greyscale()
+        .stats();
+      bright = (stat.channels?.[0]?.mean ?? 0) > 140;
+    } catch (_) { /* 못 재면 흰색(기본) */ }
+
+    const svg = bright ? WORDMARK_SVG.replace(/#ffffff/g, "#231f20") : WORDMARK_SVG;
+    const mark = await sharp(Buffer.from(svg))
       .resize(markW, markH, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
       .png()
       .toBuffer();
-    // 밝은 사진에서도 보이도록 뒤에 아주 옅은 어두운 번짐을 깔고 그 위에 흰 워드마크를 얹는다
-    const shadow = await sharp(mark).blur(6).png().toBuffer();
+    // 반대색 번짐을 뒤에 깔아 경계를 살린다 (밝은 배경엔 밝은 번짐, 어두운 배경엔 어두운 번짐)
+    const halo = await sharp(mark)
+      .blur(7)
+      .negate({ alpha: false })
+      .png()
+      .toBuffer();
 
     const out = await img
       .composite([
-        { input: shadow, left: W - markW - pad, top: H - markH - pad, blend: "over", opacity: 0.28 },
-        { input: mark, left: W - markW - pad, top: H - markH - pad, blend: "over", opacity: 0.82 },
+        { input: halo, left, top, blend: "over", opacity: 0.35 },
+        { input: mark, left, top, blend: "over", opacity: 0.9 },
       ])
       .toBuffer();
     return { base64: out.toString("base64"), mime: mime || "image/png" };
