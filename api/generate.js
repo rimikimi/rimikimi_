@@ -794,7 +794,10 @@ export default async function handler(req, res) {
         "no light stand, no reflector, no cables, no camera. The frame contains ONLY the " +
         "person, the backdrop and the floor — a finished retouched lookbook photo, not a " +
         "behind-the-scenes shot. Professional lookbook photography, 50mm at f/5.6.") +
-    "\n\nPhotorealistic skin and fabric texture, true-to-life garment colours. " +
+    "\n\nOUTPUT FORMAT: a VERTICAL PORTRAIT photograph in 3:4 aspect ratio (taller than wide, " +
+    "like a standard phone portrait photo). Do NOT copy the aspect ratio of any reference image — " +
+    "reference images may be tall phone screenshots; the output is always 3:4.\n" +
+    "Photorealistic skin and fabric texture, true-to-life garment colours. " +
     "One person only — no other people. No text, no logo, no watermark, no border or overlay.";
 
   // cutCount 가 오면 스트립 한 장, 아니면 구버전(컷별) — 구버전 앱 호환
@@ -942,9 +945,12 @@ export default async function handler(req, res) {
     ],
     // Pro 는 2K 고해상도로. (기본 모델은 편집모드 비율보존 위해 설정 생략 — 기존 동작 유지)
     // 스트립은 분할 수에 맞는 비율을 명시해야 칸이 잘리지 않는다.
+    // 드레스룸도 3:4 를 명시한다 — 편집 모드는 입력 비율을 따라가는데, 의상이 쇼핑몰
+    // 풀스크린 캡처(아이폰 화면비 1:2.16)면 출력이 그 비율로 늘어났다(실측 1408×3040).
     ...(isPro
       ? { generationConfig: { imageConfig: { imageSize: "2K",
-          ...(isStrip ? { aspectRatio: STRIP_RATIO[stripN] } : {}) } } }
+          ...(isStrip ? { aspectRatio: STRIP_RATIO[stripN] }
+            : isDressroom ? { aspectRatio: "3:4" } : {}) } } }
       : {}),
   });
 
