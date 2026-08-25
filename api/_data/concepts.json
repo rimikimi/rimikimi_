@@ -1,5 +1,17 @@
 [
  {
+  "id": "793",
+  "title": "드레스룸",
+  "title_en": "Dressroom",
+  "category": "🪄 매직 부스",
+  "categories": [
+   "🪄 매직 부스"
+  ],
+  "mode": "dressroom",
+  "sensitive": false,
+  "text": "The provided image shows a clothing item or outfit. Create a full-body photograph of a person naturally WEARING that exact clothing — same colours, same pattern, same buttons and hardware, same fit and length; do not redesign or recolour it. If the item alone does not make a complete outfit, complete the look with simple well-matching neutral pieces. The person stands against a seamless off-white studio backdrop in a natural relaxed model pose, full body head to shoes. Soft dimensional studio lighting shown only through its effect — no photography equipment in frame. Professional lookbook photography, photorealistic fabric texture. One person only. No text, no logo, no watermark, no border."
+ },
+ {
   "id": "792",
   "title": "즉석 사진",
   "title_en": "Instant Photo",

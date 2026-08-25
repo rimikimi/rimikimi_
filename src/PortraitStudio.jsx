@@ -226,6 +226,13 @@ function isFeatureConcept(p) {
   return isArtConcept(p) || isIdPhoto(p) || isFourcut(p);
 }
 
+// 드레스룸 — 의상 사진(최대 5장)을 입은 내 모습. 매직 부스 카테고리에 살지만
+// 동작은 정반대다: 아트 변환(1장·얼굴 미유지)이 아니라 본인 사진 + 의상 참조로
+// 얼굴을 유지한 채 입힌다. 그래서 art 판정보다 먼저 확인해야 한다.
+function isDressroom(concept) {
+  return concept?.mode === "dressroom";
+}
+
 // 실제 공개된 순서(최신 먼저). publishAt 이 있으면 그걸 우선하고,
 // 없으면(=처음부터 공개돼 있던 것) id 로 비교한다.
 function byNewest(a, b) {
@@ -487,6 +494,21 @@ async function generateImage(accessToken, dataUrl, promptText, conceptMeta = {})
   const mimeType = m[1];
   const base64 = m[2];
 
+  // 드레스룸: 의상 사진(1~5장)도 축소해서 함께 보냄.
+  // 의상은 얼굴 디테일이 필요 없어 더 작게(896px) 줄인다 — 6장이 한 요청에 실리므로
+  // Vercel 본문 한도(4.5MB)를 넘기지 않기 위해서다.
+  let garments = null;
+  if (Array.isArray(conceptMeta.garments) && conceptMeta.garments.length) {
+    garments = [];
+    for (const g of conceptMeta.garments.slice(0, 5)) {
+      let u;
+      try { u = await shrinkImage(g, 896, 0.85); } catch (_) { u = g; }
+      const gm = u.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
+      if (gm) garments.push({ mimeType: gm[1], base64: gm[2] });
+    }
+    if (!garments.length) garments = null;
+  }
+
   // 커플 컨셉: 두 번째 참조 사진(상대)도 같은 방식으로 축소해서 함께 보냄
   let mimeType2 = null, base64_2 = null;
   if (conceptMeta.photo2) {
@@ -524,6 +546,8 @@ async function generateImage(accessToken, dataUrl, promptText, conceptMeta = {})
         count: conceptMeta.count,
         // 인생네컷: 스트립 분할 수 — 서버가 이걸 보고 한 장으로 만든다
         cutCount: conceptMeta.cutCount,
+        // 드레스룸: 의상 1~5장 + 스타일 (프롬프트는 서버가 조립)
+        ...(garments ? { garments, dressStyle: conceptMeta.dressStyle } : {}),
         // 무료 Pro 체험(계정당 1회) — 결과화면 비교 슬라이더용
         proSample: !!conceptMeta.proSample,
         // 이 기기의 푸시 토큰. 서버가 생성을 마치면 여기로 "완성됐어요"를 쏜다.
@@ -752,6 +776,10 @@ export default function PortraitStudio() {
   });
   // 아트 변환 컨셉용 일회용 사진. localStorage 안 함 (휘발성).
   const [artPhoto, setArtPhoto] = useState(null);
+  // 드레스룸 — 의상 사진(최대 5장, 휘발성) + 스타일(mirror|model).
+  // localStorage 저장 안 함: 의상은 매번 새로 고르는 게 자연스럽고 용량도 크다.
+  const [garmentPhotos, setGarmentPhotos] = useState([]);
+  const [dressStyleKey, setDressStyleKey] = useState("mirror");
   // 커플 컨셉용 "상대 사진". 본인 사진(photo)과 완전히 분리된 슬롯이라
   // 절대 프로필을 덮어쓰지 않는다. 매번 새로 올리기 번거로우니 저장은 해둔다.
   const [partnerPhoto, setPartnerPhoto] = useState(() => {
@@ -1420,6 +1448,8 @@ export default function PortraitStudio() {
     reader.onload = () => {
       if (target === "art") setArtPhoto(reader.result);
       else if (target === "partner") setPartnerPhoto(reader.result);
+      else if (typeof target === "string" && target.startsWith("garment:"))
+        setGarmentAt(Number(target.slice(8)), reader.result);
       else setPhoto(reader.result);
       reset();
     };
@@ -1439,6 +1469,8 @@ export default function PortraitStudio() {
     }
     // 아트 변환 컨셉이면 이전 일회용 사진 비우고 들어감 (매번 새로 받음)
     if (isArtConcept(p)) setArtPhoto(null);
+    // 드레스룸도 의상은 매번 새로 (이전 코디가 남아 있으면 헷갈린다)
+    if (isDressroom(p)) { setGarmentPhotos([]); setDressStyleKey("mirror"); }
     setBatchCount(1); // 컨셉을 바꾸면 장수 선택도 초기화
     // 동의 문구가 바뀌면(본인 사진 ↔ 타인 사진 권리) 체크도 다시 받아야 한다.
     // 안 그러면 매직 부스에 들어갔는데 "타인 사진 동의 받았습니다" 가 이미 체크돼 있다.
@@ -1530,7 +1562,7 @@ export default function PortraitStudio() {
       return;
     }
     if (!selected) return; // 방어적 — home 화면은 항상 selected 와 함께 온다
-    const needArt = isArtConcept(selected);
+    const needArt = isArtConcept(selected) && !isDressroom(selected);
     writePendingContinue({
       savedAt: Date.now(),
       conceptId: selected.id,
@@ -1629,6 +1661,15 @@ export default function PortraitStudio() {
     return !showBrooklyn && !showLoginSheet && screen !== "gallery";
   }
 
+  // 하단 탭 순서 — 좌우 스와이프로 이 순서를 오간다 (갤러리 ↔ 내 사진 ↔ 프로필)
+  const TAB_ORDER = ["gallery", "mygallery", "profile"];
+  function tabNeighbor(dir) {
+    const i = TAB_ORDER.indexOf(screen);
+    if (i < 0) return null;
+    const j = i + dir;
+    return j >= 0 && j < TAB_ORDER.length ? TAB_ORDER[j] : null;
+  }
+
   // 컨셉 넘기기(좌우 스와이프)용 단순 드래그. 뒤로가기는 아래 popRef(인터랙티브 pop)가 맡는다.
   function paintDrag(px, animate) {
     const el = mainRef.current;
@@ -1660,9 +1701,12 @@ export default function PortraitStudio() {
     const edge = Math.max(44, rect.width * 0.14);
     // 왼쪽 엣지에서 시작 = 뒤로가기, 그 밖에서 시작 = (확인화면이면) 컨셉 넘기기.
     // iOS 와 같은 규칙이라 두 제스처가 서로 안 싸운다.
+    // 엣지 = 뒤로(스택이 있을 때), 본문 = 컨셉 넘기기(confirm) 또는 탭 전환(탭 화면).
+    // 갤러리는 최상위라 엣지에서 시작해도 탭 전환으로 취급한다.
+    const isTabScreen = TAB_ORDER.includes(screen);
     const mode = x >= 0 && x <= edge
-      ? (canSwipeBack() ? "back" : null)
-      : (screen === "confirm" ? "concept" : null);
+      ? (canSwipeBack() ? "back" : isTabScreen ? "tab" : null)
+      : (screen === "confirm" ? "concept" : isTabScreen ? "tab" : null);
     if (!mode) return;
     swipeRef.current = { mode, x0: tt.clientX, y0: tt.clientY, t0: Date.now(), w: rect.width, axis: null };
   }
@@ -1696,6 +1740,11 @@ export default function PortraitStudio() {
       const px = dx <= 0 ? 0 : dx;
       if (popRef.current) popRef.current.move(px);
       else paintDrag(Math.min(px, s.w * 0.9), false); // 스냅샷이 없으면 예전 방식
+    } else if (s.mode === "tab") {
+      // 탭 전환 — 이동할 이웃 탭이 있는 방향만 따라오고, 없으면 고무줄
+      const hasNext = tabNeighbor(1), hasPrev = tabNeighbor(-1);
+      const eff = (dx < 0 && !hasNext) || (dx > 0 && !hasPrev) ? dx * 0.25 : dx * 0.9;
+      paintDrag(Math.max(-s.w * 0.6, Math.min(eff, s.w * 0.6)), false);
     } else {
       // 컨셉 넘기기는 양방향 — 끝에서 고무줄처럼 저항
       paintDrag(Math.max(-s.w * 0.5, Math.min(dx, s.w * 0.5)) * 0.9, false);
@@ -1724,6 +1773,21 @@ export default function PortraitStudio() {
         const el = mainRef.current;
         if (el) el.style.opacity = "";
         goBack();
+      } else {
+        endDrag();
+      }
+      return;
+    }
+
+    if (s.mode === "tab") {
+      // 왼쪽으로 밀면 다음 탭, 오른쪽으로 밀면 이전 탭
+      const enoughTab = Math.abs(dx) > s.w * 0.25 || (Math.abs(dx) > 50 && v > 0.35);
+      const target = enoughTab ? tabNeighbor(dx < 0 ? 1 : -1) : null;
+      if (target) {
+        paintDrag(0, false);
+        const el = mainRef.current;
+        if (el) el.style.opacity = "";
+        goTab(target);
       } else {
         endDrag();
       }
@@ -1791,10 +1855,17 @@ export default function PortraitStudio() {
   async function startGenerate() {
     // 사진부터 확인 — 스토어 화면을 거쳐 돌아오면 사진 없이 confirm 에 설 수 있다.
     // (그대로 두면 스피너 → 네트워크 왕복 → 에러라서 "왜 안 되지" 가 된다)
-    const needArt = isArtConcept(selected);
+    const needArt = isArtConcept(selected) && !isDressroom(selected);
     if (!(needArt ? artPhoto : photo)) {
       setScreen("home");
       setPayToast(needArt ? "먼저 변환할 사진을 올려주세요 🙂" : "먼저 사진을 올려주세요 🙂");
+      setTimeout(() => setPayToast(""), 3000);
+      return;
+    }
+    // 드레스룸은 의상이 최소 1장 있어야 생성된다
+    if (isDressroom(selected) && garmentPhotos.length === 0) {
+      setScreen("home");
+      setPayToast(t("dress.needGarment"));
       setTimeout(() => setPayToast(""), 3000);
       return;
     }
@@ -1905,7 +1976,7 @@ export default function PortraitStudio() {
 
     try {
       const accessToken = session?.access_token;
-      const art = isArtConcept(selected);
+      const art = isArtConcept(selected) && !isDressroom(selected);
       const photoToUse = art ? artPhoto : photo;
       // 증명사진이면 선택한 정장색/배경색으로 프롬프트를 동적 생성
       let promptText = selected.text;
@@ -1931,6 +2002,10 @@ export default function PortraitStudio() {
         count: (isFourcut(selected) || isArtConcept(selected)) ? 1 : batchCount,
         // 커플: 두 번째 참조 사진(상대)
         ...(isCoupleConcept(selected) && partnerPhoto ? { photo2: partnerPhoto } : {}),
+        // 드레스룸: 의상 1~5장 + 스타일(mirror|model)
+        ...(isDressroom(selected) && garmentPhotos.length
+          ? { garments: garmentPhotos, dressStyle: dressStyleKey }
+          : {}),
         ...idMeta,
       };
       // 무료 Pro 체험 재호출용 입력 보관 (인생네컷 제외 — 단일 컷만 비교)
@@ -2082,7 +2157,8 @@ export default function PortraitStudio() {
   //               프로필을 절대 건드리면 안 된다.
   //   "partner" = 커플 컨셉의 "상대 사진". 이것도 프로필과 별개 슬롯이다.
   async function pickPhoto(target = "profile") {
-    const slot = ["art", "partner"].includes(target) ? target : "profile";
+    const slot = ["art", "partner"].includes(target) || target.startsWith("garment:")
+      ? target : "profile";
     photoTargetRef.current = slot; // 웹 file input(handleFile)이 읽는다
     if (isNative()) {
       const dataUrl = await nativePickPhoto("prompt");
@@ -2090,10 +2166,24 @@ export default function PortraitStudio() {
       // ref 가 아니라 이 호출이 캡처한 slot 을 쓴다 (시트가 열린 사이 ref 가 바뀔 수 있음)
       if (slot === "art") setArtPhoto(dataUrl);
       else if (slot === "partner") setPartnerPhoto(dataUrl);
+      else if (slot.startsWith("garment:")) setGarmentAt(Number(slot.slice(8)), dataUrl);
       else setPhoto(dataUrl);
       return;
     }
     fileRef.current?.click();
+  }
+
+  // 의상 슬롯 채우기/비우기 — idx 자리에 넣되 배열은 빈 값 없이 압축 유지
+  function setGarmentAt(idx, dataUrl) {
+    setGarmentPhotos((prev) => {
+      const next = prev.slice();
+      if (idx >= 0 && idx < next.length) next[idx] = dataUrl;
+      else next.push(dataUrl);
+      return next.slice(0, 5);
+    });
+  }
+  function removeGarmentAt(idx) {
+    setGarmentPhotos((prev) => prev.filter((_, i) => i !== idx));
   }
 
   // 스플래시는 부팅 타이머 + 세션 확인이 끝날 때까지 유지 (빈 화면 깜빡임 방지)
@@ -2166,7 +2256,8 @@ export default function PortraitStudio() {
 
       <main style={S.main} ref={mainRef}>
         {screen === "home" && (() => {
-          const art = isArtConcept(selected);
+          const art = isArtConcept(selected) && !isDressroom(selected);
+          const dress = isDressroom(selected);
           const couple = isCoupleConcept(selected);
           const currentPhoto = art ? artPhoto : photo;
           const onPickAny = () => pickPhoto(art ? "art" : "profile");
@@ -2178,6 +2269,10 @@ export default function PortraitStudio() {
             <HomeScreen
               onOpenGuide={() => setGuideMode("photo")}
               isArt={art}
+              isDress={dress}
+              garmentPhotos={garmentPhotos}
+              onPickGarment={(i) => pickPhoto("garment:" + i)}
+              onRemoveGarment={removeGarmentAt}
               isCouple={couple}
               photo={currentPhoto}
               onPick={onPickAny}
@@ -2221,8 +2316,11 @@ export default function PortraitStudio() {
         )}
         {screen === "confirm" && selected && (
           <ConfirmScreen
-            photo={isArtConcept(selected) ? artPhoto : photo}
-            art={isArtConcept(selected)}
+            photo={isArtConcept(selected) && !isDressroom(selected) ? artPhoto : photo}
+            art={isArtConcept(selected) && !isDressroom(selected)}
+            dressroom={isDressroom(selected)}
+            dressStyleKey={dressStyleKey} setDressStyleKey={setDressStyleKey}
+            garmentCount={garmentPhotos.length}
             partnerPhoto={isCoupleConcept(selected) ? partnerPhoto : null}
             canSwitch={(filtered.length ? filtered : visiblePool).length > 1}
             batchCount={batchCount} setBatchCount={setBatchCount}
@@ -2418,8 +2516,9 @@ function HomeScreen({
   ageConfirmed, setAgeConfirmed, onContinue, onBack,
   isArt = false, showAds = false,
   isCouple = false, partnerPhoto = null, onPickPartner, onOpenGuide,
+  isDress = false, garmentPhotos = [], onPickGarment, onRemoveGarment,
 }) {
-  const ready = photo && (!isCouple || partnerPhoto) && ageConfirmed;
+  const ready = photo && (!isCouple || partnerPhoto) && (!isDress || garmentPhotos.length > 0) && ageConfirmed;
   return (
     <div className="fade">
       <div style={S.navRow}>
@@ -2445,6 +2544,15 @@ function HomeScreen({
               {t("art.hero.desc4")}
             </p>
           </>
+        ) : isDress ? (
+          <>
+            <h1 style={S.heroTitle}>{t("dress.hero.title")}</h1>
+            <p style={S.heroDesc}>
+              {t("dress.hero.desc1")}<br />
+              {t("dress.hero.desc2")}<br />
+              {t("dress.hero.desc3")}
+            </p>
+          </>
         ) : isCouple ? (
           <>
             <h1 style={S.heroTitle}>{t("couple.hero.title")}</h1>
@@ -2467,7 +2575,57 @@ function HomeScreen({
         )}
       </div>
 
-      {isCouple ? (
+      {isDress ? (
+        <>
+          {/* 본인 사진 — 기존 프로필 슬롯 그대로 */}
+          {!photo ? (
+            <button style={S.uploadBox} onClick={onPick}>
+              <div style={S.uploadIcon}>＋</div>
+              <div style={S.uploadText}>{t("dress.uploadMe")}</div>
+              <div style={S.uploadHint}>{t("step2.uploadHint")}</div>
+            </button>
+          ) : (
+            <>
+              <div style={S.previewWrap}>
+                <img src={photo} alt="업로드한 사진" style={S.previewImg} />
+              </div>
+              <button style={S.changePhotoBtn} onClick={onPick}>
+                {t("step2.changePhoto")}
+              </button>
+            </>
+          )}
+
+          {/* 의상 슬롯 — 최대 5장, 1장 필수. 채워진 것 + 추가 슬롯 하나만 노출 */}
+          <div style={S.garmentLabel}>{t("dress.garmentLabel")}</div>
+          <div style={S.garmentRow} data-hscroll="">
+            {garmentPhotos.map((g, i) => (
+              <div key={i} style={S.garmentSlot}>
+                <img src={g} alt={"의상 " + (i + 1)} style={S.garmentImg} />
+                <button
+                  type="button"
+                  style={S.garmentRemove}
+                  aria-label="의상 삭제"
+                  onClick={() => onRemoveGarment && onRemoveGarment(i)}
+                >×</button>
+              </div>
+            ))}
+            {garmentPhotos.length < 5 && (
+              <button
+                type="button"
+                style={S.garmentAdd}
+                onClick={() => onPickGarment && onPickGarment(garmentPhotos.length)}
+              >
+                <span style={S.garmentAddPlus}>＋</span>
+                <span style={S.garmentAddLabel}>
+                  {garmentPhotos.length === 0 ? t("dress.addFirst") : t("dress.addMore")}
+                </span>
+              </button>
+            )}
+          </div>
+          {/* 확인 질문 없음 — 안내 한 줄만 (오너 확정) */}
+          <p style={S.garmentNote}>{t("dress.autoNote")}</p>
+        </>
+      ) : isCouple ? (
         <>
           <div style={S.coupleRow}>
             <CoupleSlot
@@ -3496,6 +3654,7 @@ function ConfirmScreen({
   photo, prompt, freeLeft, credits, canGenerate, art,
   idPhoto, idSuit, setIdSuit, idBg, setIdBg,
   fourcut, fourcutCount, setFourcutCount, fourcutStyleKey, setFourcutStyleKey,
+  dressroom = false, dressStyleKey = "mirror", setDressStyleKey, garmentCount = 0,
   onBack, onGenerate, onStore, partnerPhoto = null, canSwitch = false,
   batchCount = 1, setBatchCount, unlimited = false,
 }) {
@@ -3540,6 +3699,33 @@ function ConfirmScreen({
         <div style={S.promptPeek}>{t(art ? "step3.peekArt" : "step3.peek")}</div>
         {canSwitch && <div style={S.swipeHint}>{t("step3.swipeHint")}</div>}
       </div>
+
+      {/* 드레스룸: 거울셀카 / 모델컷 선택 + 안내 한 줄 */}
+      {dressroom && (
+        <div style={S.idOptCard}>
+          <div style={S.idOptLabel}>{t("dress.styleLabel")}</div>
+          <div style={S.idSuitRow}>
+            {[
+              { key: "mirror", label: t("dress.style.mirror") },
+              { key: "model", label: t("dress.style.model") },
+            ].map((st) => (
+              <button
+                key={st.key}
+                onClick={() => { hap.tap(); setDressStyleKey && setDressStyleKey(st.key); }}
+                style={{
+                  ...S.idSuitChip,
+                  ...(dressStyleKey === st.key ? S.idSuitChipOn : null),
+                }}
+              >
+                {st.label}
+              </button>
+            ))}
+          </div>
+          <div style={S.garmentNoteSmall}>
+            {t("dress.confirmNote", { n: garmentCount })}
+          </div>
+        </div>
+      )}
 
       {/* 한 번에 여러 장 — 유료 전용.
           인생네컷은 자체 컷 수가 있고, 매직부스는 일회용 사진이라 제외 */}
@@ -4805,6 +4991,34 @@ const S = {
   batchBar: {
     display: "flex", alignItems: "center", gap: 8, marginTop: 8,
   },
+  // 드레스룸 의상 슬롯
+  garmentLabel: { fontSize: 13, fontWeight: 700, color: INK, margin: "16px 0 8px" },
+  garmentRow: {
+    display: "flex", gap: 8, overflowX: "auto", paddingBottom: 6,
+    WebkitOverflowScrolling: "touch",
+  },
+  garmentSlot: {
+    position: "relative", flex: "0 0 auto", width: 86, height: 110,
+    borderRadius: 12, overflow: "hidden", border: "1px solid rgba(35,31,32,0.10)",
+    background: "#fff",
+  },
+  garmentImg: { width: "100%", height: "100%", objectFit: "cover", display: "block" },
+  garmentRemove: {
+    position: "absolute", top: 4, right: 4, width: 22, height: 22, borderRadius: 11,
+    border: "none", background: "rgba(20,16,14,0.55)", color: "#fff",
+    fontSize: 13, lineHeight: "22px", padding: 0, cursor: "pointer",
+  },
+  garmentAdd: {
+    flex: "0 0 auto", width: 86, height: 110, borderRadius: 12,
+    border: "1.5px dashed rgba(35,31,32,0.25)", background: "rgba(255,255,255,0.6)",
+    display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+    gap: 4, cursor: "pointer", color: "#8a7f6e",
+    fontFamily: "'Quicksand', sans-serif",
+  },
+  garmentAddPlus: { fontSize: 22, lineHeight: 1, color: ACCENT },
+  garmentAddLabel: { fontSize: 11, fontWeight: 600 },
+  garmentNote: { fontSize: 12, color: "#8a7f6e", margin: "8px 2px 0" },
+  garmentNoteSmall: { fontSize: 11.5, color: "#8a7f6e", marginTop: 8 },
   batchBtnDone: { borderColor: "#1a7f4b", color: "#1a7f4b" },
   batchIdx: { fontSize: 11.5, fontWeight: 700, opacity: 0.5, marginRight: "auto" },
   batchBtn: {

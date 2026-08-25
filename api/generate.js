@@ -538,6 +538,10 @@ export default async function handler(req, res) {
     // 커플: 두 번째 참조 사진(상대). 프롬프트가 "first/second reference image" 를
     // 지칭하므로 반드시 base64 → base64_2 순서로 넣는다.
     mimeType2, base64_2,
+    // 드레스룸: 의상 사진 1~5장 [{mimeType,base64}] + 스타일("mirror"|"model").
+    // 프롬프트는 전부 서버가 조립한다 — 폴라로이드처럼 반복 튜닝할 게 많아서,
+    // 문구를 서버에 두면 앱 빌드 없이 고칠 수 있다.
+    garments, dressStyle,
     // 묶음 생성 장수 (1/3/6/12). 요금표 밖의 값은 1장으로 취급.
     count,
     // 이 기기의 FCM 토큰(네이티브만). 생성이 끝나면 여기로 "완성됐어요"를 쏜다.
@@ -729,9 +733,73 @@ export default async function handler(req, res) {
     "Background: a simple, clean, fairly uniform studio-style background that fits the theme, so the cut composites cleanly into a photo strip. " +
     "Bright, clean, flattering lighting. Sharp focus, photorealistic, true-to-life skin. Exactly one person in frame.";
 
+  // ── 드레스룸 (2026-08-25) ─────────────────────────────────────────────
+  // 의상 사진(최대 5장)을 입은 내 모습을 만든다. Higgsfield 로 케이스별(상의만/
+  // 상+하/3장 레이어드/신발 포함 4장) 실측해 확정한 프롬프트를 서버에서 조립한다.
+  // 확정 사양: 최대 5장(아우터·상의·하의·신발·가방) / 확인 질문 없음(빠진 의상은
+  // 모델이 판단) / 거울셀카=토프 스웨이드 커튼 피팅룸 / 모델컷=오프화이트 무지.
+  const GARMENT_MAX = 5;
+  const garmentList = (Array.isArray(garments) ? garments : [])
+    .filter((g) => g && typeof g.base64 === "string" && /^image\//.test(g.mimeType || ""))
+    .slice(0, GARMENT_MAX);
+  const isDressroom = garmentList.length > 0;
+  const dressMirror = dressStyle !== "model"; // 기본 = 거울셀카
+
+  // 참조 순서: [본인 사진] + [의상 1..N]. 서수(SECOND, THIRD…)가 이 순서를 가리킨다.
+  const ORDINALS = ["SECOND", "THIRD", "FOURTH", "FIFTH", "SIXTH"];
+  const garmentListing = garmentList
+    .map((_, i) => `the ${ORDINALS[i]} reference image is one of the garments/items`)
+    .join(", ");
+
+  const dressroomInstruction =
+    "Virtual fitting-room photo. The FIRST reference image shows a person — reproduce this " +
+    "person's exact facial identity: same face, bone structure, eyes, nose, lips, same hair, " +
+    "same natural body proportions. " +
+    `The remaining ${garmentList.length} reference image(s) show clothing/fashion items: ` +
+    garmentListing + ". " +
+    "The person is WEARING ALL of these EXACT items together as one outfit. First identify what " +
+    "each item is (top, bottom, dress, outerwear, shoes, bag, accessory), then dress the person " +
+    "in all of them with a natural, correct layering order (outerwear over tops, shoes on feet, " +
+    "a bag carried or held naturally). Reproduce EVERY item exactly — same colours, same pattern, " +
+    "same buttons and hardware, same fabric, same fit and length. Do not redesign, recolour or " +
+    "simplify any item.\n\n" +
+    // 빠진 부위는 묻지 않고 모델이 채운다 (오너 확정: 확인 단계 없음)
+    "If the uploaded items do not make a complete outfit (e.g. only a top, or only shoes), " +
+    "complete the look yourself with simple, well-matching neutral pieces that let the uploaded " +
+    "items be the focus. If a dress or a full set is uploaded, no extra garments are needed.\n\n" +
+    (dressMirror
+      ? "SCENE — full-body MIRROR SELFIE in a clothing-store fitting room. The picture IS the " +
+        "view in the single mirror the person is shooting into — the frame shows simply: the " +
+        "person, the curtain behind, and the floor. NO other mirrors anywhere: no mirror frames " +
+        "at the edges, no mirror-within-mirror reflection, no repeated copies of the person. " +
+        "BEHIND: a floor-length TAUPE SUEDE fitting-room curtain — soft greige-taupe, heavy " +
+        "matte suede texture with soft vertical folds, drawn mostly closed, filling the " +
+        "background — and a light wooden floor. The person holds their phone at chest height, " +
+        "phone visible but NOT covering the face. FULL BODY head to shoes, natural relaxed " +
+        "mirror-selfie stance.\n" +
+        "LIGHTING — bright, soft and flattering like a well-lit modern retail fitting room: " +
+        "overall bright neutral-warm ambience, only a GENTLE hint of warm downlight from above. " +
+        "NO dramatic spotlight, NO strong pool of light, NO visible light fixtures. " +
+        "Real phone mirror-selfie feel, natural handheld framing."
+      : "SCENE — full-body MODEL CUT: the person stands against a seamless off-white studio " +
+        "backdrop in a natural relaxed model pose, body at a slight three-quarter angle, calm " +
+        "confident expression. FULL BODY head to shoes, generous headroom.\n" +
+        "LIGHTING — professional and dimensional, shown ONLY through its EFFECT on the person " +
+        "and the backdrop: a soft key from the upper left sculpting gentle shadows along the " +
+        "garment folds, a subtle warm rim highlight along the hair and shoulders, a soft " +
+        "vertical gradient on the seamless, and a soft natural shadow anchoring the feet. " +
+        "ABSOLUTELY NO photography equipment anywhere in the frame: no softbox, no umbrella, " +
+        "no light stand, no reflector, no cables, no camera. The frame contains ONLY the " +
+        "person, the backdrop and the floor — a finished retouched lookbook photo, not a " +
+        "behind-the-scenes shot. Professional lookbook photography, 50mm at f/5.6.") +
+    "\n\nPhotorealistic skin and fabric texture, true-to-life garment colours. " +
+    "One person only — no other people. No text, no logo, no watermark, no border or overlay.";
+
   // cutCount 가 오면 스트립 한 장, 아니면 구버전(컷별) — 구버전 앱 호환
   const isStrip = isFourcut && !!STRIP_GRID[Number(cutCount)];
-  const conceptInstruction = isFourcut
+  const conceptInstruction = isDressroom
+    ? dressroomInstruction
+    : isFourcut
     ? (isStrip ? stripInstruction : fourcutInstruction)
     : isIdPhoto
     ? idInstruction
@@ -798,7 +866,7 @@ export default async function handler(req, res) {
   // "이 사람의 얼굴" 지시가 오히려 방해가 된다.
   // 표준 경로는 앵커 1장(angle="anchor")이지만, 혹시 여러 장이 와도 문장이 성립해야 한다.
   const faceClause =
-    faceRefList.length && !skipFacePrecheck
+    faceRefList.length && !skipFacePrecheck && !isDressroom
       ? (faceRefList.length > 1
           ? `\n\nThe final ${faceRefList.length} reference images are ` +
             `the SAME person's face from multiple angles — reproduce this person's facial identity exactly. ` +
@@ -853,6 +921,12 @@ export default async function handler(req, res) {
           // 커플: 두 번째 참조 사진 (순서가 곧 "first/second reference image")
           ...(hasSecond
             ? [{ inline_data: { mime_type: mimeType2, data: base64_2 } }]
+            : []),
+          // 드레스룸: 의상 1~5장 — 서수(SECOND..SIXTH)가 이 순서를 가리킨다
+          ...(isDressroom
+            ? garmentList.map((g) => ({
+                inline_data: { mime_type: g.mimeType, data: g.base64 },
+              }))
             : []),
           // 페이스 프로필 참조는 항상 맨 뒤 블록 (§3 "얼굴 참조는 항상 마지막 블록").
           // 위 faceClause 의 "The final N reference images" 가 이 위치를 가리킨다.
