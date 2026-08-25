@@ -309,17 +309,26 @@ async function getVertexToken(sa) {
 // fire-and-forget 이 아니라 응답 전에 await 한다(FCM 왕복 ~200ms).
 // 실패해도 생성 결과와는 무관하므로 삼킨다.
 async function notifyDone(pushToken, count, conceptTitle) {
-  if (!pushToken) return;
+  // 발송 결과를 반드시 남긴다. 이게 없어서 "완료 알림이 원격(FCM→APNs)으로 가는지,
+  // 로컬 예비 경로로 뜨는지"를 신고를 받고도 판별할 수 없었다 (2026-08-25).
+  //   · pushToken 없음  → 앱이 FCM 토큰을 못 얻었다는 뜻 (initPush 실패/행)
+  //   · 실패: 401 third-party auth → Firebase 에 APNs 키가 없거나 무효
+  if (!pushToken) {
+    console.log("[push] genDone: pushToken 없음 — 원격 미발송(웹이거나 앱 initPush 실패)");
+    return;
+  }
   try {
     const { sendToToken } = await import("./_lib/push.js");
-    await sendToToken(pushToken, {
+    const r = await sendToToken(pushToken, {
       title: "사진이 완성됐어요 ✨",
       body: conceptTitle
         ? `'${conceptTitle}' ${count > 1 ? count + "장 " : ""}확인해 보세요`
         : "앱을 열어 확인해 보세요",
       data: { kind: "genDone", count },
     });
-  } catch (_) { /* 알림 실패는 생성과 무관 */ }
+    if (r?.ok) console.log("[push] genDone 발송 ok:", r.name || "");
+    else console.error("[push] genDone 실패:", r?.status || "", String(r?.error || "").slice(0, 200));
+  } catch (e) { console.error("[push] genDone 예외:", e?.message || e); }
 }
 
 function vertexSA() {
