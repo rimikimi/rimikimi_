@@ -41,6 +41,53 @@ async function shrinkOutput(base64, mime) {
   }
 }
 
+// ── 워터마크 ────────────────────────────────────────────────────────────────
+// 결제(크레딧)로 만든 이미지에만 워터마크가 없다. 무료 하루 1장도, 무제한 계정도
+// 크레딧을 쓰지 않으므로 붙는다.
+//
+// ⚠️ 반드시 **원본(raw)** 에 찍는다. 화면용 축소본에만 찍으면 "내 사진"에서 원본을
+//    내려받아 그냥 우회된다(갤러리는 서명 URL 직접 다운로드다).
+// ⚠️ 실패해도 원본을 그대로 돌려준다 — 워터마크 실패가 생성 자체를 깨뜨리면 안 된다.
+let WORDMARK_SVG = null;
+async function applyWatermark(base64, mime) {
+  try {
+    const sharp = (await import("sharp")).default;
+    if (WORDMARK_SVG === null) {
+      const { readFileSync } = await import("node:fs");
+      const { fileURLToPath } = await import("node:url");
+      const path = fileURLToPath(new URL("./_lib/wordmark.svg", import.meta.url));
+      WORDMARK_SVG = readFileSync(path, "utf8");
+    }
+    const img = sharp(Buffer.from(base64, "base64")).rotate();
+    const meta = await img.metadata();
+    const W = meta.width, H = meta.height;
+    if (!W || !H) return { base64, mime };
+
+    // 가로폭의 18% — 작은 썸네일에서도 읽히고 큰 원본에서 과하지 않은 크기
+    const markW = Math.max(90, Math.round(W * 0.18));
+    const markH = Math.round(markW * (400 / 1200)); // 원본 뷰박스 비율
+    const pad = Math.round(W * 0.035);
+
+    const mark = await sharp(Buffer.from(WORDMARK_SVG))
+      .resize(markW, markH, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
+      .png()
+      .toBuffer();
+    // 밝은 사진에서도 보이도록 뒤에 아주 옅은 어두운 번짐을 깔고 그 위에 흰 워드마크를 얹는다
+    const shadow = await sharp(mark).blur(6).png().toBuffer();
+
+    const out = await img
+      .composite([
+        { input: shadow, left: W - markW - pad, top: H - markH - pad, blend: "over", opacity: 0.28 },
+        { input: mark, left: W - markW - pad, top: H - markH - pad, blend: "over", opacity: 0.82 },
+      ])
+      .toBuffer();
+    return { base64: out.toString("base64"), mime: mime || "image/png" };
+  } catch (e) {
+    console.error("[watermark failed, using original]", e?.message || e);
+    return { base64, mime };
+  }
+}
+
 // 페이스 프로필 앵커 전용 축소.
 // 일반 결과물(1024/q82)보다 크고 곱게 남긴다 — 앵커는 사용자가 화질을 직접 확인하고,
 // 이후 모든 생성에 얼굴 참조로 다시 올라가는 원본이기 때문이다.
@@ -1007,13 +1054,19 @@ export default async function handler(req, res) {
         .find((x) => x.inlineData || x.inline_data);
       if (!part) continue;
       const inline = part.inlineData || part.inline_data;
-      const rawMime = inline.mimeType || inline.mime_type || "image/png";
-      const small = await shrinkOutput(inline.data, rawMime);
+      let rawMime = inline.mimeType || inline.mime_type || "image/png";
+      let rawOut = inline.data;
+      // 결제로 만든 것만 깨끗하다 — 원본에 찍어야 갤러리 다운로드로 우회되지 않는다
+      if (!useCredit) {
+        const wm = await applyWatermark(rawOut, rawMime);
+        rawOut = wm.base64; rawMime = wm.mime;
+      }
+      const small = await shrinkOutput(rawOut, rawMime);
       let gId = null, gExp = null;
       try {
         const saved = await saveToGallery(admin, user, {
           conceptId: conceptId || 0, conceptTitle: conceptTitle || null,
-          base64: inline.data, mimeType: rawMime,
+          base64: rawOut, mimeType: rawMime,
         });
         if (saved.ok) { gId = saved.id; gExp = saved.expiresAt; }
       } catch (_) { /* 갤러리 저장 실패가 응답을 막지 않는다 */ }
@@ -1175,7 +1228,8 @@ export default async function handler(req, res) {
   }
 
   const inline = imgPart.inlineData || imgPart.inline_data;
-  const rawMime = inline.mimeType || inline.mime_type || "image/png";
+  // let — 아래 워터마크 단계에서 mime 이 바뀔 수 있다
+  let rawMime = inline.mimeType || inline.mime_type || "image/png";
 
   // 6.4) 사진 복원: 결과를 "올린 사진과 똑같은 비율"로 가운데 크롭.
   //      Gemini 가 편집 모드에서 입력 비율을 대체로 유지하지만 프리셋으로 스냅되는
@@ -1184,6 +1238,13 @@ export default async function handler(req, res) {
   let rawData = inline.data;
   if (isRestore) {
     rawData = await cropToRatio(rawData, srcAspect(base64, mimeType));
+  }
+
+  // 6.4) 워터마크 — 결제(크레딧)로 만든 것만 깨끗하다.
+  //      축소 전 원본에 찍어야 아래 갤러리 저장분에도 함께 들어간다.
+  if (!useCredit) {
+    const wm = await applyWatermark(rawData, rawMime);
+    rawData = wm.base64; rawMime = wm.mime;
   }
 
   // 6.5) 응답 전 이미지 축소 (Vercel 4.5MB 한도 초과로 본문 잘리는 "오류 200" 방지 + 전송 속도↑)
