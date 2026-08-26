@@ -156,7 +156,10 @@ function drawSticker(ctx, st, w, h) {
 }
 
 // 프리셋의 기본 효과 조합 — 칩 하나가 "완성된 룩"이 되게 한다 (토이=비네트, 일회용=그레인…)
-const fxOf = (p) => ({ grain: p?.fx?.grain || 0, vignette: p?.fx?.vignette || 0, leak: p?.fx?.leak || 0 });
+const fxOf = (p) => ({
+  grain: p?.fx?.grain || 0, vignette: p?.fx?.vignette || 0, leak: p?.fx?.leak || 0,
+  glow: p?.fx?.glow || 0, blur: p?.fx?.blur || 0, shake: p?.fx?.shake || 0,
+});
 
 // src(1장) 또는 srcs(여러 장, 최대 10) 를 받는다. 여러 장이면 필터/효과는 전체
 // 공통(한 번 고르면 전부 적용)이고 스티커만 사진별이다 — "10장에 같은 필터 입혀서
@@ -573,10 +576,11 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
       {/* 하단 패널 */}
       <div style={ES.panel}>
         <div style={ES.tabRow}>
+          {/* 스티커 탭은 오너 지시로 제외(2026-08-26 "development 가 좀 필요할듯").
+              구현(드래그·핀치·합성)은 아래에 그대로 있으니 배열에 다시 넣으면 복귀. */}
           {[
             ["filter", t("edit.tab.filter")],
             ["fx", t("edit.tab.fx")],
-            ["sticker", t("edit.tab.sticker")],
           ].map(([k, label]) => (
             <button
               key={k}
@@ -590,7 +594,7 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
           <>
             {/* 필름 / 카메라 그룹 토글 */}
             <div style={ES.groupRow}>
-              {[["film", t("filter.gFilm")], ["camera", t("filter.gCam")]].map(([g, label]) => (
+              {[["film", t("filter.gFilm")], ["camera", t("filter.gCam")], ["fun", t("filter.gFun")]].map(([g, label]) => (
                 <button
                   key={g}
                   style={{ ...ES.groupBtn, ...(chipGroup === g ? ES.groupBtnOn : null) }}
@@ -627,9 +631,12 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
         {tab === "fx" && (
           <div style={ES.fxCol}>
             {[
+              ["glow", t("edit.fx.glow")],
               ["grain", t("edit.fx.grain")],
               ["vignette", t("edit.fx.vignette")],
               ["leak", t("edit.fx.leak")],
+              ["blur", t("edit.fx.blur")],
+              ["shake", t("edit.fx.shake")],
             ].map(([k, label]) => (
               <label key={k} style={ES.fxRow}>
                 <span style={ES.fxLabel}>{label}</span>
@@ -645,7 +652,8 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
             ))}
             {/* 날짜 스탬프 6종 — 스타일별 색·서체를 라벨에 그대로 입혀 미리보기를 겸한다 */}
             <div style={ES.dateRow}>
-              <span style={ES.fxLabel}>🗓️ {t("edit.fx.date")}</span>
+              {/* 라벨은 윗줄 전체 폭 — 62px 고정폭에 넣으면 "날짜 스/탬프"로 꺾인다(오너 신고) */}
+              <span style={ES.dateLabel}>🗓️ {t("edit.fx.date")}</span>
               <div style={ES.dateChips}>
                 {["none", ...DATE_STYLES].map((k) => (
                   <button
@@ -811,7 +819,10 @@ const ES = {
   filterThumbOn: { boxShadow: "0 0 0 2px #fff" },
   filterName: { fontSize: 10.5, fontWeight: 700, color: "rgba(255,255,255,.55)", whiteSpace: "nowrap" },
   filterNameOn: { color: "#fff" },
-  fxCol: { display: "flex", flexDirection: "column", gap: 12, padding: "2px 18px" },
+  fxCol: {
+    display: "flex", flexDirection: "column", gap: 12, padding: "2px 18px",
+    maxHeight: "34vh", overflowY: "auto", WebkitOverflowScrolling: "touch", // 슬라이더 6개+날짜 — 작은 화면 스크롤
+  },
   fxRow: { display: "flex", alignItems: "center", gap: 12 },
   fxLabel: { width: 62, fontSize: 12.5, fontWeight: 800, color: "rgba(255,255,255,.85)", flex: "0 0 auto" },
   fxSlider: { flex: 1, minWidth: 0 },
@@ -819,7 +830,8 @@ const ES = {
     width: 30, textAlign: "right", fontSize: 12, color: "rgba(255,255,255,.55)",
     fontVariantNumeric: "tabular-nums", flex: "0 0 auto",
   },
-  dateRow: { display: "flex", alignItems: "flex-start", gap: 12 },
+  dateRow: { display: "flex", flexDirection: "column", alignItems: "stretch", gap: 8 },
+  dateLabel: { fontSize: 12.5, fontWeight: 800, color: "rgba(255,255,255,.85)", whiteSpace: "nowrap" },
   dateChips: { display: "flex", gap: 6, overflowX: "auto", flex: 1, minWidth: 0, paddingBottom: 2 },
   dateChip: {
     flex: "0 0 auto", border: "1px solid rgba(255,255,255,.14)", borderRadius: 11,

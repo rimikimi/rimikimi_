@@ -15,7 +15,7 @@ android {
         applicationId "com.rimikimi.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 63
+        versionCode 64
         versionName "1.39"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
