@@ -800,10 +800,16 @@ export default async function handler(req, res) {
         "corner or a bright pedestrian alley. The background is a believable ordinary place " +
         "with natural depth, softly blurred (shallow depth of field) so the person and the " +
         "clothes remain the clear subject.\n" +
-        "POSE — natural relaxed fashion-model stance, body at a slight three-quarter angle, " +
-        "confident and effortless. The GAZE IS FREE: looking into the camera, glancing off to " +
-        "the side, or caught mid-walk like a candid street snap — whichever feels most " +
-        "natural. FULL BODY head to shoes, generous headroom.\n" +
+        // "모델 포즈" 라고 쓰면 각 잡힌 화보가 나온다(오너: 너무 모델같음 → candid moment 로).
+        // 포즈를 "취한" 게 아니라 "순간을 잡은" 사진으로 장면 자체를 재정의한다.
+        "POSE — a CANDID MOMENT, not a pose: the person is caught in a natural unposed " +
+        "instant, as if photographed without warning — mid-step down the sidewalk, brushing " +
+        "hair from their face, glancing at something across the street, adjusting a sleeve, " +
+        "a soft genuine in-between expression or an unguarded small smile. Relaxed shoulders, " +
+        "natural weight shift, hands doing something ordinary (in a pocket, holding the bag, " +
+        "at their side). ABSOLUTELY NOT a stiff editorial model pose, not posing for the " +
+        "camera at all. The GAZE IS FREE and usually off-camera, like a street snap taken by " +
+        "a friend. FULL BODY head to shoes, generous headroom.\n" +
         "LIGHTING — natural daylight belonging to the scene: soft, flattering, gently " +
         "directional, true-to-life colours. NO photography equipment anywhere in the frame. " +
         "Professional street-style lookbook photography, 50mm at f/2.8.") +
