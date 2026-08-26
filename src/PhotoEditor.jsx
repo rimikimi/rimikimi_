@@ -272,6 +272,10 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
     if (revokeRef.current) URL.revokeObjectURL(revokeRef.current);
   }, []);
 
+  // 원본 비교(peek) — 프리뷰를 누르고 있는 동안 보정 전 원본을 보여준다 (오너 지시).
+  // 라이트룸/VSCO 의 press-to-compare 관례 그대로: 누르면 원본, 떼면 보정본.
+  const [peeking, setPeeking] = useState(false);
+
   /* ---------- 미리보기 렌더 (rAF 로 합침) ---------- */
   const renderPreview = useCallback(() => {
     cancelAnimationFrame(rafRef.current);
@@ -281,12 +285,16 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
       const { width: w, height: h } = base;
       if (canvas.width !== w) { canvas.width = w; canvas.height = h; }
       const ctx = canvas.getContext("2d");
+      if (peeking) {
+        ctx.putImageData(base, 0, 0); // 원본 그대로 (룩·날짜 없음)
+        return;
+      }
       const copy = new ImageData(new Uint8ClampedArray(base.data), w, h);
       applyLook(copy.data, w, h, presetByKey(presetKey), { ...fx, seed: GRAIN_SEED });
       ctx.putImageData(copy, 0, 0);
       if (dateStyle !== "none") drawDateStamp(ctx, w, h, dateStyle);
     });
-  }, [presetKey, fx, dateStyle]);
+  }, [presetKey, fx, dateStyle, peeking]);
 
   useEffect(() => { if (ready) renderPreview(); }, [ready, renderPreview, idx]);
 
@@ -504,8 +512,16 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
               aspectRatio: baseRef.current ? `${baseRef.current.width} / ${baseRef.current.height}` : "3 / 4",
             }}
           >
-            <canvas ref={canvasRef} style={ES.canvas} />
-            {stickers.map((st) => (
+            <canvas
+              ref={canvasRef}
+              style={ES.canvas}
+              onPointerDown={(e) => { e.preventDefault(); setPeeking(true); }}
+              onPointerUp={() => setPeeking(false)}
+              onPointerCancel={() => setPeeking(false)}
+              onPointerLeave={() => setPeeking(false)}
+            />
+            {peeking && <div style={ES.peekBadge}>{t("edit.peek")}</div>}
+            {!peeking && stickers.map((st) => (
               <span
                 key={st.id}
                 onPointerDown={(e) => stickerPointerDown(e, st)}
@@ -723,7 +739,15 @@ const ES = {
     borderRadius: 16, overflow: "hidden",
     boxShadow: "0 24px 60px -20px rgba(0,0,0,.9), 0 0 0 1px rgba(255,255,255,.05)",
   },
-  canvas: { display: "block", width: "100%", height: "100%" },
+  canvas: {
+    display: "block", width: "100%", height: "100%",
+    touchAction: "none", WebkitTouchCallout: "none", WebkitUserSelect: "none",
+  },
+  peekBadge: {
+    position: "absolute", top: 12, left: 12, background: "rgba(0,0,0,.62)", color: "#fff",
+    fontSize: 11.5, fontWeight: 800, borderRadius: 9, padding: "6px 10px",
+    letterSpacing: ".03em", pointerEvents: "none",
+  },
   loadState: { color: "rgba(255,255,255,.55)", fontSize: 14 },
   sticker: {
     position: "absolute", lineHeight: 1, userSelect: "none", touchAction: "none",
