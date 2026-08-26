@@ -43,7 +43,18 @@ export async function notifyConceptDrop(req, res) {
   // 크론이 몇 분 밀려도 가장 가까운 15분 슬롯으로 맞춘다. 안 그러면 오프셋이
   // 어긋나 어느 시간대에도 해당되지 않아 알림이 통째로 누락된다.
   const STEP = 15 * 60 * 1000;
-  const slot = new Date(Math.round(now.getTime() / STEP) * STEP);
+  let slot = new Date(Math.round(now.getTime() / STEP) * STEP);
+  // ?slot=HHMM(UTC) — 호출이 늦어도 타깃 슬롯을 고정한다 (2026-08-26 실측:
+  // Vercel Hobby 크론은 최대 59분 밀리는데, 밀린 시각으로 슬롯을 잡으면
+  // "그 순간 20시인 시간대"가 KST 가 아니게 돼 drop_p540 이 매일 빠졌다).
+  const forced = String(req.query?.slot || "");
+  if (/^\d{4}$/.test(forced)) {
+    const s = new Date(now);
+    s.setUTCHours(Number(forced.slice(0, 2)), Number(forced.slice(2)), 0, 0);
+    // 자정 직후 호출이 다음날 슬롯을 가리키면 하루 되돌린다
+    if (s.getTime() - now.getTime() > 12 * 3600 * 1000) s.setUTCDate(s.getUTCDate() - 1);
+    slot = s;
+  }
 
   const offsets = offsetsWhereLocalIsDropHour(slot);
   const topics = offsets.map(dropTopicFor);
