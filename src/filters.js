@@ -120,6 +120,35 @@ export function presetByKey(key) {
   return FILM_PRESETS.find((p) => p.key === key) || FILM_PRESETS[0];
 }
 
+/* ---------- 강도 조절 적용 (오너 지시 2026-08-26) ----------
+   슬라이더 0..1, 기본 0.7. "지금의 풀 프리셋" = 0.7 지점이 되도록
+   k = strength/0.7 로 원본↔프리셋 결과를 보간(1 초과는 외삽 = 더 진하게).
+   효과(그레인·비네트·빛샘·뽀샤시·흐림·흔들림)는 강도와 무관하게 그대로 얹는다
+   — 사용자가 슬라이더로 직접 조절하는 값이라 이중 스케일하면 헷갈린다. */
+export function applyLookWithStrength(data, w, h, preset, effects = {}, strength = 0.7) {
+  const p = preset && preset.key !== "none" ? preset : null;
+  const k = strength / 0.7;
+  const seedOnly = { seed: effects.seed };
+  if (p) {
+    if (Math.abs(k - 1) > 0.01) {
+      const orig = new Uint8ClampedArray(data);
+      applyLook(data, w, h, p, seedOnly); // 프리셋만 (효과 제외)
+      for (let i = 0; i < data.length; i += 4) {
+        data[i] = clamp8(orig[i] + (data[i] - orig[i]) * k);
+        data[i + 1] = clamp8(orig[i + 1] + (data[i + 1] - orig[i + 1]) * k);
+        data[i + 2] = clamp8(orig[i + 2] + (data[i + 2] - orig[i + 2]) * k);
+      }
+    } else {
+      applyLook(data, w, h, p, seedOnly);
+    }
+  }
+  // 효과는 항상 원 강도로 (프리셋 위에)
+  if (effects.grain || effects.vignette || effects.leak || effects.blur || effects.shake || effects.glow) {
+    applyLook(data, w, h, null, effects);
+  }
+  return data;
+}
+
 const clamp8 = (v) => (v < 0 ? 0 : v > 255 ? 255 : v);
 
 /* ---------- ① 채널 LUT 굽기 ---------- */

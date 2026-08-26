@@ -14,7 +14,7 @@
 //     미리보기/원본 해상도가 달라도 같은 위치에 찍힌다.
 // ============================================================
 import { useEffect, useRef, useState, useCallback } from "react";
-import { FILM_PRESETS, presetByKey, applyLook } from "./filters";
+import { FILM_PRESETS, presetByKey, applyLook, applyLookWithStrength } from "./filters";
 import { isNative, nativeSaveToAlbum } from "./nativeBridge";
 import { shareImage } from "./share";
 import { t, getLang } from "./i18n";
@@ -174,8 +174,10 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
   const [tab, setTab] = useState("filter"); // filter | fx | sticker
   const [presetKey, setPresetKey] = useState(initialPresetKey);
   const [fx, setFx] = useState(() => fxOf(presetByKey(initialPresetKey)));
-  const [chipGroup, setChipGroup] = useState(() =>
-    presetByKey(initialPresetKey).group === "camera" ? "camera" : "film");
+  const [chipGroup, setChipGroup] = useState(() => presetByKey(initialPresetKey).group || "film");
+  // 필터 강도 (오너 지시): %표시 없는 슬라이더, 기본 0.7 = 지금의 풀 프리셋 룩.
+  // 1.0 까지 올리면 더 진하게(외삽), 0 이면 원본.
+  const [strength, setStrength] = useState(0.7);
   const [dateStyle, setDateStyle] = useState("none");
   // 스티커는 사진별 — 위치가 그 사진의 구도에 묶여 있어 공유하면 엉뚱한 데 찍힌다
   const [stickersByIdx, setStickersByIdx] = useState({});
@@ -293,11 +295,11 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
         return;
       }
       const copy = new ImageData(new Uint8ClampedArray(base.data), w, h);
-      applyLook(copy.data, w, h, presetByKey(presetKey), { ...fx, seed: GRAIN_SEED });
+      applyLookWithStrength(copy.data, w, h, presetByKey(presetKey), { ...fx, seed: GRAIN_SEED }, strength);
       ctx.putImageData(copy, 0, 0);
       if (dateStyle !== "none") drawDateStamp(ctx, w, h, dateStyle);
     });
-  }, [presetKey, fx, dateStyle, peeking]);
+  }, [presetKey, fx, dateStyle, peeking, strength]);
 
   useEffect(() => { if (ready) renderPreview(); }, [ready, renderPreview, idx]);
 
@@ -407,7 +409,7 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
       if (hasLook) {
         const id = ctx.getImageData(0, 0, w, h);
         // 원본이 커서(2K) 수백 ms 걸릴 수 있다 — 호출측이 busy 표시를 켠 채로 부른다
-        applyLook(id.data, w, h, presetByKey(presetKey), { ...fx, seed: GRAIN_SEED });
+        applyLookWithStrength(id.data, w, h, presetByKey(presetKey), { ...fx, seed: GRAIN_SEED }, strength);
         ctx.putImageData(id, 0, 0);
       }
       if (dateStyle !== "none") drawDateStamp(ctx, w, h, dateStyle);
@@ -613,6 +615,7 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
                     hap.tap();
                     setPresetKey(p.key);
                     setFx(fxOf(p)); // 프리셋 기본 효과까지 원탭 적용 (이후 효과 탭에서 조절)
+                    setStrength(0.7); // 강도는 기본값으로 리셋 (0.7 = 표준 룩)
                   }}
                 >
                   <canvas
@@ -625,6 +628,18 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
                 </button>
               ))}
             </div>
+            {/* 필터 강도 — %표시 없는 슬라이더 (기본 0.7 = 표준 룩, 끝까지 올리면 더 진하게) */}
+            {presetKey !== "none" && (
+              <div style={ES.strengthRow}>
+                <input
+                  className="pe-range"
+                  type="range" min="0" max="100"
+                  value={Math.round(strength * 100)}
+                  onChange={(e) => setStrength(Number(e.target.value) / 100)}
+                  style={{ width: "100%" }}
+                />
+              </div>
+            )}
           </>
         )}
 
@@ -819,6 +834,7 @@ const ES = {
   filterThumbOn: { boxShadow: "0 0 0 2px #fff" },
   filterName: { fontSize: 10.5, fontWeight: 700, color: "rgba(255,255,255,.55)", whiteSpace: "nowrap" },
   filterNameOn: { color: "#fff" },
+  strengthRow: { padding: "8px 18px 0" },
   fxCol: {
     display: "flex", flexDirection: "column", gap: 12, padding: "2px 18px",
     maxHeight: "34vh", overflowY: "auto", WebkitOverflowScrolling: "touch", // 슬라이더 6개+날짜 — 작은 화면 스크롤
