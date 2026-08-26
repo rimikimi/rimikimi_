@@ -9,6 +9,7 @@ import { getSavedSet, markSaved, syncExpiryNotifications, cancelExpiryNotice, sy
 import { initPush, attachPushHandlers, getPushToken } from "./push";
 import { t, useLang, getLang, localizedTitle, localizedCategory, getLangPreference, setLang } from "./i18n";
 import PhotoEditor from "./PhotoEditor";
+import { FILM_PRESETS } from "./filters";
 import LoginGate from "./LoginGate";
 import Guide, { guideSeen, markGuideSeen } from "./Guide";
 // ⚠️ 정적 import — 네이티브 WebView 에서 동적 import() 가 영원히 pending 되는
@@ -1328,12 +1329,15 @@ export default function PortraitStudio() {
 
   // ── 필터 스튜디오 (컨셉 아님 — 사진 최대 10장에 필름 필터, 전부 무료·전부 로컬) ──
   const FILTER_MAX = 10;
-  const [filterSrcs, setFilterSrcs] = useState(null); // string[] | null
+  const [filterSrcs, setFilterSrcs] = useState(null); // {srcs, preset} | null
+  const filterPresetRef = useRef("none"); // 카드에서 고른 프리셋 — 에디터가 이걸 켠 채 열린다
   const filterInputRef = useRef(null);
-  async function openFilterStudio() {
+  async function openFilterStudio(presetKey = "none") {
+    filterPresetRef.current = presetKey;
     if (isNative()) {
       const paths = await nativePickPhotos(FILTER_MAX);
-      if (paths && paths.length) setFilterSrcs(paths.slice(0, FILTER_MAX));
+      if (paths && paths.length)
+        setFilterSrcs({ srcs: paths.slice(0, FILTER_MAX), preset: filterPresetRef.current });
       return;
     }
     filterInputRef.current?.click();
@@ -1353,7 +1357,7 @@ export default function PortraitStudio() {
           })
       )
     )
-      .then((urls) => setFilterSrcs(urls))
+      .then((urls) => setFilterSrcs({ srcs: urls, preset: filterPresetRef.current }))
       .catch(() => {});
   }
 
@@ -2469,7 +2473,8 @@ export default function PortraitStudio() {
       />
       {filterSrcs && (
         <PhotoEditor
-          srcs={filterSrcs}
+          srcs={filterSrcs.srcs}
+          initialPresetKey={filterSrcs.preset}
           filename="rimikimi_filter"
           onClose={() => setFilterSrcs(null)}
         />
@@ -2937,20 +2942,41 @@ function GalleryScreen({
           onBrooklyn={onBrooklyn}
         />
       ) : activeCat === t("filter.cat") ? (
-        // 필터 스튜디오 — 컨셉이 아니라 앱 내장 기능. 사진 고르면 바로 에디터가 뜬다.
-        <button className="cardIn" style={S.filterHero} onClick={() => { hap.tap(); onFilterStudio && onFilterStudio(); }}>
-          <img
-            src={`${ASSET_BASE}/thumbs/filter.webp`}
-            alt={t("filter.cardTitle")}
-            style={S.filterHeroImg}
-            onError={(e) => { e.currentTarget.style.display = "none"; }}
-          />
-          <div style={S.filterHeroBody}>
-            <div style={S.filterHeroTitle}>{t("filter.cardTitle")}</div>
-            <div style={S.filterHeroDesc}>{t("filter.cardDesc")}</div>
-            <div style={S.filterHeroCta}>{t("filter.pick")}</div>
+        // 필터 스튜디오 — 매직부스처럼 프리셋별 전/후 썸네일 카드 그리드 (오너 지시).
+        // 카드를 고르면 그 프리셋이 걸린 채로 사진 선택 → 에디터. 썸네일은 서버
+        // 원격 로드(fs_*.webp)라 톤을 고쳐도 앱 빌드가 필요 없다.
+        <>
+          <div style={S.filterNotice}>{t("filter.gridNotice")}</div>
+          <div
+            style={{
+              ...S.grid,
+              gridTemplateColumns: "repeat(" + cols + ", 1fr)",
+              gap: cols === 2 ? 13 : 8,
+            }}
+          >
+            {FILM_PRESETS.filter((p) => p.key !== "none").map((p, i) => (
+              <button
+                key={p.key}
+                className="cardIn"
+                style={{ ...S.card, animationDelay: (i < 8 ? i * 0.018 : 0) + "s" }}
+                onClick={() => { hap.tap(); onFilterStudio && onFilterStudio(p.key); }}
+              >
+                <div style={S.thumb}>
+                  <img
+                    src={`${ASSET_BASE}/thumbs/fs_${p.key}.webp`}
+                    alt={getLang() === "ko" ? p.ko : p.en}
+                    style={S.thumbImg}
+                    loading="lazy"
+                  />
+                </div>
+                <div style={{ ...S.cardTitle, fontSize: cols === 2 ? 12.5 : 10.5 }}>
+                  {(getLang() === "ko" ? p.ko : p.en) +
+                    " · " + (p.group === "camera" ? t("filter.gCam") : t("filter.gFilm"))}
+                </div>
+              </button>
+            ))}
           </div>
-        </button>
+        </>
       ) : prompts.length === 0 ? (
         <div style={S.emptyState}>
           <div>{t("step1.empty")}</div>
@@ -4905,6 +4931,9 @@ const S = {
   },
   myGalleryGrid: {
     display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12,
+  },
+  filterNotice: {
+    fontSize: 12.5, color: INK + "8c", lineHeight: 1.6, margin: "2px 2px 12px",
   },
   // 필터 스튜디오 히어로 카드 (🎞️ 필터 카테고리 전용)
   filterHero: {

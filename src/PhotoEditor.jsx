@@ -57,19 +57,80 @@ async function loadSource(src) {
   return { img, revoke };
 }
 
-/* ---------- 날짜 스탬프 (필름 카메라 주황 각인) ---------- */
-function drawDateStamp(ctx, w, h) {
+/* ---------- 날짜 스탬프 6종 (아날로그~디지털, 오너 지시) ----------
+   스타일마다 서체·색·포맷·위치가 다르다. 시스템 서체만 쓴다(웹폰트 로드 없음). */
+export const DATE_STYLES = ["retro7", "reddot", "lcd", "type", "stamp", "script"];
+function dateParts() {
   const d = new Date();
-  const text = `'${String(d.getFullYear()).slice(2)}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
-  const size = Math.round(w * 0.042);
+  const yy = String(d.getFullYear()).slice(2);
+  const yyyy = String(d.getFullYear());
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const MON = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"][d.getMonth()];
+  return { yy, yyyy, mm, dd, MON };
+}
+function drawDateStamp(ctx, w, h, style) {
+  const { yy, yyyy, mm, dd, MON } = dateParts();
+  const s = Math.round(w * 0.042); // 기준 크기
   ctx.save();
-  ctx.font = `700 ${size}px "Courier New", monospace`;
-  ctx.textAlign = "right";
   ctx.textBaseline = "alphabetic";
-  ctx.shadowColor = "rgba(255,120,30,0.9)";
-  ctx.shadowBlur = size * 0.35;
-  ctx.fillStyle = "#FFB03A";
-  ctx.fillText(text, w - size * 0.8, h - size * 0.9);
+  if (style === "retro7") {
+    // 필름 컴팩트 카메라의 주황 7세그 각인
+    ctx.font = `700 ${s}px "Courier New", monospace`;
+    ctx.textAlign = "right";
+    ctx.shadowColor = "rgba(255,120,30,0.9)";
+    ctx.shadowBlur = s * 0.35;
+    ctx.fillStyle = "#FFB03A";
+    ctx.fillText(`'${yy} ${Number(mm)} ${Number(dd)}`, w - s * 0.8, h - s * 0.9);
+  } else if (style === "reddot") {
+    // 진한 레드 디지털 (도트 프린트 느낌)
+    ctx.font = `700 ${Math.round(s * 0.92)}px "Courier New", monospace`;
+    ctx.textAlign = "right";
+    ctx.shadowColor = "rgba(255,40,40,0.75)";
+    ctx.shadowBlur = s * 0.25;
+    ctx.fillStyle = "#FF3B30";
+    ctx.fillText(`${yy} ${mm} ${dd}`, w - s * 0.8, h - s * 0.9);
+  } else if (style === "lcd") {
+    // 2000년대 디지캠 연두 LCD
+    ctx.font = `700 ${Math.round(s * 0.95)}px "Courier New", monospace`;
+    ctx.textAlign = "right";
+    ctx.shadowColor = "rgba(60,60,60,0.9)";
+    ctx.shadowBlur = s * 0.12;
+    ctx.fillStyle = "#B7F34C";
+    ctx.fillText(`${yyyy}.${mm}.${dd}`, w - s * 0.8, h - s * 0.9);
+  } else if (style === "type") {
+    // 타자기 화이트
+    ctx.font = `400 ${Math.round(s * 0.9)}px "Courier New", monospace`;
+    ctx.textAlign = "right";
+    ctx.globalAlpha = 0.92;
+    ctx.shadowColor = "rgba(0,0,0,0.5)";
+    ctx.shadowBlur = s * 0.15;
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fillText(`${dd} ${MON} ${yyyy}`, w - s * 0.8, h - s * 0.9);
+  } else if (style === "stamp") {
+    // 고무도장 — 좌하단, 살짝 기울고 테두리 박스
+    const fs = Math.round(s * 0.85);
+    const text = `${MON} ${Number(dd)} '${yy}`;
+    ctx.font = `800 ${fs}px Georgia, serif`;
+    const tw = ctx.measureText(text).width;
+    ctx.translate(s * 1.2, h - s * 1.1);
+    ctx.rotate(-3 * Math.PI / 180);
+    ctx.globalAlpha = 0.82;
+    ctx.strokeStyle = "#E03B30";
+    ctx.lineWidth = Math.max(2, fs * 0.09);
+    ctx.strokeRect(-fs * 0.45, -fs * 1.25, tw + fs * 0.9, fs * 1.75);
+    ctx.fillStyle = "#E03B30";
+    ctx.textAlign = "left";
+    ctx.fillText(text, 0, 0);
+  } else if (style === "script") {
+    // 손글씨풍 화이트 이탤릭
+    ctx.font = `italic 600 ${Math.round(s * 1.05)}px Georgia, "Times New Roman", serif`;
+    ctx.textAlign = "right";
+    ctx.shadowColor = "rgba(0,0,0,0.45)";
+    ctx.shadowBlur = s * 0.2;
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fillText(`${yy}. ${mm}. ${dd}`, w - s * 0.8, h - s * 0.9);
+  }
   ctx.restore();
 }
 
@@ -94,19 +155,25 @@ function drawSticker(ctx, st, w, h) {
   ctx.restore();
 }
 
+// 프리셋의 기본 효과 조합 — 칩 하나가 "완성된 룩"이 되게 한다 (토이=비네트, 일회용=그레인…)
+const fxOf = (p) => ({ grain: p?.fx?.grain || 0, vignette: p?.fx?.vignette || 0, leak: p?.fx?.leak || 0 });
+
 // src(1장) 또는 srcs(여러 장, 최대 10) 를 받는다. 여러 장이면 필터/효과는 전체
 // 공통(한 번 고르면 전부 적용)이고 스티커만 사진별이다 — "10장에 같은 필터 입혀서
 // 한 번에 저장"이 배치 모드의 존재 이유라서다.
-export default function PhotoEditor({ src, srcs, filename = "rimikimi", onClose }) {
+// initialPresetKey: 필터 카테고리의 프리셋 카드에서 들어오면 그 룩이 켜진 채 열린다.
+export default function PhotoEditor({ src, srcs, initialPresetKey = "none", filename = "rimikimi", onClose }) {
   const sources = srcs && srcs.length ? srcs : [src];
   const multi = sources.length > 1;
   const [idx, setIdx] = useState(0);
   const [ready, setReady] = useState(false);
   const [loadErr, setLoadErr] = useState(false);
   const [tab, setTab] = useState("filter"); // filter | fx | sticker
-  const [presetKey, setPresetKey] = useState("none");
-  const [fx, setFx] = useState({ grain: 0, vignette: 0, leak: 0 });
-  const [dateOn, setDateOn] = useState(false);
+  const [presetKey, setPresetKey] = useState(initialPresetKey);
+  const [fx, setFx] = useState(() => fxOf(presetByKey(initialPresetKey)));
+  const [chipGroup, setChipGroup] = useState(() =>
+    presetByKey(initialPresetKey).group === "camera" ? "camera" : "film");
+  const [dateStyle, setDateStyle] = useState("none");
   // 스티커는 사진별 — 위치가 그 사진의 구도에 묶여 있어 공유하면 엉뚱한 데 찍힌다
   const [stickersByIdx, setStickersByIdx] = useState({});
   const stickers = stickersByIdx[idx] || [];
@@ -217,9 +284,9 @@ export default function PhotoEditor({ src, srcs, filename = "rimikimi", onClose 
       const copy = new ImageData(new Uint8ClampedArray(base.data), w, h);
       applyLook(copy.data, w, h, presetByKey(presetKey), { ...fx, seed: GRAIN_SEED });
       ctx.putImageData(copy, 0, 0);
-      if (dateOn) drawDateStamp(ctx, w, h);
+      if (dateStyle !== "none") drawDateStamp(ctx, w, h, dateStyle);
     });
-  }, [presetKey, fx, dateOn]);
+  }, [presetKey, fx, dateStyle]);
 
   useEffect(() => { if (ready) renderPreview(); }, [ready, renderPreview, idx]);
 
@@ -332,7 +399,7 @@ export default function PhotoEditor({ src, srcs, filename = "rimikimi", onClose 
         applyLook(id.data, w, h, presetByKey(presetKey), { ...fx, seed: GRAIN_SEED });
         ctx.putImageData(id, 0, 0);
       }
-      if (dateOn) drawDateStamp(ctx, w, h);
+      if (dateStyle !== "none") drawDateStamp(ctx, w, h, dateStyle);
       for (const st of stickersByIdx[i] || []) drawSticker(ctx, st, w, h);
       return c.toDataURL("image/jpeg", 0.95);
     } finally {
@@ -401,13 +468,16 @@ export default function PhotoEditor({ src, srcs, filename = "rimikimi", onClose 
   const sel = stickers.find((s) => s.id === selId);
 
   return (
-    <div style={ES.overlay}>
+    <div style={ES.overlay} className="pe-in">
+      <style>{PE_CSS}</style>
       {toast && <div style={ES.toast} onClick={() => setToast("")}>{toast}</div>}
 
       {/* 상단 바 */}
       <div style={ES.topBar}>
-        <button style={ES.topBtn} onClick={onClose}>✕</button>
-        <div style={ES.topTitle}>{t("edit.title")}</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
+          <button style={ES.topBtn} onClick={onClose}>✕</button>
+          <div style={ES.topTitle}>{t("edit.title")}</div>
+        </div>
         <div style={{ display: "flex", gap: 8 }}>
           <button style={ES.topAction} disabled={!!busy} onClick={handleShare}>
             {busy === "share" ? "…" : t("common.share")}
@@ -501,20 +571,41 @@ export default function PhotoEditor({ src, srcs, filename = "rimikimi", onClose 
         </div>
 
         {tab === "filter" && (
-          <div style={ES.chipScroll}>
-            {FILM_PRESETS.map((p) => (
-              // key 에 ready 를 넣는 이유: 사진 전환 시 디코드가 끝난 "뒤"에 캔버스를
-              // 다시 마운트해야 새 사진의 썸네일로 그려진다 (idx 만 넣으면 옛 썸네일로 그림)
-              <button
-                key={p.key + ":" + idx + ":" + (ready ? "r" : "l")}
-                style={{ ...ES.filterChip, ...(presetKey === p.key ? ES.filterChipOn : null) }}
-                onClick={() => { hap.tap(); setPresetKey(p.key); }}
-              >
-                <canvas ref={(el) => thumbCanvasCb(el, p.key)} style={ES.filterThumb} />
-                <span style={ES.filterName}>{getLang() === "ko" ? p.ko : p.en}</span>
-              </button>
-            ))}
-          </div>
+          <>
+            {/* 필름 / 카메라 그룹 토글 */}
+            <div style={ES.groupRow}>
+              {[["film", t("filter.gFilm")], ["camera", t("filter.gCam")]].map(([g, label]) => (
+                <button
+                  key={g}
+                  style={{ ...ES.groupBtn, ...(chipGroup === g ? ES.groupBtnOn : null) }}
+                  onClick={() => { hap.tap(); setChipGroup(g); }}
+                >{label}</button>
+              ))}
+            </div>
+            <div style={ES.chipScroll}>
+              {FILM_PRESETS.filter((p) => p.key === "none" || p.group === chipGroup).map((p) => (
+                // key 에 ready 를 넣는 이유: 사진 전환 시 디코드가 끝난 "뒤"에 캔버스를
+                // 다시 마운트해야 새 사진의 썸네일로 그려진다 (idx 만 넣으면 옛 썸네일로 그림)
+                <button
+                  key={p.key + ":" + idx + ":" + (ready ? "r" : "l")}
+                  style={{ ...ES.filterChip, ...(presetKey === p.key ? ES.filterChipOn : null) }}
+                  onClick={() => {
+                    hap.tap();
+                    setPresetKey(p.key);
+                    setFx(fxOf(p)); // 프리셋 기본 효과까지 원탭 적용 (이후 효과 탭에서 조절)
+                  }}
+                >
+                  <canvas
+                    ref={(el) => thumbCanvasCb(el, p.key)}
+                    style={{ ...ES.filterThumb, ...(presetKey === p.key ? ES.filterThumbOn : null) }}
+                  />
+                  <span style={{ ...ES.filterName, ...(presetKey === p.key ? ES.filterNameOn : null) }}>
+                    {getLang() === "ko" ? p.ko : p.en}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </>
         )}
 
         {tab === "fx" && (
@@ -527,6 +618,7 @@ export default function PhotoEditor({ src, srcs, filename = "rimikimi", onClose 
               <label key={k} style={ES.fxRow}>
                 <span style={ES.fxLabel}>{label}</span>
                 <input
+                  className="pe-range"
                   type="range" min="0" max="100"
                   value={Math.round(fx[k] * 100)}
                   onChange={(e) => setFx((p) => ({ ...p, [k]: Number(e.target.value) / 100 }))}
@@ -535,12 +627,25 @@ export default function PhotoEditor({ src, srcs, filename = "rimikimi", onClose 
                 <span style={ES.fxVal}>{Math.round(fx[k] * 100)}</span>
               </label>
             ))}
-            <button
-              style={{ ...ES.dateChip, ...(dateOn ? ES.dateChipOn : null) }}
-              onClick={() => { hap.tap(); setDateOn((v) => !v); }}
-            >
-              🗓️ {t("edit.fx.date")} {dateOn ? "ON" : "OFF"}
-            </button>
+            {/* 날짜 스탬프 6종 — 스타일별 색·서체를 라벨에 그대로 입혀 미리보기를 겸한다 */}
+            <div style={ES.dateRow}>
+              <span style={ES.fxLabel}>🗓️ {t("edit.fx.date")}</span>
+              <div style={ES.dateChips}>
+                {["none", ...DATE_STYLES].map((k) => (
+                  <button
+                    key={k}
+                    style={{
+                      ...ES.dateChip,
+                      ...(DATE_PREVIEW[k] || null),
+                      ...(dateStyle === k ? ES.dateChipOn : null),
+                    }}
+                    onClick={() => { hap.tap(); setDateStyle(k); }}
+                  >
+                    {t("edit.date." + k)}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         )}
 
@@ -577,119 +682,173 @@ export default function PhotoEditor({ src, srcs, filename = "rimikimi", onClose 
   );
 }
 
-/* ---------- 스타일 (에디터는 어두운 배경 — 색 판단이 정확해진다) ---------- */
+/* ---------- 스타일 ----------
+   에디터는 어두운 배경(색 판단이 정확)이되, 본 앱과 같은 급의 마감으로:
+   세그먼트 탭 · 화이트 필 버튼 · 커스텀 슬라이더 · 선택 링 · 진입 모션. */
 const ES = {
   overlay: {
     position: "fixed", inset: 0, zIndex: 300, display: "flex", flexDirection: "column",
-    background: "#141210",
+    background: "#0f0d0b",
     paddingTop: "env(safe-area-inset-top, 0px)",
     paddingBottom: "env(safe-area-inset-bottom, 0px)",
   },
   toast: {
     position: "fixed", top: "calc(env(safe-area-inset-top, 0px) + 64px)", left: "50%",
-    transform: "translateX(-50%)", zIndex: 320, background: "rgba(35,31,32,.94)", color: "#fff",
-    padding: "10px 18px", borderRadius: 12, fontSize: 13.5, fontWeight: 600, whiteSpace: "nowrap",
+    transform: "translateX(-50%)", zIndex: 320, background: "rgba(255,255,255,.96)", color: "#231f20",
+    padding: "10px 18px", borderRadius: 13, fontSize: 13.5, fontWeight: 700, whiteSpace: "nowrap",
+    boxShadow: "0 10px 30px -8px rgba(0,0,0,.6)",
   },
   topBar: {
-    display: "flex", alignItems: "center", justifyContent: "space-between",
-    padding: "10px 14px", gap: 10,
+    position: "relative", display: "flex", alignItems: "center", justifyContent: "space-between",
+    padding: "12px 16px 8px", gap: 10,
   },
   topBtn: {
-    width: 36, height: 36, borderRadius: 10, border: "none", background: "rgba(255,255,255,.08)",
-    color: "#fff", fontSize: 16, cursor: "pointer",
+    width: 36, height: 36, borderRadius: 18, border: "none", background: "rgba(255,255,255,.09)",
+    color: "rgba(255,255,255,.9)", fontSize: 15, cursor: "pointer", lineHeight: 1,
   },
-  topTitle: { color: "#fff", fontSize: 15, fontWeight: 800, letterSpacing: ".02em" },
+  topTitle: {
+    color: "rgba(255,255,255,.92)", fontSize: 14.5, fontWeight: 800, letterSpacing: ".04em",
+  },
   topAction: {
-    border: "none", borderRadius: 11, padding: "9px 16px", fontSize: 13.5, fontWeight: 700,
-    background: "rgba(255,255,255,.1)", color: "#fff", cursor: "pointer",
+    border: "none", borderRadius: 19, padding: "10px 16px", fontSize: 13.5, fontWeight: 800,
+    background: "rgba(255,255,255,.09)", color: "rgba(255,255,255,.92)", cursor: "pointer",
   },
-  topActionPrimary: { background: "#B8860B", color: "#fff" },
+  topActionPrimary: { background: "#fff", color: "#191512" },
   stage: {
     flex: 1, minHeight: 0, display: "flex", alignItems: "center", justifyContent: "center",
-    padding: "6px 12px", overflow: "hidden",
+    padding: "8px 16px", overflow: "hidden",
   },
   canvasWrap: {
     position: "relative", maxWidth: "100%", maxHeight: "100%",
-    borderRadius: 10, overflow: "hidden", boxShadow: "0 18px 44px -18px rgba(0,0,0,.8)",
+    borderRadius: 16, overflow: "hidden",
+    boxShadow: "0 24px 60px -20px rgba(0,0,0,.9), 0 0 0 1px rgba(255,255,255,.05)",
   },
   canvas: { display: "block", width: "100%", height: "100%" },
-  loadState: { color: "rgba(255,255,255,.6)", fontSize: 14 },
+  loadState: { color: "rgba(255,255,255,.55)", fontSize: 14 },
   sticker: {
     position: "absolute", lineHeight: 1, userSelect: "none", touchAction: "none",
     cursor: "grab", padding: 4,
   },
-  stickerSel: { outline: "1.5px dashed rgba(255,255,255,.8)", borderRadius: 8 },
+  stickerSel: { outline: "1.5px dashed rgba(255,255,255,.85)", borderRadius: 8 },
   stickerDel: {
     position: "absolute", top: -14, right: -14, width: 24, height: 24, borderRadius: 12,
     border: "none", background: "#fff", color: "#231f20", fontSize: 11, fontWeight: 800,
     boxShadow: "0 2px 8px rgba(0,0,0,.4)", cursor: "pointer",
   },
   photoStrip: {
-    display: "flex", gap: 6, overflowX: "auto", padding: "8px 14px 2px",
+    display: "flex", gap: 7, overflowX: "auto", padding: "10px 16px 2px",
     WebkitOverflowScrolling: "touch", flex: "0 0 auto",
   },
   photoThumbBtn: {
-    position: "relative", flex: "0 0 auto", width: 44, height: 58, borderRadius: 9,
-    overflow: "hidden", border: "2px solid transparent", padding: 0, background: "#000",
-    cursor: "pointer",
+    position: "relative", flex: "0 0 auto", width: 46, height: 60, borderRadius: 11,
+    overflow: "hidden", border: "none", padding: 0, background: "#000",
+    cursor: "pointer", opacity: 0.55, transition: "opacity .18s",
   },
-  photoThumbOn: { borderColor: "#B8860B" },
-  photoThumbImg: { width: "100%", height: "100%", objectFit: "cover", display: "block", opacity: 0.95 },
+  photoThumbOn: { opacity: 1, boxShadow: "0 0 0 2px #fff" },
+  photoThumbImg: { width: "100%", height: "100%", objectFit: "cover", display: "block" },
   photoThumbDot: {
     position: "absolute", top: 3, right: 3, width: 7, height: 7, borderRadius: 4,
-    background: "#B8860B", boxShadow: "0 0 0 1.5px rgba(0,0,0,.5)",
+    background: "#fff", boxShadow: "0 0 0 1.5px rgba(0,0,0,.5)",
   },
   panel: {
-    background: "#1d1a17", borderTop: "1px solid rgba(255,255,255,.06)",
-    padding: "10px 0 12px",
+    background: "rgba(26,22,18,.96)", borderTop: "1px solid rgba(255,255,255,.07)",
+    padding: "12px 0 14px", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)",
   },
-  tabRow: { display: "flex", gap: 6, padding: "0 14px 10px" },
+  tabRow: {
+    display: "inline-flex", gap: 2, margin: "0 16px 12px", padding: 3,
+    background: "rgba(255,255,255,.07)", borderRadius: 13, alignSelf: "flex-start",
+  },
   tabBtn: {
-    border: "none", borderRadius: 10, padding: "7px 14px", fontSize: 13, fontWeight: 700,
-    background: "transparent", color: "rgba(255,255,255,.55)", cursor: "pointer",
+    border: "none", borderRadius: 10, padding: "7px 16px", fontSize: 13, fontWeight: 800,
+    background: "transparent", color: "rgba(255,255,255,.5)", cursor: "pointer",
+    transition: "color .15s",
   },
-  tabBtnOn: { background: "rgba(255,255,255,.1)", color: "#fff" },
+  tabBtnOn: { background: "#fff", color: "#191512" },
+  groupRow: { display: "flex", gap: 6, padding: "0 16px 9px" },
+  groupBtn: {
+    border: "1px solid rgba(255,255,255,.14)", borderRadius: 15, padding: "5px 13px",
+    fontSize: 11.5, fontWeight: 800, background: "transparent",
+    color: "rgba(255,255,255,.55)", cursor: "pointer",
+  },
+  groupBtnOn: { background: "rgba(255,255,255,.14)", color: "#fff", borderColor: "transparent" },
   chipScroll: {
-    display: "flex", gap: 8, overflowX: "auto", padding: "2px 14px 4px",
+    display: "flex", gap: 10, overflowX: "auto", padding: "2px 16px 4px",
     WebkitOverflowScrolling: "touch",
   },
   filterChip: {
-    flex: "0 0 auto", display: "flex", flexDirection: "column", alignItems: "center", gap: 5,
-    border: "none", background: "transparent", padding: 3, borderRadius: 12, cursor: "pointer",
+    flex: "0 0 auto", display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
+    border: "none", background: "transparent", padding: 0, cursor: "pointer",
   },
-  filterChipOn: { background: "rgba(184,134,11,.28)" },
-  filterThumb: { width: 56, borderRadius: 9, display: "block" },
-  filterName: { fontSize: 10.5, fontWeight: 700, color: "rgba(255,255,255,.85)", whiteSpace: "nowrap" },
-  fxCol: { display: "flex", flexDirection: "column", gap: 10, padding: "4px 18px" },
+  filterChipOn: {},
+  filterThumb: {
+    width: 62, borderRadius: 13, display: "block",
+    boxShadow: "0 0 0 1px rgba(255,255,255,.08)",
+  },
+  filterThumbOn: { boxShadow: "0 0 0 2px #fff" },
+  filterName: { fontSize: 10.5, fontWeight: 700, color: "rgba(255,255,255,.55)", whiteSpace: "nowrap" },
+  filterNameOn: { color: "#fff" },
+  fxCol: { display: "flex", flexDirection: "column", gap: 12, padding: "2px 18px" },
   fxRow: { display: "flex", alignItems: "center", gap: 12 },
-  fxLabel: { width: 58, fontSize: 12.5, fontWeight: 700, color: "rgba(255,255,255,.85)" },
-  fxSlider: { flex: 1, accentColor: "#B8860B" },
-  fxVal: { width: 30, textAlign: "right", fontSize: 12, color: "rgba(255,255,255,.6)", fontVariantNumeric: "tabular-nums" },
+  fxLabel: { width: 62, fontSize: 12.5, fontWeight: 800, color: "rgba(255,255,255,.85)", flex: "0 0 auto" },
+  fxSlider: { flex: 1, minWidth: 0 },
+  fxVal: {
+    width: 30, textAlign: "right", fontSize: 12, color: "rgba(255,255,255,.55)",
+    fontVariantNumeric: "tabular-nums", flex: "0 0 auto",
+  },
+  dateRow: { display: "flex", alignItems: "flex-start", gap: 12 },
+  dateChips: { display: "flex", gap: 6, overflowX: "auto", flex: 1, minWidth: 0, paddingBottom: 2 },
   dateChip: {
-    alignSelf: "flex-start", border: "1px solid rgba(255,255,255,.16)", borderRadius: 11,
-    padding: "8px 14px", fontSize: 12.5, fontWeight: 700, background: "transparent",
-    color: "rgba(255,255,255,.8)", cursor: "pointer",
+    flex: "0 0 auto", border: "1px solid rgba(255,255,255,.14)", borderRadius: 11,
+    padding: "7px 11px", fontSize: 11.5, fontWeight: 800, background: "transparent",
+    color: "rgba(255,255,255,.6)", cursor: "pointer", whiteSpace: "nowrap",
   },
-  dateChipOn: { background: "rgba(184,134,11,.28)", borderColor: "#B8860B", color: "#fff" },
-  stickerPanel: { padding: "2px 14px" },
-  textRow: { display: "flex", alignItems: "center", gap: 7, marginBottom: 9 },
+  dateChipOn: { borderColor: "#fff", boxShadow: "0 0 0 1px #fff", color: "#fff" },
+  stickerPanel: { padding: "2px 16px" },
+  textRow: { display: "flex", alignItems: "center", gap: 7, marginBottom: 10 },
   textInput: {
-    flex: 1, minWidth: 0, border: "1px solid rgba(255,255,255,.14)", borderRadius: 10,
-    background: "rgba(255,255,255,.06)", color: "#fff", padding: "8px 11px", fontSize: 13.5,
+    flex: 1, minWidth: 0, border: "1px solid rgba(255,255,255,.13)", borderRadius: 12,
+    background: "rgba(255,255,255,.07)", color: "#fff", padding: "9px 12px", fontSize: 13.5,
+    outline: "none",
   },
-  colorDot: { width: 22, height: 22, borderRadius: 11, border: "2px solid transparent", cursor: "pointer", flex: "0 0 auto" },
-  colorDotOn: { borderColor: "#B8860B" },
+  colorDot: { width: 24, height: 24, borderRadius: 12, border: "2px solid rgba(255,255,255,.25)", cursor: "pointer", flex: "0 0 auto", padding: 0 },
+  colorDotOn: { borderColor: "#fff", transform: "scale(1.12)" },
   textAdd: {
-    border: "none", borderRadius: 10, padding: "8px 13px", fontSize: 12.5, fontWeight: 800,
-    background: "rgba(255,255,255,.12)", color: "#fff", cursor: "pointer", flex: "0 0 auto",
+    border: "none", borderRadius: 12, padding: "9px 14px", fontSize: 12.5, fontWeight: 800,
+    background: "#fff", color: "#191512", cursor: "pointer", flex: "0 0 auto",
   },
   emojiGrid: {
-    display: "flex", gap: 2, overflowX: "auto", flexWrap: "wrap", maxHeight: 96,
+    display: "flex", gap: 2, flexWrap: "wrap", maxHeight: 100,
     overflowY: "auto", WebkitOverflowScrolling: "touch",
   },
   emojiBtn: {
-    border: "none", background: "transparent", fontSize: 24, padding: 5, cursor: "pointer",
-    lineHeight: 1,
+    border: "none", background: "transparent", fontSize: 25, padding: 5, cursor: "pointer",
+    lineHeight: 1, borderRadius: 9,
   },
-  stickerHint: { marginTop: 6, fontSize: 11.5, color: "rgba(255,255,255,.5)" },
+  stickerHint: { marginTop: 7, fontSize: 11.5, color: "rgba(255,255,255,.45)" },
 };
+
+// 날짜 칩 라벨에 스타일별 색·서체를 그대로 입힌다 — 라벨이 곧 미리보기
+const DATE_PREVIEW = {
+  retro7: { color: "#FFB03A", fontFamily: '"Courier New", monospace', textShadow: "0 0 6px rgba(255,120,30,.8)" },
+  reddot: { color: "#FF3B30", fontFamily: '"Courier New", monospace' },
+  lcd:    { color: "#B7F34C", fontFamily: '"Courier New", monospace' },
+  type:   { color: "#fff", fontFamily: '"Courier New", monospace', fontWeight: 400 },
+  stamp:  { color: "#E03B30", fontFamily: "Georgia, serif" },
+  script: { color: "#fff", fontFamily: "Georgia, serif", fontStyle: "italic" },
+};
+
+// 커스텀 슬라이더 + 진입 모션 (인라인 스타일로는 pseudo-element 를 못 만진다)
+const PE_CSS = `
+.pe-in { animation: peUp .3s cubic-bezier(.2,.8,.2,1) backwards; }
+@keyframes peUp { from { opacity: 0; transform: translateY(16px); } }
+.pe-range { -webkit-appearance: none; appearance: none; height: 28px; background: transparent; }
+.pe-range::-webkit-slider-runnable-track {
+  height: 3px; border-radius: 2px; background: rgba(255,255,255,.22);
+}
+.pe-range::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 21px; height: 21px; border-radius: 11px; border: none;
+  background: #fff; margin-top: -9px; box-shadow: 0 1px 6px rgba(0,0,0,.45);
+}
+.pe-range::-moz-range-track { height: 3px; border-radius: 2px; background: rgba(255,255,255,.22); }
+.pe-range::-moz-range-thumb { width: 21px; height: 21px; border-radius: 11px; border: none; background: #fff; }
+`;

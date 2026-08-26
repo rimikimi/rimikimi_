@@ -260,6 +260,16 @@ export const STR = {
     "filter.cardDesc": "내 사진에 필름 감성 입히기 · 전부 무료",
     "filter.pick": "사진 고르기 (최대 10장)",
     "filter.tooMany": "최대 10장까지 고를 수 있어요",
+    "filter.gridNotice": "필터를 고르고 사진을 올리면 끝 · 한 번에 10장까지 · 전부 무료",
+    "filter.gFilm": "필름",
+    "filter.gCam": "카메라",
+    "edit.date.none": "없음",
+    "edit.date.retro7": "주황 디지털",
+    "edit.date.reddot": "레드",
+    "edit.date.lcd": "디지캠",
+    "edit.date.type": "타자기",
+    "edit.date.stamp": "도장",
+    "edit.date.script": "손글씨",
 
     // === 저장 토스트 (결과화면·내 갤러리 공용) ===
     "save.toast.done": "사진첩에 저장됐어요",
@@ -603,6 +613,16 @@ export const STR = {
     "filter.cardDesc": "Give your photos a film look · all free",
     "filter.pick": "Choose photos (up to 10)",
     "filter.tooMany": "You can choose up to 10 photos",
+    "filter.gridNotice": "Pick a filter, add your photos · up to 10 at once · all free",
+    "filter.gFilm": "Film",
+    "filter.gCam": "Camera",
+    "edit.date.none": "None",
+    "edit.date.retro7": "Orange digital",
+    "edit.date.reddot": "Red",
+    "edit.date.lcd": "Digicam",
+    "edit.date.type": "Typewriter",
+    "edit.date.stamp": "Stamp",
+    "edit.date.script": "Script",
 
     // === Save toast (result screen + my gallery) ===
     "save.toast.done": "Saved to your photos",
