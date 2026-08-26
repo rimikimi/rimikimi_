@@ -67,7 +67,10 @@ let lastPermState = "unknown";
 export function getNotifyPermState() { return lastPermState; }
 
 export async function ensureNotifyPermission(ask = true) {
-  const LN = await getPlugin();
+  // ⚠️ await 금지 (2026-08-26 시뮬레이터 실측) — Capacitor 플러그인 Proxy 는
+  //    .then 접근에도 메서드 함수를 돌려줘서 await 가 thenable 로 착각, 영원히
+  //    안 풀린다. 이 한 줄이 역대 로컬 알림(드롭 예약·만료·생성완료) 전멸의 원인.
+  const LN = getPlugin();
   if (!LN) return false;
   // ⚠️ 여기 실패는 조용히 false 가 아니라 throw — 호출측(notif_sched 계측)이
   //    "어느 콜에서 멈췄는지"를 받아야 한다. (기존 호출부는 전부 try 안에 있음)
@@ -85,7 +88,10 @@ export async function ensureNotifyPermission(ask = true) {
 // 갤러리 항목 목록을 받아 → 저장 안 한 것만 만료 10분 전 알림 예약,
 // 저장했거나 이미 10분 이내로 남은 것은 예약 취소.
 export async function syncExpiryNotifications(items, savedSet) {
-  const LN = await getPlugin();
+  // ⚠️ await 금지 (2026-08-26 시뮬레이터 실측) — Capacitor 플러그인 Proxy 는
+  //    .then 접근에도 메서드 함수를 돌려줘서 await 가 thenable 로 착각, 영원히
+  //    안 풀린다. 이 한 줄이 역대 로컬 알림(드롭 예약·만료·생성완료) 전멸의 원인.
+  const LN = getPlugin();
   if (!LN) return;
   const ok = await ensureNotifyPermission();
   if (!ok) return;
@@ -141,7 +147,10 @@ function localDropTime(publishMs) {
 // 드롭 시각이 고정(매일 20시)이라 원격 푸시 없이도 제때 뜬다.
 // 일정이 바뀔 수 있으므로 예약을 매번 통째로 다시 깐다.
 export async function syncConceptDropNotifications(drops, { ask = true } = {}) {
-  const LN = await getPlugin();
+  // ⚠️ await 금지 (2026-08-26 시뮬레이터 실측) — Capacitor 플러그인 Proxy 는
+  //    .then 접근에도 메서드 함수를 돌려줘서 await 가 thenable 로 착각, 영원히
+  //    안 풀린다. 이 한 줄이 역대 로컬 알림(드롭 예약·만료·생성완료) 전멸의 원인.
+  const LN = getPlugin();
   if (!LN) return 0;
   const ok = await ensureNotifyPermission(ask);
   if (!ok) return 0;
@@ -203,7 +212,10 @@ export function setRemotePushActive(on) { remotePushOn = !!on; }
 
 // 예약을 쓰던 구버전에서 올라온 경우 남아 있는 알림을 지우는 용도로 남긴다.
 export async function cancelGenDoneNotice() {
-  const LN = await getPlugin();
+  // ⚠️ await 금지 (2026-08-26 시뮬레이터 실측) — Capacitor 플러그인 Proxy 는
+  //    .then 접근에도 메서드 함수를 돌려줘서 await 가 thenable 로 착각, 영원히
+  //    안 풀린다. 이 한 줄이 역대 로컬 알림(드롭 예약·만료·생성완료) 전멸의 원인.
+  const LN = getPlugin();
   if (!LN) return;
   try { await LN.cancel({ notifications: [{ id: GEN_DONE_ID }] }); } catch { /* 무시 */ }
 }
@@ -212,7 +224,10 @@ export async function cancelGenDoneNotice() {
 // 화면을 보고 있으면 결과가 이미 떠 있으므로 알림은 띄우지 않는다.
 export async function notifyGenDoneNow(count = 1, conceptTitle = "") {
   if (remotePushOn) return;
-  const LN = await getPlugin();
+  // ⚠️ await 금지 (2026-08-26 시뮬레이터 실측) — Capacitor 플러그인 Proxy 는
+  //    .then 접근에도 메서드 함수를 돌려줘서 await 가 thenable 로 착각, 영원히
+  //    안 풀린다. 이 한 줄이 역대 로컬 알림(드롭 예약·만료·생성완료) 전멸의 원인.
+  const LN = getPlugin();
   if (!LN) return;
   // 포그라운드면 알림 대신 화면으로 보여주면 된다
   if (typeof document !== "undefined" && !document.hidden) return;
@@ -236,7 +251,10 @@ export async function notifyGenDoneNow(count = 1, conceptTitle = "") {
 }
 
 export async function cancelExpiryNotice(id) {
-  const LN = await getPlugin();
+  // ⚠️ await 금지 (2026-08-26 시뮬레이터 실측) — Capacitor 플러그인 Proxy 는
+  //    .then 접근에도 메서드 함수를 돌려줘서 await 가 thenable 로 착각, 영원히
+  //    안 풀린다. 이 한 줄이 역대 로컬 알림(드롭 예약·만료·생성완료) 전멸의 원인.
+  const LN = getPlugin();
   if (!LN) return;
   const idNum = Number(id);
   if (!Number.isInteger(idNum)) return;
