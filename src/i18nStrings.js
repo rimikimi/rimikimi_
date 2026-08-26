@@ -254,6 +254,12 @@ export const STR = {
     "edit.sticker.hint": "드래그로 이동 · 두 손가락으로 크기/회전",
     "edit.exporting": "만드는 중…",
     "edit.loadFail": "사진을 불러오지 못했어요",
+    "edit.saveAll": "{n}장 저장",
+    "filter.cat": "🎞️ 필터",
+    "filter.cardTitle": "필름 필터",
+    "filter.cardDesc": "내 사진에 필름 감성 입히기 · 전부 무료",
+    "filter.pick": "사진 고르기 (최대 10장)",
+    "filter.tooMany": "최대 10장까지 고를 수 있어요",
 
     // === 저장 토스트 (결과화면·내 갤러리 공용) ===
     "save.toast.done": "사진첩에 저장됐어요",
@@ -591,6 +597,12 @@ export const STR = {
     "edit.sticker.hint": "Drag to move · pinch to resize/rotate",
     "edit.exporting": "Working…",
     "edit.loadFail": "Couldn't load the photo",
+    "edit.saveAll": "Save all {n}",
+    "filter.cat": "🎞️ Filter",
+    "filter.cardTitle": "Film Filters",
+    "filter.cardDesc": "Give your photos a film look · all free",
+    "filter.pick": "Choose photos (up to 10)",
+    "filter.tooMany": "You can choose up to 10 photos",
 
     // === Save toast (result screen + my gallery) ===
     "save.toast.done": "Saved to your photos",

@@ -94,26 +94,43 @@ function drawSticker(ctx, st, w, h) {
   ctx.restore();
 }
 
-export default function PhotoEditor({ src, filename = "rimikimi", onClose }) {
+// src(1장) 또는 srcs(여러 장, 최대 10) 를 받는다. 여러 장이면 필터/효과는 전체
+// 공통(한 번 고르면 전부 적용)이고 스티커만 사진별이다 — "10장에 같은 필터 입혀서
+// 한 번에 저장"이 배치 모드의 존재 이유라서다.
+export default function PhotoEditor({ src, srcs, filename = "rimikimi", onClose }) {
+  const sources = srcs && srcs.length ? srcs : [src];
+  const multi = sources.length > 1;
+  const [idx, setIdx] = useState(0);
   const [ready, setReady] = useState(false);
   const [loadErr, setLoadErr] = useState(false);
   const [tab, setTab] = useState("filter"); // filter | fx | sticker
   const [presetKey, setPresetKey] = useState("none");
   const [fx, setFx] = useState({ grain: 0, vignette: 0, leak: 0 });
   const [dateOn, setDateOn] = useState(false);
-  const [stickers, setStickers] = useState([]);
+  // 스티커는 사진별 — 위치가 그 사진의 구도에 묶여 있어 공유하면 엉뚱한 데 찍힌다
+  const [stickersByIdx, setStickersByIdx] = useState({});
+  const stickers = stickersByIdx[idx] || [];
+  const setStickers = (updater) =>
+    setStickersByIdx((p) => ({
+      ...p,
+      [idx]: typeof updater === "function" ? updater(p[idx] || []) : updater,
+    }));
   const [selId, setSelId] = useState(null);
   const [textDraft, setTextDraft] = useState("");
   const [textColor, setTextColor] = useState(TEXT_COLORS[0]);
   const [busy, setBusy] = useState(null); // "save" | "share" | null
+  const [saveProg, setSaveProg] = useState(""); // 배치 저장 진행 "3/10"
   const [toast, setToast] = useState("");
   const toastTimer = useRef(null);
 
-  const fullImgRef = useRef(null);   // 원본 <img> (내보내기용)
+  const fullImgRef = useRef(null);   // 활성 사진의 원본 <img> (내보내기용)
   const revokeRef = useRef(null);
   const canvasRef = useRef(null);
-  const baseRef = useRef(null);      // 미리보기 원본 ImageData
+  const baseRef = useRef(null);      // 활성 사진의 미리보기 ImageData
   const thumbRef = useRef(null);     // 칩 썸네일용 작은 ImageData
+  // 사진 전환이 즉각이도록 최근 3장의 디코드 결과를 캐시 (10장 전부 들고 있으면
+  // 2K 기준 200MB+ 라 iOS 웹뷰가 위험하다)
+  const cacheRef = useRef(new Map()); // idx → {img, base, thumb, revoke}
   const rafRef = useRef(0);
   const wrapRef = useRef(null);
   const dragRef = useRef(null);      // 스티커 드래그/핀치 상태
@@ -135,40 +152,58 @@ export default function PhotoEditor({ src, filename = "rimikimi", onClose }) {
     toastTimer.current = window.setTimeout(() => setToast(""), ms);
   }
 
-  /* ---------- 로드 ---------- */
+  /* ---------- 로드 (활성 사진, 최근 3장 캐시) ---------- */
+  async function decodeAt(i) {
+    const hit = cacheRef.current.get(i);
+    if (hit) return hit;
+    const { img, revoke } = await loadSource(sources[i]);
+    const scale = Math.min(1, PREVIEW_MAX / Math.max(img.naturalWidth, img.naturalHeight));
+    const pw = Math.max(1, Math.round(img.naturalWidth * scale));
+    const ph = Math.max(1, Math.round(img.naturalHeight * scale));
+    const off = document.createElement("canvas");
+    off.width = pw; off.height = ph;
+    const octx = off.getContext("2d", { willReadFrequently: true });
+    octx.drawImage(img, 0, 0, pw, ph);
+    const base = octx.getImageData(0, 0, pw, ph);
+    const tw = THUMB_W, th = Math.round((ph / pw) * THUMB_W);
+    const toff = document.createElement("canvas");
+    toff.width = tw; toff.height = th;
+    const tctx = toff.getContext("2d", { willReadFrequently: true });
+    tctx.drawImage(img, 0, 0, tw, th);
+    const entry = { img, base, thumb: tctx.getImageData(0, 0, tw, th), revoke };
+    cacheRef.current.set(i, entry);
+    // LRU 3장 초과분 정리
+    while (cacheRef.current.size > 3) {
+      const [oldK, oldV] = cacheRef.current.entries().next().value;
+      if (oldK === i) break;
+      if (oldV.revoke) URL.revokeObjectURL(oldV.revoke);
+      cacheRef.current.delete(oldK);
+    }
+    return entry;
+  }
+
   useEffect(() => {
     let dead = false;
     (async () => {
       try {
-        const { img, revoke } = await loadSource(src);
-        if (dead) { if (revoke) URL.revokeObjectURL(revoke); return; }
-        fullImgRef.current = img;
-        revokeRef.current = revoke;
-        const scale = Math.min(1, PREVIEW_MAX / Math.max(img.naturalWidth, img.naturalHeight));
-        const pw = Math.max(1, Math.round(img.naturalWidth * scale));
-        const ph = Math.max(1, Math.round(img.naturalHeight * scale));
-        const off = document.createElement("canvas");
-        off.width = pw; off.height = ph;
-        const octx = off.getContext("2d", { willReadFrequently: true });
-        octx.drawImage(img, 0, 0, pw, ph);
-        baseRef.current = octx.getImageData(0, 0, pw, ph);
-        // 칩 썸네일 베이스
-        const tw = THUMB_W, th = Math.round((ph / pw) * THUMB_W);
-        const toff = document.createElement("canvas");
-        toff.width = tw; toff.height = th;
-        const tctx = toff.getContext("2d", { willReadFrequently: true });
-        tctx.drawImage(img, 0, 0, tw, th);
-        thumbRef.current = tctx.getImageData(0, 0, tw, th);
+        const e = await decodeAt(idx);
+        if (dead) return;
+        fullImgRef.current = e.img;
+        baseRef.current = e.base;
+        thumbRef.current = e.thumb;
         setReady(true);
       } catch (_) {
         if (!dead) setLoadErr(true);
       }
     })();
-    return () => {
-      dead = true;
-      if (revokeRef.current) URL.revokeObjectURL(revokeRef.current);
-    };
-  }, [src]);
+    return () => { dead = true; };
+  }, [idx]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 언마운트 시 objectURL 정리
+  useEffect(() => () => {
+    for (const v of cacheRef.current.values()) if (v.revoke) URL.revokeObjectURL(v.revoke);
+    if (revokeRef.current) URL.revokeObjectURL(revokeRef.current);
+  }, []);
 
   /* ---------- 미리보기 렌더 (rAF 로 합침) ---------- */
   const renderPreview = useCallback(() => {
@@ -186,10 +221,11 @@ export default function PhotoEditor({ src, filename = "rimikimi", onClose }) {
     });
   }, [presetKey, fx, dateOn]);
 
-  useEffect(() => { if (ready) renderPreview(); }, [ready, renderPreview]);
+  useEffect(() => { if (ready) renderPreview(); }, [ready, renderPreview, idx]);
 
   /* ---------- 필터 칩 썸네일 ---------- */
-  // 각 칩의 <canvas> 가 마운트될 때 한 번 그린다 (프리셋당 64px — 순간)
+  // 각 칩의 <canvas> 가 마운트될 때 한 번 그린다 (프리셋당 64px — 순간).
+  // 사진을 바꾸면 JSX 쪽 key 에 idx 가 들어가 캔버스가 새로 마운트돼 다시 그려진다.
   const thumbCanvasCb = useCallback((el, key) => {
     const tb = thumbRef.current;
     if (!el || !tb || el.dataset.drawn) return;
@@ -198,7 +234,10 @@ export default function PhotoEditor({ src, filename = "rimikimi", onClose }) {
     const copy = new ImageData(new Uint8ClampedArray(tb.data), tb.width, tb.height);
     applyLook(copy.data, tb.width, tb.height, presetByKey(key), {});
     el.getContext("2d").putImageData(copy, 0, 0);
-  }, [ready]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [ready, idx]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 사진을 바꾸면 선택 상태 해제 (스티커는 사진별이라 남의 선택이 남는다)
+  useEffect(() => { setSelId(null); }, [idx]);
 
   /* ---------- 스티커 ---------- */
   function addEmoji(e) {
@@ -272,57 +311,79 @@ export default function PhotoEditor({ src, filename = "rimikimi", onClose }) {
   }
 
   /* ---------- 내보내기 (원본 해상도) ---------- */
-  async function renderFull() {
-    const img = fullImgRef.current;
-    const w = img.naturalWidth, h = img.naturalHeight;
-    const c = document.createElement("canvas");
-    c.width = w; c.height = h;
-    const ctx = c.getContext("2d", { willReadFrequently: true });
-    ctx.drawImage(img, 0, 0);
-    const hasLook = presetKey !== "none" || fx.grain || fx.vignette || fx.leak;
-    if (hasLook) {
-      const id = ctx.getImageData(0, 0, w, h);
-      // 원본이 커서(2K) 수백 ms 걸릴 수 있다 — 호출측이 busy 표시를 켠 채로 부른다
-      applyLook(id.data, w, h, presetByKey(presetKey), { ...fx, seed: GRAIN_SEED });
-      ctx.putImageData(id, 0, 0);
+  // i 번째 사진을 전체 해상도로 합성. img 를 안 주면 새로 디코드한다(배치 저장용 —
+  // 10장을 전부 캐시에 올리면 메모리가 위험해서 장당 디코드→저장→해제로 돈다).
+  async function renderFullAt(i, imgIn = null) {
+    let img = imgIn, revoke = null;
+    if (!img) {
+      const loaded = await loadSource(sources[i]);
+      img = loaded.img; revoke = loaded.revoke;
     }
-    if (dateOn) drawDateStamp(ctx, w, h);
-    for (const st of stickers) drawSticker(ctx, st, w, h);
-    return c.toDataURL("image/jpeg", 0.95);
+    try {
+      const w = img.naturalWidth, h = img.naturalHeight;
+      const c = document.createElement("canvas");
+      c.width = w; c.height = h;
+      const ctx = c.getContext("2d", { willReadFrequently: true });
+      ctx.drawImage(img, 0, 0);
+      const hasLook = presetKey !== "none" || fx.grain || fx.vignette || fx.leak;
+      if (hasLook) {
+        const id = ctx.getImageData(0, 0, w, h);
+        // 원본이 커서(2K) 수백 ms 걸릴 수 있다 — 호출측이 busy 표시를 켠 채로 부른다
+        applyLook(id.data, w, h, presetByKey(presetKey), { ...fx, seed: GRAIN_SEED });
+        ctx.putImageData(id, 0, 0);
+      }
+      if (dateOn) drawDateStamp(ctx, w, h);
+      for (const st of stickersByIdx[i] || []) drawSticker(ctx, st, w, h);
+      return c.toDataURL("image/jpeg", 0.95);
+    } finally {
+      if (revoke) URL.revokeObjectURL(revoke);
+    }
   }
 
+  async function saveDataUrl(data, name) {
+    if (isNative()) {
+      const r = await nativeSaveToAlbum(data, name);
+      return !!r?.ok;
+    }
+    const a = document.createElement("a");
+    a.href = data;
+    a.download = name + ".jpg";
+    document.body.appendChild(a); a.click(); a.remove();
+    return true;
+  }
+
+  // 저장 — 1장이면 그 장, 여러 장이면 전부(같은 룩, 사진별 스티커) 순차 저장
   async function handleSave() {
     if (busy) return;
     setBusy("save");
     try {
       await new Promise((r) => setTimeout(r, 30)); // busy 표시가 먼저 그려지게
-      const data = await renderFull();
-      let ok = true;
-      if (isNative()) {
-        const r = await nativeSaveToAlbum(data, filename + "_edit");
-        ok = !!r?.ok;
-      } else {
-        const a = document.createElement("a");
-        a.href = data;
-        a.download = filename + "_edit.jpg";
-        document.body.appendChild(a); a.click(); a.remove();
+      let okAll = true;
+      for (let i = 0; i < sources.length; i++) {
+        if (multi) setSaveProg(`${i + 1}/${sources.length}`);
+        const data = await renderFullAt(i, i === idx ? fullImgRef.current : null);
+        const name = multi ? `${filename}_edit_${i + 1}` : `${filename}_edit`;
+        const ok = await saveDataUrl(data, name);
+        okAll = okAll && ok;
       }
-      ok ? hap.done() : hap.warn();
-      flashToast(ok ? t("save.toast.done") : t("save.toast.fail"));
+      okAll ? hap.done() : hap.warn();
+      flashToast(okAll ? t("save.toast.done") : t("save.toast.fail"));
     } catch (_) {
       hap.warn();
       flashToast(t("save.toast.fail"));
     } finally {
       setBusy(null);
+      setSaveProg("");
     }
   }
 
+  // 공유는 지금 보고 있는 사진 1장만 — 10장짜리 공유 시트는 대부분의 앱이 버벅인다
   async function handleShare() {
     if (busy) return;
     setBusy("share");
     try {
       await new Promise((r) => setTimeout(r, 30));
-      const data = await renderFull();
+      const data = await renderFullAt(idx, fullImgRef.current);
       const r = await shareImage({
         src: data,
         filename: filename + "_edit.jpg",
@@ -352,7 +413,9 @@ export default function PhotoEditor({ src, filename = "rimikimi", onClose }) {
             {busy === "share" ? "…" : t("common.share")}
           </button>
           <button style={{ ...ES.topAction, ...ES.topActionPrimary }} disabled={!!busy} onClick={handleSave}>
-            {busy === "save" ? t("edit.exporting") : t("common.save")}
+            {busy === "save"
+              ? (saveProg ? saveProg + " " + t("edit.exporting") : t("edit.exporting"))
+              : multi ? t("edit.saveAll", { n: sources.length }) : t("common.save")}
           </button>
         </div>
       </div>
@@ -405,6 +468,22 @@ export default function PhotoEditor({ src, filename = "rimikimi", onClose }) {
         )}
       </div>
 
+      {/* 사진 스트립 (여러 장일 때) — 탭해서 전환. 룩은 전체 공통, 스티커는 사진별 */}
+      {multi && (
+        <div style={ES.photoStrip}>
+          {sources.map((s, i) => (
+            <button
+              key={i}
+              style={{ ...ES.photoThumbBtn, ...(i === idx ? ES.photoThumbOn : null) }}
+              onClick={() => { if (i !== idx) { hap.tap(); setReady(false); setIdx(i); } }}
+            >
+              <img src={s} alt={"" + (i + 1)} style={ES.photoThumbImg} />
+              {(stickersByIdx[i] || []).length > 0 && <span style={ES.photoThumbDot} />}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* 하단 패널 */}
       <div style={ES.panel}>
         <div style={ES.tabRow}>
@@ -424,8 +503,10 @@ export default function PhotoEditor({ src, filename = "rimikimi", onClose }) {
         {tab === "filter" && (
           <div style={ES.chipScroll}>
             {FILM_PRESETS.map((p) => (
+              // key 에 ready 를 넣는 이유: 사진 전환 시 디코드가 끝난 "뒤"에 캔버스를
+              // 다시 마운트해야 새 사진의 썸네일로 그려진다 (idx 만 넣으면 옛 썸네일로 그림)
               <button
-                key={p.key}
+                key={p.key + ":" + idx + ":" + (ready ? "r" : "l")}
                 style={{ ...ES.filterChip, ...(presetKey === p.key ? ES.filterChipOn : null) }}
                 onClick={() => { hap.tap(); setPresetKey(p.key); }}
               >
@@ -542,6 +623,21 @@ const ES = {
     position: "absolute", top: -14, right: -14, width: 24, height: 24, borderRadius: 12,
     border: "none", background: "#fff", color: "#231f20", fontSize: 11, fontWeight: 800,
     boxShadow: "0 2px 8px rgba(0,0,0,.4)", cursor: "pointer",
+  },
+  photoStrip: {
+    display: "flex", gap: 6, overflowX: "auto", padding: "8px 14px 2px",
+    WebkitOverflowScrolling: "touch", flex: "0 0 auto",
+  },
+  photoThumbBtn: {
+    position: "relative", flex: "0 0 auto", width: 44, height: 58, borderRadius: 9,
+    overflow: "hidden", border: "2px solid transparent", padding: 0, background: "#000",
+    cursor: "pointer",
+  },
+  photoThumbOn: { borderColor: "#B8860B" },
+  photoThumbImg: { width: "100%", height: "100%", objectFit: "cover", display: "block", opacity: 0.95 },
+  photoThumbDot: {
+    position: "absolute", top: 3, right: 3, width: 7, height: 7, borderRadius: 4,
+    background: "#B8860B", boxShadow: "0 0 0 1.5px rgba(0,0,0,.5)",
   },
   panel: {
     background: "#1d1a17", borderTop: "1px solid rgba(255,255,255,.06)",

@@ -93,6 +93,20 @@ export async function nativePickPhoto(source = "prompt") {
   }
 }
 
+// 앨범에서 여러 장 선택 (필터 스튜디오용). webPath URL 배열 반환, 취소면 null.
+// getPhoto 와 달리 카메라 없이 앨범 다중 선택 UI 가 뜬다.
+export async function nativePickPhotos(limit = 10) {
+  if (!isNative()) return null;
+  const { Camera } = await import("@capacitor/camera");
+  try {
+    const r = await Camera.pickImages({ quality: 92, limit });
+    const paths = (r.photos || []).map((p) => p.webPath).filter(Boolean);
+    return paths.length ? paths.slice(0, limit) : null;
+  } catch (_) {
+    return null; // 사용자 취소
+  }
+}
+
 // 안드로이드 전용: 우리 앱 전용 앨범 폴더("rimikimi")를 준비하고 식별자(경로)를 돌려준다.
 // Media.savePhoto 는 Android 에서 albumIdentifier 가 필수(없으면 거절)라 세션당 1회 확인/생성해 캐시.
 // (androidGalleryMode 를 켜지 않은 기본 모드라 별도 권한/팝업 없이 앱 전용 폴더에만 접근.)

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useMemo, useEffect, useLayoutEffect, useCallback } from "react";
 import * as nav from "./navTransition";
 import { supabase } from "./supabaseClient";
-import { isNative, platform, nativePickPhoto, nativeShare, nativeSaveToAlbum } from "./nativeBridge";
+import { isNative, platform, nativePickPhoto, nativePickPhotos, nativeShare, nativeSaveToAlbum } from "./nativeBridge";
 import { initAds, showInterstitial } from "./ads";
 import { initIap, loginIap, logoutIap, getIapPacks, purchaseIap, restoreIap, iapAvailable, isSubscription, getIapDiag } from "./iap";
 import { FOURCUT_COUNTS, FOURCUT_STYLES, fourcutStyle } from "./fourcut";
@@ -249,6 +249,8 @@ function byNewest(a, b) {
 //  ⚠️ 새 카테고리를 추가할 땐 여기 + i18nStrings.js 의 __categories(영문) 둘 다 넣을 것.
 const CATEGORY_ORDER = [
   "🪄 매직 부스",
+  "🎞️ 필터", // 합성 카테고리(컨셉 아님) — 필터 스튜디오 카드 하나만 뜬다
+  "🎞️ Filter",
   "📸 인생네컷",
   "일상 스냅",
   "스튜디오 프로필",
@@ -1267,6 +1269,10 @@ export default function PortraitStudio() {
         counts.set(cat, (counts.get(cat) || 0) + 1);
       }
     }
+    // 필터 스튜디오 — 서버 컨셉이 아니라 앱 내장 기능이라 여기서 합성한다.
+    // 구버전 앱엔 이 코드가 없으니 자동으로 안 보인다(원격 컨셉으로 넣으면 구버전이
+    // 생성 시도를 하게 돼서 안 된다).
+    counts.set(t("filter.cat"), 1);
     const all = t("step1.all");
     return Array.from(counts.entries())
       .map(([name, count]) => ({ name, count }))
@@ -1319,6 +1325,37 @@ export default function PortraitStudio() {
     if (el) el.scrollTop = lastDirRef.current === "back" ? nav.savedScroll(screen) : 0;
     nav.run(appRef.current, el);
   }, [screen]);
+
+  // ── 필터 스튜디오 (컨셉 아님 — 사진 최대 10장에 필름 필터, 전부 무료·전부 로컬) ──
+  const FILTER_MAX = 10;
+  const [filterSrcs, setFilterSrcs] = useState(null); // string[] | null
+  const filterInputRef = useRef(null);
+  async function openFilterStudio() {
+    if (isNative()) {
+      const paths = await nativePickPhotos(FILTER_MAX);
+      if (paths && paths.length) setFilterSrcs(paths.slice(0, FILTER_MAX));
+      return;
+    }
+    filterInputRef.current?.click();
+  }
+  function onFilterFiles(e) {
+    const files = Array.from(e.target.files || []).slice(0, FILTER_MAX);
+    e.target.value = ""; // 같은 파일 재선택도 change 가 뜨게
+    if (!files.length) return;
+    Promise.all(
+      files.map(
+        (f) =>
+          new Promise((res, rej) => {
+            const fr = new FileReader();
+            fr.onloadend = () => res(fr.result);
+            fr.onerror = rej;
+            fr.readAsDataURL(f);
+          })
+      )
+    )
+      .then((urls) => setFilterSrcs(urls))
+      .catch(() => {});
+  }
 
   function resetFilters() {
     setQuery("");
@@ -2315,6 +2352,7 @@ export default function PortraitStudio() {
             unlimited={unlimited}
             popular={popular}
             onBrooklyn={openBrooklyn}
+            onFilterStudio={openFilterStudio}
           />
         )}
         {screen === "confirm" && selected && (
@@ -2419,6 +2457,23 @@ export default function PortraitStudio() {
           />
         )}
       </main>
+
+      {/* 필터 스튜디오 — 웹용 다중 선택 input + 에디터 */}
+      <input
+        ref={filterInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        style={{ display: "none" }}
+        onChange={onFilterFiles}
+      />
+      {filterSrcs && (
+        <PhotoEditor
+          srcs={filterSrcs}
+          filename="rimikimi_filter"
+          onClose={() => setFilterSrcs(null)}
+        />
+      )}
 
       {!isNative() && (
         <footer style={S.footer}>
@@ -2743,6 +2798,7 @@ function GalleryScreen({
   credits = 0, referralCount = 0, untilNext = 1,
   onInvite, inviteMsg = "", unlimited = false,
   fullPool = [], popular = [], onBrooklyn,
+  onFilterStudio,
 }) {
   const [cols, setCols] = useState(2);
   const hasFilter =
@@ -2880,6 +2936,21 @@ function GalleryScreen({
           onMore={(catName) => setActiveCat(catName)}
           onBrooklyn={onBrooklyn}
         />
+      ) : activeCat === t("filter.cat") ? (
+        // 필터 스튜디오 — 컨셉이 아니라 앱 내장 기능. 사진 고르면 바로 에디터가 뜬다.
+        <button className="cardIn" style={S.filterHero} onClick={() => { hap.tap(); onFilterStudio && onFilterStudio(); }}>
+          <img
+            src={`${ASSET_BASE}/thumbs/filter.webp`}
+            alt={t("filter.cardTitle")}
+            style={S.filterHeroImg}
+            onError={(e) => { e.currentTarget.style.display = "none"; }}
+          />
+          <div style={S.filterHeroBody}>
+            <div style={S.filterHeroTitle}>{t("filter.cardTitle")}</div>
+            <div style={S.filterHeroDesc}>{t("filter.cardDesc")}</div>
+            <div style={S.filterHeroCta}>{t("filter.pick")}</div>
+          </div>
+        </button>
       ) : prompts.length === 0 ? (
         <div style={S.emptyState}>
           <div>{t("step1.empty")}</div>
@@ -4834,6 +4905,21 @@ const S = {
   },
   myGalleryGrid: {
     display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12,
+  },
+  // 필터 스튜디오 히어로 카드 (🎞️ 필터 카테고리 전용)
+  filterHero: {
+    display: "block", width: "100%", textAlign: "left", padding: 0,
+    background: "#fff", border: "1px solid " + INK + "10", borderRadius: 18,
+    overflow: "hidden", cursor: "pointer",
+    boxShadow: "0 1px 2px " + INK + "0d, 0 14px 34px -22px " + INK + "59",
+  },
+  filterHeroImg: { width: "100%", aspectRatio: "4 / 3", objectFit: "cover", display: "block" },
+  filterHeroBody: { padding: "16px 18px 18px" },
+  filterHeroTitle: { fontSize: 18, fontWeight: 800, color: INK },
+  filterHeroDesc: { fontSize: 13, color: INK + "99", marginTop: 4, lineHeight: 1.6 },
+  filterHeroCta: {
+    marginTop: 14, display: "inline-block", background: INK, color: "#fff",
+    fontSize: 14, fontWeight: 800, borderRadius: 12, padding: "11px 18px",
   },
   myGalleryCard: {
     background: "#fff", border: "1px solid " + INK + "10",
