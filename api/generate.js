@@ -923,11 +923,33 @@ export default async function handler(req, res) {
     );
   }
 
+  // 클로즈업(뷰티샷) 컨셉 헤드 틸트 (2026-08-26 오너 지시) — 사용자가 클로즈업류
+  // 컨셉을 고르면 얼굴이 완전 정면 얼빡으로 나와 증명사진처럼 굳는다. 요청마다
+  // 2~5도 사이 랜덤으로 살짝 틀어준다(방향도 랜덤 — 매번 다른 결과).
+  //   · 발동 조건: 컨셉 텍스트가 클로즈업/바스트업/헤드샷 프레이밍을 요구할 때만
+  //   · 제외: 증명사진(정면이 규격), 매직부스(원본 구도 유지), 드레스룸/네컷/복원
+  //   · 폴라로이드 교훈: 숫자만으론 안 먹힌다 — "완전 정면 금지"를 금지 조건으로 병기
+  const wantsCloseup = /close[- ]?up|bust[- ]?up|head[- ]?shot|beauty (shot|portrait)|shoulders[- ]?up/i
+    .test(prompt || "");
+  const headTiltClause =
+    wantsCloseup && !isIdPhoto && !skipFacePrecheck && !isDressroom && !isFourcut && !isRestore
+      ? (() => {
+          const deg = (2 + Math.random() * 3).toFixed(1);
+          const dir = Math.random() < 0.5 ? "left" : "right";
+          return (
+            `\n\nHEAD ANGLE: the head is turned about ${deg} degrees to the ${dir} — a subtle, ` +
+            `natural turn. The face must NOT be perfectly frontal and NOT perfectly symmetrical: ` +
+            `the nose sits slightly off the vertical center line and one ear is a touch more ` +
+            `visible than the other. Keep the gaze toward the camera; only the head angle changes.`
+          );
+        })()
+      : "";
+
   // PHOTOREALISM(AI 티 억제)은 아트 스타일 변환 모드(skipFacePrecheck)만 제외하고 전 모드에 적용.
   //   제외 이유: 그 모드는 "일러스트/회화 등 다른 매체로 재해석"이 목적이라 "반드시 실제 사진처럼
   //   보여야 한다(not an illustration, not a digital painting)"는 지시와 정면 충돌한다.
   const instruction =
-    (skipFacePrecheck ? conceptInstruction : PHOTOREALISM + conceptInstruction) + faceClause;
+    (skipFacePrecheck ? conceptInstruction : PHOTOREALISM + conceptInstruction) + headTiltClause + faceClause;
 
   // usePro: 과금/쿼터/CTA 판정 전용 플래그(그대로 유지) — 유료(크레딧 사용) / 무제한(어드민) /
   //   무료 Pro 체험일 때 true. ⚠️ 아래 로직에서 참조하지 않는다(과금 3경로 불변 유지) — "어떤
