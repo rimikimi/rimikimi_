@@ -178,6 +178,42 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
   // 필터 강도 (오너 지시): %표시 없는 슬라이더, 기본 0.7 = 지금의 풀 프리셋 룩.
   // 1.0 까지 올리면 더 진하게(외삽), 0 이면 원본.
   const [strength, setStrength] = useState(0.7);
+  // 룩(프리셋·효과·강도)은 사진별 (오너 지시: "각각 적용 + 전체 적용 버튼").
+  // presetKey/fx/strength 는 "지금 보는 사진"의 룩이고, lookByIdx 가 장부 —
+  // 룩을 바꾸는 곳은 반드시 updateLook 을 거쳐 둘을 같이 쓴다. (effect 로 미러링하면
+  // 사진 전환 직후 옛 룩이 새 사진에 덮어써지는 레이스가 생겨서 명령형으로 간다)
+  const defaultLook = () => ({
+    presetKey: initialPresetKey,
+    fx: fxOf(presetByKey(initialPresetKey)),
+    strength: 0.7,
+  });
+  const [lookByIdx, setLookByIdx] = useState({});
+  const lookOf = (i) => lookByIdx[i] || defaultLook();
+  function updateLook(patch) {
+    const next = { presetKey, fx, strength, ...patch };
+    setPresetKey(next.presetKey);
+    setFx(next.fx);
+    setStrength(next.strength);
+    setLookByIdx((p) => ({ ...p, [idx]: next }));
+  }
+  function switchPhoto(i) {
+    const lk = lookOf(i);
+    setPresetKey(lk.presetKey);
+    setFx(lk.fx);
+    setStrength(lk.strength);
+    const g = presetByKey(lk.presetKey).group;
+    if (g) setChipGroup(g);
+    setReady(false);
+    setIdx(i);
+  }
+  function applyLookToAll() {
+    hap.tap();
+    const cur = { presetKey, fx, strength };
+    const all = {};
+    for (let i = 0; i < sources.length; i++) all[i] = cur;
+    setLookByIdx(all);
+    flashToast(t("edit.applyAllDone", { n: sources.length }));
+  }
   const [dateStyle, setDateStyle] = useState("none");
   // 스티커는 사진별 — 위치가 그 사진의 구도에 묶여 있어 공유하면 엉뚱한 데 찍힌다
   const [stickersByIdx, setStickersByIdx] = useState({});
@@ -405,11 +441,14 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
       c.width = w; c.height = h;
       const ctx = c.getContext("2d", { willReadFrequently: true });
       ctx.drawImage(img, 0, 0);
-      const hasLook = presetKey !== "none" || fx.grain || fx.vignette || fx.leak;
+      // 룩은 사진별 — i 번 사진의 장부를 쓴다 (지금 보는 사진도 장부에 최신값이 있다)
+      const lk = lookOf(i);
+      const hasLook = lk.presetKey !== "none"
+        || lk.fx.grain || lk.fx.vignette || lk.fx.leak || lk.fx.glow || lk.fx.blur || lk.fx.shake;
       if (hasLook) {
         const id = ctx.getImageData(0, 0, w, h);
         // 원본이 커서(2K) 수백 ms 걸릴 수 있다 — 호출측이 busy 표시를 켠 채로 부른다
-        applyLookWithStrength(id.data, w, h, presetByKey(presetKey), { ...fx, seed: GRAIN_SEED }, strength);
+        applyLookWithStrength(id.data, w, h, presetByKey(lk.presetKey), { ...lk.fx, seed: GRAIN_SEED }, lk.strength);
         ctx.putImageData(id, 0, 0);
       }
       if (dateStyle !== "none") drawDateStamp(ctx, w, h, dateStyle);
@@ -559,14 +598,14 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
         )}
       </div>
 
-      {/* 사진 스트립 (여러 장일 때) — 탭해서 전환. 룩은 전체 공통, 스티커는 사진별 */}
+      {/* 사진 스트립 (여러 장일 때) — 탭해서 전환. 룩·스티커 모두 사진별 ("전체 적용"으로 일괄) */}
       {multi && (
         <div style={ES.photoStrip}>
           {sources.map((s, i) => (
             <button
               key={i}
               style={{ ...ES.photoThumbBtn, ...(i === idx ? ES.photoThumbOn : null) }}
-              onClick={() => { if (i !== idx) { hap.tap(); setReady(false); setIdx(i); } }}
+              onClick={() => { if (i !== idx) { hap.tap(); switchPhoto(i); } }}
             >
               <img src={s} alt={"" + (i + 1)} style={ES.photoThumbImg} />
               {(stickersByIdx[i] || []).length > 0 && <span style={ES.photoThumbDot} />}
@@ -603,6 +642,12 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
                   onClick={() => { hap.tap(); setChipGroup(g); }}
                 >{label}</button>
               ))}
+              {/* 여러 장일 때: 지금 사진의 룩을 10장 전부에 일괄 적용 (오너 지시) */}
+              {multi && (
+                <button style={ES.applyAllBtn} onClick={applyLookToAll}>
+                  {t("edit.applyAll")}
+                </button>
+              )}
             </div>
             <div style={ES.chipScroll}>
               {FILM_PRESETS.filter((p) => p.key === "none" || p.group === chipGroup).map((p) => (
@@ -613,9 +658,8 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
                   style={{ ...ES.filterChip, ...(presetKey === p.key ? ES.filterChipOn : null) }}
                   onClick={() => {
                     hap.tap();
-                    setPresetKey(p.key);
-                    setFx(fxOf(p)); // 프리셋 기본 효과까지 원탭 적용 (이후 효과 탭에서 조절)
-                    setStrength(0.7); // 강도는 기본값으로 리셋 (0.7 = 표준 룩)
+                    // 프리셋 기본 효과까지 원탭 적용, 강도는 기본값(0.7 = 표준 룩)으로 리셋
+                    updateLook({ presetKey: p.key, fx: fxOf(p), strength: 0.7 });
                   }}
                 >
                   <canvas
@@ -635,7 +679,7 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
                   className="pe-range"
                   type="range" min="0" max="100"
                   value={Math.round(strength * 100)}
-                  onChange={(e) => setStrength(Number(e.target.value) / 100)}
+                  onChange={(e) => updateLook({ strength: Number(e.target.value) / 100 })}
                   style={{ width: "100%" }}
                 />
               </div>
@@ -659,7 +703,7 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
                   className="pe-range"
                   type="range" min="0" max="100"
                   value={Math.round(fx[k] * 100)}
-                  onChange={(e) => setFx((p) => ({ ...p, [k]: Number(e.target.value) / 100 }))}
+                  onChange={(e) => updateLook({ fx: { ...fx, [k]: Number(e.target.value) / 100 } })}
                   style={ES.fxSlider}
                 />
                 <span style={ES.fxVal}>{Math.round(fx[k] * 100)}</span>
@@ -818,6 +862,13 @@ const ES = {
     color: "rgba(255,255,255,.55)", cursor: "pointer",
   },
   groupBtnOn: { background: "rgba(255,255,255,.14)", color: "#fff", borderColor: "transparent" },
+  // 전체 적용 — 그룹 토글과 같은 급의 필이되 오른쪽 끝에서 살짝 강조
+  applyAllBtn: {
+    marginLeft: "auto", border: "1px solid rgba(255,255,255,.3)", borderRadius: 15,
+    padding: "5px 13px", fontSize: 11.5, fontWeight: 800,
+    background: "rgba(255,255,255,.08)", color: "#fff", cursor: "pointer",
+    whiteSpace: "nowrap", flexShrink: 0,
+  },
   chipScroll: {
     display: "flex", gap: 10, overflowX: "auto", padding: "2px 16px 4px",
     WebkitOverflowScrolling: "touch",
