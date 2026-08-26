@@ -18,6 +18,14 @@ import { LocalNotifications } from "@capacitor/local-notifications";
 const SAVED_KEY = "rimikimi_saved_gallery";
 const LEAD_MS = 10 * 60 * 1000; // 만료 10분 전
 
+// LN 브리지 호출이 응답 없이 멈추는 것 방지. 74 실측에서 드롭 예약(sync)이
+// 15초 타임아웃으로 죽었다 — 어느 콜인지 콜 단위로 갈라 에러 메시지에 남긴다.
+const lnT = (label, p, ms = 8000) =>
+  Promise.race([
+    p,
+    new Promise((_, rej) => setTimeout(() => rej(new Error("LN." + label + " timeout")), ms)),
+  ]);
+
 /* ---------- 저장 표시 (localStorage) ---------- */
 
 export function getSavedSet() {
@@ -61,19 +69,17 @@ export function getNotifyPermState() { return lastPermState; }
 export async function ensureNotifyPermission(ask = true) {
   const LN = await getPlugin();
   if (!LN) return false;
-  try {
-    let p = await LN.checkPermissions();
+  // ⚠️ 여기 실패는 조용히 false 가 아니라 throw — 호출측(notif_sched 계측)이
+  //    "어느 콜에서 멈췄는지"를 받아야 한다. (기존 호출부는 전부 try 안에 있음)
+  let p = await lnT("checkPermissions", LN.checkPermissions());
+  lastPermState = p.display || "unknown";
+  if (p.display !== "granted") {
+    if (!ask || permAsked) return false;
+    permAsked = true;
+    p = await lnT("requestPermissions", LN.requestPermissions(), 60000); // 사용자 응답 대기
     lastPermState = p.display || "unknown";
-    if (p.display !== "granted") {
-      if (!ask || permAsked) return false;
-      permAsked = true;
-      p = await LN.requestPermissions();
-      lastPermState = p.display || "unknown";
-    }
-    return p.display === "granted";
-  } catch {
-    return false;
   }
+  return p.display === "granted";
 }
 
 // 갤러리 항목 목록을 받아 → 저장 안 한 것만 만료 10분 전 알림 예약,
@@ -158,17 +164,14 @@ export async function syncConceptDropNotifications(drops, { ask = true } = {}) {
     });
   });
 
-  try {
-    // 이전 예약 전부 제거 후 다시 깔기 (일정 변경·이미 지난 건 정리)
-    await LN.cancel({
-      notifications: Array.from({ length: DROP_ID_MAX }, (_, i) => ({ id: DROP_ID_BASE + i })),
-    });
-    if (notifications.length) await LN.schedule({ notifications });
-    return notifications.length;
-  } catch {
-    /* 예약 실패는 조용히 무시 — 컨셉 공개 자체와는 무관 */
-    return -1;
-  }
+  // 이전 예약 전부 제거 후 다시 깔기 (일정 변경·이미 지난 건 정리).
+  // ⚠️ 타임아웃 계열은 throw 로 올린다 — notif_sched 계측이 콜 지점을 기록해야
+  //    한다. (호출부는 try 안이라 앱 동작엔 영향 없음)
+  await lnT("cancel", LN.cancel({
+    notifications: Array.from({ length: DROP_ID_MAX }, (_, i) => ({ id: DROP_ID_BASE + i })),
+  }));
+  if (notifications.length) await lnT("schedule", LN.schedule({ notifications }));
+  return notifications.length;
 }
 
 /* ---------- 생성 완료 알림 ---------- */
