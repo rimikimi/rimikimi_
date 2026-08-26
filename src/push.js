@@ -29,6 +29,19 @@ import { setRemotePushActive } from "./notify";
 let inited = false;
 let fcmToken = null;
 
+// 네이티브 브리지 호출이 응답 없이 멈추는 것 방지 (nativeBridge.withTimeout 과 같은 패턴).
+// 계측(notif_state 전 기기 0건)상 초기화 어딘가가 완주하지 못하고 있었다 — 어떤 호출이든
+// 멈추면 조용히 실패로 처리하고 앱은 로컬 알림으로 계속 간다.
+const withTimeout = (p, ms) =>
+  Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error("bridge timeout")), ms))]);
+
+// 서버 api/_lib/dropNotice.js 의 dropTopicFor 와 규칙이 같아야 한다.
+// 기기의 UTC 오프셋(분)을 토픽 이름에 담는다 — drop_p540 = UTC+9(한국).
+function dropTopicFor() {
+  const off = -new Date().getTimezoneOffset();
+  return `drop_${off < 0 ? "m" : "p"}${Math.abs(off)}`;
+}
+
 // 이 기기로 직접 알림을 보낼 때 쓰는 토큰. 생성 요청에 같이 실어 보내면
 // 서버가 "생성 끝났다"를 이 기기에만 쏜다 — 등록용 API 가 필요 없다.
 export function getPushToken() {
@@ -46,21 +59,27 @@ export async function initPush({ ask = false } = {}) {
   if (!isNative() || inited) return inited;
 
   try {
-    let perm = await FirebaseMessaging.checkPermissions();
+    let perm = await withTimeout(FirebaseMessaging.checkPermissions(), 8000);
     if (perm.receive !== "granted") {
       if (!ask) return false;
-      perm = await FirebaseMessaging.requestPermissions();
+      perm = await withTimeout(FirebaseMessaging.requestPermissions(), 60000); // 사용자 응답 대기
     }
     if (perm.receive !== "granted") return false;
 
     // iOS 는 APNs 등록이 끝나야 FCM 토큰이 나온다.
-    const { token } = await FirebaseMessaging.getToken();
+    const { token } = await withTimeout(FirebaseMessaging.getToken(), 10000);
     fcmToken = token || null;
 
     // 토큰은 앱 재설치·장기 미사용 등으로 갱신된다. 갱신되면 최신 것을 쓴다.
     FirebaseMessaging.addListener("tokenReceived", (e) => {
       if (e?.token) fcmToken = e.token;
     }).catch(() => {});
+
+    // 드롭 원격 푸시용 시간대 토픽 구독 (서버 크론이 매일 20:00 현지시각 대상으로 발송).
+    // 로컬 예약이 1차 수단이고 이건 이중 안전망이다 — 실패해도 무시.
+    if (fcmToken) {
+      withTimeout(FirebaseMessaging.subscribeToTopic({ topic: dropTopicFor() }), 8000).catch(() => {});
+    }
 
     inited = true;
     // 완료 알림은 토큰이 있어야 서버가 이 기기로 쏠 수 있다. 토큰을 못 받았으면

@@ -892,22 +892,33 @@ export default function PortraitStudio() {
   // ask 를 넘기지 않으면 권한 팝업을 띄우지 않고, 이미 허용된 경우에만 설정한다.
   // 앱을 켜자마자 묻는 건 대부분 거부로 이어지고(iOS 는 거부 후 재요청 불가),
   // 심사에서도 "맥락 없는 권한 요청"으로 지적받을 수 있다.
+  // ⚠️ 순서가 생명이다 (2026-08-26 재설계). 예전엔 initPush(원격 푸시 초기화)를
+  //    먼저 await 했는데, 네이티브 브리지 호출이 멈추면 그 뒤의 "드롭 로컬 예약"까지
+  //    통째로 죽었다 — notif_state 계측이 전 기기 0건이었던 이유로 추정.
+  //    → ① 드롭 예약 먼저 ② 푸시 초기화는 나중에, 각각 자기 try + 자기 계측.
   const setupNotifications = useCallback(async (ask = false) => {
     if (!isNative()) return;
-    await initPush({ ask });
+    // ① 새 컨셉 드롭 로컬 예약 (알림의 1차 수단)
     try {
       const r = await fetch(`${LEGAL_BASE}/api/drops?days=30`, { cache: "no-cache" });
       const drops = await r.json();
       const n = Array.isArray(drops) ? await syncConceptDropNotifications(drops, { ask }) : 0;
-      // ⚠️ 이 계측이 없어서 "새 컨셉 알림이 안 온다"는 신고에 원인을 못 짚었다.
-      //    권한이 거부됐는지, 예약이 0건인지, 일정을 못 받았는지 구분이 안 됐다.
-      track("notif_state", {
+      track("notif_sched", {
         perm: getNotifyPermState(),   // granted | denied | prompt | unknown
         scheduled: n,                 // 예약한 알림 수 (-1 = 예약 자체 실패)
         drops: Array.isArray(drops) ? drops.length : -1,
         asked: !!ask,
       });
-    } catch (_) { /* 알림 예약 실패는 앱 동작과 무관 */ }
+    } catch (e) {
+      track("notif_sched", { error: String(e?.message || e).slice(0, 80), asked: !!ask });
+    }
+    // ② 원격 푸시(FCM) 초기화 — 생성완료 직접발송 + 드롭 토픽 구독(이중 안전망)
+    try {
+      const ok = await initPush({ ask });
+      track("push_init", { ok, token: !!getPushToken(), asked: !!ask });
+    } catch (e) {
+      track("push_init", { error: String(e?.message || e).slice(0, 80), asked: !!ask });
+    }
   }, []);
 
   useEffect(() => {
