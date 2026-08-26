@@ -8,6 +8,7 @@ import { FOURCUT_COUNTS, FOURCUT_STYLES, fourcutStyle } from "./fourcut";
 import { getSavedSet, markSaved, syncExpiryNotifications, cancelExpiryNotice, syncConceptDropNotifications, cancelGenDoneNotice, notifyGenDoneNow, getNotifyPermState } from "./notify";
 import { initPush, attachPushHandlers, getPushToken } from "./push";
 import { t, useLang, getLang, localizedTitle, localizedCategory, getLangPreference, setLang } from "./i18n";
+import PhotoEditor from "./PhotoEditor";
 import LoginGate from "./LoginGate";
 import Guide, { guideSeen, markGuideSeen } from "./Guide";
 // ⚠️ 정적 import — 네이티브 WebView 에서 동적 import() 가 영원히 pending 되는
@@ -3393,6 +3394,7 @@ function MyGalleryScreen({ accessToken, onBack, onShared, onLoginRequest }) {
   const [tick, setTick] = useState(0); // 1초마다 남은시간 갱신
   const [saved, setSaved] = useState(() => getSavedSet()); // 저장한 항목 id 집합
   const [sharingId, setSharingId] = useState(null);
+  const [editor, setEditor] = useState(null); // 보정 에디터 {src, filename} | null
   const [toast, setToast] = useState("");
   const toastTimer = useRef(null);
 
@@ -3627,6 +3629,16 @@ function MyGalleryScreen({ accessToken, onBack, onShared, onLoginRequest }) {
                     </button>
                     <button
                       style={S.myGalleryShare}
+                      disabled={!it.url}
+                      onClick={() => {
+                        hap.tap();
+                        setEditor({ src: it.url, filename: `rimikimi_${it.conceptId || it.id}` });
+                      }}
+                    >
+                      {t("edit.btn")}
+                    </button>
+                    <button
+                      style={S.myGalleryShare}
                       disabled={sharingId === it.id}
                       onClick={() => handleShare(it)}
                     >
@@ -3644,6 +3656,9 @@ function MyGalleryScreen({ accessToken, onBack, onShared, onLoginRequest }) {
             );
           })}
         </div>
+      )}
+      {editor && (
+        <PhotoEditor src={editor.src} filename={editor.filename} onClose={() => setEditor(null)} />
       )}
     </div>
   );
@@ -3965,6 +3980,10 @@ function ResultScreen({
   const [sharing, setSharing] = useState(false);
   const [toast, setToast] = useState("");
   const toastTimer = useRef(null);
+  // 보정 에디터. 저장과 같은 규칙 — 갤러리 원본(2K)이 있으면 반드시 그걸 연다.
+  // (768 축소본을 보정해 저장하면 화질이 깎인 채 원본 행세를 하게 된다)
+  const [editor, setEditor] = useState(null); // {src, filename} | null
+  const [editorLoading, setEditorLoading] = useState(false);
   // 묶음 결과에서 어떤 장을 이미 저장했는지. 내 사진 화면과 같은 저장 기록(notify)을
   // 본다 — 결과화면에서만 눌러도 여기 상태가 남아야 "저장됨" 으로 바뀐다.
   const [savedIds, setSavedIds] = useState(() => getSavedSet());
@@ -4026,6 +4045,27 @@ function ResultScreen({
       text: t("share.caption"),
     });
     if (r.ok) flashToast(t("share.doneToast")); // 취소면 토스트 없음
+  }
+
+  // 보정 열기 — 단건/묶음 공용. gid 가 있으면 2K 원본을 받아서 연다(저장과 같은 규칙).
+  async function openEditor(fallbackSrc, gid, name) {
+    if (editorLoading) return;
+    setEditorLoading(true);
+    try {
+      let srcToEdit = fallbackSrc;
+      if (gid) {
+        const hi = await fetchHiResDataUrl(gid);
+        if (!hi) {
+          flashToast(t("save.toast.hiResFail"), 3000);
+          return;
+        }
+        srcToEdit = hi;
+      }
+      hap.tap();
+      setEditor({ src: srcToEdit, filename: name });
+    } finally {
+      setEditorLoading(false);
+    }
   }
 
   async function fetchHiResDataUrl(id = galleryId) {
@@ -4217,6 +4257,9 @@ function ResultScreen({
                       </button>
                       <button type="button" style={S.batchBtn}
                         onClick={() => onShareOne && onShareOne(it, i)}>{t("common.share")}</button>
+                      <button type="button" style={S.batchBtn}
+                        onClick={() => openEditor(it.imageDataUrl, it.galleryId, "rimikimi_" + (prompt?.id ?? "art") + "_" + (i + 1))}>
+                        {t("edit.btn")}</button>
                     </div>
                   </div>
                 ))}
@@ -4279,14 +4322,24 @@ function ResultScreen({
           >
             {saving ? t("common.loading") : t("result.download")}
           </button>
-          <button
-            type="button"
-            onClick={handleShareResult}
-            disabled={sharing}
-            style={{ ...S.shareResultBtn, ...(sharing ? { opacity: 0.6 } : {}) }}
-          >
-            {sharing ? t("common.loading") : t("result.share")}
-          </button>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button
+              type="button"
+              onClick={() => openEditor(resultImage, galleryId, "rimikimi_" + (prompt?.id ?? "art"))}
+              disabled={editorLoading}
+              style={{ ...S.shareResultBtn, flex: 1, ...(editorLoading ? { opacity: 0.6 } : {}) }}
+            >
+              {editorLoading ? t("common.loading") : "🎨 " + t("edit.btn")}
+            </button>
+            <button
+              type="button"
+              onClick={handleShareResult}
+              disabled={sharing}
+              style={{ ...S.shareResultBtn, flex: 1, ...(sharing ? { opacity: 0.6 } : {}) }}
+            >
+              {sharing ? t("common.loading") : t("result.share")}
+            </button>
+          </div>
           <div style={S.resultActions}>
             <button style={S.secondaryBtn} onClick={onHome}>{t("result.home")}</button>
             <button style={S.primaryBtn} onClick={onAgain}>{t("result.again")}</button>
@@ -4308,6 +4361,9 @@ function ResultScreen({
           </a>
         </div>
       ) : null}
+      {editor && (
+        <PhotoEditor src={editor.src} filename={editor.filename} onClose={() => setEditor(null)} />
+      )}
     </div>
   );
 }

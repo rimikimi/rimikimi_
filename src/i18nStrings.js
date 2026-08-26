@@ -239,6 +239,22 @@ export const STR = {
     "gallery.action.share": "공유",
     "gallery.action.delete": "삭제",
 
+    // === 보정 에디터 ===
+    "edit.btn": "보정",
+    "edit.title": "보정",
+    "edit.tab.filter": "필터",
+    "edit.tab.fx": "효과",
+    "edit.tab.sticker": "스티커",
+    "edit.fx.grain": "그레인",
+    "edit.fx.vignette": "비네트",
+    "edit.fx.leak": "빛샘",
+    "edit.fx.date": "날짜 스탬프",
+    "edit.sticker.placeholder": "문구 입력",
+    "edit.sticker.add": "추가",
+    "edit.sticker.hint": "드래그로 이동 · 두 손가락으로 크기/회전",
+    "edit.exporting": "만드는 중…",
+    "edit.loadFail": "사진을 불러오지 못했어요",
+
     // === 저장 토스트 (결과화면·내 갤러리 공용) ===
     "save.toast.done": "사진첩에 저장됐어요",
     "save.toast.fail": "저장에 실패했어요. 잠시 후 다시 시도해 주세요.",
@@ -559,6 +575,22 @@ export const STR = {
     "gallery.savedBadge": "✓ Saved",
     "gallery.action.share": "Share",
     "gallery.action.delete": "Delete",
+
+    // === Photo editor ===
+    "edit.btn": "Edit",
+    "edit.title": "Edit",
+    "edit.tab.filter": "Filters",
+    "edit.tab.fx": "Effects",
+    "edit.tab.sticker": "Stickers",
+    "edit.fx.grain": "Grain",
+    "edit.fx.vignette": "Vignette",
+    "edit.fx.leak": "Light leak",
+    "edit.fx.date": "Date stamp",
+    "edit.sticker.placeholder": "Type a caption",
+    "edit.sticker.add": "Add",
+    "edit.sticker.hint": "Drag to move · pinch to resize/rotate",
+    "edit.exporting": "Working…",
+    "edit.loadFail": "Couldn't load the photo",
 
     // === Save toast (result screen + my gallery) ===
     "save.toast.done": "Saved to your photos",
