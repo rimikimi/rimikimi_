@@ -95,6 +95,25 @@ export const FILM_PRESETS = [
     temp: -2, tint: -6, ex: 0.06,  con: -0.06, fade: 20, whitePull: 14, sat: -0.12, vib: 0.08, sh: [-4, 6, 4],   hi: [6, 4, -2],
     hsl: [{ c: 120, w: 60, h: 10, s: -0.15, l: 0.03 }],
     fx: { grain: 0.2 } },
+
+  /* ── 재미 (SNOW류 — 특수 렌더 모드, special 필드가 전용 코드 경로를 탄다) ── */
+  { key: "sepia",    ko: "세피아",    en: "Sepia", group: "fun",
+    ex: 0.02, con: 0.12, fade: 8, whitePull: 6, bw: [0.3, 0.55, 0.15], sh: [18, 6, -14], hi: [24, 10, -18] },
+  { key: "duopink",  ko: "듀오 핑크", en: "Duo Pink", group: "fun",
+    special: "duotone", c1: [38, 18, 66], c2: [255, 158, 201] },
+  { key: "neon",     ko: "네온",      en: "Neon", group: "fun",
+    special: "duotone", c1: [24, 8, 66], c2: [90, 255, 240],
+    fx: { glow: 0.5 } },
+  { key: "thermal",  ko: "서모",      en: "Thermal", group: "fun",
+    special: "thermal" },
+  { key: "glitch",   ko: "글리치",    en: "Glitch", group: "fun",
+    special: "glitch" },
+  { key: "vhs",      ko: "VHS",      en: "VHS", group: "fun",
+    special: "vhs", fx: { grain: 0.35 } },
+  { key: "pixelate", ko: "모자이크",  en: "Pixel", group: "fun",
+    special: "pixelate" },
+  { key: "sketch",   ko: "스케치",    en: "Sketch", group: "fun",
+    special: "sketch" },
 ];
 
 export function presetByKey(key) {
@@ -204,9 +223,77 @@ export function buildLuts(p) {
   return luts;
 }
 
-/* ---------- 메인: 프리셋 + 효과 1패스 적용 ----------
+/* ---------- 이웃 연산 효과 (블러 계열 — 픽셀 단독으론 불가) ---------- */
+
+// 분리형 박스 블러(가로→세로, 슬라이딩 합) — O(n), 반경 무관 상수 시간.
+// 알파는 건드리지 않는다.
+function boxBlurRGBA(data, w, h, radius) {
+  const r = Math.max(1, radius | 0);
+  const tmp = new Uint8ClampedArray(data.length);
+  const div = r * 2 + 1;
+  // 가로
+  for (let y = 0; y < h; y++) {
+    const row = y * w;
+    let sR = 0, sG = 0, sB = 0;
+    for (let i = -r; i <= r; i++) {
+      const x = Math.min(w - 1, Math.max(0, i));
+      const k = (row + x) * 4;
+      sR += data[k]; sG += data[k + 1]; sB += data[k + 2];
+    }
+    for (let x = 0; x < w; x++) {
+      const k = (row + x) * 4;
+      tmp[k] = sR / div; tmp[k + 1] = sG / div; tmp[k + 2] = sB / div; tmp[k + 3] = data[k + 3];
+      const xAdd = Math.min(w - 1, x + r + 1), xSub = Math.max(0, x - r);
+      const ka = (row + xAdd) * 4, ks = (row + xSub) * 4;
+      sR += data[ka] - data[ks]; sG += data[ka + 1] - data[ks + 1]; sB += data[ka + 2] - data[ks + 2];
+    }
+  }
+  // 세로
+  for (let x = 0; x < w; x++) {
+    let sR = 0, sG = 0, sB = 0;
+    for (let i = -r; i <= r; i++) {
+      const y = Math.min(h - 1, Math.max(0, i));
+      const k = (y * w + x) * 4;
+      sR += tmp[k]; sG += tmp[k + 1]; sB += tmp[k + 2];
+    }
+    for (let y = 0; y < h; y++) {
+      const k = (y * w + x) * 4;
+      data[k] = sR / div; data[k + 1] = sG / div; data[k + 2] = sB / div;
+      const yAdd = Math.min(h - 1, y + r + 1), ySub = Math.max(0, y - r);
+      const ka = (yAdd * w + x) * 4, ks = (ySub * w + x) * 4;
+      sR += tmp[ka] - tmp[ks]; sG += tmp[ka + 1] - tmp[ks + 1]; sB += tmp[ka + 2] - tmp[ks + 2];
+    }
+  }
+}
+
+// 흔들림(모션 블러) — 살짝 기운 방향(약 8도)으로 탭 평균. 손떨림 스냅 느낌.
+function motionBlurRGBA(data, w, h, amount) {
+  const len = Math.max(2, Math.round(Math.min(w, h) * 0.05 * amount)); // 이동 길이(px)
+  const taps = Math.min(11, Math.max(3, Math.round(len / 2) * 2 + 1));
+  const src = new Uint8ClampedArray(data);
+  const ang = 8 * Math.PI / 180;
+  const dx = Math.cos(ang), dy = Math.sin(ang);
+  const half = (taps - 1) / 2;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      let sR = 0, sG = 0, sB = 0;
+      for (let t = -half; t <= half; t++) {
+        const step = (t / half) * (len / 2);
+        const sx = Math.min(w - 1, Math.max(0, Math.round(x + dx * step)));
+        const sy = Math.min(h - 1, Math.max(0, Math.round(y + dy * step)));
+        const k = (sy * w + sx) * 4;
+        sR += src[k]; sG += src[k + 1]; sB += src[k + 2];
+      }
+      const k = (y * w + x) * 4;
+      data[k] = sR / taps; data[k + 1] = sG / taps; data[k + 2] = sB / taps;
+    }
+  }
+}
+
+/* ---------- 메인: 프리셋 + 효과 적용 ----------
    data: ImageData.data (RGBA, 제자리 수정)
-   effects: { grain:0..1, vignette:0..1, leak:0..1, seed:정수 } (없으면 프리셋만) */
+   effects: { grain, vignette, leak, blur(흐림), shake(흔들림), glow(뽀샤시), seed }
+   순서: 흔들림/흐림(기하) → 색·그레인·비네트·빛샘(1패스) → 뽀샤시(블룸, 마지막) */
 export function applyLook(data, w, h, preset, effects = {}) {
   const p = preset && preset.key !== "none" ? preset : null;
   const luts = p ? buildLuts(p) : null;
@@ -217,7 +304,114 @@ export function applyLook(data, w, h, preset, effects = {}) {
   const grain = effects.grain || 0;
   const vig = effects.vignette || 0;
   const leak = effects.leak || 0;
+  const blur = effects.blur || 0;
+  const shake = effects.shake || 0;
+  const glow = effects.glow || 0;
   const seed = (effects.seed || 7) | 0;
+
+  if (shake) motionBlurRGBA(data, w, h, shake);
+  if (blur) boxBlurRGBA(data, w, h, Math.round(Math.min(w, h) * 0.02 * blur) + 1);
+
+  // ── 재미(특수 렌더) 프리셋 — 표준 색 파이프라인 대신/이전에 전용 처리 ──
+  if (p?.special === "pixelate") {
+    const bs = Math.max(4, Math.round(Math.min(w, h) * 0.02)); // 블록 크기
+    for (let by = 0; by < h; by += bs) {
+      for (let bx = 0; bx < w; bx += bs) {
+        let sR = 0, sG = 0, sB = 0, n = 0;
+        for (let y = by; y < Math.min(h, by + bs); y++)
+          for (let x = bx; x < Math.min(w, bx + bs); x++) {
+            const k = (y * w + x) * 4; sR += data[k]; sG += data[k + 1]; sB += data[k + 2]; n++;
+          }
+        sR /= n; sG /= n; sB /= n;
+        for (let y = by; y < Math.min(h, by + bs); y++)
+          for (let x = bx; x < Math.min(w, bx + bs); x++) {
+            const k = (y * w + x) * 4; data[k] = sR; data[k + 1] = sG; data[k + 2] = sB;
+          }
+      }
+    }
+    return data;
+  }
+  if (p?.special === "sketch") {
+    // 연필 스케치 = 그레이 + (반전본 블러) 컬러닷지 — 고전 포토샵 레시피
+    const g = new Uint8ClampedArray(data.length);
+    for (let i = 0; i < data.length; i += 4) {
+      const L = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+      g[i] = g[i + 1] = g[i + 2] = L; g[i + 3] = 255;
+    }
+    const inv = new Uint8ClampedArray(g);
+    for (let i = 0; i < inv.length; i += 4) { inv[i] = 255 - inv[i]; inv[i + 1] = 255 - inv[i + 1]; inv[i + 2] = 255 - inv[i + 2]; }
+    boxBlurRGBA(inv, w, h, Math.max(2, Math.round(Math.min(w, h) * 0.008)));
+    for (let i = 0; i < data.length; i += 4) {
+      const base = g[i], bl = inv[i];
+      const dodge = bl >= 255 ? 255 : Math.min(255, (base * 255) / (255 - bl));
+      // 종이빛 살짝 (순백 대신 미색)
+      data[i] = clamp8(dodge * 0.985 + 2);
+      data[i + 1] = clamp8(dodge * 0.975 + 2);
+      data[i + 2] = clamp8(dodge * 0.95 + 2);
+    }
+    return data;
+  }
+  if (p?.special === "glitch") {
+    const src = new Uint8ClampedArray(data);
+    // 행 블록 수평 오프셋 (시드 고정) + RGB 채널 어긋남 + 스캔라인
+    let rnd = seed * 2654435761 >>> 0;
+    const nextR = () => { rnd ^= rnd << 13; rnd ^= rnd >>> 17; rnd ^= rnd << 5; return (rnd >>> 0) / 4294967296; };
+    const bandH = Math.max(6, Math.round(h * 0.03));
+    for (let by = 0; by < h; by += bandH) {
+      const off = nextR() < 0.35 ? Math.round((nextR() - 0.5) * w * 0.08) : 0;
+      const chShift = Math.round(w * 0.008) + 1;
+      for (let y = by; y < Math.min(h, by + bandH); y++) {
+        for (let x = 0; x < w; x++) {
+          const sx = Math.min(w - 1, Math.max(0, x + off));
+          const k = (y * w + x) * 4;
+          const kR = (y * w + Math.min(w - 1, Math.max(0, sx + chShift))) * 4;
+          const kB = (y * w + Math.min(w - 1, Math.max(0, sx - chShift))) * 4;
+          data[k] = src[kR]; data[k + 1] = src[(y * w + sx) * 4 + 1]; data[k + 2] = src[kB + 2];
+        }
+      }
+    }
+    for (let y = 0; y < h; y += 3) // 스캔라인
+      for (let x = 0; x < w; x++) { const k = (y * w + x) * 4; data[k] *= 0.88; data[k + 1] *= 0.88; data[k + 2] *= 0.88; }
+    return data;
+  }
+  // 듀오톤/서모 — 밝기를 팔레트로 매핑. 표준 색 패스는 건너뛰고
+  // 그레인/비네트/빛샘/뽀샤시는 이어서 적용된다.
+  let skipColor = false;
+  if (p?.special === "duotone") {
+    const [r1, g1, b1] = p.c1, [r2, g2, b2] = p.c2;
+    for (let i = 0; i < data.length; i += 4) {
+      const t = (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114) / 255;
+      data[i] = r1 + (r2 - r1) * t; data[i + 1] = g1 + (g2 - g1) * t; data[i + 2] = b1 + (b2 - b1) * t;
+    }
+    skipColor = true;
+  }
+  if (p?.special === "thermal") {
+    // 열화상 팔레트: 남색→보라→빨강→주황→노랑→흰색
+    const stops = [[8, 8, 60], [90, 20, 120], [210, 40, 40], [255, 130, 20], [255, 220, 60], [255, 255, 255]];
+    for (let i = 0; i < data.length; i += 4) {
+      const t = (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114) / 255 * (stops.length - 1);
+      const s0 = Math.min(stops.length - 2, Math.floor(t)), f = t - s0;
+      const a = stops[s0], b2 = stops[s0 + 1];
+      data[i] = a[0] + (b2[0] - a[0]) * f; data[i + 1] = a[1] + (b2[1] - a[1]) * f; data[i + 2] = a[2] + (b2[2] - a[2]) * f;
+    }
+    skipColor = true;
+  }
+  if (p?.special === "vhs") {
+    const src = new Uint8ClampedArray(data);
+    const chShift = Math.max(1, Math.round(w * 0.004));
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const k = (y * w + x) * 4;
+        const kR = (y * w + Math.min(w - 1, x + chShift)) * 4;
+        const kB = (y * w + Math.max(0, x - chShift)) * 4;
+        data[k] = src[kR]; data[k + 2] = src[kB + 2];
+      }
+    }
+    boxBlurRGBA(data, w, h, 1);
+    for (let y = 0; y < h; y += 2) // 굵은 스캔라인
+      for (let x = 0; x < w; x++) { const k = (y * w + x) * 4; data[k] *= 0.9; data[k + 1] *= 0.9; data[k + 2] *= 0.9; }
+    // 이후 표준 패스가 grain 을 얹는다 (프리셋 fx.grain)
+  }
 
   // 비네트/빛샘용 좌표 상수 (픽셀 루프 밖에서 준비)
   const cx = w / 2, cy = h / 2;
@@ -230,7 +424,7 @@ export function applyLook(data, w, h, preset, effects = {}) {
       const i = (y * w + x) * 4;
       let r = data[i], g = data[i + 1], b = data[i + 2];
 
-      if (luts) {
+      if (luts && !skipColor) {
         r = luts[0][r]; g = luts[1][g]; b = luts[2][b];
 
         if (bw) {
@@ -308,6 +502,23 @@ export function applyLook(data, w, h, preset, effects = {}) {
       data[i] = clamp8(r + 0.5) | 0;
       data[i + 1] = clamp8(g + 0.5) | 0;
       data[i + 2] = clamp8(b + 0.5) | 0;
+    }
+  }
+
+  // 뽀샤시(소프트 글로우) — 밝게 띄운 블러본을 스크린 블렌드 (2000년대 뽀샤시 보정).
+  // 색 패스 뒤에 둬야 필터 톤 위에 은은하게 얹힌다.
+  if (glow) {
+    const soft = new Uint8ClampedArray(data);
+    boxBlurRGBA(soft, w, h, Math.round(Math.min(w, h) * 0.015) + 2);
+    const amt = glow * 0.85;
+    const lift = glow * 10; // 전체를 살짝 환하게 — 뽀샤시 특유의 화사함
+    for (let i = 0; i < data.length; i += 4) {
+      for (let c = 0; c < 3; c++) {
+        const v = data[i + c];
+        const s = soft[i + c];
+        const screen = 255 - ((255 - v) * (255 - s)) / 255;
+        data[i + c] = clamp8(v + (screen - v) * amt + lift);
+      }
     }
   }
   return data;
