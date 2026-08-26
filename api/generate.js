@@ -764,7 +764,8 @@ export default async function handler(req, res) {
     "Virtual fitting-room photo. The FIRST reference image shows a person — reproduce this " +
     "person's exact facial identity: same face, bone structure, eyes, nose, lips, same hair, " +
     "same natural body proportions. " +
-    `The remaining ${garmentList.length} reference image(s) show clothing/fashion items: ` +
+    // "remaining" 이라 쓰면 안 된다 — 맨 뒤에 얼굴 참조가 더 붙는다(faceClause 참고)
+    `The NEXT ${garmentList.length} reference image(s) show clothing/fashion items: ` +
     garmentListing + ". " +
     "The person is WEARING ALL of these EXACT items together as one outfit. First identify what " +
     "each item is (top, bottom, dress, outerwear, shoes, bag, accessory), then dress the person " +
@@ -879,9 +880,21 @@ export default async function handler(req, res) {
   // 매직 부스(skipFacePrecheck)에는 붙이지 않는다 — 사람이 아닌 사진도 받는 모드라
   // "이 사람의 얼굴" 지시가 오히려 방해가 된다.
   // 표준 경로는 앵커 1장(angle="anchor")이지만, 혹시 여러 장이 와도 문장이 성립해야 한다.
+  //
+  // 드레스룸도 붙인다 (2026-08-26 — 오너 신고 "인물유지가 왜 이러냐"). 처음엔 의상
+  // 서수(SECOND..SIXTH)와 "final N" 서수가 꼬일까 봐 뺐는데, 그게 바로 유지력 하락의
+  // 원인이었다(본인 사진 1장에만 의존). 대신 드레스룸 전용 문구로 "의상이 아니다 /
+  // 그 사진들 속 옷은 무시해라"를 명시해 두 서수 체계를 갈라준다.
   const faceClause =
-    faceRefList.length && !skipFacePrecheck && !isDressroom
-      ? (faceRefList.length > 1
+    faceRefList.length && !skipFacePrecheck
+      ? (isDressroom
+          ? `\n\nAfter the garment references, the final ${faceRefList.length} reference ` +
+            `image(s) at the very END are FACE REFERENCES of the same person from the FIRST ` +
+            `image — they are NOT garments and NOT part of the outfit. Use them ONLY to ` +
+            `reproduce this person's facial identity exactly (face, bone structure, eyes, nose, ` +
+            `lips, skin tone). IGNORE the clothing, pose and background inside these face ` +
+            `references — the outfit comes ONLY from the garment references listed above.`
+          : faceRefList.length > 1
           ? `\n\nThe final ${faceRefList.length} reference images are ` +
             `the SAME person's face from multiple angles — reproduce this person's facial identity exactly. ` +
             `They are provided only to fix the face; they never change the composition, framing, pose, ` +
