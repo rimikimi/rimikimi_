@@ -898,11 +898,23 @@ export default function PortraitStudio() {
   //    → ① 드롭 예약 먼저 ② 푸시 초기화는 나중에, 각각 자기 try + 자기 계측.
   const setupNotifications = useCallback(async (ask = false) => {
     if (!isNative()) return;
+    // 진입 마커 — 73 실측에서 app_open 은 찍히는데 notif_sched/push_init 이 전무했다.
+    // 이 마커가 찍히고 뒤가 안 찍히면 "이 함수 안에서 멈춤"이 확정된다.
+    track("notif_start", { asked: !!ask });
+    // 모든 단계에 바깥 타임아웃 — 어떤 브리지/네트워크 호출이 hang 해도
+    // 에러 행으로 변환돼 "어디서 멈췄는지"가 계측에 남는다.
+    const raceT = (label, p, ms) =>
+      Promise.race([
+        p,
+        new Promise((_, rej) => setTimeout(() => rej(new Error(label + " timeout " + ms + "ms")), ms)),
+      ]);
     // ① 새 컨셉 드롭 로컬 예약 (알림의 1차 수단)
     try {
-      const r = await fetch(`${LEGAL_BASE}/api/drops?days=30`, { cache: "no-cache" });
-      const drops = await r.json();
-      const n = Array.isArray(drops) ? await syncConceptDropNotifications(drops, { ask }) : 0;
+      const r = await raceT("fetch", fetch(`${LEGAL_BASE}/api/drops?days=30`, { cache: "no-cache" }), 10000);
+      const drops = await raceT("json", r.json(), 5000);
+      const n = Array.isArray(drops)
+        ? await raceT("sync", syncConceptDropNotifications(drops, { ask }), 15000)
+        : 0;
       track("notif_sched", {
         perm: getNotifyPermState(),   // granted | denied | prompt | unknown
         scheduled: n,                 // 예약한 알림 수 (-1 = 예약 자체 실패)
@@ -913,8 +925,9 @@ export default function PortraitStudio() {
       track("notif_sched", { error: String(e?.message || e).slice(0, 80), asked: !!ask });
     }
     // ② 원격 푸시(FCM) 초기화 — 생성완료 직접발송 + 드롭 토픽 구독(이중 안전망)
+    // ask=true(권한 팝업)면 사용자 응답을 기다려야 하므로 여유 있게.
     try {
-      const ok = await initPush({ ask });
+      const ok = await raceT("initPush", initPush({ ask }), ask ? 90000 : 20000);
       track("push_init", { ok, token: !!getPushToken(), asked: !!ask });
     } catch (e) {
       track("push_init", { error: String(e?.message || e).slice(0, 80), asked: !!ask });
