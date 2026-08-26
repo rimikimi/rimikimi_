@@ -793,17 +793,20 @@ export default async function handler(req, res) {
         "overall bright neutral-warm ambience, only a GENTLE hint of warm downlight from above. " +
         "NO dramatic spotlight, NO strong pool of light, NO visible light fixtures. " +
         "Real phone mirror-selfie feel, natural handheld framing."
-      : "SCENE — full-body MODEL CUT: the person stands against a seamless off-white studio " +
-        "backdrop in a natural relaxed model pose, body at a slight three-quarter angle, calm " +
-        "confident expression. FULL BODY head to shoes, generous headroom.\n" +
-        "LIGHTING — professional and dimensional, shown ONLY through its EFFECT on the person " +
-        "and the backdrop: a soft key from the upper left sculpting gentle shadows along the " +
-        "garment folds, a subtle warm rim highlight along the hair and shoulders, a soft " +
-        "vertical gradient on the seamless, and a soft natural shadow anchoring the feet. " +
-        "ABSOLUTELY NO photography equipment anywhere in the frame: no softbox, no umbrella, " +
-        "no light stand, no reflector, no cables, no camera. The frame contains ONLY the " +
-        "person, the backdrop and the floor — a finished retouched lookbook photo, not a " +
-        "behind-the-scenes shot. Professional lookbook photography, 50mm at f/5.6.") +
+      // 오너 지시(2026-08-26): 스튜디오 무지 배경 → 일상 배경. 포즈는 모델, 시선은 자유.
+      : "SCENE — full-body STREET-STYLE MODEL CUT in an everyday real-world setting: the " +
+        "person stands in a casual daily location that complements the outfit — for example a " +
+        "quiet city sidewalk, a café exterior, a tree-lined residential street, a clean urban " +
+        "corner or a bright pedestrian alley. The background is a believable ordinary place " +
+        "with natural depth, softly blurred (shallow depth of field) so the person and the " +
+        "clothes remain the clear subject.\n" +
+        "POSE — natural relaxed fashion-model stance, body at a slight three-quarter angle, " +
+        "confident and effortless. The GAZE IS FREE: looking into the camera, glancing off to " +
+        "the side, or caught mid-walk like a candid street snap — whichever feels most " +
+        "natural. FULL BODY head to shoes, generous headroom.\n" +
+        "LIGHTING — natural daylight belonging to the scene: soft, flattering, gently " +
+        "directional, true-to-life colours. NO photography equipment anywhere in the frame. " +
+        "Professional street-style lookbook photography, 50mm at f/2.8.") +
     "\n\nOUTPUT FORMAT: a VERTICAL PORTRAIT photograph in 3:4 aspect ratio (taller than wide, " +
     "like a standard phone portrait photo). Do NOT copy the aspect ratio of any reference image — " +
     "reference images may be tall phone screenshots; the output is always 3:4.\n" +
