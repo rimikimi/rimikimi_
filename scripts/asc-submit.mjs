@@ -1,20 +1,22 @@
 import { createSign } from "node:crypto";
 import { readFileSync } from "node:fs";
 const KEY_ID="3KXPZAL47V", ISSUER="257d4dcf-3cfc-482b-8df3-b038f7c50485", APP="6782776518";
-const VERSION="1.28", BUILD="57";
+const VERSION="1.39", BUILD="78";
 const DRY = process.argv.includes("--dry");
 
 const NOTES = {
-  ko: `알림이 생겼어요.
+  ko: `무료 필터가 생겼어요.
 
-• 새 컨셉이 올라오면 바로 알려드려요
-• 사진이 완성되면 알림이 와요 — 앱을 닫아도 생성은 계속됩니다
-• 새로운 컨셉 90종 추가`,
-  "en-US": `Notifications are here.
+• 필름·카메라·재미 프리셋 27종 — 전부 무료
+• 날짜 스탬프 6종 + 적용 강도 슬라이더
+• 한 번에 최대 10장까지 편집·저장
+• 새 컨셉 추가, 알림 안정화`,
+  "en-US": `Free filters are here.
 
-• Get a heads-up the moment new concepts drop
-• Get notified when your photo is ready — it keeps generating even if you close the app
-• 90 new concepts added`,
+• 27 film, camera & fun presets — all free
+• 6 date stamps + an adjustable strength slider
+• Edit and save up to 10 photos at once
+• New concepts and more reliable notifications`,
 };
 
 const key=readFileSync("/Users/home/.appstoreconnect/private_keys/AuthKey_3KXPZAL47V.p8","utf8");
