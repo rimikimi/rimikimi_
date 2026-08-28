@@ -4,19 +4,22 @@ const KEY_ID="3KXPZAL47V", ISSUER="257d4dcf-3cfc-482b-8df3-b038f7c50485", APP="6
 const VERSION="1.39", BUILD="78";
 const DRY = process.argv.includes("--dry");
 
+// 2026-08-28: 4.3(a) 반려 후 오너 지시 — 필터 위주 노트 제거, 컨셉/드레스룸 중심 (asc-meta-rimikimi.mjs 와 동일 문안)
 const NOTES = {
-  ko: `무료 필터가 생겼어요.
+  ko: `새 기능 드레스룸 — 이 옷, 나한테 어울릴까? 상의·하의·아우터·신발·가방 사진을 최대 5장 올리면 그 코디를 입은 내 모습을 미리 볼 수 있어요. 쇼핑몰 캡처도 OK, 거울셀카·모델컷 선택.
 
-• 필름·카메라·재미 프리셋 27종 — 전부 무료
-• 날짜 스탬프 6종 + 적용 강도 슬라이더
-• 한 번에 최대 10장까지 편집·저장
-• 새 컨셉 추가, 알림 안정화`,
-  "en-US": `Free filters are here.
+• 새 컨셉 추가 — 매일 저녁 8시 새 컨셉 4종이 도착해요
+• 새 컨셉 알림이 제시간에 오도록 수정
+• 매직 부스에 즉석 사진 컨셉 추가
+• 클로즈업 컨셉의 얼굴 각도가 더 자연스러워졌어요
+• 갤러리 저장 오류 등 버그 수정, 편집 도구 개선`,
+  "en-US": `New: Dressing Room — will this look good on me? Upload photos of a top, bottoms, outerwear, shoes or a bag (up to 5) and preview the whole outfit on you. Store screenshots work too. Mirror selfie or model shot.
 
-• 27 film, camera & fun presets — all free
-• 6 date stamps + an adjustable strength slider
-• Edit and save up to 10 photos at once
-• New concepts and more reliable notifications`,
+• New concepts — 4 arrive every evening
+• Concept-drop notifications now arrive on time
+• Instant-photo concept added to Magic Booth
+• More natural head angles in close-up concepts
+• Gallery save fix and other bug fixes, editing tool improvements`,
 };
 
 const key=readFileSync("/Users/home/.appstoreconnect/private_keys/AuthKey_3KXPZAL47V.p8","utf8");
