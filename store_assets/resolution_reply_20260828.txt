@@ -1,0 +1,20 @@
+[App Store Connect > 리미키미 1.39 > Resolution Center 답신 — 아래 영문만 복사해서 붙여넣기]
+[보내면 그 자체가 재심 요청입니다. 빌드 78 그대로 다시 심사에 들어갑니다.]
+
+Hello, and thank you for the review. We would like to ask for a second look, with some context that we think is relevant to guideline 4.3(a).
+
+1) rimikimi is our own original app, not a repackaged template.
+It has been on the App Store since July 2026 and is currently live at version 1.33, with more than ten approved updates. The app is written and maintained by us in our own repository; we did not purchase or adapt a third-party app template, and no source code or assets are shared with apps from other developers.
+
+2) Version 1.39 is a feature update to that same live app, not a new or duplicated concept.
+The core of rimikimi is a daily-updated library of AI portrait concepts: 300+ concepts written in-house, with four new ones published every evening and delivered by push notification. Alongside that, the app offers a multi-frame photo-booth mode, couple portraits from two people's photos, and a new Dressing Room feature that previews an outfit on the user from photos of individual garments.
+
+3) The previous release notes may have given a misleading impression of the update.
+The notes for 1.39 led with a secondary addition — a simple editing tool — which we believe could make the update read like a generic photo-filter app, a very crowded category. That was our mistake in describing the release. We have rewritten the release notes, app description, subtitle and keywords for this version so that they accurately describe what rimikimi is: a daily concept-based AI photoshoot app. No binary change was needed for this; the build under review is unchanged.
+
+4) A note that may help you locate the issue.
+Our analytics show that during the review period this build was not launched on any device other than our own, and the demo account provided in App Review Information was not signed in. We mention this only in case the submission was assessed on metadata alone. The demo account remains active with unlimited generations, and we are happy to provide a video walkthrough or any additional material you need.
+
+Could you please let us know which app or apps this submission was compared against? If there is a specific overlap we are not seeing, we will address it directly and promptly.
+
+Thank you for your time.
