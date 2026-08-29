@@ -1758,6 +1758,9 @@ export default function PortraitStudio() {
   function onTouchStartRoot(e) {
     swipeRef.current = null;
     if (showBrooklyn || showLoginSheet) return;
+    // 모달(사진 편집기 등)이 떠 있으면 뒤로가기·탭 전환 스와이프를 받지 않는다.
+    // 안 그러면 편집기 안에서 필터 칩을 옆으로 넘길 때 화면 전체가 밀린다.
+    if (document.body.dataset.modalOpen) return;
     const tt = e.touches && e.touches[0];
     if (!tt) return;
     // 가로로 스크롤되는 줄(인기 컨셉 등)에서 시작했으면 그쪽 제스처에 양보

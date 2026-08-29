@@ -14,6 +14,7 @@
 //     미리보기/원본 해상도가 달라도 같은 위치에 찍힌다.
 // ============================================================
 import { useEffect, useRef, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { FILM_PRESETS, presetByKey, applyLook, applyLookWithStrength } from "./filters";
 import { isNative, nativeSaveToAlbum } from "./nativeBridge";
 import { shareImage } from "./share";
@@ -168,6 +169,13 @@ const fxOf = (p) => ({
 export default function PhotoEditor({ src, srcs, initialPresetKey = "none", filename = "rimikimi", onClose }) {
   const sources = srcs && srcs.length ? srcs : [src];
   const multi = sources.length > 1;
+  // 에디터가 떠 있는 동안 앱 루트의 스와이프 제스처(뒤로가기·탭 전환)를 끈다.
+  // 포털로 루트 밖에 있어 대부분의 터치는 애초에 안 오지만, 전환 도중에 열리는 경우까지
+  // 확실히 막는다. 루트 핸들러가 이 플래그를 보고 즉시 빠져나간다.
+  useEffect(() => {
+    document.body.dataset.modalOpen = "1";
+    return () => { delete document.body.dataset.modalOpen; };
+  }, []);
   const [idx, setIdx] = useState(0);
   const [ready, setReady] = useState(false);
   const [loadErr, setLoadErr] = useState(false);
@@ -519,7 +527,13 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
 
   const sel = stickers.find((s) => s.id === selId);
 
-  return (
+  // ⚠️ body 로 포털한다 (main 안에 두면 안 된다).
+  //   화면 전환(navTransition)은 <main> 에 transform / will-change:transform 을 건다.
+  //   transform 이 걸린 조상은 position:fixed 의 컨테이닝 블록이 되므로, 에디터가 main 안에
+  //   있으면 전환·엣지 스와이프 때마다 오버레이가 화면과 같이 옆으로 끌려간다(실제 버그).
+  //   포털로 app 루트 바깥에 두면 루트의 스와이프 핸들러도 에디터 터치를 못 받는다
+  //   = 필터 칩을 옆으로 넘겨도 뒤로가기 제스처가 발동하지 않는다.
+  return createPortal(
     <div style={ES.overlay} className="pe-in">
       <style>{PE_CSS}</style>
       {toast && <div style={ES.toast} onClick={() => setToast("")}>{toast}</div>}
@@ -761,7 +775,8 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
