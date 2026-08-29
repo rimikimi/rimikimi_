@@ -640,12 +640,20 @@ export default async function handler(req, res) {
   // 증명사진: 사용자가 고른 정장색/배경색으로 서버가 프롬프트 조립 (자연스러운 정장)
   const isIdPhoto =
     (Number(conceptId) === 409 || /증명사진|id ?photo/i.test(conceptTitle || "")) && !!idSuit;
+  // 색은 말이 아니라 hex 로 지정한다(오너 지시) — 클라이언트 ID_SUITS 의 css 값과 동일.
+  const ID_SUIT_HEX = {
+    "dark navy": "#1F2A44",
+    "charcoal dark grey": "#3B3E44",
+    "light grey": "#B7BCC4",
+    black: "#15171A",
+  };
+  const idSuitHex = ID_SUIT_HEX[idSuit] || ID_SUIT_HEX["dark navy"];
   const idInstruction =
     "Create a clean, professional ID / passport-style photograph using the person in the provided photo. " +
     "Keep their exact face, identity, facial features, skin tone and natural likeness — do not beautify, slim, smooth, or change who they are. " +
     "Composition: front-facing head-AND-SHOULDERS portrait, looking straight at the camera, neutral relaxed expression, mouth closed, eyes open and clearly visible, face and both ears visible, hair tidy, no hat, no sunglasses. " +
     "FRAMING (important): zoom OUT a little — do NOT crop tightly on the face/head. Frame it like a standard ID/passport photo so that the whole head with a small margin of empty space above the hair AND the entire shoulder line down to roughly the upper chest are clearly visible. Both shoulders and the top of the suit must be fully in frame; never cut off the shoulders. " +
-    "Dress the person in a business-formal " + (idSuit || "dark navy") + " suit jacket and a clean white collared shirt, styled appropriately for the person's apparent gender and build (a women's blazer for women, a men's suit for men). " +
+    "Dress the person in a business-formal " + (idSuit || "dark navy") + " (exact colour " + idSuitHex + ") suit jacket and a clean white #FFFFFF collared shirt, styled appropriately for the person's apparent gender and build (a women's blazer for women, a men's suit for men). " +
     "The suit must have a BESPOKE, made-to-measure tailored fit — precisely tailored to the person's own frame: clean tailored shoulders that follow their natural shoulder line, a trim but comfortable body, smooth lapels with no bunching or gaping, the look of a high-end custom-tailored garment. " +
     REALISTIC_GARMENT +
     "Keep the person's real shoulder width, neck and posture — do NOT broaden, square off, or enlarge the shoulders, and do NOT widen the neck. The jacket should follow the body's actual contour and connect to the neck and shoulders with seamless, anatomically-correct, photorealistic transitions. " +
@@ -657,31 +665,31 @@ export default async function handler(req, res) {
   // 인생네컷: 스타일별 무드/악세서리 + 컷별 포즈로 단일 컷 포트레이트 생성
   const isFourcut = !!fourcutStyle;
   const FC_STYLE = {
-    cute:     { mood: "soft dreamy CUTE aesthetic, pastel pink and cream tones, gentle soft lighting, sweet adorable vibe", acc: "a cute ribbon hairband" },
-    luxury:   { mood: "LUXURY editorial fashion aesthetic, elegant black and gold tones, glossy premium studio lighting, sophisticated chic vibe", acc: "an elegant pearl hairpin" },
-    funky:    { mood: "FUNKY Y2K retro aesthetic, bold saturated neon colors, high-contrast on-camera flash look, edgy playful vibe", acc: "fun colorful hair clips" },
-    playful:  { mood: "PLAYFUL vibrant party aesthetic, bright cheerful colors, joyful energetic vibe", acc: "a fun colorful party headband" },
-    birthday: { mood: "festive BIRTHDAY party aesthetic, warm celebratory tones with balloon and confetti accents, happy celebratory vibe", acc: "a cute party-hat headband" },
-    film:     { mood: "nostalgic 90s FILM photography aesthetic, warm faded beige tones, soft grain and gentle halation, timeless analog vibe", acc: "a simple thin hair ribbon" },
-    summer:   { mood: "fresh SUMMER vacation aesthetic, bright aqua and sky-blue tones, sunlit airy highlights, breezy cheerful vibe", acc: "a woven straw sun visor" },
-    mono:     { mood: "clean MONOCHROME editorial aesthetic, crisp black-and-white tones with soft gray gradients, minimal timeless vibe", acc: "a sleek minimal hair clip" },
+    cute:     { mood: "soft dreamy CUTE aesthetic, palette: pastel pink #F7D3DC and cream #FBF1E4, gentle soft lighting, sweet adorable vibe", acc: "a cute ribbon hairband" },
+    luxury:   { mood: "LUXURY editorial fashion aesthetic, palette: black #101010 and gold #C9A227, glossy premium studio lighting, sophisticated chic vibe", acc: "an elegant pearl hairpin" },
+    funky:    { mood: "FUNKY Y2K retro aesthetic, palette: neon magenta #FF2D95, neon cyan #00E5FF and neon lime #C6FF00, high-contrast on-camera flash look, edgy playful vibe", acc: "fun colorful hair clips" },
+    playful:  { mood: "PLAYFUL vibrant party aesthetic, palette: coral #FF6B6B, sunny yellow #FFD166 and mint #4ECDC4, joyful energetic vibe", acc: "a fun colorful party headband" },
+    birthday: { mood: "festive BIRTHDAY party aesthetic, warm cream #FFE8C8 base with balloon and confetti accents in #FF6B6B, #FFD166 and #4ECDC4, happy celebratory vibe", acc: "a cute party-hat headband" },
+    film:     { mood: "nostalgic 90s FILM photography aesthetic, palette: faded beige #D9C3A5 highlights and #8C7B68 midtones, soft grain and gentle halation, timeless analog vibe", acc: "a simple thin hair ribbon" },
+    summer:   { mood: "fresh SUMMER vacation aesthetic, palette: aqua #7FDBDA and sky blue #8FC8F0, sunlit airy highlights, breezy cheerful vibe", acc: "a woven straw sun visor" },
+    mono:     { mood: "clean MONOCHROME editorial aesthetic, pure greyscale only: blacks #111111, mid grey #8A8A8A, whites #F2F2F2 — no colour cast at all, minimal timeless vibe", acc: "a sleek minimal hair clip" },
 
     // ── 테마 프리셋: 프레임 색이 아니라 "찍히는 사진"(의상·배경·무드)이 달라진다 ──
-    school:    { mood: "youthful SCHOOL-UNIFORM photo-booth aesthetic, clean navy-and-white palette, bright classroom daylight, fresh nostalgic student vibe",
+    school:    { mood: "youthful SCHOOL-UNIFORM photo-booth aesthetic, palette: navy #1B2A4A and white #F5F6F8, bright classroom daylight, fresh nostalgic student vibe",
                  acc: "a neat school uniform with a navy blazer and ribbon tie", extra: "wearing a crisp school uniform, tidy collar and ribbon" },
-    couple:    { mood: "warm ROMANTIC couple photo-booth aesthetic, soft blush and cream tones, cozy intimate lighting, sweet affectionate vibe",
+    couple:    { mood: "warm ROMANTIC couple photo-booth aesthetic, palette: blush #F3C9C4 and cream #FBF1E4, cozy intimate lighting, sweet affectionate vibe",
                  acc: "a delicate heart hairpin", extra: "styled for a romantic date look, soft knit or neat blouse" },
-    wedding:   { mood: "elegant WEDDING photo-booth aesthetic, ivory and champagne tones, luminous soft studio light, graceful bridal vibe",
+    wedding:   { mood: "elegant WEDDING photo-booth aesthetic, palette: ivory #F6F1E7 and champagne #E4CFA8, luminous soft studio light, graceful bridal vibe",
                  acc: "a fine pearl-and-crystal hairpiece", extra: "wearing an elegant ivory bridal dress with a clean neckline" },
-    party:     { mood: "glamorous NIGHT PARTY photo-booth aesthetic, deep jewel tones with sparkling bokeh lights, on-camera flash look, lively festive vibe",
+    party:     { mood: "glamorous NIGHT PARTY photo-booth aesthetic, deep jewel palette: emerald #0F5A4A, sapphire #17376B and amethyst #5B2C6F, with sparkling bokeh lights, on-camera flash look, lively festive vibe",
                  acc: "sparkling drop earrings", extra: "wearing a chic sequin or satin party dress" },
-    beach:     { mood: "sunny BEACH VACATION photo-booth aesthetic, turquoise and sand tones, bright sunlit highlights, breezy carefree vibe",
+    beach:     { mood: "sunny BEACH VACATION photo-booth aesthetic, palette: turquoise #2EC4B6 and sand #E9D8B4, bright sunlit highlights, breezy carefree vibe",
                  acc: "a woven straw hat", extra: "wearing a light summer dress or resort top, sun-kissed glow" },
-    vintage:   { mood: "retro VINTAGE 70s photo-booth aesthetic, warm amber and mustard tones, soft film grain, nostalgic analog vibe",
+    vintage:   { mood: "retro VINTAGE 70s photo-booth aesthetic, palette: amber #C8791E and mustard #D6A419, soft film grain, nostalgic analog vibe",
                  acc: "a patterned silk headscarf", extra: "wearing retro-styled clothing with vintage patterns" },
-    christmas: { mood: "cozy CHRISTMAS photo-booth aesthetic, deep red and evergreen tones with warm string-light bokeh, festive holiday vibe",
+    christmas: { mood: "cozy CHRISTMAS photo-booth aesthetic, palette: deep red #9B1B1B and evergreen #1E5133, with warm string-light bokeh, festive holiday vibe",
                  acc: "a soft red santa-hat headband", extra: "wearing a cozy knit sweater in holiday colors" },
-    newtro:    { mood: "bold NEWTRO 90s Korean photo-booth aesthetic, saturated primary colors with grainy flash, playful retro-modern vibe",
+    newtro:    { mood: "bold NEWTRO 90s Korean photo-booth aesthetic, saturated primaries: red #E63946, blue #1D4ED8 and yellow #FACC15, with grainy flash, playful retro-modern vibe",
                  acc: "colorful retro hair clips", extra: "wearing bold 90s-style streetwear with color-blocking" },
   };
   // 컷별 포즈 — 과장된 연출(V사인·윙크·놀란표정)은 뺐다. 실제로 연속 촬영한 것처럼
@@ -803,10 +811,17 @@ export default async function handler(req, res) {
         "things: the person, the taupe curtain behind them, and the wooden floor. THERE IS NO " +
         "OTHER MIRROR IN THE ROOM. Nothing reflective appears at either side edge of the " +
         "picture: no mirror frame, no glass panel, no metal trim, no second reflection, no " +
-        "repeated copy of the person, no infinite-mirror effect. The side walls are plain. " +
-        "BEHIND: a floor-length TAUPE SUEDE fitting-room curtain — soft greige-taupe, heavy " +
+        "repeated copy of the person, no infinite-mirror effect. The side walls are plain, " +
+        "soft warm white #F2EFEE.\n" +
+        "EXACT SCENE COLOURS (match these hex values):\n" +
+        "- Curtain base colour #837166 (greige-taupe). Lit folds no lighter than #9B8879, " +
+        "shadowed folds no darker than #6B584E. Matte suede, never glossy, never grey-blue, " +
+        "never brown-orange.\n" +
+        "- Wooden floor #CBAB8E (light oak), pale natural planks.\n" +
+        "- Walls and ceiling #F2EFEE (soft warm white).\n" +
+        "BEHIND: a floor-length TAUPE SUEDE fitting-room curtain in that exact colour, heavy " +
         "matte suede texture with soft vertical folds, drawn mostly closed, filling the " +
-        "background — and a light wooden floor. The person holds their phone at chest height, " +
+        "background — and the light oak floor. The person holds their phone at chest height, " +
         "phone visible but NOT covering the face. Natural relaxed mirror-selfie stance.\n" +
         DRESS_FRAMING +
         "LIGHTING — bright, soft and flattering like a well-lit modern retail fitting room: " +
