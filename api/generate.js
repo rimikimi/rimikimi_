@@ -748,6 +748,23 @@ export default async function handler(req, res) {
   // 확정 사양: 최대 5장(아우터·상의·하의·신발·가방) / 확인 질문 없음(빠진 의상은
   // 모델이 판단) / 거울셀카=토프 스웨이드 커튼 피팅룸 / 모델컷=오프화이트 무지.
   const GARMENT_MAX = 5;
+  // 프레이밍 — 오너가 "딱 좋다"고 고른 실사 거울셀카 3장에서 잰 비율을 그대로 박는다.
+  // (머리 위 20~25% / 인물 70~75% / 발 아래 4~8%. 발이 잘린 컷은 반려된 케이스다.)
+  // 예전엔 "FULL BODY head to shoes" 한 줄뿐이라 모델이 무릎~허벅지에서 자르거나
+  // 신발을 프레임 밖으로 내보내는 일이 있었다 → 숫자와 금지 조건을 같이 준다.
+  const DRESS_FRAMING =
+    "FRAMING (STRICT — follow these proportions exactly):\n" +
+    "- WHOLE BODY from the top of the head down to the SOLES OF THE SHOES is inside the frame.\n" +
+    "- The person's head-to-shoe height fills about 70-75% of the image height — not more.\n" +
+    "- Leave about 20-25% of empty space ABOVE the top of the head.\n" +
+    "- Leave about 4-8% of visible FLOOR BELOW the shoes, so the feet clearly do not touch the " +
+    "bottom edge of the picture.\n" +
+    "- BOTH SHOES are fully visible and complete. NEVER crop the feet, ankles, shoes, shins or " +
+    "the top of the head. A cropped foot makes the picture unusable.\n" +
+    "- Shoot from far enough back (the person stands about 2 metres from the mirror/camera, " +
+    "camera at chest height, lens level and straight-on). If unsure, step BACK and include more " +
+    "floor — never zoom in.\n" +
+    "- The person is centred horizontally, standing upright on the floor.\n";
   const garmentList = (Array.isArray(garments) ? garments : [])
     .filter((g) => g && typeof g.base64 === "string" && /^image\//.test(g.mimeType || ""))
     .slice(0, GARMENT_MAX);
@@ -787,8 +804,8 @@ export default async function handler(req, res) {
         "BEHIND: a floor-length TAUPE SUEDE fitting-room curtain — soft greige-taupe, heavy " +
         "matte suede texture with soft vertical folds, drawn mostly closed, filling the " +
         "background — and a light wooden floor. The person holds their phone at chest height, " +
-        "phone visible but NOT covering the face. FULL BODY head to shoes, natural relaxed " +
-        "mirror-selfie stance.\n" +
+        "phone visible but NOT covering the face. Natural relaxed mirror-selfie stance.\n" +
+        DRESS_FRAMING +
         "LIGHTING — bright, soft and flattering like a well-lit modern retail fitting room: " +
         "overall bright neutral-warm ambience, only a GENTLE hint of warm downlight from above. " +
         "NO dramatic spotlight, NO strong pool of light, NO visible light fixtures. " +
@@ -809,7 +826,8 @@ export default async function handler(req, res) {
         "natural weight shift, hands doing something ordinary (in a pocket, holding the bag, " +
         "at their side). ABSOLUTELY NOT a stiff editorial model pose, not posing for the " +
         "camera at all. The GAZE IS FREE and usually off-camera, like a street snap taken by " +
-        "a friend. FULL BODY head to shoes, generous headroom.\n" +
+        "a friend.\n" +
+        DRESS_FRAMING +
         "LIGHTING — natural daylight belonging to the scene: soft, flattering, gently " +
         "directional, true-to-life colours. NO photography equipment anywhere in the frame. " +
         "Professional street-style lookbook photography, 50mm at f/2.8.") +
