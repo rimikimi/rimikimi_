@@ -59,6 +59,24 @@ const ASSET_BASE = isNative() ? LEGAL_BASE : "";
    돌아왔을 때 요청이 끊겨 "실패"처럼 보임 (실제론 서버가 끝내서 갤러리에 있음).
    → 생성 시작 시 마커를 남겨두고, 실패하거나 앱 복귀 시 갤러리에서 방금 만든
      결과를 찾아 결과화면에 자동으로 띄운다. (localStorage 라 앱 재시작에도 생존) */
+// 드레스룸 의상 슬롯 수 — UI(슬롯/추가 버튼)와 전송 페이로드가 같은 값을 쓴다
+const GARMENT_MAX = 5;
+
+// 파일/원격 URL → data URL. 네이티브 앨범 다중 선택은 webPath(파일 URL)를 주는데
+// 생성 API 는 data URL 만 읽으므로 여기서 바꾼다.
+async function toDataUrl(url) {
+  if (/^data:/.test(url)) return url;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error("image fetch " + r.status);
+  const blob = await r.blob();
+  return await new Promise((res, rej) => {
+    const fr = new FileReader();
+    fr.onloadend = () => res(fr.result);
+    fr.onerror = rej;
+    fr.readAsDataURL(blob);
+  });
+}
+
 const PENDING_GEN_KEY = "rimikimi_pending_gen";
 const PENDING_GEN_MAX_AGE = 10 * 60 * 1000; // 10분 지난 마커는 무효
 
@@ -504,7 +522,7 @@ async function generateImage(accessToken, dataUrl, promptText, conceptMeta = {})
   let garments = null;
   if (Array.isArray(conceptMeta.garments) && conceptMeta.garments.length) {
     garments = [];
-    for (const g of conceptMeta.garments.slice(0, 5)) {
+    for (const g of conceptMeta.garments.slice(0, GARMENT_MAX)) {
       let u;
       try { u = await shrinkImage(g, 896, 0.85); } catch (_) { u = g; }
       const gm = u.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
@@ -1356,6 +1374,7 @@ export default function PortraitStudio() {
   const [filterSrcs, setFilterSrcs] = useState(null); // {srcs, preset} | null
   const filterPresetRef = useRef("none"); // 카드에서 고른 프리셋 — 에디터가 이걸 켠 채 열린다
   const filterInputRef = useRef(null);
+  const garmentInputRef = useRef(null);
   async function openFilterStudio(presetKey = "none") {
     filterPresetRef.current = presetKey;
     if (isNative()) {
@@ -2250,11 +2269,48 @@ export default function PortraitStudio() {
       const next = prev.slice();
       if (idx >= 0 && idx < next.length) next[idx] = dataUrl;
       else next.push(dataUrl);
-      return next.slice(0, 5);
+      return next.slice(0, GARMENT_MAX);
     });
   }
   function removeGarmentAt(idx) {
     setGarmentPhotos((prev) => prev.filter((_, i) => i !== idx));
+  }
+  // 여러 장을 한 번에 (오너 지시: "한 장씩 업로드가 아니라 5장 선택")
+  function addGarments(dataUrls) {
+    if (!dataUrls || !dataUrls.length) return;
+    setGarmentPhotos((prev) => [...prev, ...dataUrls].slice(0, GARMENT_MAX));
+  }
+  // 앨범 다중 선택 → 남은 슬롯만큼 채운다.
+  // 네이티브 pickImages 는 webPath(파일 URL)를 주는데, 생성 API 는 data URL 을 요구하므로
+  // (buildPayload 의 garments 파서가 data:...;base64 를 정규식으로 읽는다) 여기서 변환한다.
+  async function pickGarments() {
+    const room = GARMENT_MAX - garmentPhotos.length;
+    if (room <= 0) return;
+    if (isNative()) {
+      const paths = await nativePickPhotos(room);
+      if (!paths || !paths.length) return;
+      const urls = [];
+      for (const p of paths.slice(0, room)) {
+        try { urls.push(await toDataUrl(p)); } catch (_) { /* 한 장 실패는 건너뛴다 */ }
+      }
+      addGarments(urls);
+      return;
+    }
+    garmentInputRef.current?.click();
+  }
+  function onGarmentFiles(e) {
+    const room = GARMENT_MAX - garmentPhotos.length;
+    const files = Array.from(e.target.files || []).filter((f) => f.type.startsWith("image/")).slice(0, room);
+    e.target.value = ""; // 같은 파일 재선택도 change 가 뜨게
+    if (!files.length) return;
+    Promise.all(
+      files.map((f) => new Promise((res, rej) => {
+        const fr = new FileReader();
+        fr.onloadend = () => res(fr.result);
+        fr.onerror = rej;
+        fr.readAsDataURL(f);
+      }))
+    ).then(addGarments).catch(() => {});
   }
 
   // 스플래시는 부팅 타이머 + 세션 확인이 끝날 때까지 유지 (빈 화면 깜빡임 방지)
@@ -2342,7 +2398,7 @@ export default function PortraitStudio() {
               isArt={art}
               isDress={dress}
               garmentPhotos={garmentPhotos}
-              onPickGarment={(i) => pickPhoto("garment:" + i)}
+              onPickGarments={pickGarments}
               onRemoveGarment={removeGarmentAt}
               isCouple={couple}
               photo={currentPhoto}
@@ -2498,6 +2554,16 @@ export default function PortraitStudio() {
         style={{ display: "none" }}
         onChange={onFilterFiles}
       />
+
+      {/* 드레스룸 의상 — 웹용 다중 선택 input (최대 5장) */}
+      <input
+        ref={garmentInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        style={{ display: "none" }}
+        onChange={onGarmentFiles}
+      />
       {filterSrcs && (
         <PhotoEditor
           srcs={filterSrcs.srcs}
@@ -2606,7 +2672,7 @@ function HomeScreen({
   ageConfirmed, setAgeConfirmed, onContinue, onBack,
   isArt = false, showAds = false,
   isCouple = false, partnerPhoto = null, onPickPartner, onOpenGuide,
-  isDress = false, garmentPhotos = [], onPickGarment, onRemoveGarment,
+  isDress = false, garmentPhotos = [], onPickGarments, onRemoveGarment,
 }) {
   const ready = photo && (!isCouple || partnerPhoto) && (!isDress || garmentPhotos.length > 0) && ageConfirmed;
   return (
@@ -2699,11 +2765,11 @@ function HomeScreen({
                 >×</button>
               </div>
             ))}
-            {garmentPhotos.length < 5 && (
+            {garmentPhotos.length < GARMENT_MAX && (
               <button
                 type="button"
                 style={S.garmentAdd}
-                onClick={() => onPickGarment && onPickGarment(garmentPhotos.length)}
+                onClick={() => onPickGarments && onPickGarments()}
               >
                 <span style={S.garmentAddPlus}>＋</span>
                 <span style={S.garmentAddLabel}>
