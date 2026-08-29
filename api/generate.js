@@ -755,10 +755,13 @@ export default async function handler(req, res) {
   const DRESS_FRAMING =
     "FRAMING (STRICT — follow these proportions exactly):\n" +
     "- WHOLE BODY from the top of the head down to the SOLES OF THE SHOES is inside the frame.\n" +
-    "- The person's head-to-shoe height fills about 70-75% of the image height — not more.\n" +
-    "- Leave about 20-25% of empty space ABOVE the top of the head.\n" +
-    "- Leave about 4-8% of visible FLOOR BELOW the shoes, so the feet clearly do not touch the " +
+    "- The person's head-to-shoe height fills about 75-80% of the image height.\n" +
+    "- Leave about 15-20% of empty space ABOVE the top of the head — the top of the head sits " +
+    "roughly one sixth of the way down from the top edge. Do NOT leave a large empty area above " +
+    "the head: more than about 20% headroom is WRONG, it makes the person look small and far away.\n" +
+    "- Leave about 3-7% of visible FLOOR BELOW the shoes, so the feet clearly do not touch the " +
     "bottom edge of the picture.\n" +
+    "- This is a full-length outfit photo, NOT a wide shot of the room with a small person in it.\n" +
     "- BOTH SHOES are fully visible and complete. NEVER crop the feet, ankles, shoes, shins or " +
     "the top of the head. A cropped foot makes the picture unusable.\n" +
     "- Shoot from far enough back (the person stands about 2 metres from the mirror/camera, " +
