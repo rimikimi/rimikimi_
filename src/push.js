@@ -92,13 +92,30 @@ export async function initPush({ ask = false } = {}) {
   }
 }
 
-// 알림을 눌러서 앱이 열렸을 때. 지금은 별도 화면 이동 없이 앱만 열리면
-// 되므로(열면 새 컨셉이 목록 맨 앞에 있다) 배지만 정리한다.
+// 알림 정리 — 알림 센터에 쌓인 것을 지운다.
+// ⚠️ iOS 는 이것만으로 앱 아이콘의 빨간 배지가 사라지지 않는다(배지 숫자는 별개).
+//    배지 0 은 네이티브(AppDelegate.applicationDidBecomeActive)에서 지운다.
+//    안드로이드는 배지가 "떠 있는 알림"에서 파생되므로 이걸 지우면 같이 사라진다.
+export async function clearNotifications() {
+  if (!isNative()) return;
+  try { await FirebaseMessaging.removeAllDeliveredNotifications(); } catch (_) { /* 무시 */ }
+}
+
+// 알림을 눌러서 앱이 열렸을 때 + 앱이 활성화될 때마다 정리한다.
+// 예전엔 "알림을 눌러서" 연 경우에만 지웠다 → 알림을 밀어서 지우거나 홈에서 그냥
+// 앱을 열면 배지가 계속 남아 있었다(오너 실사용에서 발견).
 export async function attachPushHandlers() {
   if (!isNative()) return;
   try {
     await FirebaseMessaging.addListener("notificationActionPerformed", () => {
-      FirebaseMessaging.removeAllDeliveredNotifications().catch(() => {});
+      clearNotifications();
     });
   } catch (_) { /* 무시 */ }
+  try {
+    const { App: CapApp } = await import("@capacitor/app");
+    await CapApp.addListener("appStateChange", ({ isActive }) => {
+      if (isActive) clearNotifications();
+    });
+  } catch (_) { /* 무시 */ }
+  clearNotifications(); // 지금 이 실행(콜드 스타트)도 정리
 }

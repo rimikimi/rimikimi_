@@ -1,6 +1,7 @@
 import UIKit
 import Capacitor
 import AppTrackingTransparency
+import UserNotifications
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -42,6 +43,23 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func applicationDidBecomeActive(_ application: UIApplication) {
         // Restart any tasks that were paused (or not yet started) while the application was inactive. If the application was previously in the background, optionally refresh the user interface.
         requestTrackingIfNeeded()
+        clearBadge()
+    }
+
+    // 앱 아이콘의 빨간 배지 지우기.
+    // 서버 푸시가 aps.badge = 1 을 보내는데(api/_lib/push.js), iOS 배지는 앱이 직접
+    // 0 으로 되돌리기 전까지 남는다. 알림을 밀어서 지워도, 알림 센터를 비워도 안 없어진다
+    // (removeAllDeliveredNotifications 는 배지 숫자와 무관). 그래서 앱이 활성화될 때마다 0.
+    private func clearBadge() {
+        if #available(iOS 16.0, *) {
+            UNUserNotificationCenter.current().setBadgeCount(0) { _ in }
+        } else {
+            application_setLegacyBadgeZero()
+        }
+    }
+
+    private func application_setLegacyBadgeZero() {
+        UIApplication.shared.applicationIconBadgeNumber = 0
     }
 
     func applicationWillTerminate(_ application: UIApplication) {
