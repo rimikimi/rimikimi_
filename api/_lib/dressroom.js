@@ -137,7 +137,15 @@ export function buildDressroom({ garments, dressStyle }) {
     "in all of them with a natural, correct layering order (outerwear over tops, shoes on feet, " +
     "a bag carried or held naturally). Reproduce EVERY item exactly — same colours, same pattern, " +
     "same buttons and hardware, same fabric, same fit and length. Do not redesign, recolour or " +
-    "simplify any item.\n\n" +
+    "simplify any item.\n" +
+    // 오너 지시(2026-08-30): 결과물에 가격표가 달려 나왔다. 피팅룸 장면이라 모델이
+    // "안 산 옷" 으로 해석해 택을 붙이기도 하고, 의상 사진(쇼핑몰 캡처)에 택이 보이면
+    // 그대로 옮겨 그린다. 양쪽 다 막는다.
+    "NO TAGS: the clothes are worn as if they already belong to the person. Remove and never " +
+    "draw any price tag, hang tag, paper or card label, size sticker, barcode, brand swing " +
+    "ticket, plastic tag fastener, security tag or pin — not on the garment, not hanging from a " +
+    "sleeve, collar, cuff or hem, not tucked inside. If a tag or label is visible in an uploaded " +
+    "garment photo, leave it out. Nothing may dangle from the clothing.\n\n" +
     // 빠진 부위는 묻지 않고 모델이 채운다 (오너 확정: 확인 단계 없음)
     "If the uploaded items do not make a complete outfit (e.g. only a top, or only shoes), " +
     "complete the look yourself with simple, well-matching neutral pieces that let the uploaded " +
