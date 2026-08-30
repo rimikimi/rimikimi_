@@ -15,35 +15,80 @@ export function buildDressroom({ garments, dressStyle }) {
   // 모델이 매번 아무거나 골랐다. 이제 서버가 매 요청마다 후보를 랜덤으로 몇 개 뽑고,
   // 그중에서 "이 옷을 실제로 입고 갈 만한 곳"을 모델이 고르게 한다.
   // 색은 오너 규칙대로 전부 hex 로 지정한다.
-  const MODEL_SCENES = [
-    "a quiet city sidewalk in front of low-rise shopfronts — pale concrete pavement #C9C4BD, muted stone facades #D6D0C8, soft overcast sky #B9C4CE",
-    "a café terrace: small round outdoor table and a bentwood chair, warm terracotta tiles #B5573A, cream plaster wall #EFE6D8, green planters #6B7238",
-    "a tree-lined residential street, dappled sunlight through foliage #5E7F4B, warm beige apartment walls #E0D3BC, grey asphalt #7C7C7A",
-    "a park path with a wooden bench, mown grass #6E8B4A, weathered oak bench #8B6F4E, bright sky #C6D6E4",
-    "a riverside walkway with a low railing, water #6F8CA0, pale walkway stone #CFC8BC, distant skyline haze #AEBAC6",
-    "a rooftop terrace above the city, warm concrete floor #C2B8AC, clean white parapet #EDEAE4, wide open sky #A9C2D8",
-    "a bright museum corridor, smooth white walls #F2F0EC, pale oak floor #D8C3A2, soft even daylight",
-    "an independent bookstore interior, warm wooden shelves #7A5638, amber lamp light #E0A93B, cream book spines #EDE3D2",
-    "a seaside promenade, pale sand #E3D2B4, turquoise water #2EC4B6, whitewashed wall #F4F1EA",
-    "an autumn street with fallen leaves, amber foliage #C8791E, rust brick wall #9C5B3C, cool grey pavement #B3AFA9",
-    "a quiet brick alley with soft shade, red-brown brick #9A5B47, grey stone ground #A9A49C, a sliver of bright sky #CBD8E4",
-    "a hotel lobby corner with a low armchair, deep green marble #1F4A3C, brass trim #C9A227, warm ivory wall #F6F1E7",
-    "a neon-lit night street after rain, wet asphalt reflections #2E3238, magenta sign glow #E0218A, cyan sign glow #00E5FF",
-    "a university campus stone stairway, pale granite steps #CFCAC1, ivy green #4F7A44, red-brick building #9C5B3C",
-    // 운동복(레깅스·트레이닝·러닝화)이 어울리는 곳 — 없으면 호텔 로비 같은 데로 밀린다
-    "a riverside running track at morning, red rubberised lane #B5573A, mown grass verge #6E8B4A, hazy city skyline #AEBAC6",
-    "a bright pilates/yoga studio, pale oak floor #D8C3A2, soft white walls #F2F0EC, large window daylight, a rolled mat #A3B18A",
-    "an outdoor basketball half-court, faded blue asphalt #4A6C8C, white line markings #F4F1EA, chain-link fence #9AA0A6",
-    "a public tennis court in daylight, clay-red surface #B5573A, white lines #F4F1EA, deep green fence windbreak #1F4A3C",
-    "a wooded hiking trail head, packed earth path #8B6F4E, dense green foliage #4F7A44, dappled sunlight",
-  ];
-  // 요청마다 다른 후보 4개 (Fisher-Yates)
-  const scenePool = MODEL_SCENES.slice();
-  for (let i = scenePool.length - 1; i > 0; i--) {
+  // ⚠️ 배경만 늘리면 안 된다. 후보를 순수 랜덤으로 뽑으면 풀이 커질수록 "이 옷에 맞는
+  //    곳"이 후보에 안 들어올 확률이 올라간다(운동복인데 후보가 전부 실내인 식).
+  //    그래서 그룹별로 하나씩 뽑아 **어떤 옷이 와도 맞는 후보가 최소 하나는** 있게 한다.
+  const SCENE_GROUPS = {
+    // 평상복·데일리
+    casual: [
+      "a quiet city sidewalk in front of low-rise shopfronts — pale concrete pavement #C9C4BD, muted stone facades #D6D0C8, soft overcast sky #B9C4CE",
+      "a café terrace: small round outdoor table and a bentwood chair, warm terracotta tiles #B5573A, cream plaster wall #EFE6D8, green planters #6B7238",
+      "a tree-lined residential street, dappled sunlight through foliage #5E7F4B, warm beige apartment walls #E0D3BC, grey asphalt #7C7C7A",
+      "a park path with a wooden bench, mown grass #6E8B4A, weathered oak bench #8B6F4E, bright sky #C6D6E4",
+      "a riverside walkway with a low railing, water #6F8CA0, pale walkway stone #CFC8BC, distant skyline haze #AEBAC6",
+      "a quiet brick alley with soft shade, red-brown brick #9A5B47, grey stone ground #A9A49C, a sliver of bright sky #CBD8E4",
+      "a university campus stone stairway, pale granite steps #CFCAC1, ivy green #4F7A44, red-brick building #9C5B3C",
+      "a small neighbourhood flower shop front, buckets of blooms #F2A5C0, green foliage #4F7A44, whitewashed frontage #F4F1EA",
+      "a weekend street market lane, striped awnings #E8721C, produce crates #6E8B4A, worn asphalt #8A8A8A",
+    ],
+    // 단정·실내·차분한 곳 (블라우스·니트·미니멀 룩)
+    refined: [
+      "a bright museum corridor, smooth white walls #F2F0EC, pale oak floor #D8C3A2, soft even daylight",
+      "an independent bookstore interior, warm wooden shelves #7A5638, amber lamp light #E0A93B, cream book spines #EDE3D2",
+      "a rooftop terrace above the city, warm concrete floor #C2B8AC, clean white parapet #EDEAE4, wide open sky #A9C2D8",
+      "a hotel lobby corner with a low armchair, deep green marble #1F4A3C, brass trim #C9A227, warm ivory wall #F6F1E7",
+      "a minimal concept-store interior, polished microcement floor #C6C2BB, white display plinths #F2F0EC, soft track lighting",
+    ],
+    // 오피스·비즈니스 (정장·블레이저·슬랙스)
+    business: [
+      "a modern office building lobby, glass curtain wall #B9C4CE, pale stone floor #D6D0C8, brushed steel trim #9AA0A6",
+      "a bright corporate corridor beside floor-to-ceiling windows, grey carpet #8A8A8A, white walls #F2F0EC, city daylight",
+      "a coworking lounge with a long oak table, warm oak #B08858, soft grey seating #9AA0A6, plants #6B7238",
+    ],
+    // 활동복 (레깅스·트레이닝·러닝화)
+    active: [
+      "a riverside running track at morning, red rubberised lane #B5573A, mown grass verge #6E8B4A, hazy city skyline #AEBAC6",
+      "a bright pilates/yoga studio, pale oak floor #D8C3A2, soft white walls #F2F0EC, large window daylight, a rolled mat #A3B18A",
+      "an outdoor basketball half-court, faded blue asphalt #4A6C8C, white line markings #F4F1EA, chain-link fence #9AA0A6",
+      "a public tennis court in daylight, clay-red surface #B5573A, white lines #F4F1EA, deep green fence windbreak #1F4A3C",
+      "a wooded hiking trail head, packed earth path #8B6F4E, dense green foliage #4F7A44, dappled sunlight",
+      "a bright modern gym floor, rubber flooring #36393D, pale grey walls #C6C2BB, daylight from high windows",
+    ],
+    // 저녁·차려입는 자리 (원피스·새틴·힐)
+    evening: [
+      "a warm restaurant interior at night, deep walnut panelling #4A2C1D, amber pendant light #E0A93B, cream linen tables #EDE3D2",
+      "a quiet wine bar, dark green wall #1E5133, brass fittings #C9A227, low warm light #E0A93B",
+      "a formal event foyer with a chandelier, ivory marble #F6F1E7, gold trim #C9A227, deep carpet #6E1B2E",
+      "a neon-lit night street after rain, wet asphalt reflections #2E3238, magenta sign glow #E0218A, cyan sign glow #00E5FF",
+      "a hotel poolside at dusk, still water #2EC4B6, pale stone deck #E3D2B4, warm sky #F2B27C",
+    ],
+    // 계절·특수 (코트·패딩·트렌치·한복·여행)
+    seasonal: [
+      "an autumn street with fallen leaves, amber foliage #C8791E, rust brick wall #9C5B3C, cool grey pavement #B3AFA9",
+      "a snowy winter street, fresh snow #F4F6F8, bare dark branches #4A4A48, cold blue shadows #A9BCCF",
+      "a rainy city street under soft grey light, wet pavement #7C7C7A, glossy reflections #B9C4CE, shopfront glow #E0A93B",
+      "a seaside promenade in summer, pale sand #E3D2B4, turquoise water #2EC4B6, whitewashed wall #F4F1EA",
+      "a hanok village alley, dark tiled roofs #36393D, ochre earthen walls #C08A28, stone path #A9A49C",
+      "a palace stone wall path in daylight, weathered granite #A9A49C, deep red timber #9B1B1B, pine green #1E5133",
+      "an airport terminal walkway with wide windows, polished floor #D6D0C8, pale steel columns #9AA0A6, bright daylight",
+      "a train platform in the afternoon, concrete platform #B3AFA9, yellow safety line #F2C744, soft shade",
+    ],
+    // 홈웨어·라운지웨어 (잠옷·파자마·홈세트)
+    home: [
+      "a sunlit living room, warm oak floor #D8C3A2, soft linen sofa #E6D9C3, sheer curtains #F4F1EA",
+      "a tidy bedroom corner in morning light, cream bedding #FBF3E4, pale wall #F2EFEE, warm wood side table #B08858",
+      "a bright home kitchen, white tiles #F2F0EC, pale wood counter #D8C3A2, morning window light",
+    ],
+  };
+  const MODEL_SCENES = Object.values(SCENE_GROUPS).flat();
+  // 그룹마다 하나씩 뽑고 순서를 섞는다 → 후보는 매번 다르지만 커버리지는 항상 보장된다
+  const pickOne = (arr) => arr[Math.floor(Math.random() * arr.length)];
+  const picked = Object.values(SCENE_GROUPS).map(pickOne);
+  for (let i = picked.length - 1; i > 0; i--) {
     const k = Math.floor(Math.random() * (i + 1));
-    [scenePool[i], scenePool[k]] = [scenePool[k], scenePool[i]];
+    [picked[i], picked[k]] = [picked[k], picked[i]];
   }
-  const sceneChoices = scenePool.slice(0, 4).map((s, i) => `  ${i + 1}) ${s}`).join("\n");
+  const sceneChoices = picked.map((s, i) => `  ${i + 1}) ${s}`).join("\n");
 
   // 프레이밍 — 오너가 "딱 좋다"고 고른 실사 거울셀카 3장에서 잰 비율을 그대로 박는다.
   // (머리 위 20~25% / 인물 70~75% / 발 아래 4~8%. 발이 잘린 컷은 반려된 케이스다.)
@@ -51,7 +96,8 @@ export function buildDressroom({ garments, dressStyle }) {
   // 신발을 프레임 밖으로 내보내는 일이 있었다 → 숫자와 금지 조건을 같이 준다.
   const DRESS_FRAMING =
     "FRAMING (STRICT — follow these proportions exactly):\n" +
-    "- WHOLE BODY from the top of the head down to the SOLES OF THE SHOES is inside the frame.\n" +
+    "- WHOLE BODY from the top of the head down to the SOLES OF THE SHOES (or bare feet, if the " +
+    "outfit is homewear/loungewear worn indoors) is inside the frame.\n" +
     "- The person's head-to-shoe height fills about 75-80% of the image height.\n" +
     "- Leave about 15-20% of empty space ABOVE the top of the head — the top of the head sits " +
     "roughly one sixth of the way down from the top edge. Do NOT leave a large empty area above " +
@@ -59,7 +105,7 @@ export function buildDressroom({ garments, dressStyle }) {
     "- Leave about 3-7% of visible FLOOR BELOW the shoes, so the feet clearly do not touch the " +
     "bottom edge of the picture.\n" +
     "- This is a full-length outfit photo, NOT a wide shot of the room with a small person in it.\n" +
-    "- BOTH SHOES are fully visible and complete. NEVER crop the feet, ankles, shoes, shins or " +
+    "- BOTH FEET are fully visible and complete. NEVER crop the feet, ankles, shoes, shins or " +
     "the top of the head. A cropped foot makes the picture unusable.\n" +
     "- Shoot from far enough back (about 2 metres between camera and person, camera at chest " +
     "height, lens level and straight-on). If unsure, step BACK and include more ground — never " +
@@ -124,7 +170,7 @@ export function buildDressroom({ garments, dressStyle }) {
         "First LOOK AT THE OUTFIT the person is wearing — its formality, season, fabric weight " +
         "and colours — then pick the ONE location below where a real person would actually wear " +
         "that outfit:\n" + sceneChoices + "\n" +
-        "Choose only one and commit to it. If NONE of the four suits the outfit — for example " +
+        "Choose only one and commit to it. If NONE of them suits the outfit — for example " +
         "activewear with only indoor or dressy options on the list — then ignore the list and " +
         "use the ordinary everyday place where that outfit actually belongs (a running path, a " +
         "gym, a playground, a market street…), described in the same plain real-world way.\n" +
