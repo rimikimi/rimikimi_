@@ -20,7 +20,12 @@
 // ============================================================
 import { readFileSync, writeFileSync } from "node:fs";
 
-const FILE = new URL("../api/_data/concepts.json", import.meta.url);
+// 기본 대상은 라이브 컨셉 데이터. `--file=<경로>` 로 스테이징 파일에도 쓸 수 있다
+// (새 배치는 공개 전에 여기서 색을 박아둔다).
+const argFile = (process.argv.find((a) => a.startsWith("--file=")) || "").slice(7);
+const FILE = argFile
+  ? new URL("file://" + (argFile.startsWith("/") ? argFile : process.cwd() + "/" + argFile))
+  : new URL("../api/_data/concepts.json", import.meta.url);
 const DRY = process.argv.includes("--dry");
 
 // 색 → hex. 복합어(off-white, rose gold)가 먼저 매칭되도록 길이순으로 정렬해 쓴다.
@@ -209,10 +214,10 @@ for (let i = 0; i < list.length; i++) {
   }
 }
 // 검증 ② 원본 파일과 같은 직렬화 형식(indent 1)으로 쓴다 — 형식 차이로 인한 대량 diff 방지
-const outJson = JSON.stringify(data, null, 1);
+const outJson = JSON.stringify(data, null, 1) + (raw.endsWith("\n") ? "\n" : "");
 if (strip(outJson) !== raw) {
   console.error("✗ 직렬화 형식이 원본과 다릅니다 — 쓰지 않고 중단합니다.");
   process.exit(1);
 }
 writeFileSync(FILE, outJson);
-console.log("\n✓ api/_data/concepts.json 갱신 (삽입 외 변경 없음 · 형식 동일 검증 통과)");
+console.log(`\n✓ ${FILE.pathname.split("/").pop()} 갱신 (삽입 외 변경 없음 · 형식 동일 검증 통과)`);
