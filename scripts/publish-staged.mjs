@@ -72,7 +72,13 @@ if (perDay > 0) {
 //    (실제로 190종을 4종씩 깔고 "9/20 까지" 라고 잘못 출력했었다).
 const lastPublishAt = picked[picked.length - 1].publishAt;
 
-writeFileSync(DATA, JSON.stringify([...picked.reverse(), ...data], null, 0), "utf8");
+// 들여쓰기는 기존 파일과 똑같이 유지한다 — 안 그러면 631종 전체가 한 줄로 바뀌어
+// 커밋 diff 가 통째로 갈리고, 색 hex 스크립트의 "형식 동일" 검증도 깨진다.
+// 두 번째 줄의 들여쓰기 폭이 곧 indent (`[\n {\n  "id"…` 이면 1)
+const rawData = readFileSync(DATA, "utf8");
+const secondLine = rawData.split("\n")[1] || "";
+const indent = (secondLine.match(/^ +/) || [""])[0].length;
+writeFileSync(DATA, JSON.stringify([...picked.reverse(), ...data], null, indent), "utf8");
 
 const ids = picked.map((c) => c.id).sort((a, b) => a - b);
 console.log(`추가 ${picked.length}종: ${ids[0]} ~ ${ids[ids.length - 1]}`);
