@@ -5161,8 +5161,10 @@ const S = {
   tabLabel: { fontSize: 10.5, fontWeight: 600, letterSpacing: "0.02em" },
   footer: {
     textAlign: "center",
-    // 홈 인디케이터 안전영역만큼 아래 여백 추가
-    padding: "16px 20px calc(env(safe-area-inset-bottom, 0px) + 28px)",
+    // 하단 고정 탭바(BottomNav)가 사업자정보를 가리지 않도록 탭바 높이만큼 여백 확보.
+    // 전자상거래법상 상호·사업자등록번호·통신판매업 신고번호·주소·연락처는 화면에서
+    // 실제로 보여야 하며, 가려지면 PG 카드사 심사에서 보완 요구가 온다(2026-08 토스 지적).
+    padding: "16px 20px calc(env(safe-area-inset-bottom, 0px) + 96px)",
     fontFamily: "'Quicksand', sans-serif",
   },
   footerLinks: {
