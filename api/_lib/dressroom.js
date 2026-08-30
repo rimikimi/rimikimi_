@@ -30,6 +30,12 @@ export function buildDressroom({ garments, dressStyle }) {
     "a hotel lobby corner with a low armchair, deep green marble #1F4A3C, brass trim #C9A227, warm ivory wall #F6F1E7",
     "a neon-lit night street after rain, wet asphalt reflections #2E3238, magenta sign glow #E0218A, cyan sign glow #00E5FF",
     "a university campus stone stairway, pale granite steps #CFCAC1, ivy green #4F7A44, red-brick building #9C5B3C",
+    // 운동복(레깅스·트레이닝·러닝화)이 어울리는 곳 — 없으면 호텔 로비 같은 데로 밀린다
+    "a riverside running track at morning, red rubberised lane #B5573A, mown grass verge #6E8B4A, hazy city skyline #AEBAC6",
+    "a bright pilates/yoga studio, pale oak floor #D8C3A2, soft white walls #F2F0EC, large window daylight, a rolled mat #A3B18A",
+    "an outdoor basketball half-court, faded blue asphalt #4A6C8C, white line markings #F4F1EA, chain-link fence #9AA0A6",
+    "a public tennis court in daylight, clay-red surface #B5573A, white lines #F4F1EA, deep green fence windbreak #1F4A3C",
+    "a wooded hiking trail head, packed earth path #8B6F4E, dense green foliage #4F7A44, dappled sunlight",
   ];
   // 요청마다 다른 후보 4개 (Fisher-Yates)
   const scenePool = MODEL_SCENES.slice();
@@ -118,7 +124,11 @@ export function buildDressroom({ garments, dressStyle }) {
         "First LOOK AT THE OUTFIT the person is wearing — its formality, season, fabric weight " +
         "and colours — then pick the ONE location below where a real person would actually wear " +
         "that outfit:\n" + sceneChoices + "\n" +
-        "Choose only one and commit to it. Dressy or tailored looks belong in the more polished " +
+        "Choose only one and commit to it. If NONE of the four suits the outfit — for example " +
+        "activewear with only indoor or dressy options on the list — then ignore the list and " +
+        "use the ordinary everyday place where that outfit actually belongs (a running path, a " +
+        "gym, a playground, a market street…), described in the same plain real-world way.\n" +
+        "Dressy or tailored looks belong in the more polished " +
         "options; relaxed or sporty looks belong in the casual ones. The season and weather of " +
         "the location MUST match the clothing — never a heavy winter coat in bright summer light, " +
         "never a thin summer dress against autumn leaves. The background is a believable ordinary " +
