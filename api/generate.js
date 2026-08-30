@@ -756,6 +756,35 @@ export default async function handler(req, res) {
   // 확정 사양: 최대 5장(아우터·상의·하의·신발·가방) / 확인 질문 없음(빠진 의상은
   // 모델이 판단) / 거울셀카=토프 스웨이드 커튼 피팅룸 / 모델컷=오프화이트 무지.
   const GARMENT_MAX = 5;
+  // ── 모델컷 배경 풀 (오너 지시 2026-08-30) ────────────────────────────────
+  // 예전엔 "일상 장소 — 예를 들면 인도/카페 앞/가로수길…" 한 문장이 하드코딩이라
+  // 모델이 매번 아무거나 골랐다. 이제 서버가 매 요청마다 후보를 랜덤으로 몇 개 뽑고,
+  // 그중에서 "이 옷을 실제로 입고 갈 만한 곳"을 모델이 고르게 한다.
+  // 색은 오너 규칙대로 전부 hex 로 지정한다.
+  const MODEL_SCENES = [
+    "a quiet city sidewalk in front of low-rise shopfronts — pale concrete pavement #C9C4BD, muted stone facades #D6D0C8, soft overcast sky #B9C4CE",
+    "a café terrace: small round outdoor table and a bentwood chair, warm terracotta tiles #B5573A, cream plaster wall #EFE6D8, green planters #6B7238",
+    "a tree-lined residential street, dappled sunlight through foliage #5E7F4B, warm beige apartment walls #E0D3BC, grey asphalt #7C7C7A",
+    "a park path with a wooden bench, mown grass #6E8B4A, weathered oak bench #8B6F4E, bright sky #C6D6E4",
+    "a riverside walkway with a low railing, water #6F8CA0, pale walkway stone #CFC8BC, distant skyline haze #AEBAC6",
+    "a rooftop terrace above the city, warm concrete floor #C2B8AC, clean white parapet #EDEAE4, wide open sky #A9C2D8",
+    "a bright museum corridor, smooth white walls #F2F0EC, pale oak floor #D8C3A2, soft even daylight",
+    "an independent bookstore interior, warm wooden shelves #7A5638, amber lamp light #E0A93B, cream book spines #EDE3D2",
+    "a seaside promenade, pale sand #E3D2B4, turquoise water #2EC4B6, whitewashed wall #F4F1EA",
+    "an autumn street with fallen leaves, amber foliage #C8791E, rust brick wall #9C5B3C, cool grey pavement #B3AFA9",
+    "a quiet brick alley with soft shade, red-brown brick #9A5B47, grey stone ground #A9A49C, a sliver of bright sky #CBD8E4",
+    "a hotel lobby corner with a low armchair, deep green marble #1F4A3C, brass trim #C9A227, warm ivory wall #F6F1E7",
+    "a neon-lit night street after rain, wet asphalt reflections #2E3238, magenta sign glow #E0218A, cyan sign glow #00E5FF",
+    "a university campus stone stairway, pale granite steps #CFCAC1, ivy green #4F7A44, red-brick building #9C5B3C",
+  ];
+  // 요청마다 다른 후보 4개 (Fisher-Yates)
+  const scenePool = MODEL_SCENES.slice();
+  for (let i = scenePool.length - 1; i > 0; i--) {
+    const k = Math.floor(Math.random() * (i + 1));
+    [scenePool[i], scenePool[k]] = [scenePool[k], scenePool[i]];
+  }
+  const sceneChoices = scenePool.slice(0, 4).map((s, i) => `  ${i + 1}) ${s}`).join("\n");
+
   // 프레이밍 — 오너가 "딱 좋다"고 고른 실사 거울셀카 3장에서 잰 비율을 그대로 박는다.
   // (머리 위 20~25% / 인물 70~75% / 발 아래 4~8%. 발이 잘린 컷은 반려된 케이스다.)
   // 예전엔 "FULL BODY head to shoes" 한 줄뿐이라 모델이 무릎~허벅지에서 자르거나
@@ -772,10 +801,12 @@ export default async function handler(req, res) {
     "- This is a full-length outfit photo, NOT a wide shot of the room with a small person in it.\n" +
     "- BOTH SHOES are fully visible and complete. NEVER crop the feet, ankles, shoes, shins or " +
     "the top of the head. A cropped foot makes the picture unusable.\n" +
-    "- Shoot from far enough back (the person stands about 2 metres from the mirror/camera, " +
-    "camera at chest height, lens level and straight-on). If unsure, step BACK and include more " +
-    "floor — never zoom in.\n" +
-    "- The person is centred horizontally, standing upright on the floor.\n";
+    "- Shoot from far enough back (about 2 metres between camera and person, camera at chest " +
+    "height, lens level and straight-on). If unsure, step BACK and include more ground — never " +
+    "zoom in.\n" +
+    "- The person is centred horizontally. They may be STANDING or SEATED (a café chair, a park " +
+    "bench, a low step, a stone ledge) — either is fine, but even when seated the WHOLE body " +
+    "including both shoes must stay inside the frame with the same margins above and below.\n";
   const garmentList = (Array.isArray(garments) ? garments : [])
     .filter((g) => g && typeof g.base64 === "string" && /^image\//.test(g.mimeType || ""))
     .slice(0, GARMENT_MAX);
@@ -829,12 +860,16 @@ export default async function handler(req, res) {
         "NO dramatic spotlight, NO strong pool of light, NO visible light fixtures. " +
         "Real phone mirror-selfie feel, natural handheld framing."
       // 오너 지시(2026-08-26): 스튜디오 무지 배경 → 일상 배경. 포즈는 모델, 시선은 자유.
-      : "SCENE — full-body STREET-STYLE MODEL CUT in an everyday real-world setting: the " +
-        "person stands in a casual daily location that complements the outfit — for example a " +
-        "quiet city sidewalk, a café exterior, a tree-lined residential street, a clean urban " +
-        "corner or a bright pedestrian alley. The background is a believable ordinary place " +
-        "with natural depth, softly blurred (shallow depth of field) so the person and the " +
-        "clothes remain the clear subject.\n" +
+      : "SCENE — a full-body everyday OUTFIT SNAP, taken by a friend on an iPhone.\n" +
+        "First LOOK AT THE OUTFIT the person is wearing — its formality, season, fabric weight " +
+        "and colours — then pick the ONE location below where a real person would actually wear " +
+        "that outfit:\n" + sceneChoices + "\n" +
+        "Choose only one and commit to it. Dressy or tailored looks belong in the more polished " +
+        "options; relaxed or sporty looks belong in the casual ones. The season and weather of " +
+        "the location MUST match the clothing — never a heavy winter coat in bright summer light, " +
+        "never a thin summer dress against autumn leaves. The background is a believable ordinary " +
+        "place with natural depth, gently blurred so the person and the clothes stay the clear " +
+        "subject.\n" +
         // "모델 포즈" 라고 쓰면 각 잡힌 화보가 나온다(오너: 너무 모델같음 → candid moment 로).
         // 포즈를 "취한" 게 아니라 "순간을 잡은" 사진으로 장면 자체를 재정의한다.
         "POSE — a CANDID MOMENT, not a pose: the person is caught in a natural unposed " +
@@ -846,9 +881,13 @@ export default async function handler(req, res) {
         "camera at all. The GAZE IS FREE and usually off-camera, like a street snap taken by " +
         "a friend.\n" +
         DRESS_FRAMING +
-        "LIGHTING — natural daylight belonging to the scene: soft, flattering, gently " +
-        "directional, true-to-life colours. NO photography equipment anywhere in the frame. " +
-        "Professional street-style lookbook photography, 50mm at f/2.8.") +
+        "LIGHTING — only the light that already belongs to the scene: natural daylight (or the " +
+        "street/interior lights at night), soft and gently directional, true-to-life colours. " +
+        "NO photography equipment, NO studio lighting, NO reflectors anywhere in the frame.\n" +
+        "CAMERA — shot on an iPhone by a friend, held at chest height: the ordinary look of a " +
+        "modern phone camera, mild wide-angle, deep-ish focus with only gentle background " +
+        "separation, everyday colour rendering. It should read as a real photo somebody took " +
+        "and sent you — NOT a fashion editorial, NOT a professional lookbook, no studio polish.") +
     "\n\nOUTPUT FORMAT: a VERTICAL PORTRAIT photograph in 3:4 aspect ratio (taller than wide, " +
     "like a standard phone portrait photo). Do NOT copy the aspect ratio of any reference image — " +
     "reference images may be tall phone screenshots; the output is always 3:4.\n" +
