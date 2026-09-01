@@ -196,7 +196,8 @@ export async function buildDressroom({ garments, dressStyle, apiKey }) {
     const k = Math.floor(Math.random() * (i + 1));
     [picked[i], picked[k]] = [picked[k], picked[i]];
   }
-  const sceneChoices = picked.map((p, i) => `  ${i + 1}) [for ${GROUP_LABEL[p.g]}] ${p.s}`).join("\n");
+  const labelledCandidates = picked.map((p) => `[for ${GROUP_LABEL[p.g]}] ${p.s}`);
+  const sceneChoices = labelledCandidates.map((s, i) => `  ${i + 1}) ${s}`).join("\n");
 
   // 프레이밍 — 오너가 "딱 좋다"고 고른 실사 거울셀카 3장에서 잰 비율을 그대로 박는다.
   // (머리 위 20~25% / 인물 70~75% / 발 아래 4~8%. 발이 잘린 컷은 반려된 케이스다.)
@@ -252,7 +253,10 @@ export async function buildDressroom({ garments, dressStyle, apiKey }) {
     : // 분류 실패 폴백: 라벨 붙은 후보 목록에서 모델이 고른다 (기존 방식)
       "First LOOK AT THE OUTFIT the person is wearing — its formality, season, fabric weight " +
       "and colours — then pick the ONE location below where a real person would actually wear " +
-      "that outfit:\n" + sceneChoices + "\n" +
+      // ⚠️ 후보 목록 자리도 토큰이다 — 배치에서 샷마다 목록 순서를 회전시켜
+      //    "첫 번째로 맞는 것"이 샷마다 달라지게 한다 (같은 배경 반복 방지).
+      "that outfit:\n__DRESS_CANDIDATES__\n" +
+      "If MORE THAN ONE option suits the outfit, use the FIRST suitable one in the list.\n" +
       "Choose only one and commit to it. Each option is labelled with the kind of clothing it " +
       "is for — respect the labels STRICTLY. An option marked ONLY may be used only for that " +
       "clothing type: never place a dress, casual or office outfit in a gym, running track, " +
@@ -354,9 +358,13 @@ export async function buildDressroom({ garments, dressStyle, apiKey }) {
     "One person only — no other people. No text, no logo, no watermark, no border or overlay.";
   return {
     isDressroom, garmentList, dressMirror, sceneGroup, sceneList, scene: chosenScene,
-    // instruction = 첫 장면으로 치환된 완성본(단건·테스트·거울셀카용).
-    // instructionTemplate = __DRESS_SCENE__ 토큰이 남은 원본 — 배치 호출부가 장마다 치환.
-    instruction: dressroomInstruction.split("__DRESS_SCENE__").join(chosenScene || ""),
+    // instruction = 토큰이 전부 치환된 완성본(단건·테스트·거울셀카용).
+    // instructionTemplate = __DRESS_SCENE__ / __DRESS_CANDIDATES__ 토큰이 남은 원본 —
+    //   배치 호출부(generate.js instructionAt)가 샷마다 다르게 치환한다.
+    instruction: dressroomInstruction
+      .split("__DRESS_SCENE__").join(chosenScene || "")
+      .split("__DRESS_CANDIDATES__").join(sceneChoices),
     instructionTemplate: dressroomInstruction,
+    fallbackCandidates: labelledCandidates,
   };
 }

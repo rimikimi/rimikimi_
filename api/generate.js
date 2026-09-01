@@ -754,7 +754,7 @@ export default async function handler(req, res) {
   // 드레스룸 프롬프트는 api/_lib/dressroom.js 로 분리 — 테스트 스크립트가 같은 코드를 쓴다
   // instructionTemplate 에는 장면 자리가 __DRESS_SCENE__ 토큰으로 남아 있다 —
   // 배치(3/6/12장)에서 장마다 다른 배경을 끼우기 위해서다(아래 instructionAt).
-  const { isDressroom, garmentList, instruction: _dressResolved, instructionTemplate: dressroomInstruction, sceneList: dressSceneList = [] } =
+  const { isDressroom, garmentList, instruction: _dressResolved, instructionTemplate: dressroomInstruction, sceneList: dressSceneList = [], fallbackCandidates: dressCandidates = [] } =
     await buildDressroom({ garments, dressStyle, apiKey });
 
 
@@ -893,10 +893,20 @@ export default async function handler(req, res) {
   // 드레스룸 일상컷: 장면 토큰을 "이 샷의 배경"으로 치환한다. 배치에서 shotIdx 가
   // 달라지면 같은 그룹 안의 다른 배경이 들어간다(오너: "그룹 안에서는 랜덤이어야").
   // 토큰이 없으면(다른 컨셉·거울셀카·분류 폴백) 그대로 돌려준다.
-  const instructionAt = (shotIdx = 0) =>
-    dressSceneList.length && instruction.includes("__DRESS_SCENE__")
-      ? instruction.split("__DRESS_SCENE__").join(dressSceneList[shotIdx % dressSceneList.length])
-      : instruction;
+  const instructionAt = (shotIdx = 0) => {
+    let s = instruction;
+    // 분류 성공: 그룹을 섞은 목록에서 순번대로 — 그룹이 배치 최대(12장) 이상이라
+    // 한 배치 안에서는 같은 배경이 두 번 나오지 않는다.
+    if (dressSceneList.length && s.includes("__DRESS_SCENE__"))
+      s = s.split("__DRESS_SCENE__").join(dressSceneList[shotIdx % dressSceneList.length]);
+    // 분류 실패 폴백: 후보 목록을 샷마다 회전시켜 "첫 번째로 맞는 것"이 매번 달라지게.
+    if (s.includes("__DRESS_CANDIDATES__")) {
+      const n = dressCandidates.length || 1;
+      const rot = dressCandidates.map((_, i) => dressCandidates[(i + shotIdx) % n]);
+      s = s.split("__DRESS_CANDIDATES__").join(rot.map((c, i) => `  ${i + 1}) ${c}`).join("\n"));
+    }
+    return s;
+  };
 
   // usePro: 과금/쿼터/CTA 판정 전용 플래그(그대로 유지) — 유료(크레딧 사용) / 무제한(어드민) /
   //   무료 Pro 체험일 때 true. ⚠️ 아래 로직에서 참조하지 않는다(과금 3경로 불변 유지) — "어떤
