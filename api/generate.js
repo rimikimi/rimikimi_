@@ -752,7 +752,9 @@ export default async function handler(req, res) {
     "Bright, clean, flattering lighting. Sharp focus, photorealistic, true-to-life skin. Exactly one person in frame.";
 
   // 드레스룸 프롬프트는 api/_lib/dressroom.js 로 분리 — 테스트 스크립트가 같은 코드를 쓴다
-  const { isDressroom, garmentList, instruction: dressroomInstruction } =
+  // instructionTemplate 에는 장면 자리가 __DRESS_SCENE__ 토큰으로 남아 있다 —
+  // 배치(3/6/12장)에서 장마다 다른 배경을 끼우기 위해서다(아래 instructionAt).
+  const { isDressroom, garmentList, instruction: _dressResolved, instructionTemplate: dressroomInstruction, sceneList: dressSceneList = [] } =
     await buildDressroom({ garments, dressStyle, apiKey });
 
 
@@ -888,6 +890,14 @@ export default async function handler(req, res) {
   const instruction =
     (skipFacePrecheck ? conceptInstruction : PHOTOREALISM + conceptInstruction) + headTiltClause + faceClause;
 
+  // 드레스룸 일상컷: 장면 토큰을 "이 샷의 배경"으로 치환한다. 배치에서 shotIdx 가
+  // 달라지면 같은 그룹 안의 다른 배경이 들어간다(오너: "그룹 안에서는 랜덤이어야").
+  // 토큰이 없으면(다른 컨셉·거울셀카·분류 폴백) 그대로 돌려준다.
+  const instructionAt = (shotIdx = 0) =>
+    dressSceneList.length && instruction.includes("__DRESS_SCENE__")
+      ? instruction.split("__DRESS_SCENE__").join(dressSceneList[shotIdx % dressSceneList.length])
+      : instruction;
+
   // usePro: 과금/쿼터/CTA 판정 전용 플래그(그대로 유지) — 유료(크레딧 사용) / 무제한(어드민) /
   //   무료 Pro 체험일 때 true. ⚠️ 아래 로직에서 참조하지 않는다(과금 3경로 불변 유지) — "어떤
   //   모델로 호출할지"는 useProEngine 으로 완전히 분리한다.
@@ -904,14 +914,14 @@ export default async function handler(req, res) {
 
   // 편집(image-to-image) 모드에선 Gemini가 generationConfig.imageConfig.aspectRatio 를 무시하고
   // 오히려 출력을 세로로 크롭하는 정황 → 설정을 빼고 편집 기본동작(입력 비율 유지)에 맡긴다.
-  const bodyFor = (isPro) => ({
+  const bodyFor = (isPro, shotIdx = 0) => ({
     contents: [
       {
         // ⚠️ role 은 Vertex 에서 필수다 (없으면 400 "Please use a valid role: user, model").
         //    AI Studio 는 생략해도 받아주므로 예전엔 빠져 있었다. 양쪽 다 이 형태로 동작한다.
         role: "user",
         parts: [
-          { text: instruction },
+          { text: instructionAt(shotIdx) },
           { inline_data: { mime_type: mimeType, data: base64 } },
           // 커플: 두 번째 참조 사진 (순서가 곧 "first/second reference image")
           ...(hasSecond
@@ -945,7 +955,7 @@ export default async function handler(req, res) {
   });
 
   // Gemini 한 번 호출(타임아웃 포함). 네트워크 예외(hang/AbortError 포함)는 upstream 없이 반환.
-  async function callGemini(model, isPro, timeoutMs) {
+  async function callGemini(model, isPro, timeoutMs, shotIdx = 0) {
     const endpoint =
       "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent";
     const controller = new AbortController();
@@ -954,7 +964,7 @@ export default async function handler(req, res) {
       const upstream = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-        body: JSON.stringify(bodyFor(isPro)),
+        body: JSON.stringify(bodyFor(isPro, shotIdx)),
         signal: controller.signal,
       });
       return { upstream };
@@ -1002,7 +1012,7 @@ export default async function handler(req, res) {
   let result;
 
   // Vertex 로 호출 (AI Studio 와 요청/응답 본문 형태가 같아 bodyFor 를 그대로 쓴다)
-  async function callVertex(model, isPro, timeoutMs) {
+  async function callVertex(model, isPro, timeoutMs, shotIdx = 0) {
     const sa = vertexSA();
     if (!sa) return { networkError: new Error("VERTEX_SA_JSON 미설정") };
     const controller = new AbortController();
@@ -1015,7 +1025,7 @@ export default async function handler(req, res) {
       const upstream = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
-        body: JSON.stringify(bodyFor(isPro)),
+        body: JSON.stringify(bodyFor(isPro, shotIdx)),
         signal: controller.signal,
       });
       return { upstream };
@@ -1031,10 +1041,10 @@ export default async function handler(req, res) {
   //    그러면 Vertex 분당 한도에 걸려 429 가 쏟아진다. 429 는 몇 초만 쉬면
   //    대개 풀리므로 폴백보다 "기다렸다 다시 던지기" 가 맞다.
   //    (maxDuration 300s / 예산 200s 라 여유가 있다)
-  async function callVertexBackoff(model, isPro, timeoutMs) {
+  async function callVertexBackoff(model, isPro, timeoutMs, shotIdx = 0) {
     const waits = [2500, 6000, 12000];
     for (let i = 0; ; i++) {
-      const r = await callVertex(model, isPro, Math.min(timeoutMs, Math.max(8000, left() - 4000)));
+      const r = await callVertex(model, isPro, Math.min(timeoutMs, Math.max(8000, left() - 4000)), shotIdx);
       if (r?.upstream?.status !== 429) return r;
       if (i >= waits.length || left() < waits[i] + 15000) {
         console.error("[generate] Vertex 429 — 재시도 여력 없음");
@@ -1113,14 +1123,14 @@ export default async function handler(req, res) {
     }
 
     // 한 장 생성 = Vertex 우선, 실패 시 AI Studio. (단건 경로와 같은 순서)
-    async function oneShot() {
+    async function oneShot(shotIdx = 0) {
       if (vertexSA()) {
-        const r = await callVertexBackoff(PRO_MODEL, true, budget(90000));
+        const r = await callVertexBackoff(PRO_MODEL, true, budget(90000), shotIdx);
         if (!isBusyFailure(r)) return r;
       }
-      const r2 = await callGemini(PRO_MODEL, true, budget(40000));
+      const r2 = await callGemini(PRO_MODEL, true, budget(40000), shotIdx);
       if (!isBusyFailure(r2)) return r2;
-      return await callGemini(BASE_MODEL, false, budget(30000));
+      return await callGemini(BASE_MODEL, false, budget(30000), shotIdx);
     }
 
     // ⚠️ 예전엔 batchCount 를 전부 동시에 던졌는데, 12장이면 Vertex 분당 한도에
@@ -1131,7 +1141,8 @@ export default async function handler(req, res) {
     for (let i = 0; i < batchCount; i += CONCURRENCY) {
       const n = Math.min(CONCURRENCY, batchCount - i);
       const wave = await Promise.all(
-        Array.from({ length: n }, () => oneShot().catch(() => null))
+        // shotIdx = 배치 내 순번 — 드레스룸 일상컷이 장마다 다른 배경을 받는 근거
+        Array.from({ length: n }, (_, kk) => oneShot(i + kk).catch(() => null))
       );
       settled.push(...wave);
       // 다음 파 전에 잠깐 쉬어 분당 한도에 여유를 준다

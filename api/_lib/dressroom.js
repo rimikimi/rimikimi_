@@ -178,14 +178,24 @@ export async function buildDressroom({ garments, dressStyle, apiKey }) {
   const isDressroom = garmentList.length > 0;
   const dressMirror = dressStyle !== "model"; // 기본 = 거울셀카
 
-  // 일상컷이면 옷을 먼저 분류하고, 배경은 그 그룹 안에서만 고른다 (그룹 안은 다양성용 랜덤).
-  let sceneGroup = null, chosenScene = null;
+  // 일상컷이면 옷을 먼저 분류하고, 배경은 그 그룹 안에서만 고른다.
+  // ⚠️ 오너 반려(2026-09-01): 3장 배치가 전부 같은 배경으로 나왔다 — 배치는 프롬프트를
+  //    한 번만 조립해 재사용하기 때문. 그래서 "그룹 전체를 섞은 목록"을 돌려주고,
+  //    장면 자리는 토큰(__DRESS_SCENE__)으로 남겨 호출부가 장마다 다른 장면을 끼운다.
+  let sceneGroup = null, sceneList = [], chosenScene = null;
   if (!dressMirror && apiKey && garmentList.length) {
     sceneGroup = await classifyOutfit(garmentList, apiKey);
-    if (sceneGroup && SCENE_GROUPS[sceneGroup]) chosenScene = pickOne(SCENE_GROUPS[sceneGroup]);
+    if (sceneGroup && SCENE_GROUPS[sceneGroup]) {
+      sceneList = SCENE_GROUPS[sceneGroup].slice();
+      for (let i = sceneList.length - 1; i > 0; i--) {
+        const k = Math.floor(Math.random() * (i + 1));
+        [sceneList[i], sceneList[k]] = [sceneList[k], sceneList[i]];
+      }
+      chosenScene = sceneList[0];
+    }
   }
   const sceneBlock = chosenScene
-    ? "LOCATION — this exact place, already chosen to match the outfit:\n  " + chosenScene + ".\n" +
+    ? "LOCATION — this exact place, already chosen to match the outfit:\n  __DRESS_SCENE__.\n" +
       "Use THIS location and no other. Render it with its real, specific, lived-in detail — " +
       "NEVER a bare empty room, an empty hall, or a featureless space with blank walls. " +
       "The background has natural depth, gently blurred so the person and the clothes stay " +
@@ -293,5 +303,11 @@ export async function buildDressroom({ garments, dressStyle, apiKey }) {
     "reference images may be tall phone screenshots; the output is always 3:4.\n" +
     "Photorealistic skin and fabric texture, true-to-life garment colours. " +
     "One person only — no other people. No text, no logo, no watermark, no border or overlay.";
-  return { isDressroom, garmentList, dressMirror, instruction: dressroomInstruction, sceneGroup, scene: chosenScene };
+  return {
+    isDressroom, garmentList, dressMirror, sceneGroup, sceneList, scene: chosenScene,
+    // instruction = 첫 장면으로 치환된 완성본(단건·테스트·거울셀카용).
+    // instructionTemplate = __DRESS_SCENE__ 토큰이 남은 원본 — 배치 호출부가 장마다 치환.
+    instruction: dressroomInstruction.split("__DRESS_SCENE__").join(chosenScene || ""),
+    instructionTemplate: dressroomInstruction,
+  };
 }
