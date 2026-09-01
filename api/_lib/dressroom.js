@@ -77,6 +77,11 @@ export async function buildDressroom({ garments, dressStyle, apiKey }) {
       "a university campus stone stairway, pale granite steps #CFCAC1, ivy green #4F7A44, red-brick building #9C5B3C",
       "a small neighbourhood flower shop front, buckets of blooms #F2A5C0, green foliage #4F7A44, whitewashed frontage #F4F1EA",
       "a weekend street market lane, striped awnings #E8721C, produce crates #6E8B4A, worn asphalt #8A8A8A",
+      "a convenience store front at dusk, bright interior glow #F2E8C9, blue-white signage #4A90D9, grey pavement #8A8A8A",
+      "a subway station platform, cream tiled pillars #E8E2D2, yellow safety line #F2C744, brushed steel screen doors #9AA0A6",
+      "a tree-shaded apartment-complex path, warm urethane track #C86A50, green shrubs #4F7A44, beige towers #E0D3BC",
+      "a stationery and gift shop aisle, white shelving #F2F0EC, colourful notebooks #F2A5C0 and #7FDBDA, warm downlight",
+      "a riverside bicycle path in late afternoon, blue-grey lane #5A6773, golden dry grass #D6A419, soft haze",
     ],
     // 단정·실내·차분한 곳 (블라우스·니트·미니멀 룩)
     refined: [
@@ -85,12 +90,28 @@ export async function buildDressroom({ garments, dressStyle, apiKey }) {
       "a rooftop terrace above the city, warm concrete floor #C2B8AC, clean white parapet #EDEAE4, wide open sky #A9C2D8",
       "a hotel lobby corner with a low armchair, deep green marble #1F4A3C, brass trim #C9A227, warm ivory wall #F6F1E7",
       "a minimal concept-store interior, polished microcement floor #C6C2BB, white display plinths #F2F0EC, soft track lighting",
+      "an art gallery white cube with one large painting, matte white walls #F4F2EE, oak bench #B08858, soft skylight",
+      "a boutique perfume shop, mirrored shelves #D9DCE0, amber glass bottles #C8791E, warm spotlights",
+      "a quiet tea house with hanji paper screens, warm paper light #F1E4C7, dark wood frames #4A2C1D, celadon cups #A3C6B8",
+      "a classic library reading room, tall wooden shelves #7A5638, green desk lamps #1F4A3C, warm window light",
+      "a marble staircase landing by a tall window, pale marble #E8E4DC, bronze railing #8C6239, soft daylight",
+      "a florist studio, eucalyptus green #A3B18A, cream wrapping paper #FBF3E4, terracotta pots #B5573A",
+      "a patisserie with a glass display counter, cream interior #F3EBDD, brass fittings #C9A227, pastel cakes #F7D3DC",
     ],
     // 오피스·비즈니스 (정장·블레이저·슬랙스)
     business: [
       "a modern office building lobby, glass curtain wall #B9C4CE, pale stone floor #D6D0C8, brushed steel trim #9AA0A6",
       "a bright corporate corridor beside floor-to-ceiling windows, grey carpet #8A8A8A, white walls #F2F0EC, city daylight",
       "a coworking lounge with a long oak table, warm oak #B08858, soft grey seating #9AA0A6, plants #6B7238",
+      "a glass conference-room corridor, frosted glass #D8DDE2, charcoal carpet #46494E, clean white ceiling light",
+      "an elevator hall of a corporate tower, dark stone walls #55524C, brass elevator doors #C9A227, warm downlights",
+      "a business-district crosswalk at morning, glass towers #B9C4CE, grey asphalt #7C7C7A, sharp daylight",
+      "a hotel business lounge, navy armchairs #24354F, walnut tables #4A2C1D, wide city-view window",
+      "a firm reception desk area, white-oak panelling #C9B08A, matte black desk #1A1A1A, soft even light",
+      "an office rooftop break deck, wooden deck #B08858, planters #6B7238, hazy skyline #AEBAC6",
+      "a cafe inside an office lobby, terrazzo floor #D8D2C6, matte black counter #1F1F1F, morning light",
+      "a modern bank-branch interior, pale grey floor #C6C2BB, deep green accent wall #1E5133, clean daylight",
+      "a co-working phone-booth corridor, mustard accent wall #D6A419, grey felt panels #8A8A8A, warm strip light",
     ],
     // 활동복 (레깅스·트레이닝·러닝화)
     active: [
@@ -100,6 +121,12 @@ export async function buildDressroom({ garments, dressStyle, apiKey }) {
       "a public tennis court in daylight, clay-red surface #B5573A, white lines #F4F1EA, deep green fence windbreak #1F4A3C",
       "a wooded hiking trail head, packed earth path #8B6F4E, dense green foliage #4F7A44, dappled sunlight",
       "a bright modern gym floor, rubber flooring #36393D, pale grey walls #C6C2BB, daylight from high windows",
+      "an indoor climbing gym, pale grey wall #C6C2BB, colourful holds #E63946 and #FACC15, rubber crash mats #36393D",
+      "a stadium running track at dusk, burgundy lanes #6E1B2E, white lines #F4F1EA, floodlight glow",
+      "a park outdoor-exercise station, green steel equipment #2F6B4F, sandy ground #D9C7A6, tree shade",
+      "an indoor pool deck, aqua water #7FDBDA, white tiles #F2F0EC, bright skylight",
+      "a badminton court hall, green mat court #2F6B4F, white lines #F4F1EA, high ceiling lights",
+      "a bike-path rest stop with racks, blue lane #4A6C8C, steel racks #9AA0A6, clear morning light",
     ],
     // 저녁·차려입는 자리 (원피스·새틴·힐)
     evening: [
@@ -108,6 +135,13 @@ export async function buildDressroom({ garments, dressStyle, apiKey }) {
       "a formal event foyer with a chandelier, ivory marble #F6F1E7, gold trim #C9A227, deep carpet #6E1B2E",
       "a neon-lit night street after rain, wet asphalt reflections #2E3238, magenta sign glow #E0218A, cyan sign glow #00E5FF",
       "a hotel poolside at dusk, still water #2EC4B6, pale stone deck #E3D2B4, warm sky #F2B27C",
+      "a rooftop cocktail bar at night, warm string lights #E0A93B, deep night sky #1B2233, glass railing",
+      "a jazz lounge, deep red velvet #6E1B2E, brass instrument glints #C9A227, low smoky light",
+      "a fine-dining private room, charcoal walls #3A3A3C, crisp white tablecloth #F7F5F0, one warm pendant",
+      "a theatre foyer at intermission, red carpet #8F1D22, cream columns #EDE3D2, chandelier glow",
+      "a hotel bar counter with backlit bottles, amber glow #C8791E, dark marble #24211E, soft reflections",
+      "a night river-cruise deck, warm city bokeh #E0A93B, dark water #101820, small deck lights",
+      "a gallery opening reception at night, white walls #F2F0EC, glinting wine glasses #C96A78, warm spots",
     ],
     // 계절·특수 (코트·패딩·트렌치·한복·여행)
     seasonal: [
@@ -119,12 +153,27 @@ export async function buildDressroom({ garments, dressStyle, apiKey }) {
       "a palace stone wall path in daylight, weathered granite #A9A49C, deep red timber #9B1B1B, pine green #1E5133",
       "an airport terminal walkway with wide windows, polished floor #D6D0C8, pale steel columns #9AA0A6, bright daylight",
       "a train platform in the afternoon, concrete platform #B3AFA9, yellow safety line #F2C744, soft shade",
+      "a spring street under full cherry blossoms, petal pink #F7D3DC, fresh leaf green #A3B18A, soft overcast",
+      "a summer fountain plaza, wet stone #A9A49C, white spray mist #F4F6F8, bright sun",
+      "a ginkgo avenue in golden autumn, ginkgo yellow #E8C33A, dark trunks #4A4A48, warm low sun",
+      "a winter cafe window seat, warm interior glow #E0A93B, condensation on glass #DCE6EC, snow outside #F4F6F8",
+      "a spring picnic lawn, fresh grass #6E8B4A, cream picnic mat #FBF3E4, blossom trees #F7D3DC",
+      "a foggy early-morning park, grey mist #C3C9CC, wet path #7C7C7A, bare dark branches #4A4A48",
     ],
     // 홈웨어·라운지웨어 (잠옷·파자마·홈세트)
     home: [
       "a sunlit living room, warm oak floor #D8C3A2, soft linen sofa #E6D9C3, sheer curtains #F4F1EA",
       "a tidy bedroom corner in morning light, cream bedding #FBF3E4, pale wall #F2EFEE, warm wood side table #B08858",
       "a bright home kitchen, white tiles #F2F0EC, pale wood counter #D8C3A2, morning window light",
+      "a cozy reading nook, warm floor-lamp glow #E0A93B, sage cushion #A3B18A, oak shelf #B08858",
+      "a plant-filled balcony at morning, terracotta pots #B5573A, green leaves #4F7A44, soft daylight",
+      "a home office desk corner, pale wood desk #D8C3A2, cream wall #F2EFEE, warm task light #E0A93B",
+      "a kitchen breakfast bar with coffee, wood counter #B08858, white mugs #FFFFFF, morning sun",
+      "a linen-fresh bedroom, oat linen bedding #E6DCC8, white duvet #FAF8F4, soft window light",
+      "a window seat with cushions and a book, cream cushions #FBF3E4, grey throw #B3AFA9, daylight",
+      "a hallway mirror corner at home, white door frame #F2EFEE, oak floor #D8C3A2, soft lamp glow #E0A93B",
+      "a soft rug by a TV console, beige rug #E6D9C3, walnut console #4A2C1D, evening lamp glow #E0A93B",
+      "a sunny laundry-drying veranda, white linens #FAF8F4, pale tile floor #D6D0C8, bright daylight",
     ],
   };
   const MODEL_SCENES = Object.values(SCENE_GROUPS).flat();
