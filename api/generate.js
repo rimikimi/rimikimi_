@@ -753,7 +753,7 @@ export default async function handler(req, res) {
 
   // 드레스룸 프롬프트는 api/_lib/dressroom.js 로 분리 — 테스트 스크립트가 같은 코드를 쓴다
   const { isDressroom, garmentList, instruction: dressroomInstruction } =
-    buildDressroom({ garments, dressStyle });
+    await buildDressroom({ garments, dressStyle, apiKey });
 
 
   // cutCount 가 오면 스트립 한 장, 아니면 구버전(컷별) — 구버전 앱 호환

@@ -3,7 +3,54 @@
 // 같은 코드를 쓰도록 모듈로 분리했다. 여기서 나온 문자열이 그대로 모델에 들어간다.
 // ============================================================
 
-export function buildDressroom({ garments, dressStyle }) {
+// ── 의상 분류 (2026-09-01 오너 지시: "배경은 랜덤이 아니라 옷에 어울리는 걸로") ──
+// 의상 사진을 가벼운 비전 모델에 먼저 보여주고 "이 옷을 입고 갈 곳"의 그룹을 받는다.
+// 배경은 그 그룹 안에서만 뽑는다 — 그룹 안 랜덤은 다양성용이고, 그룹 밖으로는 못 나간다.
+// 분류가 실패하면(타임아웃 등) 라벨 붙은 후보 목록 방식으로 폴백해 생성은 계속된다.
+// ⚠️ timeout 은 12s. 9s 로 뒀더니 flash 가 "생각"(thinking ~900토큰)에 시간을 써서
+//    표준 케이스도 타임아웃으로 폴백됐다. 아래에서 thinkingBudget 0 으로 생각도 끈다.
+async function classifyOutfit(garmentList, apiKey, timeoutMs = 12000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const r = await fetch(
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+        signal: controller.signal,
+        body: JSON.stringify({
+          contents: [{
+            role: "user",
+            parts: [
+              { text:
+                "These product photos together form ONE outfit a person will wear. " +
+                "Where would a real person wear this outfit? Answer with exactly ONE word from this list:\n" +
+                "casual (everyday clothes), refined (polished or elegant daywear), " +
+                "business (office/tailored), active (sportswear, leggings, gym or running gear), " +
+                "evening (dressy night-out looks), seasonal (heavy winter coat, padded jacket, " +
+                "hanbok or traditional dress, rain gear), home (pajamas, loungewear).\n" +
+                "Answer with only the single word." },
+              ...garmentList.slice(0, 3).map((g) => ({ inline_data: { mime_type: g.mimeType, data: g.base64 } })),
+            ],
+          }],
+          generationConfig: { thinkingConfig: { thinkingBudget: 0 }, maxOutputTokens: 10 },
+        }),
+      }
+    );
+    const j = await r.json();
+    if (!r.ok) return null;
+    const txt = (j.candidates?.[0]?.content?.parts || []).map((p) => p.text || "").join(" ");
+    const m = txt.toLowerCase().match(/\b(casual|refined|business|active|evening|seasonal|home)\b/);
+    return m ? m[1] : null;
+  } catch (_) {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export async function buildDressroom({ garments, dressStyle, apiKey }) {
   // ── 드레스룸 (2026-08-25) ─────────────────────────────────────────────
   // 의상 사진(최대 5장)을 입은 내 모습을 만든다. Higgsfield 로 케이스별(상의만/
   // 상+하/3장 레이어드/신발 포함 4장) 실측해 확정한 프롬프트를 서버에서 조립한다.
@@ -131,6 +178,32 @@ export function buildDressroom({ garments, dressStyle }) {
   const isDressroom = garmentList.length > 0;
   const dressMirror = dressStyle !== "model"; // 기본 = 거울셀카
 
+  // 일상컷이면 옷을 먼저 분류하고, 배경은 그 그룹 안에서만 고른다 (그룹 안은 다양성용 랜덤).
+  let sceneGroup = null, chosenScene = null;
+  if (!dressMirror && apiKey && garmentList.length) {
+    sceneGroup = await classifyOutfit(garmentList, apiKey);
+    if (sceneGroup && SCENE_GROUPS[sceneGroup]) chosenScene = pickOne(SCENE_GROUPS[sceneGroup]);
+  }
+  const sceneBlock = chosenScene
+    ? "LOCATION — this exact place, already chosen to match the outfit:\n  " + chosenScene + ".\n" +
+      "Use THIS location and no other. Render it with its real, specific, lived-in detail — " +
+      "NEVER a bare empty room, an empty hall, or a featureless space with blank walls. " +
+      "The background has natural depth, gently blurred so the person and the clothes stay " +
+      "the clear subject.\n"
+    : // 분류 실패 폴백: 라벨 붙은 후보 목록에서 모델이 고른다 (기존 방식)
+      "First LOOK AT THE OUTFIT the person is wearing — its formality, season, fabric weight " +
+      "and colours — then pick the ONE location below where a real person would actually wear " +
+      "that outfit:\n" + sceneChoices + "\n" +
+      "Choose only one and commit to it. Each option is labelled with the kind of clothing it " +
+      "is for — respect the labels STRICTLY. An option marked ONLY may be used only for that " +
+      "clothing type: never place a dress, casual or office outfit in a gym, running track, " +
+      "sports court or bedroom. If NONE of the options suits the outfit, ignore the list and " +
+      "use the ordinary everyday place where that outfit actually belongs, described in the " +
+      "same plain real-world way.\n" +
+      "The chosen place must look genuinely REAL and lived-in, with the specific believable " +
+      "detail of that location — NEVER a bare empty room, an empty hall, or a featureless " +
+      "space with blank walls.\n";
+
   // 참조 순서: [본인 사진] + [의상 1..N]. 서수(SECOND, THIRD…)가 이 순서를 가리킨다.
   const ORDINALS = ["SECOND", "THIRD", "FOURTH", "FIFTH", "SIXTH"];
   const garmentListing = garmentList
@@ -150,6 +223,13 @@ export function buildDressroom({ garments, dressStyle }) {
     "a bag carried or held naturally). Reproduce EVERY item exactly — same colours, same pattern, " +
     "same buttons and hardware, same fabric, same fit and length. Do not redesign, recolour or " +
     "simplify any item.\n" +
+    // 오너 반려(2026-09-01): 미니 원피스가 미디 기장으로 늘어나서 나옴 — 기장·실루엣을 따로 못박는다
+    "LENGTH & SILHOUETTE ARE PART OF THE GARMENT: reproduce the exact hem length relative to " +
+    "the body — a mini stays a mini, a midi stays a midi, cropped stays cropped, sleeve length " +
+    "stays identical. Never lengthen, shorten, loosen or slim a garment. Keep the same " +
+    "neckline shape and depth, the same waist seam position, and the same fabric surface " +
+    "(boucle stays boucle, knit stays knit, satin stays satin). If you are unsure, err on the " +
+    "side of copying the reference garment more literally.\n" +
     // 오너 지시(2026-08-30): 결과물에 가격표가 달려 나왔다. 피팅룸 장면이라 모델이
     // "안 산 옷" 으로 해석해 택을 붙이기도 하고, 의상 사진(쇼핑몰 캡처)에 택이 보이면
     // 그대로 옮겨 그린다. 양쪽 다 막는다.
@@ -187,24 +267,9 @@ export function buildDressroom({ garments, dressStyle }) {
         "Real phone mirror-selfie feel, natural handheld framing."
       // 오너 지시(2026-08-26): 스튜디오 무지 배경 → 일상 배경. 포즈는 모델, 시선은 자유.
       : "SCENE — a full-body everyday OUTFIT SNAP, taken by a friend on an iPhone.\n" +
-        "First LOOK AT THE OUTFIT the person is wearing — its formality, season, fabric weight " +
-        "and colours — then pick the ONE location below where a real person would actually wear " +
-        "that outfit:\n" + sceneChoices + "\n" +
-        "Choose only one and commit to it. Each option is labelled with the kind of clothing it " +
-        "is for — respect the labels STRICTLY. An option marked ONLY may be used only for that " +
-        "clothing type: never place a dress, casual or office outfit in a gym, running track, " +
-        "sports court or bedroom. If NONE of the options suits the outfit, ignore the list and " +
-        "use the ordinary everyday place where that outfit actually belongs, described in the " +
-        "same plain real-world way.\n" +
-        "The chosen place must look genuinely REAL and lived-in, with the specific believable " +
-        "detail of that location — NEVER a bare empty room, an empty hall, or a featureless " +
-        "space with blank walls.\n" +
-        "Dressy or tailored looks belong in the more polished " +
-        "options; relaxed or sporty looks belong in the casual ones. The season and weather of " +
-        "the location MUST match the clothing — never a heavy winter coat in bright summer light, " +
-        "never a thin summer dress against autumn leaves. The background is a believable ordinary " +
-        "place with natural depth, gently blurred so the person and the clothes stay the clear " +
-        "subject.\n" +
+        sceneBlock +
+        "The season and weather of the location MUST match the clothing — never a heavy winter " +
+        "coat in bright summer light, never a thin summer dress against autumn leaves.\n" +
         // "모델 포즈" 라고 쓰면 각 잡힌 화보가 나온다(오너: 너무 모델같음 → candid moment 로).
         // 포즈를 "취한" 게 아니라 "순간을 잡은" 사진으로 장면 자체를 재정의한다.
         "POSE — a CANDID MOMENT, not a pose: the person is caught in a natural unposed " +
@@ -228,5 +293,5 @@ export function buildDressroom({ garments, dressStyle }) {
     "reference images may be tall phone screenshots; the output is always 3:4.\n" +
     "Photorealistic skin and fabric texture, true-to-life garment colours. " +
     "One person only — no other people. No text, no logo, no watermark, no border or overlay.";
-  return { isDressroom, garmentList, dressMirror, instruction: dressroomInstruction };
+  return { isDressroom, garmentList, dressMirror, instruction: dressroomInstruction, sceneGroup, scene: chosenScene };
 }

@@ -38,11 +38,14 @@ const mimeOf = (p) => (/\.png$/i.test(p) ? "image/png" : /\.webp$/i.test(p) ? "i
 const b64 = (p) => readFileSync(p).toString("base64");
 
 const garments = garmentPaths.map((p) => ({ mimeType: mimeOf(p), base64: b64(p) }));
-const { instruction, garmentList } = buildDressroom({ garments, dressStyle: style });
+const { instruction, garmentList, sceneGroup, scene } = await buildDressroom({ garments, dressStyle: style, apiKey });
 
-const scenes = instruction.split("\n").filter((l) => /^ {2}\d\)/.test(l));
 console.log(`스타일: ${style} · 의상 ${garmentList.length}장`);
-if (scenes.length) console.log("이번 요청 배경 후보:\n" + scenes.join("\n"));
+if (scene) console.log(`의상 분류: ${sceneGroup} → 배경: ${scene}`);
+else {
+  const scenes = instruction.split("\n").filter((l) => /^ {2}\d\)/.test(l));
+  if (scenes.length) console.log("분류 실패 → 후보 폴백:\n" + scenes.join("\n"));
+}
 if (args.includes("--print")) console.log("\n----- 프롬프트 -----\n" + instruction + "\n-------------------\n");
 
 // 서버 bodyFor 와 같은 형태: [지시문] + [사람] + [의상 …], Pro 는 2K / 3:4
