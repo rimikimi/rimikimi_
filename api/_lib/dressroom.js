@@ -81,14 +81,26 @@ export function buildDressroom({ garments, dressStyle }) {
     ],
   };
   const MODEL_SCENES = Object.values(SCENE_GROUPS).flat();
+  // 후보마다 "어떤 옷 전용인지" 라벨을 붙인다 (2026-09-01 오너 반려 반영).
+  // 라벨 없이 "옷에 맞는 걸 골라라"만 줬더니 원피스 차림이 체육관(active) 후보로
+  // 들어가 빈 헬스장에 서 있는 컷이 나왔다. ONLY 라벨 = 그 옷이 아니면 금지.
+  const GROUP_LABEL = {
+    casual: "everyday casual wear",
+    refined: "polished, minimal or elegant daywear",
+    business: "office / tailored looks",
+    active: "ONLY activewear or sportswear",
+    evening: "dressy evening looks",
+    seasonal: "only if the outfit clearly matches this season/weather",
+    home: "ONLY sleepwear or loungewear",
+  };
   // 그룹마다 하나씩 뽑고 순서를 섞는다 → 후보는 매번 다르지만 커버리지는 항상 보장된다
   const pickOne = (arr) => arr[Math.floor(Math.random() * arr.length)];
-  const picked = Object.values(SCENE_GROUPS).map(pickOne);
+  const picked = Object.entries(SCENE_GROUPS).map(([g, arr]) => ({ g, s: pickOne(arr) }));
   for (let i = picked.length - 1; i > 0; i--) {
     const k = Math.floor(Math.random() * (i + 1));
     [picked[i], picked[k]] = [picked[k], picked[i]];
   }
-  const sceneChoices = picked.map((s, i) => `  ${i + 1}) ${s}`).join("\n");
+  const sceneChoices = picked.map((p, i) => `  ${i + 1}) [for ${GROUP_LABEL[p.g]}] ${p.s}`).join("\n");
 
   // 프레이밍 — 오너가 "딱 좋다"고 고른 실사 거울셀카 3장에서 잰 비율을 그대로 박는다.
   // (머리 위 20~25% / 인물 70~75% / 발 아래 4~8%. 발이 잘린 컷은 반려된 케이스다.)
@@ -178,10 +190,15 @@ export function buildDressroom({ garments, dressStyle }) {
         "First LOOK AT THE OUTFIT the person is wearing — its formality, season, fabric weight " +
         "and colours — then pick the ONE location below where a real person would actually wear " +
         "that outfit:\n" + sceneChoices + "\n" +
-        "Choose only one and commit to it. If NONE of them suits the outfit — for example " +
-        "activewear with only indoor or dressy options on the list — then ignore the list and " +
-        "use the ordinary everyday place where that outfit actually belongs (a running path, a " +
-        "gym, a playground, a market street…), described in the same plain real-world way.\n" +
+        "Choose only one and commit to it. Each option is labelled with the kind of clothing it " +
+        "is for — respect the labels STRICTLY. An option marked ONLY may be used only for that " +
+        "clothing type: never place a dress, casual or office outfit in a gym, running track, " +
+        "sports court or bedroom. If NONE of the options suits the outfit, ignore the list and " +
+        "use the ordinary everyday place where that outfit actually belongs, described in the " +
+        "same plain real-world way.\n" +
+        "The chosen place must look genuinely REAL and lived-in, with the specific believable " +
+        "detail of that location — NEVER a bare empty room, an empty hall, or a featureless " +
+        "space with blank walls.\n" +
         "Dressy or tailored looks belong in the more polished " +
         "options; relaxed or sporty looks belong in the casual ones. The season and weather of " +
         "the location MUST match the clothing — never a heavy winter coat in bright summer light, " +
