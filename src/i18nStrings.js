@@ -220,7 +220,7 @@ export const STR = {
     "dress.needGarment": "입어볼 의상 사진을 먼저 올려주세요 🙂",
     "dress.styleLabel": "어떤 컷으로 만들까요?",
     "dress.style.mirror": "거울셀카",
-    "dress.style.model": "모델컷",
+    "dress.style.model": "일상컷",
     "dress.confirmNote": "의상 {n}장 · 빠진 의상은 AI가 판단해서 생성해줘요.",
 
     // === 내 갤러리 ===
@@ -581,7 +581,7 @@ export const STR = {
     "dress.needGarment": "Please add a clothing photo first 🙂",
     "dress.styleLabel": "Which cut?",
     "dress.style.mirror": "Mirror selfie",
-    "dress.style.model": "Model cut",
+    "dress.style.model": "Everyday cut",
     "dress.confirmNote": "{n} item(s) · anything missing, AI fills in to match.",
 
     "gallery.title": "My gallery",

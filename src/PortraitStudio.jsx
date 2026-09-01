@@ -3907,7 +3907,7 @@ function ConfirmScreen({
         {canSwitch && <div style={S.swipeHint}>{t("step3.swipeHint")}</div>}
       </div>
 
-      {/* 드레스룸: 거울셀카 / 모델컷 선택 + 안내 한 줄 */}
+      {/* 드레스룸: 거울셀카 / 일상컷(내부 키는 model 유지) 선택 + 안내 한 줄 */}
       {dressroom && (
         <div style={S.idOptCard}>
           <div style={S.idOptLabel}>{t("dress.styleLabel")}</div>
