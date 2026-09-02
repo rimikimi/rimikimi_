@@ -250,6 +250,8 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
   const rafRef = useRef(0);
   const wrapRef = useRef(null);
   const dragRef = useRef(null);      // 스티커 드래그/핀치 상태
+  const stickerElRef = useRef(new Map()); // id → DOM (드래그 중 transform 직접 갱신용)
+  const overlayRef = useRef(null);   // 닫을 때 150ms 페이드아웃(WAAPI)
   // 스티커 크기는 "이미지 폭 대비 비율"이라 화면상 픽셀 크기는 래퍼 실폭에서 계산한다.
   // (cqw 컨테이너 쿼리 단위는 iOS 16 미만 웹뷰가 몰라서 실측으로 간다)
   const [wrapW, setWrapW] = useState(0);
@@ -404,34 +406,66 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
     dragRef.current = d;
     ev.currentTarget.setPointerCapture?.(ev.pointerId);
   }
+  // 드래그 중엔 React state 를 건드리지 않는다(모션 리뷰). 매 pointermove 마다 setStickers 로
+  // left/top(%) 을 바꾸면 레이아웃→페인트→합성이 프레임마다 돌고 stickers.map 재렌더까지
+  // 얹혀 2K 캔버스 위에서 끊겼다. 이제 이동·핀치는 엘리먼트의 transform 만 직접 바꾸고
+  // (합성 전용), 손을 뗄 때 한 번만 state 에 커밋한다. 좌표 체계(0..1 비율)는 그대로.
+  function paintStickerLive(d) {
+    const el = stickerElRef.current.get(d.id);
+    if (!el || !d.live) return;
+    const offX = (d.live.x - d.start.x) * d.rect.width;
+    const offY = (d.live.y - d.start.y) * d.rect.height;
+    const k = d.live.scale / d.start.scale;
+    el.style.transform =
+      `translate(${offX}px, ${offY}px) translate(-50%,-50%) rotate(${d.live.rot}deg) scale(${k})`;
+  }
   function stickerPointerMove(ev) {
     const d = dragRef.current;
     if (!d || !d.pointers.has(ev.pointerId)) return;
     ev.preventDefault();
     const prev = d.pointers.get(ev.pointerId);
     d.pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    if (!d.live) d.live = { ...d.start };
     if (d.pointers.size === 1) {
       const dx = (ev.clientX - prev.x) / d.rect.width;
       const dy = (ev.clientY - prev.y) / d.rect.height;
-      setStickers((p) => p.map((s) => (s.id === d.id
-        ? { ...s, x: Math.min(1.05, Math.max(-0.05, s.x + dx)), y: Math.min(1.05, Math.max(-0.05, s.y + dy)) }
-        : s)));
+      d.live.x = Math.min(1.05, Math.max(-0.05, d.live.x + dx));
+      d.live.y = Math.min(1.05, Math.max(-0.05, d.live.y + dy));
     } else if (d.pointers.size === 2 && d.baseDist) {
       const [a, b] = [...d.pointers.values()];
       const dist = Math.hypot(a.x - b.x, a.y - b.y);
       const ang = (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI;
       const k = dist / d.baseDist;
-      setStickers((p) => p.map((s) => (s.id === d.id
-        ? { ...s, scale: Math.min(0.9, Math.max(0.04, d.start.scale * k)), rot: d.start.rot + (ang - d.baseAng) }
-        : s)));
+      d.live.scale = Math.min(0.9, Math.max(0.04, d.start.scale * k));
+      d.live.rot = d.start.rot + (ang - d.baseAng);
     }
+    paintStickerLive(d);
   }
   function stickerPointerUp(ev) {
     const d = dragRef.current;
     if (!d) return;
     d.pointers.delete(ev.pointerId);
-    if (d.pointers.size === 0) dragRef.current = null;
-    else { d.baseDist = null; d.baseAng = null; } // 남은 손가락 기준 재설정은 다음 down 에서
+    if (d.pointers.size === 0) {
+      dragRef.current = null;
+      if (d.live) {
+        const live = d.live;
+        // 커밋: state 가 left/top/fontSize/rotate 를 다시 그리므로 임시 transform 은 지운다
+        const el = stickerElRef.current.get(d.id);
+        if (el) el.style.transform = "";
+        setStickers((p) => p.map((s) => (s.id === d.id ? { ...s, ...live } : s)));
+      }
+    } else {
+      // 손가락 하나가 남으면 남은 손가락 기준으로 이동을 이어간다 — 기준점을 현재 값으로 재설정
+      d.baseDist = null; d.baseAng = null;
+      if (d.live) {
+        d.start = { ...d.live };
+        const el = stickerElRef.current.get(d.id);
+        if (el) {
+          // 커밋 없이 이어가므로 지금 위치를 새 기준(start)으로 두고 transform 을 다시 계산
+          paintStickerLive(d);
+        }
+      }
+    }
   }
 
   /* ---------- 내보내기 (원본 해상도) ---------- */
@@ -533,15 +567,25 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
   //   있으면 전환·엣지 스와이프 때마다 오버레이가 화면과 같이 옆으로 끌려간다(실제 버그).
   //   포털로 app 루트 바깥에 두면 루트의 스와이프 핸들러도 에디터 터치를 못 받는다
   //   = 필터 칩을 옆으로 넘겨도 뒤로가기 제스처가 발동하지 않는다.
+  // 닫기: 진입(300ms)과 달리 사용자 행동이라 빠르게 — 하지만 0ms 는 "뚝 끊김"이라 150ms 페이드.
+  function closeEditor() {
+    const el = overlayRef.current;
+    let reduced = false;
+    try { reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (_) {}
+    if (!el || reduced || !el.animate) return onClose();
+    el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 150, easing: "cubic-bezier(0.32,0.72,0,1)", fill: "forwards" })
+      .finished.then(onClose, onClose);
+  }
+
   return createPortal(
-    <div style={ES.overlay} className="pe-in">
+    <div style={ES.overlay} className="pe-in" ref={overlayRef}>
       <style>{PE_CSS}</style>
-      {toast && <div style={ES.toast} onClick={() => setToast("")}>{toast}</div>}
+      {toast && <div style={ES.toast} className="pe-toast" onClick={() => setToast("")}>{toast}</div>}
 
       {/* 상단 바 */}
       <div style={ES.topBar}>
         <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
-          <button style={ES.topBtn} onClick={onClose}>✕</button>
+          <button style={ES.topBtn} onClick={closeEditor}>✕</button>
           <div style={ES.topTitle}>{t("edit.title")}</div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
@@ -582,6 +626,7 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
             {!peeking && stickers.map((st) => (
               <span
                 key={st.id}
+                ref={(el) => { if (el) stickerElRef.current.set(st.id, el); else stickerElRef.current.delete(st.id); }}
                 onPointerDown={(e) => stickerPointerDown(e, st)}
                 onPointerMove={stickerPointerMove}
                 onPointerUp={stickerPointerUp}
@@ -791,8 +836,9 @@ const ES = {
     paddingBottom: "env(safe-area-inset-bottom, 0px)",
   },
   toast: {
+    // transform 은 .pe-toast CSS 가 소유한다(진입 전환 + @starting-style) — 인라인에 두면 덮어써서 전환이 안 된다
     position: "fixed", top: "calc(env(safe-area-inset-top, 0px) + 64px)", left: "50%",
-    transform: "translateX(-50%)", zIndex: 320, background: "rgba(255,255,255,.96)", color: "#231f20",
+    zIndex: 320, background: "rgba(255,255,255,.96)", color: "#231f20",
     padding: "10px 18px", borderRadius: 13, fontSize: 13.5, fontWeight: 700, whiteSpace: "nowrap",
     boxShadow: "0 10px 30px -8px rgba(0,0,0,.6)",
   },
@@ -957,8 +1003,17 @@ const DATE_PREVIEW = {
 
 // 커스텀 슬라이더 + 진입 모션 (인라인 스타일로는 pseudo-element 를 못 만진다)
 const PE_CSS = `
-.pe-in { animation: peUp .3s cubic-bezier(.2,.8,.2,1) backwards; }
+/* 진입은 앱 공통 토큰(--d-enter/--ease-out)을 쓴다 — 편집기만 다른 곡선이면 이 화면만 튄다(모션 리뷰).
+   body 로 포털돼도 :root 변수라 그대로 닿는다. */
+.pe-in { animation: peUp var(--d-enter, 300ms) var(--ease-out, cubic-bezier(0.32,0.72,0,1)) backwards; }
 @keyframes peUp { from { opacity: 0; transform: translateY(16px); } }
+/* 토스트: 키프레임이 아니라 전환 — flashToast 연타에도 처음부터 다시 재생되지 않고 이어진다 */
+.pe-toast {
+  opacity: 1; transform: translate(-50%, 0);
+  transition: opacity var(--d-swap, 180ms) var(--ease-out, cubic-bezier(0.32,0.72,0,1)),
+              transform var(--d-swap, 180ms) var(--ease-out, cubic-bezier(0.32,0.72,0,1));
+}
+@starting-style { .pe-toast { opacity: 0; transform: translate(-50%, -6px); } }
 .pe-range { -webkit-appearance: none; appearance: none; height: 28px; background: transparent; }
 .pe-range::-webkit-slider-runnable-track {
   height: 3px; border-radius: 2px; background: rgba(255,255,255,.22);

@@ -1759,8 +1759,10 @@ export default function PortraitStudio() {
   function paintDrag(px, animate) {
     const el = mainRef.current;
     if (!el) return;
+    // 손을 뗀 뒤 제자리 복귀는 "시스템 응답" — 진입(300ms)보다 짧게 snap 한다(180ms).
+    // 300ms 면 손에서 떨어진 뒤에도 화면이 끌려가는 느낌이 났다(모션 리뷰).
     el.style.transition = animate
-      ? "transform var(--d-enter) var(--ease-out), opacity var(--d-enter) var(--ease-out)"
+      ? "transform var(--d-swap) var(--ease-out), opacity var(--d-swap) var(--ease-out)"
       : "";
     el.style.transform = px ? `translateX(${px}px)` : "";
     el.style.opacity = px ? String(Math.max(0.35, 1 - Math.abs(px) / 520)) : "";
@@ -2381,7 +2383,9 @@ export default function PortraitStudio() {
         </div>
       )}
 
-      <main style={S.main} ref={mainRef}>
+      {/* data-navdir: 마지막 화면 전환의 방향 — "tab" 이면 CSS 가 .fade 를 150ms 불투명도로 줄인다.
+          navDirRef 는 setScreen 안에서 즉시 "fwd" 로 리셋되므로 lastDirRef 를 읽어야 한다. */}
+      <main style={S.main} ref={mainRef} data-navdir={lastDirRef.current}>
         {screen === "home" && (() => {
           const art = isArtConcept(selected) && !isDressroom(selected);
           const dress = isDressroom(selected);
@@ -6003,6 +6007,9 @@ body { margin: 0; background: ${BG}; }
    여기 애니메이션들은 마지막 키프레임이 곧 기본 상태라 forwards 가 필요 없다.
    backwards 는 지연/시작 전 상태만 담당하고 끝나면 잔여 스타일을 남기지 않는다. */
 .fade { animation: fadeIn var(--d-enter) var(--ease-out) backwards; padding-top: 18px; }
+/* 탭 전환은 세션당 수십 번 — 빈도 원칙상 "떠오름"을 걷어내고 150ms 불투명도만 남긴다(모션 리뷰).
+   탭 버튼([data-tabbtn])만 예외로 두고 콘텐츠는 300ms 떠오르던 불일치를 맞춘다. */
+main[data-navdir="tab"] .fade { animation: dimIn 150ms var(--ease-out) backwards; }
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
@@ -6081,8 +6088,14 @@ button:active { transition-duration: var(--d-press); transform: scale(0.985); }
 [data-tabbtn] { transition: none !important; }
 [data-tabbtn]:active { transform: none; }
 ::-webkit-scrollbar { height: 0; width: 0; }
+/* 감소 모션 = "적고 부드럽게"지 "없음"이 아니다. 이동(translate/scale)만 걷어내고
+   150ms 불투명도는 남긴다 — 전부 0ms 로 만들면 상태가 바뀐 것 자체를 못 읽는다(모션 리뷰). */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+  .fade, .cardIn, .resultReveal, .pe-in { animation-name: dimIn !important; animation-duration: 150ms !important; }
+  [style*="sheetUp"], [style*="bkPop"] { animation-name: dimIn !important; animation-duration: 150ms !important; }
+  *, *::before, *::after { transition-duration: .001ms !important; }
+  .pe-toast { transition-duration: 150ms !important; transform: translate(-50%, 0) !important; }
   button:active { transform: none; }
+  .splashDot, .genHeart { animation: none !important; opacity: .8; }
 }
 `;
