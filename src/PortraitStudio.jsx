@@ -1785,8 +1785,37 @@ export default function PortraitStudio() {
   }
   // 진행 중인 인터랙티브 pop 컨트롤러 (navTransition.beginPop 반환값)
   const popRef = useRef(null);
+  // 가로 제스처가 잡히면 세로 스크롤을 잠근다 — iOS 는 뒤로가기/페이지 제스처가 인식되는 순간
+  // 스크롤뷰가 손가락을 놓는다. 안 잠그면 손가락이 조금만 위아래로 흔들려도 뒤 화면이 세로로
+  // 같이 스크롤돼서 "손가락을 따라오는" 것처럼 보인다(오너 스크린샷). 때에 따라 수평만 갈 때도
+  // 있던 이유 = 그때는 손가락이 정확히 옆으로만 갔던 것.
+  const scrollLockRef = useRef(false);
+  function lockScroll() {
+    const el = mainRef.current;
+    if (!el || scrollLockRef.current) return;
+    scrollLockRef.current = true;
+    el.style.overflowY = "hidden"; // scrollTop 은 보존된다
+  }
+  function unlockScroll() {
+    if (!scrollLockRef.current) return;
+    scrollLockRef.current = false;
+    const el = mainRef.current;
+    if (el) el.style.overflowY = "";
+  }
+  // React 의 touchmove 는 passive 라 preventDefault 가 안 먹는다 → 문서에 non-passive 로 직접.
+  // 가로 제스처 중이면 브라우저 기본 동작(세로 스크롤)을 막는다.
+  useEffect(() => {
+    const h = (e) => {
+      const s = swipeRef.current;
+      if (s && s.axis === "x" && e.cancelable) e.preventDefault();
+    };
+    document.addEventListener("touchmove", h, { passive: false });
+    return () => document.removeEventListener("touchmove", h);
+  }, []);
+
   function endDrag() {
     swipeRef.current = null;
+    unlockScroll();
     if (popRef.current) { popRef.current.cancelNow(); popRef.current = null; return; }
     paintDrag(0, true);
     setTimeout(() => { const el = mainRef.current; if (el) el.style.transition = ""; }, 240);
@@ -1831,6 +1860,7 @@ export default function PortraitStudio() {
       if (Math.abs(dx) < 7 && Math.abs(dy) < 7) return;
       s.axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
       if (s.axis === "y") { swipeRef.current = null; return; }
+      lockScroll(); // 여기서부터 화면은 수평으로만 움직인다
     }
     s.dx = dx;
     // 손가락 속도는 마지막 구간으로 잰다 — 전체 평균으로 재면 천천히 끌다 튕겨도 느리게 판정된다
@@ -1867,6 +1897,7 @@ export default function PortraitStudio() {
     const vLast = s.v || 0;
     const v = Math.abs(vLast) > 0.05 ? Math.abs(vLast) : Math.abs(dx) / Math.max(1, Date.now() - s.t0);
     swipeRef.current = null;
+    unlockScroll();
 
     if (s.mode === "back") {
       // 충분히 끌었거나(32%) 짧아도 빠르게 튕겼으면(60px + 속도) 뒤로
