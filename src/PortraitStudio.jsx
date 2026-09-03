@@ -3,7 +3,6 @@ import * as nav from "./navTransition";
 import { supabase } from "./supabaseClient";
 import { isNative, platform, nativePickPhoto, nativePickPhotos, nativeShare, nativeSaveToAlbum } from "./nativeBridge";
 import { initAds, showInterstitial } from "./ads";
-import { StatusBar } from "@capacitor/status-bar";
 import { initIap, loginIap, logoutIap, getIapPacks, purchaseIap, restoreIap, iapAvailable, isSubscription, getIapDiag } from "./iap";
 import { FOURCUT_COUNTS, FOURCUT_STYLES, fourcutStyle } from "./fourcut";
 import { getSavedSet, markSaved, syncExpiryNotifications, cancelExpiryNotice, syncConceptDropNotifications, cancelGenDoneNotice, notifyGenDoneNow, getNotifyPermState } from "./notify";
@@ -1009,20 +1008,20 @@ export default function PortraitStudio() {
   }, []);
 
   // iOS 기본 동작: 상태바를 탭하면 맨 위로 스크롤 (오너 지적). 문서가 아니라 <main> 이
-  // 스크롤 컨테이너라 WKWebView 의 자동 scrollsToTop 이 안 먹는다 → 플러그인 statusTap 으로 직접.
+  // 스크롤 컨테이너라 WKWebView 의 자동 scrollsToTop 이 안 먹는다.
+  // ⚠️ Capacitor 는 이 이벤트를 StatusBar 플러그인 리스너가 아니라 **window** 에 쏜다
+  //    (status-bar 플러그인 네이티브 코드: triggerJSEvent("statusTap", target: "window")).
+  //    build 81 은 StatusBar.addListener 에 걸어서 한 번도 안 울렸다. 플러그인 패키지는 그 네이티브
+  //    포워딩 때문에 여전히 필요하다.
+  //    웹에서는 이 이벤트가 안 오므로 게이트 없이 항상 걸어둔다(프로브가 dispatch 로 검증 가능).
   useEffect(() => {
-    if (!isNative()) return;
-    let h;
-    (async () => {
-      try {
-        h = await StatusBar.addListener("statusTap", () => {
-          const el = mainRef.current;
-          if (!el) return;
-          try { el.scrollTo({ top: 0, behavior: "smooth" }); } catch (_) { el.scrollTop = 0; }
-        });
-      } catch (_) { /* 웹/미지원 플랫폼 */ }
-    })();
-    return () => { try { h?.remove(); } catch (_) {} };
+    const onTap = () => {
+      const el = mainRef.current;
+      if (!el) return;
+      try { el.scrollTo({ top: 0, behavior: "smooth" }); } catch (_) { el.scrollTop = 0; }
+    };
+    window.addEventListener("statusTap", onTap);
+    return () => window.removeEventListener("statusTap", onTap);
   }, []);
 
   // 네이티브 앱: OAuth 시스템 브라우저 → 딥링크(com.rimikimi.app://login-callback) 복귀 처리
@@ -1848,7 +1847,7 @@ export default function PortraitStudio() {
       }
       const px = dx <= 0 ? 0 : dx;
       if (popRef.current) popRef.current.move(px);
-      else swipeRef.current = null; // 스냅샷이 없으면 제스처를 시작하지 않는다 — 이전 화면 없이 현재 화면만 밀리는 건 iOS 에 없는 동작
+      else swipeRef.current = null; // beginPop 이 null = 모션 줄이기 설정. (스냅샷이 없어도 배경만 깔고 진행한다)
     } else if (s.mode === "tab") {
       // 탭 전환 — 이동할 이웃 탭이 있는 방향만 따라오고, 없으면 고무줄
       const hasNext = tabNeighbor(1), hasPrev = tabNeighbor(-1);
@@ -5145,6 +5144,10 @@ const S = {
     overflowY: "auto", overflowX: "hidden",
     WebkitOverflowScrolling: "touch",
     overscrollBehavior: "contain",     // 내부 스크롤 끝에서 문서로 바운스 전파 차단
+    // 가로 터치는 우리 제스처(뒤로가기·컨셉 넘기기) 몫이라고 WebKit 에 미리 알린다.
+    // 없으면 WebKit 이 "스크롤인가?" 판정하느라 첫 이동을 붙잡고 있다가 넘겨서 손가락보다 늦게 따라온다.
+    // 가로 스크롤 줄([data-hscroll])은 자기 자신이 스크롤 컨테이너라 이 값의 영향을 안 받는다.
+    touchAction: "pan-y",
     // top 패딩 0 = sticky 카테고리바가 헤더 바로 아래에 딱 붙음(패딩 있으면 WebKit이 그 만큼
     // 아래에서 sticky 고정 → 헤더와 바 사이로 갤러리가 비쳐 보이는 틈 발생). 위 여백은 .fade 가 담당.
     // 하단 플로팅 탭바(고정)에 마지막 내용이 가리지 않도록 여백 확보

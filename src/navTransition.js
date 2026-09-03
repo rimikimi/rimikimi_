@@ -122,14 +122,17 @@ function mountGhost(appEl, mainEl, snap, z) {
     `width:${b.width}px;height:${b.height}px;overflow:hidden;` +
     `pointer-events:none;z-index:${z};will-change:transform;`;
   paintBg(g, appEl, b);
-  const inner = snap.node.cloneNode(true);
-  g.appendChild(inner);
+  // snap 이 없으면(앱 재시작·로그인 복귀 뒤처럼 이전 화면을 찍어둔 적이 없을 때) 배경만 깐다.
+  // 내용 없는 배경 위로 현재 화면이 빠지는 것도 iOS pop 과 같은 구조라, 제스처를 아예
+  // 안 받는 것보다 훨씬 자연스럽다.
+  const inner = snap ? snap.node.cloneNode(true) : null;
+  if (inner) g.appendChild(inner);
   const dim = document.createElement("div");
   dim.style.cssText =
     "position:absolute;left:0;top:0;width:100%;height:100%;background:#231f20;opacity:0;";
   g.appendChild(dim);
   appEl.appendChild(g);
-  inner.scrollTop = snap.scrollTop; // overflow:hidden 도 프로그램 스크롤은 먹는다
+  if (inner) inner.scrollTop = snap.scrollTop; // overflow:hidden 도 프로그램 스크롤은 먹는다
   layers.push(g);
   return { el: g, dim, width: b.width };
 }
@@ -239,11 +242,10 @@ export function run(appEl, mainEl) {
 
 // ── 왼쪽 엣지 스와이프 = 인터랙티브 pop ─────────────────────────────────────
 // 돌아갈 화면의 캐시 스냅샷을 뒤에 깔고, 손가락을 따라 두 겹이 같이 움직인다.
-// 스냅샷이 없으면 null 을 돌려주고 호출부가 예전 방식으로 폴백한다.
+// 스냅샷이 없어도 배경만 깔고 진행한다(예전엔 null 을 돌려줘서 제스처가 죽었다 — "슬라이드 안 됨").
 export function beginPop(appEl, mainEl, targetScreen) {
   if (!appEl || !mainEl || prefersReduced()) return null;
-  const snap = snaps.get(targetScreen);
-  if (!snap) return null;
+  const snap = snaps.get(targetScreen) || null;
 
   killLayers();
   clearTimeout(endTimer);
