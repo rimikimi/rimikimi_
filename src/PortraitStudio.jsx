@@ -3,6 +3,7 @@ import * as nav from "./navTransition";
 import { supabase } from "./supabaseClient";
 import { isNative, platform, nativePickPhoto, nativePickPhotos, nativeShare, nativeSaveToAlbum } from "./nativeBridge";
 import { initAds, showInterstitial } from "./ads";
+import { StatusBar } from "@capacitor/status-bar";
 import { initIap, loginIap, logoutIap, getIapPacks, purchaseIap, restoreIap, iapAvailable, isSubscription, getIapDiag } from "./iap";
 import { FOURCUT_COUNTS, FOURCUT_STYLES, fourcutStyle } from "./fourcut";
 import { getSavedSet, markSaved, syncExpiryNotifications, cancelExpiryNotice, syncConceptDropNotifications, cancelGenDoneNotice, notifyGenDoneNow, getNotifyPermState } from "./notify";
@@ -1007,6 +1008,23 @@ export default function PortraitStudio() {
     };
   }, []);
 
+  // iOS 기본 동작: 상태바를 탭하면 맨 위로 스크롤 (오너 지적). 문서가 아니라 <main> 이
+  // 스크롤 컨테이너라 WKWebView 의 자동 scrollsToTop 이 안 먹는다 → 플러그인 statusTap 으로 직접.
+  useEffect(() => {
+    if (!isNative()) return;
+    let h;
+    (async () => {
+      try {
+        h = await StatusBar.addListener("statusTap", () => {
+          const el = mainRef.current;
+          if (!el) return;
+          try { el.scrollTo({ top: 0, behavior: "smooth" }); } catch (_) { el.scrollTop = 0; }
+        });
+      } catch (_) { /* 웹/미지원 플랫폼 */ }
+    })();
+    return () => { try { h?.remove(); } catch (_) {} };
+  }, []);
+
   // 네이티브 앱: OAuth 시스템 브라우저 → 딥링크(com.rimikimi.app://login-callback) 복귀 처리
   useEffect(() => {
     if (!isNative()) return;
@@ -1761,11 +1779,10 @@ export default function PortraitStudio() {
     if (!el) return;
     // 손을 뗀 뒤 제자리 복귀는 "시스템 응답" — 진입(300ms)보다 짧게 snap 한다(180ms).
     // 300ms 면 손에서 떨어진 뒤에도 화면이 끌려가는 느낌이 났다(모션 리뷰).
-    el.style.transition = animate
-      ? "transform var(--d-swap) var(--ease-out), opacity var(--d-swap) var(--ease-out)"
-      : "";
+    // iOS 는 끌리는 화면을 투명하게 만들지 않는다 — 위치만 1:1 로 따라온다. 예전 opacity 감쇠 제거(오너 지적).
+    el.style.transition = animate ? "transform var(--d-swap) var(--ease-out)" : "";
     el.style.transform = px ? `translateX(${px}px)` : "";
-    el.style.opacity = px ? String(Math.max(0.35, 1 - Math.abs(px) / 520)) : "";
+    el.style.opacity = "";
   }
   // 진행 중인 인터랙티브 pop 컨트롤러 (navTransition.beginPop 반환값)
   const popRef = useRef(null);
@@ -1794,9 +1811,11 @@ export default function PortraitStudio() {
     // 엣지 = 뒤로(스택이 있을 때), 본문 = 컨셉 넘기기(confirm) 또는 탭 전환(탭 화면).
     // 갤러리는 최상위라 엣지에서 시작해도 탭 전환으로 취급한다.
     const isTabScreen = TAB_ORDER.includes(screen);
+    // iOS 탭바 화면은 가로로 밀어서 탭을 바꾸지 않는다(UITabBarController 에 그런 제스처가 없다).
+    // 예전 "tab" 모드(본문을 끌면 화면이 밀리며 탭 전환)는 안드로이드/웹 느낌이라 제거 — 오너 지적.
     const mode = x >= 0 && x <= edge
-      ? (canSwipeBack() ? "back" : isTabScreen ? "tab" : null)
-      : (screen === "confirm" ? "concept" : isTabScreen ? "tab" : null);
+      ? (canSwipeBack() ? "back" : null)
+      : (screen === "confirm" ? "concept" : null);
     if (!mode) return;
     swipeRef.current = { mode, x0: tt.clientX, y0: tt.clientY, t0: Date.now(), w: rect.width, axis: null };
   }
@@ -1829,7 +1848,7 @@ export default function PortraitStudio() {
       }
       const px = dx <= 0 ? 0 : dx;
       if (popRef.current) popRef.current.move(px);
-      else paintDrag(Math.min(px, s.w * 0.9), false); // 스냅샷이 없으면 예전 방식
+      else swipeRef.current = null; // 스냅샷이 없으면 제스처를 시작하지 않는다 — 이전 화면 없이 현재 화면만 밀리는 건 iOS 에 없는 동작
     } else if (s.mode === "tab") {
       // 탭 전환 — 이동할 이웃 탭이 있는 방향만 따라오고, 없으면 고무줄
       const hasNext = tabNeighbor(1), hasPrev = tabNeighbor(-1);

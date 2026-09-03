@@ -26,6 +26,7 @@
     "@capacitor/ios": "^8.5.0",
     "@capacitor/local-notifications": "^8.2.0",
     "@capacitor/share": "^8.0.1",
+    "@capacitor/status-bar": "^8.0.3",
     "@revenuecat/purchases-capacitor": "^13.2.0",
     "@supabase/supabase-js": "^2.106.2",
     "firebase": "^12.17.1",
