@@ -4,7 +4,7 @@ import { supabase } from "./supabaseClient";
 import { isNative, platform, nativePickPhoto, nativePickPhotos, nativeShare, nativeSaveToAlbum } from "./nativeBridge";
 import { initAds, showInterstitial } from "./ads";
 import { initIap, loginIap, logoutIap, getIapPacks, purchaseIap, restoreIap, iapAvailable, isSubscription, getIapDiag } from "./iap";
-import { FOURCUT_COUNTS, FOURCUT_STYLES, fourcutStyle } from "./fourcut";
+import { FOURCUT_COUNTS, FOURCUT_STYLES, resolveFourcutStyles } from "./fourcut";
 import { getSavedSet, markSaved, syncExpiryNotifications, cancelExpiryNotice, syncConceptDropNotifications, cancelGenDoneNotice, notifyGenDoneNow, getNotifyPermState } from "./notify";
 import { initPush, attachPushHandlers, getPushToken } from "./push";
 import { t, useLang, getLang, localizedTitle, localizedCategory, getLangPreference, setLang } from "./i18n";
@@ -843,6 +843,11 @@ export default function PortraitStudio() {
   const [blocked, setBlocked] = useState(false);
   const [concepts, setConcepts] = useState([]);
   const [conceptsLoading, setConceptsLoading] = useState(true);
+  // 인생네컷 스타일 칩 — 서버 concepts.json(인생네컷 컨셉의 fourcutStyles)이 우선, 없으면 번들 목록
+  const fourcutStyles = useMemo(
+    () => resolveFourcutStyles(concepts.find((c) => c.mode === "fourcut")?.fourcutStyles),
+    [concepts]
+  );
   const [credits, setCredits] = useState(0);
   const [referralCount, setReferralCount] = useState(0);
   // 내 초대 코드(6자). 서버(quota)가 발급해 내려준다. 못 받으면 uuid 링크로 폴백한다.
@@ -1566,7 +1571,7 @@ export default function PortraitStudio() {
     setNavDir("fwd");
     setSelected(p);
     // 인생네컷 프리셋 카드(스타일이 지정된 컨셉)면 그 스타일을 미리 선택해 준다
-    if (p.fourcutStyle && FOURCUT_STYLES.some((s) => s.key === p.fourcutStyle)) {
+    if (p.fourcutStyle && fourcutStyles.some((s) => s.key === p.fourcutStyle)) {
       setFourcutStyleKey(p.fourcutStyle);
     }
     // 아트 변환 컨셉이면 이전 일회용 사진 비우고 들어감 (매번 새로 받음)
@@ -1600,7 +1605,7 @@ export default function PortraitStudio() {
     }
     if (!next || next.id === selected.id) return false;
 
-    if (next.fourcutStyle && FOURCUT_STYLES.some((s) => s.key === next.fourcutStyle)) {
+    if (next.fourcutStyle && fourcutStyles.some((s) => s.key === next.fourcutStyle)) {
       setFourcutStyleKey(next.fourcutStyle);
     }
 
@@ -2516,6 +2521,7 @@ export default function PortraitStudio() {
             fourcut={isFourcut(selected)}
             fourcutCount={fourcutCount} setFourcutCount={setFourcutCount}
             fourcutStyleKey={fourcutStyleKey} setFourcutStyleKey={setFourcutStyleKey}
+            fourcutStyles={fourcutStyles}
             onBack={() => popTo("home")}
             onGenerate={startGenerate}
             onStore={PAYMENTS_ENABLED ? openStore : () => { setPayToast("오늘 무료 횟수를 다 썼어요. 친구 초대로 크레딧을 받아보세요 🙂"); setTimeout(() => setPayToast(""), 3500); }}
@@ -3913,7 +3919,7 @@ function MyGalleryScreen({ accessToken, onBack, onShared, onLoginRequest }) {
 function ConfirmScreen({
   photo, prompt, freeLeft, credits, canGenerate, art,
   idPhoto, idSuit, setIdSuit, idBg, setIdBg,
-  fourcut, fourcutCount, setFourcutCount, fourcutStyleKey, setFourcutStyleKey,
+  fourcut, fourcutCount, setFourcutCount, fourcutStyleKey, setFourcutStyleKey, fourcutStyles = FOURCUT_STYLES,
   dressroom = false, dressStyleKey = "mirror", setDressStyleKey, garmentCount = 0,
   onBack, onGenerate, onStore, partnerPhoto = null, canSwitch = false,
   batchCount = 1, setBatchCount, unlimited = false,
@@ -4050,7 +4056,7 @@ function ConfirmScreen({
 
           <div style={{ ...S.idOptLabel, marginTop: 14 }}>스타일</div>
           <div style={S.idSuitRow}>
-            {FOURCUT_STYLES.map((s) => (
+            {fourcutStyles.map((s) => (
               <button
                 key={s.key}
                 onClick={() => setFourcutStyleKey(s.key)}

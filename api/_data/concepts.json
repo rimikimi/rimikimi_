@@ -7358,7 +7358,94 @@
    "📸 인생네컷"
   ],
   "mode": "fourcut",
-  "text": ""
+  "text": "",
+  "fourcutStyles": [
+   {
+    "key": "cute",
+    "label": "큐티",
+    "emoji": "🎀"
+   },
+   {
+    "key": "luxury",
+    "label": "럭셔리",
+    "emoji": "🖤"
+   },
+   {
+    "key": "funky",
+    "label": "펑키",
+    "emoji": "⚡"
+   },
+   {
+    "key": "playful",
+    "label": "플레이풀",
+    "emoji": "🎉"
+   },
+   {
+    "key": "birthday",
+    "label": "버스데이",
+    "emoji": "🎂"
+   },
+   {
+    "key": "film",
+    "label": "필름",
+    "emoji": "🎞"
+   },
+   {
+    "key": "summer",
+    "label": "썸머",
+    "emoji": "🌊"
+   },
+   {
+    "key": "mono",
+    "label": "모노",
+    "emoji": "◻️"
+   },
+   {
+    "key": "school",
+    "label": "교복",
+    "emoji": "🎒"
+   },
+   {
+    "key": "couple",
+    "label": "커플",
+    "emoji": "💑"
+   },
+   {
+    "key": "wedding",
+    "label": "웨딩",
+    "emoji": "💍"
+   },
+   {
+    "key": "party",
+    "label": "파티",
+    "emoji": "🥂"
+   },
+   {
+    "key": "beach",
+    "label": "여름",
+    "emoji": "🏖"
+   },
+   {
+    "key": "vintage",
+    "label": "빈티지",
+    "emoji": "📻"
+   },
+   {
+    "key": "christmas",
+    "label": "크리스마스",
+    "emoji": "🎄"
+   },
+   {
+    "key": "newtro",
+    "label": "뉴트로",
+    "emoji": "🕹"
+   },
+   {
+    "key": "editorial",
+    "label": "화보",
+    "emoji": "📷"
+   }
+  ]
  },
  {
   "id": 330,

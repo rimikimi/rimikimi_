@@ -34,6 +34,18 @@ export function fourcutStyle(key) {
   return FOURCUT_STYLES.find((s) => s.key === key) || FOURCUT_STYLES[0];
 }
 
+// 스타일 목록은 서버(concepts.json 의 인생네컷 컨셉 `fourcutStyles`)가 우선이다 — 컨셉과 같은 방식.
+// 스타일을 더하거나 이름을 바꿀 때 앱 빌드가 필요 없도록(오너 지적 2026-09-09). 서버 목록이 없거나
+// 깨졌으면 위 번들 목록으로 폴백. 서버 항목은 key/label/emoji 만 있으면 되고, 프레임 색 등은
+// (스트립 한 장 생성 방식이라 쓰이지 않지만) 번들 항목이 있으면 거기서 채운다.
+export function resolveFourcutStyles(remote) {
+  if (!Array.isArray(remote)) return FOURCUT_STYLES;
+  const list = remote
+    .filter((s) => s && typeof s.key === "string" && s.key && typeof s.label === "string" && s.label)
+    .map((s) => ({ ...(FOURCUT_STYLES.find((b) => b.key === s.key) || FOURCUT_STYLES[0]), ...s }));
+  return list.length ? list : FOURCUT_STYLES;
+}
+
 function gridFor(n) {
   return ({ 2: [1, 2], 3: [1, 3], 4: [2, 2], 6: [2, 3], 8: [2, 4] })[n] || [2, 2];
 }
