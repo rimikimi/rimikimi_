@@ -26,6 +26,8 @@ export const FOURCUT_STYLES = [
   { key: "vintage",   label: "빈티지",     emoji: "📻", bg: "#f0e2cc", cell: "#fffaf0", accent: "#b07d3a", text: "#8a5f27", stickers: ["✶", "◍", "❖", "✧"] },
   { key: "christmas", label: "크리스마스", emoji: "🎄", bg: "#f6e2e2", cell: "#ffffff", accent: "#c0392b", text: "#1f6b3a", stickers: ["🎄", "❄", "🎁", "★"] },
   { key: "newtro",    label: "뉴트로",     emoji: "🕹", bg: "#fff0d6", cell: "#ffffff", accent: "#ff5a3c", text: "#1f4fd8", stickers: ["★", "▲", "●", "■"] },
+  // 화보(2026-09-09 오너 프롬프트): 흰 배경 + 직광 플래시 + 필름 컨택트시트. 서버 api/_lib/fourcutEditorial.js 전용 프롬프트.
+  { key: "editorial", label: "화보",       emoji: "📷", bg: "#0a0a0a", cell: "#ffffff", accent: "#f2a21a", text: "#f2a21a", stickers: ["", "", "", ""] },
 ];
 
 export function fourcutStyle(key) {

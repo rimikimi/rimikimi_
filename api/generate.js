@@ -13,6 +13,7 @@ import { precheckHasFace } from "./_lib/precheck.js";
 import { getCreditInfo, consumeCredit, consumeCredits, refundCredits, getProSampleUsed, markProSampleUsed } from "./_lib/credits.js";
 import { saveToGallery } from "./_lib/gallery.js";
 import { buildDressroom } from "./_lib/dressroom.js";
+import { buildEditorialStrip } from "./_lib/fourcutEditorial.js";
 
 // Vertex 의 나노바나나 프로는 2K 요청이 ~42s 걸리고, 묶음 생성(3/6/12장)은 그보다
 // 훨씬 오래 걸린다. 팀 플랜이 Pro 라 300s 까지 쓸 수 있다(picbox·claire 와 동일).
@@ -692,6 +693,10 @@ export default async function handler(req, res) {
                  acc: "a soft red santa-hat headband", extra: "wearing a cozy knit sweater in holiday colors" },
     newtro:    { mood: "bold NEWTRO 90s Korean photo-booth aesthetic, saturated primaries: red #E63946, blue #1D4ED8 and yellow #FACC15, with grainy flash, playful retro-modern vibe",
                  acc: "colorful retro hair clips", extra: "wearing bold 90s-style streetwear with color-blocking" },
+    // 화보(오너 프롬프트 2026-09-09): 스트립은 api/_lib/fourcutEditorial.js 의 전용 프롬프트를 통째로 쓴다.
+    // mood/acc/extra 는 구버전 앱(컷별 생성) 호환용.
+    editorial: { mood: "raw direct-flash fashion editorial aesthetic on a pure white #FFFFFF seamless backdrop, hard on-camera flash, crushed blacks #0A0A0A, Kodak Portra 400 film grain, 90s magazine test-shoot vibe",
+                 acc: "a single thin silver #C0C0C0 ring and nothing else", extra: "wearing a fitted black #0A0A0A sleeveless camisole tank top with thin spaghetti straps, deep crimson matte red #7A1B2E lipstick, loose undone waves" },
   };
   // 컷별 포즈 — 과장된 연출(V사인·윙크·놀란표정)은 뺐다. 실제로 연속 촬영한 것처럼
   // 표정·시선·각도만 미묘하게 다른 자연스러운 프레임들.
@@ -718,8 +723,9 @@ export default async function handler(req, res) {
                        4: "2 columns x 2 rows", 6: "2 columns x 3 rows" };
   const STRIP_RATIO = { 2: "3:4", 3: "9:16", 4: "3:4", 6: "3:4" };
   const stripN = STRIP_GRID[Number(cutCount)] ? Number(cutCount) : 4;
-  const stripInstruction =
-    `Create a Korean photo-booth (인생네컷) PHOTO STRIP as ONE single image, using the person in the provided photo.\n\n` +
+  const stripInstruction = fourcutStyle === "editorial"
+    ? buildEditorialStrip(stripN, STRIP_GRID[stripN])
+    : `Create a Korean photo-booth (인생네컷) PHOTO STRIP as ONE single image, using the person in the provided photo.\n\n` +
     `LAYOUT: exactly ${stripN} photo cells arranged in ${STRIP_GRID[stripN]} on one clean strip. ` +
     `Even gutters between cells, a wider margin at the bottom. Each cell has slightly rounded corners. ` +
     `All ${stripN} cells fully inside the frame, none cropped.\n\n` +
