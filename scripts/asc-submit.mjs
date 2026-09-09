@@ -1,25 +1,26 @@
 import { createSign } from "node:crypto";
 import { readFileSync } from "node:fs";
 const KEY_ID="3KXPZAL47V", ISSUER="257d4dcf-3cfc-482b-8df3-b038f7c50485", APP="6782776518";
-const VERSION="1.39", BUILD="78";
+const VERSION="1.40", BUILD="84";
 const DRY = process.argv.includes("--dry");
 
 // 2026-08-28: 4.3(a) 반려 후 오너 지시 — 필터 위주 노트 제거, 컨셉/드레스룸 중심 (asc-meta-rimikimi.mjs 와 동일 문안)
+// 2026-09-09: 1.40 (build 84) — 드레스룸 일상컷·인생네컷 화보·iOS 조작감 중심 (필터 언급 없음)
 const NOTES = {
-  ko: `새 기능 드레스룸 — 이 옷, 나한테 어울릴까? 상의·하의·아우터·신발·가방 사진을 최대 5장 올리면 그 코디를 입은 내 모습을 미리 볼 수 있어요. 쇼핑몰 캡처도 OK, 거울셀카·모델컷 선택.
+  ko: `드레스룸 일상컷이 똑똑해졌어요 — 올린 옷을 분석해서 그 옷에 어울리는 장소에서 전신으로 찍어 드려요. 여러 장 만들면 장마다 배경이 달라요. 의상 사진은 이제 한 번에 5장까지 골라요.
 
+• 인생네컷에 새 스타일 "화보" — 흰 배경에 플래시로 찍은 화보 컨택트시트
 • 새 컨셉 추가 — 매일 저녁 8시 새 컨셉 4종이 도착해요
-• 새 컨셉 알림이 제시간에 오도록 수정
-• 매직 부스에 즉석 사진 컨셉 추가
-• 클로즈업 컨셉의 얼굴 각도가 더 자연스러워졌어요
-• 갤러리 저장 오류 등 버그 수정, 편집 도구 개선`,
-  "en-US": `New: Dressing Room — will this look good on me? Upload photos of a top, bottoms, outerwear, shoes or a bag (up to 5) and preview the whole outfit on you. Store screenshots work too. Mirror selfie or model shot.
+• 화면 상단을 탭하면 맨 위로, 뒤로가기 스와이프가 더 자연스러워졌어요
+• 알림을 확인하면 앱 아이콘 배지가 바로 사라져요
+• 편집 화면 안정성 개선 및 버그 수정`,
+  "en-US": `Dressing Room "Everyday cut" got smarter — we analyze the outfit you upload and shoot you full-length in a place that suits it. Make several and each one gets a different setting. Pick up to 5 garment photos at once.
 
+• New "Editorial" style in Life Cut — a white-backdrop flash contact sheet
 • New concepts — 4 arrive every evening
-• Concept-drop notifications now arrive on time
-• Instant-photo concept added to Magic Booth
-• More natural head angles in close-up concepts
-• Gallery save fix and other bug fixes, editing tool improvements`,
+• Tap the status bar to scroll to top; smoother back-swipe
+• App icon badge clears as soon as you check a notification
+• Editor stability improvements and bug fixes`,
 };
 
 const key=readFileSync("/Users/home/.appstoreconnect/private_keys/AuthKey_3KXPZAL47V.p8","utf8");
