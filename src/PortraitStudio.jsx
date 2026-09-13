@@ -9,7 +9,7 @@ import { getSavedSet, markSaved, syncExpiryNotifications, cancelExpiryNotice, sy
 import { initPush, attachPushHandlers, getPushToken } from "./push";
 import { t, useLang, getLang, localizedTitle, localizedCategory, getLangPreference, setLang } from "./i18n";
 import PhotoEditor from "./PhotoEditor";
-import { FILM_PRESETS } from "./filters";
+import { FILM_PRESETS, groupedPresets } from "./filters";
 import LoginGate from "./LoginGate";
 import Guide, { guideSeen, markGuideSeen } from "./Guide";
 // ⚠️ 정적 import — 네이티브 WebView 에서 동적 import() 가 영원히 pending 되는
@@ -1337,7 +1337,9 @@ export default function PortraitStudio() {
     // 필터 스튜디오 — 서버 컨셉이 아니라 앱 내장 기능이라 여기서 합성한다.
     // 구버전 앱엔 이 코드가 없으니 자동으로 안 보인다(원격 컨셉으로 넣으면 구버전이
     // 생성 시도를 하게 돼서 안 된다).
-    counts.set(t("filter.cat"), 1);
+    // 칩 숫자는 "필터 개수" — 예전엔 카드가 하나뿐이라 1 이었는데, 이제 프리셋을 전부
+    // 그룹별로 펼쳐 보여주므로 실제 개수를 쓴다(원본 제외).
+    counts.set(t("filter.cat"), FILM_PRESETS.filter((p) => p.key !== "none").length);
     const all = t("step1.all");
     return Array.from(counts.entries())
       .map(([name, count]) => ({ name, count }))
@@ -2960,6 +2962,10 @@ function GalleryScreen({
   const [cols, setCols] = useState(2);
   const hasFilter =
     query.trim() !== "" || activeCat !== "전체";
+  // 필터 스튜디오 화면은 컨셉 그리드가 아니라 그룹별 가로 줄이다 — 열 전환 버튼과
+  // "N개의 컨셉" 표시가 여기서는 의미가 없어서 각각 감추고/바꿔 준다.
+  const isFilterCat = activeCat === t("filter.cat");
+  const filterCount = FILM_PRESETS.filter((p) => p.key !== "none").length;
 
   // G 레이아웃: 추천 + 카테고리별 카로셀
   // 필터 없을 때(=첫 진입) 보여줌. 필터 켜지면 기존 그리드로 폴백.
@@ -3067,20 +3073,24 @@ function GalleryScreen({
               {localizedCategory(c.name)} <span style={S.catChipCount}>{c.count}</span>
             </button>
           ))}
-          <button
-            style={{ ...S.catChip, flexShrink: 0, marginLeft: 4 }}
-            onClick={() => setCols((c) => (c === 2 ? 4 : 2))}
-            aria-label={cols === 2 ? "4열로 보기" : "2열로 보기"}
-            title={cols === 2 ? "4열로 보기" : "2열로 보기"}
-          >
-            <GridIcon cells={cols === 2 ? 4 : 2} />
-          </button>
+          {!isFilterCat && (
+            <button
+              style={{ ...S.catChip, flexShrink: 0, marginLeft: 4 }}
+              onClick={() => setCols((c) => (c === 2 ? 4 : 2))}
+              aria-label={cols === 2 ? "4열로 보기" : "2열로 보기"}
+              title={cols === 2 ? "4열로 보기" : "2열로 보기"}
+            >
+              <GridIcon cells={cols === 2 ? 4 : 2} />
+            </button>
+          )}
         </div>
       </div>
 
       <div style={S.filterMetaRow}>
         <span style={S.resultCount}>
-          {hasFilter
+          {isFilterCat
+            ? t("step1.resultCount", { n: filterCount })
+            : hasFilter
             ? t("step1.resultCount", { n: totalFiltered })
             : t("step1.totalCount", { n: poolTotal })}
         </span>
@@ -3094,40 +3104,42 @@ function GalleryScreen({
           onBrooklyn={onBrooklyn}
         />
       ) : activeCat === t("filter.cat") ? (
-        // 필터 스튜디오 — 매직부스처럼 프리셋별 전/후 썸네일 카드 그리드 (오너 지시).
+        // 필터 스튜디오 — 프리셋별 전/후 썸네일. 27개를 한 그리드에 쭉 펼치면 "다 펼쳐진"
+        // 느낌이라(오너 지적) 갤러리 홈과 같은 방식으로 **그룹(필름/카메라/재미)별 가로 줄**로 묶는다.
         // 카드를 고르면 그 프리셋이 걸린 채로 사진 선택 → 에디터. 썸네일은 서버
         // 원격 로드(fs_*.webp)라 톤을 고쳐도 앱 빌드가 필요 없다.
         <>
           <div style={S.filterNotice}>{t("filter.gridNotice")}</div>
-          <div
-            style={{
-              ...S.grid,
-              gridTemplateColumns: "repeat(" + cols + ", 1fr)",
-              gap: cols === 2 ? 13 : 8,
-            }}
-          >
-            {FILM_PRESETS.filter((p) => p.key !== "none").map((p, i) => (
-              <button
-                key={p.key}
-                className="cardIn"
-                style={{ ...S.card, animationDelay: (i < 8 ? i * 0.018 : 0) + "s" }}
-                onClick={() => { hap.tap(); onFilterStudio && onFilterStudio(p.key); }}
-              >
-                <div style={S.thumb}>
-                  <img
-                    src={`${ASSET_BASE}/thumbs/fs_${p.key}.webp`}
-                    alt={getLang() === "ko" ? p.ko : p.en}
-                    style={S.thumbImg}
-                    loading="lazy"
-                  />
+          {groupedPresets().map((g) => (
+            <div key={g.key} style={S.homeSection}>
+              <div style={S.homeRowHead}>
+                <div style={S.homeRowTitle}>
+                  {g.emoji} {t(g.labelKey)}
+                  <span style={S.homeRowCount}>{g.items.length}</span>
                 </div>
-                <div style={{ ...S.cardTitle, fontSize: cols === 2 ? 12.5 : 10.5 }}>
-                  {(getLang() === "ko" ? p.ko : p.en) +
-                    " · " + (p.group === "camera" ? t("filter.gCam") : t("filter.gFilm"))}
-                </div>
-              </button>
-            ))}
-          </div>
+              </div>
+              <div style={S.homeRail} data-hscroll>
+                {g.items.map((p) => (
+                  <button
+                    key={p.key}
+                    style={S.fsRailCard}
+                    onClick={() => { hap.tap(); onFilterStudio && onFilterStudio(p.key); }}
+                    aria-label={getLang() === "ko" ? p.ko : p.en}
+                  >
+                    <div style={S.fsRailThumb}>
+                      <img
+                        src={`${ASSET_BASE}/thumbs/fs_${p.key}.webp`}
+                        alt={getLang() === "ko" ? p.ko : p.en}
+                        style={S.railImg}
+                        loading="lazy"
+                      />
+                    </div>
+                    <div style={S.fsRailName}>{getLang() === "ko" ? p.ko : p.en}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
         </>
       ) : prompts.length === 0 ? (
         <div style={S.emptyState}>
@@ -5486,12 +5498,17 @@ const S = {
     scrollSnapType: "x mandatory",
     paddingBottom: 8,
     margin: "0 -20px", paddingLeft: 20, paddingRight: 20,
+    // ⚠️ scroll-padding 이 없으면 스냅이 "첫 카드를 스크롤포트 왼쪽 끝"에 맞추려고
+    //    paddingLeft(20) 만큼 저절로 스크롤돼서, 첫 카드가 화면 왼쪽에 딱 붙어 잘린 것처럼 보인다.
+    scrollPaddingLeft: 20, scrollPaddingRight: 20,
   },
   homeRailFeatured: {
     display: "flex", gap: 12, overflowX: "auto",
     scrollSnapType: "x mandatory",
     paddingBottom: 8,
     margin: "0 -20px", paddingLeft: 20, paddingRight: 20,
+
+    scrollPaddingLeft: 20, scrollPaddingRight: 20,
   },
   railCard: {
     // featuredCard 와 같은 이유 — 고정 110px 이면 기기 폭에 따라 2.91~3.46 장으로
@@ -5505,6 +5522,22 @@ const S = {
   },
   railImg: {
     width: "100%", height: "100%", objectFit: "cover", display: "block",
+  },
+
+  // 필터 스튜디오 가로 줄 카드 — railCard 와 같은 폭(3.4장)이지만 이름 줄이 아래 붙는다.
+  // (필터는 썸네일만 보면 뭐가 뭔지 모른다 — 이름이 있어야 고를 수 있다)
+  fsRailCard: {
+    flexShrink: 0, width: "calc((100% - 24px) / 3.4)",
+    background: "transparent", border: "none", padding: 0, cursor: "pointer",
+    display: "flex", flexDirection: "column", gap: 6, scrollSnapAlign: "start",
+  },
+  fsRailThumb: {
+    width: "100%", aspectRatio: "3/4", borderRadius: 14, overflow: "hidden",
+    background: "#f0ece4", boxShadow: "0 8px 20px -12px rgba(35,31,32,0.18)",
+  },
+  fsRailName: {
+    fontSize: 11.5, fontWeight: 700, color: INK, textAlign: "center",
+    whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
   },
   featuredCard: {
     // ⚠️ 예전엔 width:200 고정이었다. 컨텐츠 폭이 ~390 이라 두 장(200+12+200=412)이

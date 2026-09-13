@@ -116,6 +116,25 @@ export const FILM_PRESETS = [
     special: "sketch" },
 ];
 
+// 필터 목록은 그룹별로 묶어서 보여준다 — 27개를 한 줄로 쭉 펼치면 "다 펼쳐진" 느낌이라
+// 갤러리 홈처럼 그룹 제목 + 가로 줄로 접는다(오너 지시 2026-09-13).
+// 순서 = 화면에 뜨는 순서. 여기 없는 group 은 "재미" 뒤에 자동으로 붙는다.
+export const FILTER_GROUPS = [
+  { key: "film",   labelKey: "filter.gFilm", emoji: "🎞️" },
+  { key: "camera", labelKey: "filter.gCam",  emoji: "📷" },
+  { key: "fun",    labelKey: "filter.gFun",  emoji: "✨" },
+];
+
+// [{ key, emoji, labelKey, items }] — 원본(none) 제외, FILM_PRESETS 순서 유지.
+export function groupedPresets() {
+  const rest = FILM_PRESETS.filter((p) => p.key !== "none");
+  const known = new Set(FILTER_GROUPS.map((g) => g.key));
+  const groups = FILTER_GROUPS.map((g) => ({ ...g, items: rest.filter((p) => p.group === g.key) }));
+  const orphans = rest.filter((p) => !known.has(p.group));
+  if (orphans.length) groups.push({ key: "etc", labelKey: "filter.gEtc", emoji: "🎨", items: orphans });
+  return groups.filter((g) => g.items.length);
+}
+
 export function presetByKey(key) {
   return FILM_PRESETS.find((p) => p.key === key) || FILM_PRESETS[0];
 }
