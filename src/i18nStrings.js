@@ -732,6 +732,7 @@ export const STR = {
       "웨딩 / 브라이덜": "Wedding / Bridal",
       "하이패션 / 화보": "High Fashion",
       "스튜디오 프로필": "Studio Portrait",
+      "세계여행": "World Travel",
       "일상 스냅": "Everyday Snap",
       "예술 / 클래식": "Art / Classic",
       "스트릿 패션": "Streetwear",
