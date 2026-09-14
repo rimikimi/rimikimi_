@@ -7900,7 +7900,7 @@
   "categories": [
    "🪄 매직 부스"
   ],
-  "text": "Transform the person in the reference photo into a glamorous fashion illustration drawn with colored pencils, in the style of high-end fashion week sketches (think David Downton / Vogue illustration). Exaggerated elegant proportions — slightly elongated body and limbs — but the face must remain recognizable as the same person (same hairstyle, same facial features, same gender). Confident colored pencil strokes, layered hatching, vibrant accent colors on lips/clothing, loose suggestion of background, white (#FFFFFF) space around the figure. Sophisticated, chic, runway-ready.",
+  "text": "Re-draw the subject in the reference photo as a glamorous colored-pencil fashion illustration, in the style of high-end fashion week sketches (think David Downton / Vogue illustration). Confident colored pencil strokes, layered hatching, vibrant accent colours, loose suggestion of a background, generous white (#FFFFFF) space around the subject. Keep the same pose, camera angle, framing and composition as the photo — do not re-pose the subject, do not stretch or elongate the body or limbs, and do not turn a close-up into a full-body figure. Preserve whatever makes the subject recognizable — if it is a person, keep the exact face, hairstyle, gender and clothing; if it is an animal, keep its fur colour, ear shape and markings; if it is an object, food, building or landscape, keep its distinctive silhouette and colours. Sophisticated, chic, hand-drawn.",
   "sensitive": false
  },
  {

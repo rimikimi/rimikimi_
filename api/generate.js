@@ -808,10 +808,17 @@ export default async function handler(req, res) {
       // 바꿔 내놔서 원본과 결과의 프레이밍이 어긋났다.
       // ⚠️ 예외 조항이 필요하다. 여백을 크게 두는 스타일(787 여백 드로잉)은 피사체를
       //    일부러 작게 그리는 게 핵심인데, 이 규칙이 그대로면 정면 충돌한다.
+      // ⚠️ 예외 조항을 "여백"에만 걸어야 한다. 예전엔 "…unless the style asks for different
+      //    framing, scale or negative space" 라 한 문장에 re-pose 까지 묶여 있어서, 스타일
+      //    프롬프트가 여백을 언급하기만 해도 포즈·구도까지 마음대로 바꿔도 되는 걸로 읽혔다.
+      //    실측 2026-09-14: 407 색연필 + 위에서 내려찍은 앉은 강아지 → 눈높이 전신 서 있는 강아지.
       "Keep the same framing and crop as the provided image — a head-and-shoulders photo stays " +
-      "head-and-shoulders, a full-body photo stays full-body. Do not zoom in or out, and do not " +
-      "re-pose the subject, unless the style below explicitly asks for different framing, " +
-      "scale or negative space. Apply the following style:\n" + prompt
+      "head-and-shoulders, a full-body photo stays full-body — and keep the same camera angle " +
+      "(a photo taken from above stays seen from above). NEVER re-pose the subject, never change " +
+      "its body proportions, and never change which way it faces: the pose, the viewpoint and the " +
+      "composition come from the photo, not from the style. Do not zoom in or out. Only the amount " +
+      "of empty space around the subject may differ, and only if the style below explicitly asks " +
+      "for it. Apply the following style:\n" + prompt
     : hasSecond
     ? "Using the TWO people in the two provided reference photos, generate a single new photograph " +
       "containing BOTH of them together. The FIRST reference image is the first person and the " +
