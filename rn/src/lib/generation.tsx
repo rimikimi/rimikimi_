@@ -9,6 +9,7 @@ import { encodeForUpload, type EncodedPhoto, type PhotoRef } from "./photo";
 import { type Concept, isArtOnly, isRestoreConcept } from "./concepts";
 import { getPushToken } from "./push";
 import { loadProfileRefs } from "./faceProfile";
+import { setLastDoneJob } from "./lastJob";
 import { FIRST_GEN_DONE_KEY, INVITE_CARD_DUE_KEY, getFlag, setFlag } from "./prefs";
 
 // ============================================================================
@@ -132,6 +133,7 @@ export function GenerationProvider({ children }: { children: React.ReactNode }) 
       await clearPendingGen();
       refreshQuota();
       void noteDone();
+      void setLastDoneJob({ jobId: p.jobId, conceptId: String(p.conceptId), title: p.conceptTitle, url: images[0].uri });
       return true;
     }
     return false;
@@ -213,6 +215,7 @@ export function GenerationProvider({ children }: { children: React.ReactNode }) 
         patch(id, { status: "done", images });
         refreshQuota();
         void noteDone();
+        if (images[0]) void setLastDoneJob({ jobId: id, conceptId: String(concept.id), title: concept.title, url: images[0].uri });
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
       } catch (err) {
         const e = err as ApiError;

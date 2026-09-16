@@ -74,12 +74,25 @@ src/app/camera.tsx · editor.tsx   웹뷰 자리표시(https://rimikimi-app.verc
 - **faceRefs / pushToken** 을 `/api/generate` 요청에 1.x 와 동일하게(아트 변환 제외 시 faceRefs).
 - **dev 프리뷰** (`scripts/previews.tsx`, `src/app/dev/`): 앱에서 `/dev` 로 가면 토큰·컴포넌트 / 로그인 시트 / 크레딧 시트 / 스토어 목록 / 시트·정방향 맞춤 / 카드 프리뷰 + 실제 화면 바로가기. `__DEV__` 가 아니면 빈 화면.
 
+## 3주차에 된 것
+
+- **편집기·카메라 웹뷰 네이티브 브리지** (`src/ui/WebTool.tsx`, `src/lib/nativeMedia.ts`): 웹(`src/nativeBridge.js`, 이 워크트리 밖 — iOS 쪽 작업으로 이미 들어와 있다)이 이미 `window.webkit.messageHandlers.rimikimi` 를 네이티브 임베드 판정 기준으로 쓰고 있길래(`isRimikimiWebView()`), **웹은 한 글자도 안 고치고** Android WebView 에 그 이름을 그대로 흉내 내는 shim 을 `injectedJavaScriptBeforeContentLoaded` 로 심었다 — `window.webkit.messageHandlers.rimikimi.postMessage(obj)` 를 `window.ReactNativeWebView.postMessage(JSON.stringify(obj))` 로 연결만 해 준다. 메시지 규약은 `{id,type,payload}` → 처리 후 `window.__rimikimiResolve(id, result)`(이건 nativeBridge.js 자신이 이미 정의해 둔 함수라 여기서 또 안 만든다). 액션 4종: `saveToAlbum`(expo-media-library, `{ok:true}|{error}`) · `share`(expo-sharing, `{ok,reason?}`) · `close`(id 없이 옴, `router.back()`) · `refreshCredits`(quota 컨텍스트 갱신). 결과 화면 "다듬기" 버튼은 원격 URL 이면 `?img=` 로 편집기에 넘긴다(웹 쪽이 그 파라미터를 읽는지는 미확인 — `?tool=camera|filter&native=1` 자체를 아직 src/ 가 안 읽는다, 아래 참고).
+- **카메라 권한** (`src/app/camera.tsx`, `app.config.ts`): `expo-image-picker` 의 `cameraPermission` 문자열만으론 매니페스트에 `CAMERA` 가 안 붙는 걸 `expo prebuild` 로 실측 확인해 `android.permissions` 에 명시 추가했다. 카메라 탭 진입 시 `requestCameraPermissionsAsync()` 로 먼저 물어보고(거부 시 안내 후 뒤로), 그 다음에 웹뷰를 띄운다. react-native-webview 13.16.1 은 Android `getUserMedia` 권한을 자체 `WebChromeClient.onPermissionRequest` 로 이미 자동 처리한다(OS CAMERA 권한 확인 → 없으면 Activity 에 직접 요청 → 승인) — JS `onPermissionRequest` prop 은 이 버전 타입에 없다(런타임에도 없음, 안 써도 됨).
+- **완료 푸시 → 결과 화면 직행** (`src/lib/lastJob.ts`, `src/lib/push.ts`, `src/lib/generation.tsx`): 서버 푸시 payload 는 `{kind:"genDone",count}` 뿐이라 알림 자체엔 어떤 결과인지 정보가 없다(`api/_lib/push.js` 미변경, 이 워크트리 밖). 대신 이 기기가 방금 완료한 생성을 `AsyncStorage`(10분 TTL)에 남겨 뒀다가 알림을 탭하면 그 결과로 연다 — `/result/[jobId]` 로 jobId·conceptId·title·url 을 다 실어 보내므로, 앱이 완전히 죽었다 열려도(GenerationProvider 메모리가 비어도) 최소 그 한 장은 보여준다. 완료된 게 없거나 10분 넘게 지났으면 기존처럼 내 사진 탭.
+- **알림 상태바 아이콘** (`assets/images/notification-icon.png`): 96×96, 흰색(255,255,255) + 알파만 있는 하트 실루엣(로고 워드마크의 모노크롬 버전, 파라메트릭 하트 커브로 생성) — `expo-notifications`·FCM 기본 아이콘 둘 다 이걸로 바꿨다. `expo prebuild` 로 `drawable-{m,h,xh,xxh,xxxh}dpi/notification_icon.png` 5종에 실제로 깔리는 것과 `AndroidManifest.xml` 의 `default_notification_icon` meta-data 를 확인했다. ⚠️ `assets/` 전체가 `.gitignore` 대상(기존 앱 아이콘·스플래시도 마찬가지 — 이 저장소 관례)이라 이 PNG 도 git 에는 안 잡힌다, 커밋과 별도로 전달 필요.
+- **부수 수정**: `nativeMedia.ts`·`result/[jobId].tsx` 의 `expo-media-library`/`expo-sharing`/`expo-file-system` import 를 최상단에서 함수 안 지연 import 로 바꿨다 — 최상단에 두면 네이티브 모듈이 없는 빌드(웹 `/dev` 프리뷰 등)에서 그 화면이 번들에 물려 있는 것만으로 전체가 크래시났다(실기기 Android 동작엔 영향 없음, 검증 중 발견).
+
+## 확인 못 한 것 (3주차)
+
+- **`src/` 쪽 라우팅 미완**: `WebTool.tsx` 가 `?tool=camera|filter&native=1` 로 웹을 띄우는데, `src/CameraStudio.jsx`/`PhotoEditor.jsx`/`main.jsx` 어디에도 이 쿼리를 읽는 코드가 없다(1·2주차부터 있던 자리표시 가정, 이번 주도 그대로) — 웹 쪽이 이 파라미터로 실제 카메라/편집기 화면을 곧장 띄우도록 라우팅해야 브리지가 눈에 보이는 동작으로 이어진다. `nativeClose`/`nativeRefreshCredits`(`src/nativeBridge.js`)도 정의만 있고 `CameraStudio.jsx`/`PhotoEditor.jsx` 어느 버튼에서도 아직 안 부른다.
+- **실기기/에뮬레이터 미검증**: 이 환경엔 Android SDK 는 있는데 Java 런타임이 없어(`java -version` 실패) `gradle`/`expo run:android` 자체가 안 된다 — 브리지 postMessage 왕복, 카메라 실권한 프롬프트, 저장/공유 실동작, 알림 아이콘 실제 표시는 전부 미검증(타입·번들·prebuild 매니페스트 배선만 확인).
+- **웹(`/dev`) 스크린샷 실패**: `rn/src/lib/supabase.ts` 의 세션 스토리지(`expo-secure-store`)가 웹에서 `ExpoSecureStore.default.getValueWithKeyAsync is not a function` 로 앱 부팅 자체를 막는다(1주차부터 있던 기존 코드, 이번 주 변경 아님) — `/dev`·`/camera`·`/editor` 어느 라우트를 열어도 이 오류 오버레이가 화면을 덮어 실제 UI 스크린샷을 못 찍었다. 캡처는 시도했으나(에러 화면만) 의미가 없어 버렸다.
+- **얼굴 검출(ML Kit) — 조사만, 안 붙임**: `@react-native-ml-kit/face-detection`(npm 최신 2.0.1, 2025-09-01 배포) 을 확인했다. New Architecture/TurboModule 지원 근거가 없고(레거시 브리지 네이티브 모듈, RN `>=0.60 <1.0.x` 만 명시), Expo config plugin 도 없다(수동 링킹 전제). 이 프로젝트는 RN 0.86 — 최근 React Native 는 New Architecture 가 기본/사실상 필수라 구형 레거시 모듈은 빌드 실패나 런타임 크래시 위험이 크다. 게다가 이 환경엔 Java 가 없어 실빌드로 확인할 방법 자체가 없다 → **지시대로 실빌드 검증 없이는 안 붙였다.** `rn/src/lib/fit.ts` 의 `setFaceDetector()` 인터페이스는 그대로 열려 있으니, 실기기 빌드가 되는 환경에서 붙여 검증하면 된다.
+- 완료 푸시 결과 직행이 커버 못 하는 경우: 알림이 10분 넘게 방치됐다 탭되면(TTL) 예전처럼 내 사진 탭으로 간다 — 서버가 payload 에 jobId/URL 을 안 실어 주는 한 구조적 한계.
+
 ## 자리표시(stub) / 남은 것
 
-- 카메라·편집기(다듬기): 웹뷰 자리표시. 저장·공유·앨범 네이티브 브리지 미구현. 편집기 쪽 정방향 맞춤 제안은 웹뷰라 미연결.
-- 얼굴 검출(정방향 맞춤): 위 참고 — ML Kit(`@react-native-ml-kit/face-detection`) 을 붙이려면 실기기 빌드 검증 후 `setFaceDetector()` 로 연결.
-- 알림 아이콘: `expo-notifications` 플러그인 `icon` 에 앱 아이콘을 임시로 꽂았다 — 96×96 흰색·투명 단색 PNG 로 교체 필요(Android 8+ 상태바).
-- 완료 푸시 수신 시 결과 화면 직행(지금은 내 사진 탭으로), 만료 리마인드 알림.
+- 얼굴 검출(정방향 맞춤): 위 "확인 못 한 것" 참고 — ML Kit 조사 완료, 미장착.
 - 증명사진(idphoto) 옵션(정장/배경색) 미구현 — 기본 프롬프트로 나간다.
 - 결과 사진 768×1024 재크롭(웹 `fitToSize`) 생략 — 서버 결과 그대로.
 - 다크 모드: 토큰에 주석만. 라이트 전용 출시.

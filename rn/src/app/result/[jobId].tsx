@@ -2,10 +2,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Alert, ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { Image } from "expo-image";
-import * as MediaLibrary from "expo-media-library";
-import * as Sharing from "expo-sharing";
 import * as Haptics from "expo-haptics";
-import { File, Paths } from "expo-file-system";
+import type { File } from "expo-file-system";
 import { Screen } from "@/ui/Screen";
 import { AppHeader } from "@/ui/AppHeader";
 import { Text } from "@/ui/Text";
@@ -27,7 +25,11 @@ import { duration } from "@/theme/motion";
 // ATT 팝업 → 초대 카드(첫 생성 완료 직후 1회)는 2주차.
 // ============================================================================
 
+// ⚠️ expo-file-system/expo-media-library/expo-sharing 는 지연 import 한다(nativeMedia.ts 와 같은
+// 이유) — 최상단 import 로 두면 네이티브 모듈이 없는 웹 프리뷰(`/dev`)에서 이 화면이 번들에
+// 물려 있는 것만으로 전체가 크래시난다(실기기 Android 에는 영향 없음, 순수 웹 프리뷰 문제).
 async function toLocalFile(img: ResultImage, name: string): Promise<File> {
+  const { File, Paths } = await import("expo-file-system");
   const f = new File(Paths.cache, name);
   if (f.exists) f.delete();
   if (img.uri.startsWith("data:")) {
@@ -75,6 +77,7 @@ export default function Result() {
     if (!img) return;
     setSaving(true);
     try {
+      const MediaLibrary = await import("expo-media-library");
       const perm = await MediaLibrary.requestPermissionsAsync(true);
       if (!perm.granted) throw new Error("no permission");
       const f = await toLocalFile(img, `rimikimi_${String(concept?.id ?? "photo")}_${idx}.png`);
@@ -91,6 +94,7 @@ export default function Result() {
   const share = async () => {
     if (!img) return;
     try {
+      const Sharing = await import("expo-sharing");
       const f = await toLocalFile(img, `rimikimi_${String(concept?.id ?? "photo")}_${idx}.png`);
       if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(f.uri, { mimeType: "image/png", dialogTitle: copy.result.share });
     } catch { /* 취소/미지원 */ }
@@ -126,7 +130,13 @@ export default function Result() {
 
       <View style={styles.actions}>
         <Button label={copy.result.saveAlbum} variant="secondary" loading={saving} leading={<IconDownload size={20} color={color.ink} />} onPress={() => { void save(); }} style={styles.action} />
-        <Button label={copy.result.edit} variant="secondary" leading={<IconWand size={20} color={color.ink} />} onPress={() => router.push("/editor")} style={styles.action} />
+        <Button
+          label={copy.result.edit}
+          variant="secondary"
+          leading={<IconWand size={20} color={color.ink} />}
+          onPress={() => router.push({ pathname: "/editor", params: img?.uri.startsWith("data:") ? {} : { img: img?.uri ?? "" } })}
+          style={styles.action}
+        />
         <Button label={copy.result.share} variant="secondary" leading={<IconShare size={20} color={color.ink} />} onPress={() => { void share(); }} style={styles.action} />
       </View>
       <Button label={copy.result.oneMore} full onPress={oneMore} />

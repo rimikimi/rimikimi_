@@ -56,7 +56,10 @@ const config: ExpoConfig = {
         category: ["BROWSABLE", "DEFAULT"],
       },
     ],
-    permissions: ["android.permission.INTERNET"],
+    // CAMERA: 3주차 확인 — expo-image-picker cameraPermission 문자열만으로는 매니페스트에
+    // 안 붙는다(prebuild 로 실측: 이 줄 빼고 생성한 AndroidManifest.xml 에 CAMERA 없음).
+    // 여기 명시해야 카메라 탭(웹뷰 getUserMedia)과 사진 찍기 둘 다 된다.
+    permissions: ["android.permission.INTERNET", "android.permission.CAMERA"],
     blockedPermissions: [
       "android.permission.RECORD_AUDIO",
       "android.permission.ACCESS_MEDIA_LOCATION",
@@ -76,9 +79,8 @@ const config: ExpoConfig = {
     "expo-secure-store",
     "@react-native-firebase/app",
     "@react-native-firebase/messaging",
-    // ⚠️ icon 은 Android 8+ 상태바용 흰색·투명 배경 단색 PNG 여야 한다 — 지금은 앱 아이콘을 임시로
-    //    꽂아 둔 것(회색 사각으로 보일 수 있음). 96×96 단색 벨 아이콘으로 교체 필요.
-    ["expo-notifications", { icon: "./assets/images/icon.png", color: "#E6403C", defaultChannel: "default" }],
+    // Android 8+ 상태바 알림 아이콘: 흰색·투명 배경 단색 96×96 PNG(로고 하트 실루엣) — 3주차 교체.
+    ["expo-notifications", { icon: "./assets/images/notification-icon.png", color: "#E6403C", defaultChannel: "default" }],
     [
       "expo-splash-screen",
       { backgroundColor: BG, image: "./assets/images/splash-icon.png", imageWidth: 160 },
