@@ -6,7 +6,8 @@ import { ApiError, fetchGallery, generateImage, type GenerateMeta, type GalleryI
 import { useAuth } from "./auth";
 import { useQuota } from "./quota";
 import { encodeForUpload, type EncodedPhoto, type PhotoRef } from "./photo";
-import { type Concept, isArtOnly, isRestoreConcept } from "./concepts";
+import { RESULT_W, RESULT_H, fitResultToRatio, fitResultToSize, fileRatio } from "./fitToSize";
+import { type Concept, ID_BGS, buildIdPhotoPrompt, isArtOnly, isIdPhoto, isRestoreConcept } from "./concepts";
 import { getPushToken } from "./push";
 import { loadProfileRefs } from "./faceProfile";
 import { setLastDoneJob } from "./lastJob";
@@ -52,6 +53,9 @@ export interface JobInput {
   batchCount: number;
   fourcutCount?: number;
   fourcutStyle?: string;
+  /** 증명사진: 정장색 키 + 배경 hex (concepts.ts ID_SUITS/ID_BGS) */
+  idSuit?: string;
+  idBg?: string;
 }
 
 interface PendingMarker { jobId: string; startedAt: number; conceptId: string | number; conceptTitle: string; count: number }
@@ -199,6 +203,14 @@ export function GenerationProvider({ children }: { children: React.ReactNode }) 
           meta.skipFacePrecheck = isArtOnly(concept);
           meta.keepRatio = isRestoreConcept(concept);
           meta.count = count;
+          if (isIdPhoto(concept)) {
+            const bg = ID_BGS.find((b) => b.hex.toLowerCase() === (input.idBg || "").toLowerCase()) || { hex: input.idBg || ID_BGS[0].hex, name: "custom solid" };
+            const suit = input.idSuit || "dark navy";
+            promptText = buildIdPhotoPrompt(suit, bg.hex, bg.name);
+            meta.idSuit = suit;
+            meta.idBg = bg.hex;
+            meta.idBgName = bg.name;
+          }
           if (input.partner) meta.photo2 = await encodeForUpload(input.partner, 1024);
           if (input.garments && input.garments.length) {
             const garments: EncodedPhoto[] = [];
@@ -208,9 +220,13 @@ export function GenerationProvider({ children }: { children: React.ReactNode }) 
           }
         }
         const r = await generateImage(token, photo, promptText, meta);
+        // 웹과 동일한 결과 재크롭(fitToSize/fitToRatio) — 표시·저장·공유 전에 1회 적용.
+        // keepRatio(사진 복원) 만 원본 비율로 크롭, 그 외(인생네컷·묶음·증명사진 포함)는 768×1024.
+        const ratio = meta.keepRatio ? (await fileRatio(input.photo.uri)) ?? RESULT_W / RESULT_H : null;
+        const fitOne = (dataUrl: string) => (ratio ? fitResultToRatio(dataUrl, ratio) : fitResultToSize(dataUrl));
         const images: ResultImage[] = r.batch
-          ? r.batch.map((b) => ({ uri: b.imageDataUrl, galleryId: b.galleryId, galleryExpiresAt: b.galleryExpiresAt }))
-          : [{ uri: r.imageDataUrl, galleryId: r.galleryId, galleryExpiresAt: r.galleryExpiresAt }];
+          ? await Promise.all(r.batch.map(async (b) => ({ uri: await fitOne(b.imageDataUrl), galleryId: b.galleryId, galleryExpiresAt: b.galleryExpiresAt })))
+          : [{ uri: await fitOne(r.imageDataUrl), galleryId: r.galleryId, galleryExpiresAt: r.galleryExpiresAt }];
         await clearPendingGen();
         patch(id, { status: "done", images });
         refreshQuota();

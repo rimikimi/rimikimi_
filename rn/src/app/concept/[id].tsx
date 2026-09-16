@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { Alert, ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
+import { Alert, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -15,7 +15,7 @@ import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { useGeneration } from "@/lib/generation";
 import { useCreditGate } from "@/lib/creditGate";
-import { FOURCUT_COUNTS, GARMENT_MAX, isArtOnly, isCoupleConcept, isDressroom, isFourcut, thumbUrl } from "@/lib/concepts";
+import { FOURCUT_COUNTS, GARMENT_MAX, ID_BGS, ID_SUITS, isArtOnly, isCoupleConcept, isDressroom, isFourcut, isIdPhoto, thumbUrl } from "@/lib/concepts";
 import { pickPhotos, registerPhoto, type PhotoRef } from "@/lib/photo";
 import { copy } from "@/lib/copy";
 import { color, radius, space, themedStyles } from "@/theme/tokens";
@@ -42,8 +42,11 @@ export default function ConceptOptions() {
   const fourcut = isFourcut(concept);
   const couple = isCoupleConcept(concept);
   const art = isArtOnly(concept);
+  const idphoto = isIdPhoto(concept);
 
   const [artPhoto, setArtPhoto] = useState<PhotoRef | null>(null);
+  const [idSuit, setIdSuit] = useState<string>(ID_SUITS[0].key);
+  const [idBg, setIdBg] = useState<string>(ID_BGS[0].hex);
   const [partner, setPartner] = useState<PhotoRef | null>(null);
   const [garments, setGarments] = useState<PhotoRef[]>([]);
   const [dressStyle, setDressStyle] = useState<"mirror" | "model">("mirror");
@@ -107,6 +110,8 @@ export default function ConceptOptions() {
           batchCount,
           fourcutCount: fourcut ? fourcutCount : undefined,
           fourcutStyle: fourcut ? fourcutStyle : undefined,
+          idSuit: idphoto ? idSuit : undefined,
+          idBg: idphoto ? idBg : undefined,
         });
         // 홈으로 복귀 + 내 사진 진행 카드 (SPEC §3): 스택을 탭까지 걷고 내 사진 탭으로.
         router.dismissAll();
@@ -165,6 +170,35 @@ export default function ConceptOptions() {
             </View>
           </Card>
         ) : null}
+
+        {idphoto ? (
+          <Card style={{ gap: space.s3 }}>
+            <Text size="footnote" weight="semibold">{copy.options.idphoto.suitLabel}</Text>
+            <View style={styles.chips}>
+              {ID_SUITS.map((s) => (
+                <Chip
+                  key={s.key}
+                  label={s.label}
+                  active={idSuit === s.key}
+                  onPress={() => setIdSuit(s.key)}
+                />
+              ))}
+            </View>
+            <Text size="footnote" weight="semibold" style={{ marginTop: space.s2 }}>{copy.options.idphoto.bgLabel}</Text>
+            <View style={styles.swatchRow}>
+              {ID_BGS.map((b) => (
+                <Pressable
+                  key={b.hex}
+                  accessibilityRole="button"
+                  accessibilityLabel={b.name}
+                  onPress={() => setIdBg(b.hex)}
+                  style={[styles.swatch, { backgroundColor: b.hex }, idBg.toLowerCase() === b.hex.toLowerCase() ? styles.swatchOn : null]}
+                />
+              ))}
+            </View>
+            <Text size="caption" tone="subtle">{copy.options.idphoto.disclaimer}</Text>
+          </Card>
+        ) : null}
       </Screen>
 
       {/* 고정 액션 바 — 콘텐츠는 이 아래로 스크롤한다 */}
@@ -178,6 +212,9 @@ export default function ConceptOptions() {
 const styles = themedStyles(() => StyleSheet.create({
   content: { paddingHorizontal: space.screen, gap: space.s4 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: space.s2 },
+  swatchRow: { flexDirection: "row", flexWrap: "wrap", gap: space.s3 },
+  swatch: { width: 36, height: 36, borderRadius: 18, borderWidth: StyleSheet.hairlineWidth, borderColor: color.line },
+  swatchOn: { borderWidth: 2, borderColor: color.accent },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   actionBar: { position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: space.screen, paddingTop: space.s3, backgroundColor: color.bg, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: color.line },
 }));

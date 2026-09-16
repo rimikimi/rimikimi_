@@ -72,6 +72,47 @@ export function isCoupleConcept(c?: Concept | null): boolean {
   return categoriesOf(c).includes(COUPLE_CATEGORY);
 }
 export function isIdPhoto(c?: Concept | null): boolean { return !!c && (c.mode === "idphoto" || /증명사진/.test(c.title || "")); }
+
+// 증명사진 옵션 — 웹 src/PortraitStudio.jsx 의 ID_SUITS/ID_BGS/ID_DISCLAIMER 를 그대로 옮긴 것.
+// 실제 정장·배경 스와치 색이라 UI 테마 토큰이 아니다(라이트/다크 무관, 웹과 동일한 값 고정).
+export interface IdSuit { key: string; label: string; css: string }
+export const ID_SUITS: IdSuit[] = [
+  { key: "dark navy", label: "다크 네이비", css: "#1f2a44" },
+  { key: "charcoal dark grey", label: "다크 그레이", css: "#3b3e44" },
+  { key: "light grey", label: "라이트 그레이", css: "#b7bcc4" },
+  { key: "black", label: "블랙", css: "#15171a" },
+];
+export interface IdBg { hex: string; name: string }
+export const ID_BGS: IdBg[] = [
+  { hex: "#FFFFFF", name: "pure white" },
+  { hex: "#f7f4f5", name: "soft warm light grey" },
+  { hex: "#fff9eb", name: "warm ivory cream" },
+  { hex: "#ffeaeb", name: "soft pastel pink" },
+  { hex: "#c4ecf0", name: "light sky blue" },
+  { hex: "#a5d2d8", name: "soft muted teal" },
+  { hex: "#1b3c5a", name: "deep navy blue" },
+  { hex: "#4d3f64", name: "deep muted purple" },
+];
+/** 웹 buildIdPhotoPrompt() 그대로 — 서버가 idSuit/idBg 로 프롬프트를 조립하지만
+ * 구버전 호환용으로 완성된 프롬프트 문자열도 함께 보낸다. */
+export function buildIdPhotoPrompt(suitKey: string, bgHex: string, bgName: string): string {
+  return (
+    "Create a clean, professional ID / passport-style photograph of the person in the provided photo. " +
+    "Keep their exact face, identity, facial features and natural likeness — do not beautify, slim, or change who they are. " +
+    "Front-facing head-AND-shoulders headshot, looking straight at the camera, neutral relaxed expression with the mouth closed, " +
+    "eyes open and clearly visible, face and both ears visible, hair tidy, no hat and no sunglasses. " +
+    "Framing: do not crop tightly on the face — leave a little space above the hair and include the full shoulder line down to the upper chest (standard ID photo crop); never cut off the shoulders. " +
+    "Dress the person in a formal " + suitKey + " suit jacket over a crisp collared shirt with a BESPOKE, made-to-measure tailored fit precisely tailored to the person's own frame. " +
+    "It must look completely real and natural (realistic fabric texture, natural lapels/folds and shadows, seamless transitions at the neck and shoulders; clean tailored shoulders following the natural shoulder line; never flat, pasted-on, plastic, or costume-like). " +
+    "Replace the background with a solid " + bgName + " (" + bgHex + ") studio backdrop that has a very subtle, smooth gradient — " +
+    "slightly brighter just behind the head and gently darker toward the edges. " +
+    "Soft, even studio lighting with no harsh shadows on the face or the background. " +
+    "Sharp focus, high resolution, true-to-life natural skin tones, vertical portrait composition centered like an official ID photo."
+  );
+}
+
+export const ID_DISCLAIMER =
+  "AI로 생성된 증명사진이에요. 공공기관·여권·비자 심사 등 공식 제출용으로는 규격 불일치로 거절될 수 있으니 참고용으로 사용해 주세요.";
 export function isFourcut(c?: Concept | null): boolean { return !!c && (c.mode === "fourcut" || /인생네컷/.test(c.title || "")); }
 export function isRestoreConcept(c?: Concept | null): boolean { return !!c && (Number(c.id) === 408 || /복원|restor/i.test(c.title || "")); }
 export function isFeatureConcept(c: Concept): boolean { return isArtConcept(c) || isIdPhoto(c) || isFourcut(c); }

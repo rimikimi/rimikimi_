@@ -47,6 +47,11 @@ export const copy = {
       countLabel: "컷 수",
       styleLabel: "스타일",
     },
+    idphoto: {
+      suitLabel: "정장 색상",
+      bgLabel: "배경 색상",
+      disclaimer: "AI로 생성된 증명사진이에요. 공공기관·여권·비자 심사 등 공식 제출용으로는 규격 불일치로 거절될 수 있으니 참고용으로 사용해 주세요.",
+    },
   },
   batch: [
     { count: 1, cost: 1, label: "1장" },
