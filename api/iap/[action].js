@@ -4,7 +4,9 @@
 //   - /api/iap/webhook (POST, RC 호출): 백업 적립 (NON_RENEWING_PURCHASE)
 //
 // 하나의 서버리스 함수로 합침 (Hobby 플랜 12개 함수 제한 회피).
-// 두 경로 모두 같은 iap_events(거래ID UNIQUE) 멱등 테이블 공유 → 이중적립 없음.
+// 두 경로 모두 같은 iap_events(거래ID UNIQUE) 멱등 테이블을 공유한다. 단, 그것만으로는
+// 부족하다 — 두 경로가 서로 다른 거래ID 를 쓰면 UNIQUE 를 빠져나간다. 이중적립 방어는
+// iapGrant.js 상단 "2026-09-16 실측 사고" 주석의 3중 방어를 함께 봐야 한다.
 // ============================================================
 
 import { getAuthedUser, makeAdmin } from "../_lib/auth.js";
@@ -17,6 +19,7 @@ import {
   purchaseTxId,
   purchaseTime,
   grantCreditsForTransaction,
+  isSandboxPurchase,
 } from "../_lib/iapGrant.js";
 
 export default async function handler(req, res) {
@@ -81,9 +84,18 @@ async function handleGrant(req, res) {
     entry = mine.slice().sort((a, b) => purchaseTime(a) - purchaseTime(b)).pop();
   }
 
+  // 샌드박스(테스트) 결제는 실서비스 크레딧을 주지 않는다. 2026-09-16 사고 참고
+  // (iapGrant.js isSandboxPurchase 주석). 조용히 성공시키면 테스터가 눈치를 못 채니
+  // 명시적으로 알린다.
+  if (isSandboxPurchase(entry)) {
+    console.warn(`[iap] 샌드박스 결제 적립 거부 user=${user.id} product=${productId}`);
+    return res.status(200).json({ ok: true, sandbox: true, credits: 0, alreadyGranted: true });
+  }
+
   const txKey = purchaseTxId(entry);
   if (!txKey) {
-    return res.status(502).json({ error: "거래 정보를 확인할 수 없어요." });
+    // 스토어 거래ID 가 없다(RC 구독 객체 등). 웹훅이 진짜 거래ID 로 적립하도록 넘긴다.
+    return res.status(202).json({ pending: true, error: "구매 확인 중이에요. 잠시만요." });
   }
 
   const result = await grantCreditsForTransaction(admin, {
@@ -123,9 +135,21 @@ async function handleWebhook(req, res) {
     return res.status(200).json({ ok: true, ignored: type || "unknown" });
   }
 
+  // 샌드박스 이벤트는 적립하지 않는다. RevenueCat 은 샌드박스 갱신도 그대로 쏘는데,
+  // 샌드박스는 연간 구독을 하루/한 시간 단위로 가속 갱신한다. 이걸 막지 않으면
+  // 샌드박스 애플 ID 하나로 크레딧을 무한정 찍을 수 있다(2026-09-16 실측 3,120장).
+  if (String(ev.environment || "").toUpperCase() === "SANDBOX") {
+    console.warn(
+      `[iap] 샌드박스 웹훅 무시 type=${type} user=${ev.app_user_id} product=${ev.product_id}`
+    );
+    return res.status(200).json({ ok: true, ignored: "sandbox" });
+  }
+
   const userId = ev.app_user_id;
   const productId = ev.product_id;
-  const txId = ev.store_transaction_id || ev.transaction_id || ev.id || null;
+  // ⚠️ ev.id(RC 내부 이벤트 id) 폴백 금지 — grant 쪽과 키 네임스페이스가 달라져
+  //    같은 구매가 두 번 적립된다. 진짜 거래ID 가 없으면 적립하지 않는다.
+  const txId = ev.store_transaction_id || ev.transaction_id || null;
 
   if (!userId || !productId || !(productId in PRODUCT_CREDITS) || !txId) {
     return res.status(200).json({ ok: true, skipped: true });

@@ -15,6 +15,30 @@ export const PRODUCT_CREDITS = Object.fromEntries(
   ALL_PACKAGES.map((p) => [p.id, p.credits])
 );
 
+// productId → { kind, period } (구독 주기 가드용)
+const PRODUCT_META = Object.fromEntries(
+  ALL_PACKAGES.map((p) => [p.id, { kind: p.kind, period: p.period || null }])
+);
+
+// 구독 1주기 안에 같은 상품이 두 번 적립될 수는 없다. 스토어 시계 오차·조기
+// 갱신을 감안해 주기보다 넉넉히 짧게 잡는다(초 단위).
+const PERIOD_MIN_GAP_SEC = { week: 5 * 86400, month: 25 * 86400, year: 300 * 86400 };
+
+// 🔴 2026-09-16 실측 사고: 샌드박스 구독 갱신으로 크레딧이 무한 발급됐다.
+//    사용자 f18c73cb… 가 연간 구독(240장)을 8/29~9/9 **매일** 갱신받아 3,120장을
+//    적립했다(사용량 0). 연간 구독이 하루 만에 갱신될 리 없다 — StoreKit 샌드박스의
+//    가속 갱신이 그대로 프로덕션 DB 에 꽂힌 것이다. 샌드박스 애플 ID 만 있으면
+//    누구나 크레딧을 무한정 찍어낼 수 있었다.
+//    ⇒ 아래 3중 방어. 셋 중 하나만 빠져도 다시 뚫린다.
+//      ① 샌드박스 거래는 적립하지 않는다 (isSandboxPurchase)
+//      ② 구독은 주기당 1회만 적립한다 (PERIOD_MIN_GAP_SEC)
+//      ③ 멱등키는 **스토어 거래ID 한 종류만** 쓴다 (purchaseTxId 의 p.id 폴백 제거)
+export function isSandboxPurchase(p) {
+  const env = p?.environment ?? p?.store_environment ?? p?.sandbox ?? null;
+  if (env === true) return true;
+  return typeof env === "string" && env.toUpperCase() === "SANDBOX";
+}
+
 // 🔴 2026-08-19 (claire 682c2ce 이식) 크레딧 지급 전면 불능의 근본원인:
 //    RevenueCat 이 v2 의 expand 허용값을 바꿔서 /purchases?expand=items.product 가
 //    400 parameter_error("'items.product' is not one of ['items.redemption']") 를 내기
@@ -111,13 +135,18 @@ function stripBasePlan(id) {
   return id ? String(id).split(":")[0] : null;
 }
 
-// 구매 객체에서 스토어 거래ID 추출 (멱등 키, 방어적)
+// 구매 객체에서 **스토어** 거래ID 추출 (멱등 키).
+// ⚠️ 여기에 `p.id`(RevenueCat 내부 id, 예: subAap6bd1a4e9…) 를 폴백으로 넣지 말 것.
+//    웹훅은 ev.store_transaction_id(예: 2000001228566503) 를 쓰는데, grant 쪽이
+//    RC 내부 id 로 떨어지면 **같은 구매가 서로 다른 키로 두 번 적립된다.**
+//    실측: 2026-08-29 00:38:16/18 같은 구독이 2초 간격 240장씩 두 번 적립.
+//    스토어 거래ID 를 못 구하면 null → grant 는 202(pending) 로 물러나고,
+//    진짜 거래ID 를 가진 웹훅이 적립한다.
 export function purchaseTxId(p) {
   return (
     p?.store_purchase_identifier ||
     p?.store_transaction_id ||
     p?.transaction_id ||
-    p?.id ||
     null
   );
 }
@@ -138,6 +167,30 @@ export async function grantCreditsForTransaction(
   const credits = PRODUCT_CREDITS[productId];
   if (!credits) return { error: `알 수 없는 상품: ${productId}`, status: 400 };
   if (!transactionId) return { error: "거래ID 없음", status: 400 };
+
+  // 0) 구독 주기 가드 — 같은 구독 상품이 한 주기 안에 두 번 적립될 수는 없다.
+  //    샌드박스 가속 갱신·웹훅 중복 재전송이 거래ID 를 매번 새로 달고 오므로
+  //    iap_events 의 UNIQUE 만으로는 못 막는다.
+  const meta = PRODUCT_META[productId];
+  const minGap = meta?.kind === "subscription" ? PERIOD_MIN_GAP_SEC[meta.period] : 0;
+  if (minGap) {
+    const since = new Date(Date.now() - minGap * 1000).toISOString();
+    const { data: recent } = await admin
+      .from("iap_events")
+      .select("transaction_id, created_at")
+      .eq("user_id", userId)
+      .eq("product_id", productId)
+      .gte("created_at", since)
+      .limit(1);
+    if (recent && recent.length > 0) {
+      console.warn(
+        `[iap] 구독 주기 가드: ${productId} 가 주기(${meta.period}) 안에 재적립 시도됨 ` +
+          `user=${userId} tx=${transactionId} 직전=${recent[0].created_at}`
+      );
+      const totals = await getTotals(admin, userId);
+      return { ok: true, alreadyGranted: true, credits, ...totals };
+    }
+  }
 
   // 1) iap_events 에 거래ID 기록 시도 (UNIQUE 충돌 = 이미 적립됨)
   const { error: insErr } = await admin.from("iap_events").insert({
