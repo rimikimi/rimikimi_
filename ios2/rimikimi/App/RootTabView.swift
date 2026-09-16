@@ -49,7 +49,6 @@ struct RootTabView: View {
         //    `.toolbarColorScheme` / `.toolbarBackground` / `UITabBarAppearance` 는 이 떠 있는
         //    탭바에 아무 효과가 없다(불투명 단색까지 강제해 확인).
         // 안쪽 화면(푸시)에서는 탭바가 숨으므로 카메라 원도 함께 숨긴다 — 만들기 바 위에 겹치던 문제.
-        .background(TabBarFrameReader(topY: $app.tabBarTopY))
         .overlay(alignment: .bottom) {
             if app.galleryPath.isEmpty && app.myPhotosPath.isEmpty && app.profilePath.isEmpty {
                 CameraTabButton(bottomPadding: cameraBottomPadding) { openCamera() }
@@ -104,68 +103,14 @@ struct RootTabView: View {
         app.requireLogin(.camera)
     }
 
-    /// 실측한 탭바 상단 Y(윈도우 좌표) 기준 카메라 원의 `.padding(.bottom)` 값. 결함 #2(오너 지시) —
-    /// 고정 pt 대신 실제 탭바 프레임을 써서 기기(홈 인디케이터 유무)에 관계없이 원이 탭바 위에
-    /// 일관되게 살짝 겹쳐 뜨게 한다.
-    private var cameraBottomPadding: CGFloat {
-        guard let topY = app.tabBarTopY else { return TabBarMetrics.cameraFallbackBottom }
-        let screenBottom = UIScreen.main.bounds.height
-        let pad = screenBottom - topY - TabBarMetrics.cameraOverlap
-        return max(pad, TabBarMetrics.bottom)
-    }
-}
-
-/// UIKit 계층에서 실제 `UITabBar`(iOS 26 떠 있는 탭바) 를 찾아 그 상단 Y(윈도우 좌표)를 알려준다.
-/// SwiftUI `TabView` 가 만드는 탭바는 고정 pt 로 예측할 수 없어(기기마다 다름, 결함 #2) 직접 잰다.
-private struct TabBarFrameReader: UIViewRepresentable {
-    @Binding var topY: CGFloat?
-
-    func makeUIView(context: Context) -> TrackerView {
-        let v = TrackerView()
-        v.onUpdate = { topY = $0 }
-        return v
-    }
-    func updateUIView(_ uiView: TrackerView, context: Context) {}
-
-    final class TrackerView: UIView {
-        var onUpdate: ((CGFloat) -> Void)?
-        private var displayLink: CADisplayLink?
-
-        override init(frame: CGRect) {
-            super.init(frame: frame)
-            isUserInteractionEnabled = false
-            backgroundColor = .clear
-        }
-        required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
-
-        override func didMoveToWindow() {
-            super.didMoveToWindow()
-            displayLink?.invalidate()
-            displayLink = nil
-            guard window != nil else { return }
-            // 탭바가 스크롤에 따라 최소화/복귀되는 애니메이션을 따라가려면 매 프레임 다시 재야 한다.
-            let link = CADisplayLink(target: self, selector: #selector(tick))
-            link.add(to: .main, forMode: .common)
-            displayLink = link
-            tick()
-        }
-
-        deinit { displayLink?.invalidate() }
-
-        @objc private func tick() {
-            guard let window, let tabBar = Self.findTabBar(in: window) else { return }
-            let topY = tabBar.convert(tabBar.bounds, to: nil).minY
-            onUpdate?(topY)
-        }
-
-        private static func findTabBar(in view: UIView) -> UITabBar? {
-            if let bar = view as? UITabBar { return bar }
-            for sub in view.subviews {
-                if let found = findTabBar(in: sub) { return found }
-            }
-            return nil
-        }
-    }
+    /// 카메라 원의 `.padding(.bottom)`.
+    /// ⚠️ **탭바 프레임을 재서 계산하지 말 것** (2026-09-16 build 91 사고).
+    ///    `UITabBar` 를 찾아 `screenBottom - topY` 로 계산했더니 버튼이 화면 한가운데로 갔다.
+    ///    이유 두 가지: ① 이 오버레이는 `.bottom` 정렬이라 padding 기준이 **안전영역 아래**인데
+    ///    계산은 **화면 아래** 기준이었다(이중 계산) ② iOS 26 떠 있는 탭바는 찾은 `UITabBar`
+    ///    뷰의 프레임이 실제 보이는 알약과 달라 `topY` 가 엉뚱하게 작게 나온다.
+    ///    → 고정값으로 두고, 값은 **시뮬레이터 스크린샷에서 픽셀을 직접 재서** 맞춘다.
+    private var cameraBottomPadding: CGFloat { TabBarMetrics.cameraFallbackBottom }
 }
 
 extension UIImage {

@@ -74,22 +74,12 @@ final class AppState {
     var showInviteCard = !UserDefaults.standard.bool(forKey: AppState.inviteCardDismissedKey)
     private static let inviteCardDismissedKey = "invite.card.dismissed.v1"
 
-    /// build 90 실기기 결함 #4(오너 지시, 재작업) — `RootTabView.TabBarFrameReader` 가 실측한 탭바
-    /// 상단 Y(윈도우 좌표). 탭 루트 화면들이 스크롤 하단 여백(`contentBottomPad`)을 실제 탭바 높이 +
-    /// 안전영역 기준으로 계산하는 데 쓴다. 아직 못 쟀으면 `nil`.
-    var tabBarTopY: CGFloat?
-
-    /// 탭 화면 스크롤 콘텐츠의 하단 여백 — 고정 24pt였던 걸 실측 탭바 프레임 기준으로 바꿨다(결함 #4).
-    /// 탭바는 높이 62 + 하단 14 + 안전영역(홈 인디케이터 기기 ~34)까지 화면 아래에서 100pt 넘게 차지해서
-    /// 고정 24pt로는 마지막 콘텐츠가 항상 가려졌다 — 오너가 캡처(`fix_2_camera_proMax.png` 하단의
-    /// Brooklyn 배너, 프로필 사업자 정보)에서 직접 확인. 탭바 상단 Y 를 실측해 "화면 바닥부터 탭바 상단까지"
-    /// 거리 + 여유 12pt 를 쓴다. 측정 전(첫 프레임)엔 예전 고정값으로 폴백.
-    var contentBottomPad: CGFloat {
-        guard let topY = tabBarTopY else { return TabBarMetrics.contentBottomPad }
-        let screenBottom = UIScreen.main.bounds.height
-        let pad = screenBottom - topY + 12
-        return max(pad, TabBarMetrics.contentBottomPad)
-    }
+    /// 탭 화면 스크롤 콘텐츠의 하단 여백.
+    /// ⚠️ **탭바 프레임을 재서 계산하지 말 것** (2026-09-16 build 91 사고 — 같은 측정값을 쓰던
+    ///    카메라 버튼이 화면 한가운데로 갔다. `RootTabView.cameraBottomPadding` 주석 참고).
+    ///    고정 24pt 로는 마지막 콘텐츠가 떠 있는 탭바에 가려서(결함 #4) 넉넉한 고정값을 쓴다.
+    ///    여백이 조금 남는 건 해가 없지만, 모자라면 콘텐츠가 가려진다 — 넉넉한 쪽으로 둔다.
+    var contentBottomPad: CGFloat { TabBarMetrics.contentBottomPad }
     #if DEBUG
     /// dev/fit 캡처용 — 결과 화면이 뜨면 정방향 맞춤 시트를 바로 연다.
     var devAutoOpenFit = false

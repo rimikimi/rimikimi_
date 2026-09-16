@@ -43,13 +43,13 @@ enum TabBarMetrics {
     /// 로만 쓴다 — 탭바 위 절대 여백이 아니다.
     static let cameraOverlap: CGFloat = 10
     /// 탭바 프레임을 아직 측정하지 못했을 때(첫 프레임)의 폴백 — 이전 고정값과 동일하게 둬서 깜빡임 최소화.
-    static let cameraFallbackBottom: CGFloat = 28
+    static let cameraFallbackBottom: CGFloat = 28   // 시뮬 스크린샷 실측으로 조정한다
     /// 탭바가 없는(푸시된) 화면의 하단 여백, 그리고 탭바 실측 전(첫 프레임) `AppState.contentBottomPad`
     /// 의 폴백값. **탭바가 실제로 떠 있는 탭 루트 화면**(갤러리·필터·내 사진·프로필)에서는 이 고정값 대신
     /// `AppState.contentBottomPad`(탭바 프레임 실측, 결함 #4 재작업 — 오너 지시)를 써야 한다. 고정 24pt로는
     /// 탭바(높이 62 + 하단 14 + 안전영역)에 마지막 콘텐츠가 가려진다 — `UI/Filter/` 는 이번 작업 범위 밖이라
     /// 그대로 두었으니 필터 작업자가 같은 방식으로 옮겨야 한다.
-    static let contentBottomPad: CGFloat = 24
+    static let contentBottomPad: CGFloat = 120
 }
 
 /// 갤러리 카드 비율 — 컨셉 썸네일은 3:4.
