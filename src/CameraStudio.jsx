@@ -16,7 +16,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { FILM_PRESETS, groupedPresets, presetByKey, applyLook } from "./filters";
 import { t, getLang } from "./i18n";
-import { isNative } from "./nativeBridge";
+import { isNative, isRimikimiWebView } from "./nativeBridge";
 import * as hap from "./haptics";
 
 const GRAIN_SEED = 7;          // PhotoEditor 와 같은 시드 — 미리보기/결과의 그레인이 같다
@@ -73,7 +73,10 @@ export default function CameraStudio({ initialPresetKey = "none", onShot, onClos
       //    받은 적이 없으면 iOS 가 프롬프트 대신 앱을 종료하는 경로가 있다(TestFlight build 85·86
       //    크래시 — 시뮬레이터엔 카메라가 없어 재현 불가). @capacitor/camera 의 requestPermissions
       //    는 이 앱의 기존 촬영 기능이 쓰던 검증된 경로라 그걸로 먼저 권한을 확정한다.
-      if (isNative()) {
+      // 2.0 WKWebView 임베드(ios2/android2)는 Capacitor 셸이 아니다 — WebKit 이 getUserMedia 요청에
+      // 붙는 카메라 권한 프롬프트를 직접 낸다(Info.plist NSCameraUsageDescription). Capacitor 카메라
+      // 플러그인 프리체크는 실제 Capacitor 네이티브 셸에서만 필요.
+      if (isNative() && !isRimikimiWebView()) {
         const { Camera } = await import("@capacitor/camera");
         const st = await Camera.requestPermissions({ permissions: ["camera"] });
         if (st.camera === "denied") { const e = new Error("denied"); e.name = "NotAllowedError"; throw e; }

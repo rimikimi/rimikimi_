@@ -13,8 +13,61 @@ import { Capacitor } from "@capacitor/core";
 import { Media } from "@capacitor-community/media";
 import { App as CapApp } from "@capacitor/app";
 
-export const isNative = () => Capacitor.isNativePlatform();
+export const isNative = () => Capacitor.isNativePlatform() || isRimikimiWebView();
 export const platform = () => Capacitor.getPlatform(); // "web" | "ios" | "android"
+
+// ============================================================
+// 2.0 iOS(SwiftUI)/Android(RN) 네이티브 브릿지 — 편집기·카메라를 웹뷰로 그대로 띄우고
+// (v2/SPEC.md §5 1단계) 저장·공유·닫기·크레딧 갱신만 네이티브로 뺀다. Capacitor 셸이
+// 아니라 순정 WKWebView 라 위 Capacitor 경로를 못 쓴다 — 대신 `ios2/…/WebToolView.swift`
+// 가 심어 주는 `window.webkit.messageHandlers.rimikimi` 로 부른다.
+// 프로토콜: postMessage({id, type, payload}) → 네이티브가 window.__rimikimiResolve(id, result)
+// 로 응답. 반환 모양은 기존 nativeSaveToAlbum/nativeShareImage 와 맞춘다({ok}/{error}).
+export function isRimikimiWebView() {
+  return typeof window !== "undefined"
+    && !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.rimikimi);
+}
+
+let _wkSeq = 0;
+const _wkPending = new Map();
+if (typeof window !== "undefined") {
+  window.__rimikimiResolve = (id, result) => {
+    const p = _wkPending.get(id);
+    if (!p) return;
+    _wkPending.delete(id);
+    p(result);
+  };
+}
+
+function wkCall(type, payload, timeoutMs = 20000) {
+  return new Promise((resolve) => {
+    if (!isRimikimiWebView()) { resolve({ error: "no bridge" }); return; }
+    const id = String(++_wkSeq);
+    _wkPending.set(id, resolve);
+    try {
+      window.webkit.messageHandlers.rimikimi.postMessage({ id, type, payload });
+    } catch (e) {
+      _wkPending.delete(id);
+      resolve({ error: e?.message || String(e) });
+      return;
+    }
+    setTimeout(() => {
+      if (_wkPending.has(id)) { _wkPending.delete(id); resolve({ error: "timeout" }); }
+    }, timeoutMs);
+  });
+}
+
+/** 네이티브 화면 닫기(웹뷰 자체를 dismiss). 응답 없음. */
+export function nativeClose() {
+  if (!isRimikimiWebView()) return;
+  try { window.webkit.messageHandlers.rimikimi.postMessage({ type: "close" }); } catch (_) {}
+}
+
+/** 구매/생성 등으로 크레딧이 바뀌었을 수 있을 때 `/api/quota` 재조회 요청. */
+export function nativeRefreshCredits() {
+  if (!isRimikimiWebView()) return Promise.resolve({ ok: false });
+  return wkCall("refreshCredits");
+}
 
 /* ---------- 안드로이드 WebView 터치 복구 ---------- */
 // targetSdk 35/36(edge-to-edge)에서 풀스크린 네이티브 액티비티가 닫히고 WebView 로
@@ -135,6 +188,7 @@ async function ensureAndroidAlbum() {
 // filename 은 확장자 없이 넘길 것(Android 요구사항, iOS는 무시함).
 // 반환: { ok: true } | { error }
 export async function nativeSaveToAlbum(dataUrl, filename = "rimikimi") {
+  if (isRimikimiWebView()) return wkCall("saveToAlbum", { dataUrl, filename });
   if (!isNative()) return { error: "web only" };
   try {
     const opts = { path: dataUrl, fileName: filename };
@@ -152,6 +206,7 @@ export async function nativeSaveToAlbum(dataUrl, filename = "rimikimi") {
 
 // 네이티브 공유 시트 (카톡/메시지/저장 등 시스템 시트)
 export async function nativeShare({ title, text, url }) {
+  if (isRimikimiWebView()) return false; // 링크 공유는 안 씀(편집기·카메라는 이미지 공유만)
   if (!isNative()) return false;
   try {
     const { Share } = await import("@capacitor/share");
@@ -174,8 +229,13 @@ export async function nativeShare({ title, text, url }) {
 // 이 함수는 resolve=완료, reject/에러=미완료(호출부가 크레딧 클레임을 스킵)로 처리하면
 // §A 표준의 "iOS activityType 확인 / Android resolve 기준" 판정과 실질적으로 동일하다.
 export async function nativeShareImage({ src, filename = "rimikimi.png", title, text }) {
-  if (!isNative()) return { ok: false, reason: "web only" };
   if (!src) return { ok: false, reason: "no src" };
+  if (isRimikimiWebView()) {
+    const dataUrl = /^data:/.test(src) ? src : `data:image/jpeg;base64,${await toBase64Payload(src)}`;
+    const r = await wkCall("share", { dataUrl, filename, title, text });
+    return r?.ok ? { ok: true } : { ok: false, reason: r?.reason || r?.error || "cancelled" };
+  }
+  if (!isNative()) return { ok: false, reason: "web only" };
   try {
     const base64 = await toBase64Payload(src);
     const { Filesystem, Directory } = await import("@capacitor/filesystem");

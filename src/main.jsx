@@ -2,7 +2,12 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { Capacitor } from "@capacitor/core";
 import PortraitStudio from "./PortraitStudio.jsx";
+import ToolEntry from "./ToolEntry.jsx";
 import { installTouchRestore } from "./nativeBridge";
+
+// 2.0 iOS(SwiftUI)/Android(RN) 이 편집기·카메라만 웹뷰로 띄울 때 쓰는 진입점
+// (v2/SPEC.md §5 1단계, `?tool=camera` | `?tool=filter`). 없으면 평소처럼 전체 앱.
+const _toolParam = new URLSearchParams(window.location.search).get("tool");
 
 // ── 네이티브 API 베이스 패치 ──
 // 네이티브(번들 모드)에서 webview origin 은 capacitor://localhost 라
@@ -32,6 +37,6 @@ installTouchRestore();
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <PortraitStudio />
+    {_toolParam === "camera" || _toolParam === "filter" ? <ToolEntry /> : <PortraitStudio />}
   </React.StrictMode>
 );
