@@ -16,7 +16,7 @@ struct RootTabView: View {
                         .navigationDestination(for: Route.self) { RouteDestination(route: $0) }
                 }
             }
-            Tab("필터", systemImage: "camera.filters", value: .filter) {
+            Tab("필터", systemImage: "film", value: .filter) {
                 NavigationStack { FilterTabView() }
             }
             // 가운데 슬롯: 아이콘·라벨을 비워 두고(투명 이미지, 빈 문자열) 떠 있는 원만 보이게 한다.

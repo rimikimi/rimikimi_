@@ -43,7 +43,9 @@ enum TabBarMetrics {
 
 /// 갤러리 카드 비율 — 컨셉 썸네일은 3:4.
 enum CardMetrics {
-    static let railCardWidth: CGFloat = 150
-    static let bigRailCardWidth: CGFloat = 200
+    /// 가로줄 카드 폭 — 화면의 약 41% (160pt @390, 목업 `.card{flex:0 0 160px}`).
+    static let railCardFraction: CGFloat = 160.0 / 390.0
+    static let railGap: CGFloat = 10
+    static let railBottom: CGFloat = 18
     static let aspect: CGFloat = 3.0 / 4.0
 }

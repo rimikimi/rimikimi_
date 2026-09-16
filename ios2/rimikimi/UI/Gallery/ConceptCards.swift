@@ -1,61 +1,85 @@
 import SwiftUI
 
-/// 가로 줄 — 제목 + 카드들. `big` 은 추천/새로 나왔어요(200pt), 아니면 카테고리 줄(150pt).
+/// 가로 줄 — 제목(20/700) [+ NEW 배지] + 오른쪽 "더보기"(15/600 강조색) + 카드들.
+/// 목업 `scratchpad/mock.html #home` 의 `.rowh` / `.rail` / `.card` 와 같은 치수.
 struct ConceptRail: View {
     var title: String
     var concepts: [Concept]
-    var big: Bool
+    var isNew = false
     var more: Route? = nil
 
     var body: some View {
         if !concepts.isEmpty {
             VStack(alignment: .leading, spacing: 0) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text(title).font(AppFont.headline).tracking(Tracking.headline)
+                HStack(alignment: .firstTextBaseline, spacing: Spacing.s2) {
+                    Text(title).font(AppFont.sectionTitle).tracking(Tracking.sectionTitle)
+                    if isNew { NewBadge() }
                     Spacer()
                     if let more {
                         NavigationLink(value: more) {
-                            Text("더보기 →").font(AppFont.calloutEmphasis).foregroundStyle(Color.ink2)
+                            Text("더보기").font(AppFont.calloutEmphasis).foregroundStyle(Color.accent)
                         }
-                        .buttonStyle(TextButtonStyle(color: .ink2))
+                        .buttonStyle(TextButtonStyle(color: .accent))
                     }
                 }
                 .padding(.horizontal, Spacing.page)
-                .padding(.top, Spacing.s5)
-                .padding(.bottom, Spacing.s3)
+                .padding(.top, Spacing.s1)
+                .padding(.bottom, Spacing.s3 - 2)
                 .accessibilityAddTraits(.isHeader)
 
                 ScrollView(.horizontal) {
-                    LazyHStack(alignment: .top, spacing: Spacing.s3) {
+                    LazyHStack(alignment: .top, spacing: CardMetrics.railGap) {
                         ForEach(concepts) { c in
-                            ConceptCard(concept: c, width: big ? CardMetrics.bigRailCardWidth : CardMetrics.railCardWidth)
+                            ConceptCard(concept: c)
+                                .containerRelativeFrame(.horizontal) { w, _ in (w * CardMetrics.railCardFraction).rounded() }
                         }
                     }
                     .padding(.horizontal, Spacing.page)
+                    .scrollTargetLayout()
                 }
                 .scrollIndicators(.hidden)
                 .scrollTargetBehavior(.viewAligned)
+                .padding(.bottom, CardMetrics.railBottom)
             }
         }
     }
 }
 
-/// 컨셉 카드 — 3:4 썸네일 + 제목. 탭 → 옵션 화면(푸시).
+/// NEW — 빨간 작은 배지 #E6403C, 11/700, 모서리 5.
+struct NewBadge: View {
+    var body: some View {
+        Text("NEW")
+            .font(AppFont.badge).tracking(0.4)
+            .foregroundStyle(Color.white)
+            .padding(.horizontal, 6).padding(.vertical, 2)
+            .background(Color.accent, in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+            .offset(y: -2)
+            .accessibilityLabel("새로 나옴")
+    }
+}
+
+/// 컨셉 카드 — 흰 카드(모서리 14) 안에 3:4 썸네일 + 제목 14/600 한 줄 말줄임. 탭 → 옵션 화면(푸시).
 struct ConceptCard: View {
     var concept: Concept
-    var width: CGFloat
 
     var body: some View {
         NavigationLink(value: Route.concept(concept)) {
-            VStack(alignment: .leading, spacing: Spacing.s2) {
-                RemoteImage(url: concept.thumbURL, cornerRadius: Radius.card)
-                    .frame(width: width, height: width / CardMetrics.aspect)
+            VStack(alignment: .leading, spacing: 0) {
+                RemoteImage(url: concept.thumbURL, cornerRadius: 0)
+                    .aspectRatio(CardMetrics.aspect, contentMode: .fit)
                 Text(concept.title)
-                    .font(AppFont.footnote)
+                    .font(AppFont.cardTitle)
                     .foregroundStyle(Color.ink)
                     .lineLimit(1)
-                    .frame(width: width, alignment: .leading)
+                    .truncationMode(.tail)
+                    .padding(.horizontal, Spacing.s3)
+                    .padding(.top, 9).padding(.bottom, 11)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .background(Color.card)
+            .clipShape(RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
+            .shadow(color: .black.opacity(0.06), radius: 1, y: 1)
+            .shadow(color: .black.opacity(0.10), radius: 12, y: 8)
         }
         .buttonStyle(PressScaleButtonStyle())
     }
@@ -64,23 +88,14 @@ struct ConceptCard: View {
 /// 두 열 그리드 — 카테고리 화면.
 struct ConceptGrid: View {
     var concepts: [Concept]
-    private let columns = [GridItem(.flexible(), spacing: Spacing.s3), GridItem(.flexible(), spacing: Spacing.s3)]
+    private let columns = [GridItem(.flexible(), spacing: CardMetrics.railGap), GridItem(.flexible(), spacing: CardMetrics.railGap)]
 
     var body: some View {
         if concepts.isEmpty {
             EmptyState(message: "검색 결과가 없어요")
         } else {
             LazyVGrid(columns: columns, spacing: Spacing.s4) {
-                ForEach(concepts) { c in
-                    NavigationLink(value: Route.concept(c)) {
-                        VStack(alignment: .leading, spacing: Spacing.s2) {
-                            RemoteImage(url: c.thumbURL, cornerRadius: Radius.card)
-                                .aspectRatio(CardMetrics.aspect, contentMode: .fit)
-                            Text(c.title).font(AppFont.footnote).foregroundStyle(Color.ink).lineLimit(1)
-                        }
-                    }
-                    .buttonStyle(PressScaleButtonStyle())
-                }
+                ForEach(concepts) { c in ConceptCard(concept: c) }
             }
             .padding(.horizontal, Spacing.page)
         }

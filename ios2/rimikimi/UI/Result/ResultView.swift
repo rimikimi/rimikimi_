@@ -65,7 +65,7 @@ struct ResultView: View {
                 .padding(.horizontal, Spacing.page)
 
                 if let concept {
-                    ConceptRail(title: "비슷한 컨셉", concepts: app.concepts.similar(to: concept), big: false)
+                    ConceptRail(title: "비슷한 컨셉", concepts: app.concepts.similar(to: concept))
                 }
             }
             .padding(.bottom, TabBarMetrics.contentBottomPad)

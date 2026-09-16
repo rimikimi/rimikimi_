@@ -17,11 +17,10 @@ struct GalleryHomeView: View {
                     ConceptGrid(concepts: app.concepts.concepts(in: cat))
                         .padding(.top, Spacing.s3)
                 } else {
-                    ConceptRail(title: "🔥 추천", concepts: app.concepts.featured, big: true)
-                    ConceptRail(title: "✨ 새로 나왔어요", concepts: app.concepts.newest, big: true)
+                    ConceptRail(title: "추천", concepts: app.concepts.featured)
+                    ConceptRail(title: "새로 나왔어요", concepts: app.concepts.newest, isNew: true)
                     ForEach(app.concepts.rows) { row in
-                        ConceptRail(title: row.name, concepts: row.items, big: false,
-                                    more: row.items.count >= 10 ? Route.category(row.name) : nil)
+                        ConceptRail(title: row.name, concepts: row.items, more: Route.category(row.name))
                     }
                 }
             }
@@ -37,9 +36,9 @@ struct GalleryHomeView: View {
         VStack(alignment: .leading, spacing: Spacing.s3) {
             ForEach(0..<2, id: \.self) { _ in
                 SkeletonBlock().frame(height: 20).frame(width: 120).padding(.horizontal, Spacing.page).padding(.top, Spacing.s5)
-                HStack(spacing: Spacing.s3) {
+                HStack(spacing: CardMetrics.railGap) {
                     ForEach(0..<3, id: \.self) { _ in
-                        SkeletonBlock().frame(width: CardMetrics.bigRailCardWidth, height: CardMetrics.bigRailCardWidth / CardMetrics.aspect)
+                        SkeletonBlock().frame(width: 160, height: 160 / CardMetrics.aspect + 40)
                     }
                 }
                 .padding(.horizontal, Spacing.page)

@@ -4,6 +4,12 @@ import SwiftUI
 /// Title2 22/700 · Headline 17/600 · Body 17 · Callout 15 · Footnote 13/500 · Caption 11/600
 enum AppFont {
     static let title2 = Font.system(size: 22, weight: .bold)
+    /// 홈 가로줄 제목 — 목업 `.rowh b` 20/700, 자간 -0.02em.
+    static let sectionTitle = Font.system(size: 20, weight: .bold)
+    /// 카드 제목 — 목업 `.card .t` 14/600.
+    static let cardTitle = Font.system(size: 14, weight: .semibold)
+    /// NEW 배지 — 11/700.
+    static let badge = Font.system(size: 11, weight: .bold)
     static let headline = Font.system(size: 17, weight: .semibold)
     static let body = Font.system(size: 17)
     static let bodyEmphasis = Font.system(size: 17, weight: .semibold)
@@ -19,4 +25,5 @@ enum AppFont {
 enum Tracking {
     static let title2: CGFloat = 22 * -0.015
     static let headline: CGFloat = 17 * -0.01
+    static let sectionTitle: CGFloat = 20 * -0.02
 }
