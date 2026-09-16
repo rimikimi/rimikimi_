@@ -10,6 +10,7 @@ import { initPush, attachPushHandlers, getPushToken } from "./push";
 import { t, useLang, getLang, localizedTitle, localizedCategory, getLangPreference, setLang } from "./i18n";
 import PhotoEditor from "./PhotoEditor";
 import { FILM_PRESETS, groupedPresets } from "./filters";
+import CameraStudio from "./CameraStudio";
 import LoginGate from "./LoginGate";
 import Guide, { guideSeen, markGuideSeen } from "./Guide";
 // ⚠️ 정적 import — 네이티브 WebView 에서 동적 import() 가 영원히 pending 되는
@@ -1397,6 +1398,8 @@ export default function PortraitStudio() {
   // ── 필터 스튜디오 (컨셉 아님 — 사진 최대 10장에 필름 필터, 전부 무료·전부 로컬) ──
   const FILTER_MAX = 10;
   const [filterSrcs, setFilterSrcs] = useState(null); // {srcs, preset} | null
+  // 카메라 화면 — 찍은 사진은 그대로 편집기로 넘어간다(필터·스티커·저장이 거기 다 있다)
+  const [cameraPreset, setCameraPreset] = useState(null); // presetKey | null = 닫힘
   const filterPresetRef = useRef("none"); // 카드에서 고른 프리셋 — 에디터가 이걸 켠 채 열린다
   const filterInputRef = useRef(null);
   const garmentInputRef = useRef(null);
@@ -2501,6 +2504,7 @@ export default function PortraitStudio() {
             popular={popular}
             onBrooklyn={openBrooklyn}
             onFilterStudio={openFilterStudio}
+            onCamera={(key) => setCameraPreset(key || "none")}
           />
         )}
         {screen === "confirm" && selected && (
@@ -2626,6 +2630,17 @@ export default function PortraitStudio() {
         style={{ display: "none" }}
         onChange={onGarmentFiles}
       />
+      {cameraPreset !== null && (
+        <CameraStudio
+          initialPresetKey={cameraPreset}
+          onClose={() => setCameraPreset(null)}
+          onShot={(dataUrl, presetKey) => {
+            setCameraPreset(null);
+            setFilterSrcs({ srcs: [dataUrl], preset: presetKey });
+          }}
+        />
+      )}
+
       {filterSrcs && (
         <PhotoEditor
           srcs={filterSrcs.srcs}
@@ -2959,6 +2974,7 @@ function GalleryScreen({
   onInvite, inviteMsg = "", unlimited = false,
   fullPool = [], popular = [], onBrooklyn,
   onFilterStudio,
+  onCamera,
 }) {
   const [cols, setCols] = useState(2);
   const hasFilter =
@@ -3111,6 +3127,22 @@ function GalleryScreen({
         // 원격 로드(fs_*.webp)라 톤을 고쳐도 앱 빌드가 필요 없다.
         <>
           <div style={S.filterNotice}>{t("filter.gridNotice")}</div>
+          <button
+            style={S.camCta}
+            onClick={() => { hap.tap(); onCamera && onCamera("none"); }}
+          >
+            <span style={S.camCtaIcon} aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 8.5h2.6l1.3-2h8.2l1.3 2H20a1 1 0 0 1 1 1V18a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5a1 1 0 0 1 1-1Z" />
+                <circle cx="12" cy="13.5" r="3.4" />
+              </svg>
+            </span>
+            <span style={S.camCtaText}>
+              <span style={S.camCtaTitle}>{t("camera.cta")}</span>
+              <span style={S.camCtaDesc}>{t("camera.ctaDesc")}</span>
+            </span>
+            <span style={S.camCtaGo}>›</span>
+          </button>
           {groupedPresets().map((g) => (
             <div key={g.key} style={S.homeSection}>
               <div style={S.homeRowHead}>
@@ -5097,6 +5129,23 @@ const S = {
   myGalleryGrid: {
     display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12,
   },
+  // 필터 화면 맨 위 카메라 진입 버튼
+  camCta: {
+    width: "100%", display: "flex", alignItems: "center", gap: 12,
+    background: "#fff", border: "1px solid " + INK + "12", borderRadius: 18,
+    padding: "13px 15px", marginBottom: 18, cursor: "pointer", textAlign: "left",
+    boxShadow: "0 10px 24px -16px rgba(35,31,32,0.34)",
+  },
+  camCtaIcon: {
+    flex: "none", width: 42, height: 42, borderRadius: 14,
+    background: "linear-gradient(140deg,#231f20,#4a4243)", color: "#fff",
+    display: "flex", alignItems: "center", justifyContent: "center",
+  },
+  camCtaText: { flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 },
+  camCtaTitle: { fontSize: 14.5, fontWeight: 800, color: INK, letterSpacing: "-0.01em" },
+  camCtaDesc: { fontSize: 12, color: INK + "8c", lineHeight: 1.4 },
+  camCtaGo: { flex: "none", fontSize: 20, color: INK + "55", paddingRight: 2 },
+
   filterNotice: {
     fontSize: 12.5, color: INK + "8c", lineHeight: 1.6, margin: "2px 2px 12px",
   },

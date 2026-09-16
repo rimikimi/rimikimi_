@@ -83,7 +83,7 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>내 사진을 직접 촬영해서 AI 포트레이트를 만들기 위해 카메라가 필요해요.</string>
+	<string>내 사진을 직접 촬영해 AI 포트레이트를 만들거나, 필터를 미리 보면서 사진을 찍기 위해 카메라가 필요해요.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>생성된 이미지를 사진 앨범에 저장해 드리기 위해 사진 보관함 쓰기 권한이 필요해요.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
