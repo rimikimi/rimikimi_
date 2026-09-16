@@ -3115,7 +3115,8 @@ function GalleryScreen({
 
       <div style={S.stickyBar}>
         <div style={S.catRowSticky} data-hscroll>
-          {categories.map((c, i) => (
+          {/* 필터는 하단 탭에 대분류로 있으니 상단 칩에서는 뺀다(오너 지시 2026-09-17). 내부 상태(activeCat)는 그대로 — 탭이 그 값을 쓴다. */}
+          {categories.filter((c) => c.name !== t("filter.cat")).map((c, i) => (
             <button
               key={c.name}
               style={{
