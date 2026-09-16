@@ -16,6 +16,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { FILM_PRESETS, groupedPresets, presetByKey, applyLook } from "./filters";
 import { t, getLang } from "./i18n";
+import { isNative } from "./nativeBridge";
 import * as hap from "./haptics";
 
 const GRAIN_SEED = 7;          // PhotoEditor 와 같은 시드 — 미리보기/결과의 그레인이 같다
@@ -66,6 +67,17 @@ export default function CameraStudio({ initialPresetKey = "none", onShot, onClos
     setReady(false);
     try {
       if (!navigator.mediaDevices?.getUserMedia) throw new Error("unsupported");
+      // ⚠️ 네이티브에서는 iOS 권한을 **앱이 먼저** 받는다.
+      //    Capacitor 는 웹뷰의 카메라 요청(requestMediaCapturePermissionFor)을 권한 창 없이 그대로
+      //    승인(.grant)해 버린다. 그러면 WebKit 이 곧장 캡처를 시작하는데, 앱이 아직 카메라 권한을
+      //    받은 적이 없으면 iOS 가 프롬프트 대신 앱을 종료하는 경로가 있다(TestFlight build 85·86
+      //    크래시 — 시뮬레이터엔 카메라가 없어 재현 불가). @capacitor/camera 의 requestPermissions
+      //    는 이 앱의 기존 촬영 기능이 쓰던 검증된 경로라 그걸로 먼저 권한을 확정한다.
+      if (isNative()) {
+        const { Camera } = await import("@capacitor/camera");
+        const st = await Camera.requestPermissions({ permissions: ["camera"] });
+        if (st.camera === "denied") { const e = new Error("denied"); e.name = "NotAllowedError"; throw e; }
+      }
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: mode, width: { ideal: 1440 }, height: { ideal: 1920 } },
         audio: false,
