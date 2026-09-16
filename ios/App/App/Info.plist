@@ -82,6 +82,10 @@
 	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<!-- 필터 카메라(웹뷰 getUserMedia)가 열릴 때 iOS 가 마이크 권한 문구 존재 여부까지 확인한다.
+	     문구가 없으면 권한 요청 없이 앱이 즉시 종료된다(TCC 크래시). 소리는 실제로 쓰지 않는다. -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>필터 카메라를 열 때 iOS가 확인하는 항목이에요. 리미키미는 소리를 녹음하지 않아요.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>내 사진을 직접 촬영해 AI 포트레이트를 만들거나, 필터를 미리 보면서 사진을 찍기 위해 카메라가 필요해요.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
