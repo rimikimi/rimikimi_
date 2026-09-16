@@ -76,6 +76,47 @@ export async function deleteGalleryItem(token: string, id: string): Promise<void
   await fetch(`${getEnv().apiBase}/api/gallery?id=${encodeURIComponent(id)}`, { method: "DELETE", headers: auth(token) });
 }
 
+// ---- /api/iap/grant ---------------------------------------------------------
+/** 서버가 RevenueCat 을 재검증해 크레딧을 지급한다. 202 = 아직 RC 에 반영 전 → "pending". */
+export async function iapGrant(token: string, productId: string, transactionId: string | null): Promise<"ok" | "pending"> {
+  const r = await fetch(`${getEnv().apiBase}/api/iap/grant`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...auth(token) },
+    body: JSON.stringify({ productId, transactionId }),
+  });
+  if (r.status === 202) return "pending";
+  const j = (await r.json().catch(() => ({}))) as { error?: string };
+  if (!r.ok) throw new ApiError(j?.error || "적립 실패", r.status);
+  return "ok";
+}
+
+// ---- /api/referral/claim ----------------------------------------------------
+export async function referralClaim(token: string, ref: string): Promise<{ ok: boolean; reason?: string }> {
+  const r = await fetch(`${getEnv().apiBase}/api/referral/claim`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...auth(token) },
+    body: JSON.stringify({ ref }),
+  });
+  const j = (await r.json().catch(() => null)) as { ok?: boolean; reason?: string } | null;
+  if (!j) return { ok: false, reason: "db_error" };
+  return { ok: !!j.ok, reason: j.reason };
+}
+
+// ---- /api/account/delete ----------------------------------------------------
+export async function accountDelete(token: string): Promise<void> {
+  const r = await fetch(`${getEnv().apiBase}/api/account/delete`, { method: "POST", headers: auth(token) });
+  const j = (await r.json().catch(() => ({}))) as { error?: string };
+  if (!r.ok) throw new ApiError(j?.error || "삭제 실패", r.status);
+}
+
+// ---- /api/drops (→ /api/concepts?drops=1) -----------------------------------
+export interface Drop { at: string; count: number; titles?: string[] }
+export async function fetchDrops(days = 30): Promise<Drop[]> {
+  const r = await fetch(`${getEnv().apiBase}/api/drops?days=${days}`, { cache: "no-cache" });
+  const j = (await r.json()) as unknown;
+  return Array.isArray(j) ? (j as Drop[]) : [];
+}
+
 // ---- /api/generate ----------------------------------------------------------
 export interface GenerateMeta {
   id: number | string;
@@ -98,7 +139,19 @@ export interface GenerateMeta {
   idBgName?: string;
   proSample?: boolean;
   pushToken?: string | null;
-  faceRefs?: EncodedPhoto[];
+  faceRefs?: (EncodedPhoto & { angle?: string })[];
+}
+
+/** 페이스 프로필 앵커 생성(1.x faceProfile.requestAnchor) — 서버는 셀카를 저장하지 않는다. */
+export async function requestFaceAnchor(token: string, shots: EncodedPhoto[]): Promise<EncodedPhoto> {
+  const r = await fetch(`${getEnv().apiBase}/api/generate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...auth(token) },
+    body: JSON.stringify({ faceAnchor: true, shots: shots.map((s, i) => ({ ...s, angle: "shot" + (i + 1) })) }),
+  });
+  const j = (await r.json().catch(() => null)) as { base64?: string; mimeType?: string; error?: string } | null;
+  if (!r.ok || !j?.base64) throw new ApiError(j?.error || "기준 사진을 만들지 못했어요. 잠시 뒤 다시 시도해 주세요.", r.status);
+  return { mimeType: j.mimeType || "image/jpeg", base64: j.base64 };
 }
 
 export interface GenerateResult {

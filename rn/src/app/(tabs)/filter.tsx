@@ -11,30 +11,19 @@ import { IconCamera } from "@/ui/icons";
 import { useAuth } from "@/lib/auth";
 import { getEnv } from "@/lib/env";
 import { copy } from "@/lib/copy";
+import { groupedPresets } from "@/filters";
 import { color, radius, space } from "@/theme/tokens";
 import { duration } from "@/theme/motion";
 
 // 필터 탭 — 필름 · 카메라 · 재미 세 그룹 가로줄, 맨 위 "카메라로 찍기" (SPEC §2).
-// 프리셋 → (로그인) → 사진 고르기 → 편집기. 1단계(2.0)는 편집기·카메라를 웹뷰로 임베드(SPEC §5).
-// 프리셋 목록·썸네일(thumbs/fs_{key}.webp)은 웹 src/filters.js 27종 — 키만 여기 둔다.
+// 프리셋 목록·순서는 src/filters.ts(웹 src/filters.js 사본) groupedPresets() — 하드코딩 없음.
+// 프리셋 → (로그인) → 편집기(1단계는 웹뷰). 썸네일 thumbs/fs_{key}.webp.
 
-const GROUPS: { key: "film" | "camera" | "fun"; label: string; presets: { key: string; label: string }[] }[] = [
-  { key: "film", label: copy.filter.groups.film, presets: [
-    { key: "kodak", label: "코닥" }, { key: "fuji", label: "후지" }, { key: "portra", label: "포트라" }, { key: "cinestill", label: "시네스틸" },
-    { key: "bw", label: "흑백" }, { key: "vintage", label: "빈티지" }, { key: "polaroid", label: "폴라로이드" }, { key: "faded", label: "페이디드" },
-  ] },
-  { key: "camera", label: copy.filter.groups.camera, presets: [
-    { key: "ccd", label: "CCD" }, { key: "y2k", label: "Y2K" }, { key: "disposable", label: "일회용" }, { key: "vhs", label: "VHS" },
-    { key: "lomo", label: "로모" }, { key: "flash", label: "플래시" }, { key: "night", label: "야간" }, { key: "hdr", label: "HDR" },
-  ] },
-  { key: "fun", label: copy.filter.groups.fun, presets: [
-    { key: "pop", label: "팝" }, { key: "duotone", label: "듀오톤" }, { key: "glitch", label: "글리치" }, { key: "pixel", label: "픽셀" },
-    { key: "sketch", label: "스케치" }, { key: "neon", label: "네온" }, { key: "dreamy", label: "드리미" },
-  ] },
-];
+const GROUP_LABEL: Record<string, string> = { film: copy.filter.groups.film, camera: copy.filter.groups.camera, fun: copy.filter.groups.fun, etc: "기타" };
 
 export default function FilterTab() {
   const { requireLogin } = useAuth();
+  const groups = groupedPresets();
   const open = (preset?: string) => {
     const route = preset ? `/editor?preset=${encodeURIComponent(preset)}` : "/editor";
     requireLogin("filter", () => router.push(route as never), route);
@@ -54,14 +43,14 @@ export default function FilterTab() {
         </Card>
       </View>
       <View style={styles.groups}>
-        {GROUPS.map((g) => (
+        {groups.map((g) => (
           <View key={g.key} style={styles.group}>
-            <Text size="headline" style={styles.groupTitle}>{g.label}</Text>
+            <Text size="headline" style={styles.groupTitle}>{`${g.emoji} ${GROUP_LABEL[g.key] ?? g.key}`}</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row} overScrollMode="never">
-              {g.presets.map((p) => (
-                <Pressable key={p.key} accessibilityRole="button" accessibilityLabel={p.label} onPress={() => open(p.key)} style={({ pressed }) => [styles.preset, pressed && { opacity: 0.85 }]}>
+              {g.items.map((p) => (
+                <Pressable key={p.key} accessibilityRole="button" accessibilityLabel={p.ko} onPress={() => open(p.key)} style={({ pressed }) => [styles.preset, pressed && { opacity: 0.85 }]}>
                   <Image source={{ uri: `${getEnv().apiBase}/thumbs/fs_${p.key}.webp` }} style={styles.presetImg} contentFit="cover" transition={duration.enter} cachePolicy="disk" />
-                  <Text size="footnote" numberOfLines={1}>{p.label}</Text>
+                  <Text size="footnote" numberOfLines={1}>{p.ko}</Text>
                 </Pressable>
               ))}
             </ScrollView>

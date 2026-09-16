@@ -19,3 +19,6 @@ ios/
 
 .env
 .env.local
+
+# Firebase 클라이언트 설정 — 1.x android/app/google-services.json 과 같이 미추적
+google-services.json

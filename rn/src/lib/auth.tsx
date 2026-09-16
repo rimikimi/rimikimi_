@@ -5,6 +5,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { Session } from "@supabase/supabase-js";
 import { bindAppStateRefresh, supabase } from "./supabase";
 import { NATIVE_REDIRECT, getEnv } from "./env";
+import { loginIap, logoutIap } from "./iap";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -109,9 +110,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => { sub.subscription.unsubscribe(); linkSub.remove(); };
   }, []);
 
-  // 세션이 생기면 하던 동작을 이어서 한다.
+  // 세션이 생기면 하던 동작을 이어서 한다. RevenueCat 앱 유저 ID 도 여기서 맞춘다(1.x loginIap).
   useEffect(() => {
     if (!session?.user?.id) return;
+    const uid = session.user.id;
+    setTimeout(() => { void loginIap(uid); }, 0);
     const p = pending.current;
     pending.current = null;
     setSheetOpen(false);
@@ -175,6 +178,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
+    await logoutIap();
     await supabase().auth.signOut();
     setSession(null);
   }, []);

@@ -9,7 +9,8 @@ import { copy } from "@/lib/copy";
 import { color, space } from "@/theme/tokens";
 import { GUIDE_SEEN_KEY } from "@/lib/prefs";
 
-// 첫 실행 가이드 — 딱 1장. ATT 는 첫 생성 완료 후, 알림 권한은 "새 컨셉 알림 켜기" 를 누를 때(SPEC §3).
+// 첫 실행 가이드 — 딱 1장(1.x Guide.jsx intro "3단계면 끝나요" 문구 재사용). 실행 시 다른 팝업 없음.
+// ATT 는 iOS 전용, 알림 권한은 프로필 "새 컨셉 알림 켜기" 에서만(SPEC §3).
 export default function Guide() {
   const insets = useSafeAreaInsets();
   return (
@@ -17,7 +18,14 @@ export default function Guide() {
       <View style={styles.body}>
         <Logo height={40} />
         <Text size="title2" center style={{ marginTop: space.s6 }}>{copy.guide.title}</Text>
-        <Text size="body" tone="muted" center style={{ marginTop: space.s3 }}>{copy.guide.body}</Text>
+        <View style={styles.steps}>
+          {copy.guide.steps.map((s, i) => (
+            <View key={s.t} style={[styles.step, i < copy.guide.steps.length - 1 && styles.stepLine]}>
+              <Text size="body" weight="semibold">{s.t}</Text>
+              <Text size="footnote" tone="muted">{s.d}</Text>
+            </View>
+          ))}
+        </View>
       </View>
       <Button
         label={copy.guide.cta}
@@ -33,5 +41,8 @@ export default function Guide() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: color.bg, paddingHorizontal: space.s5 },
-  body: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: space.s4 },
+  body: { flex: 1, alignItems: "center", justifyContent: "center" },
+  steps: { alignSelf: "stretch", marginTop: space.s5 },
+  step: { paddingVertical: space.s3, gap: 2 },
+  stepLine: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: color.line },
 });

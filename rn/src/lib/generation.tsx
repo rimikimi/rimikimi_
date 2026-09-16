@@ -7,6 +7,9 @@ import { useAuth } from "./auth";
 import { useQuota } from "./quota";
 import { encodeForUpload, type EncodedPhoto, type PhotoRef } from "./photo";
 import { type Concept, isArtOnly, isRestoreConcept } from "./concepts";
+import { getPushToken } from "./push";
+import { loadProfileRefs } from "./faceProfile";
+import { FIRST_GEN_DONE_KEY, INVITE_CARD_DUE_KEY, getFlag, setFlag } from "./prefs";
 
 // ============================================================================
 // 생성 — SPEC §3: 만들기 → 홈으로 복귀 + 내 사진 진행 카드 → 완료 시 카드가 결과로 → 결과 화면.
@@ -92,6 +95,13 @@ export function GenerationProvider({ children }: { children: React.ReactNode }) 
     setJobs((prev) => prev.map((j) => (j.id === id ? { ...j, ...p } : j)));
   }, []);
 
+  // 첫 생성 완료 → 홈 상단 초대 카드 1회 (SPEC §3). ATT 는 iOS 전용이라 안드로이드는 초대 카드만.
+  const noteDone = useCallback(async () => {
+    if (await getFlag(FIRST_GEN_DONE_KEY)) return;
+    await setFlag(FIRST_GEN_DONE_KEY, true);
+    await setFlag(INVITE_CARD_DUE_KEY, true);
+  }, []);
+
   // 갤러리를 한 번 조회해 방금 만든 결과를 찾는다. true / false / "offline".
   const lookupPendingResult = useCallback(async (p: PendingMarker): Promise<boolean | "offline"> => {
     const token = tokenRef.current;
@@ -121,10 +131,11 @@ export function GenerationProvider({ children }: { children: React.ReactNode }) 
       });
       await clearPendingGen();
       refreshQuota();
+      void noteDone();
       return true;
     }
     return false;
-  }, [refreshQuota]);
+  }, [refreshQuota, noteDone]);
 
   const tryRecover = useCallback(async ({ poll }: { poll: boolean }): Promise<boolean> => {
     if (recovering.current) return false;
@@ -171,8 +182,12 @@ export function GenerationProvider({ children }: { children: React.ReactNode }) 
       await writePendingGen({ jobId: id, startedAt, conceptId: concept.id, conceptTitle: concept.title, count });
       try {
         const photo = await encodeForUpload(input.photo, 1024);
-        const meta: GenerateMeta = { id: concept.id, title: concept.title };
+        // 1.x 와 동일: 이 기기의 푸시 토큰(완료 알림용) + 페이스 프로필 앵커(있을 때만, 요청 1회용).
+        const meta: GenerateMeta = { id: concept.id, title: concept.title, pushToken: getPushToken() };
         let promptText = concept.text || "";
+        if (!isArtOnly(concept)) {
+          try { meta.faceRefs = await loadProfileRefs(); } catch { meta.faceRefs = []; }
+        }
         if (input.fourcutCount) {
           promptText = "인생네컷";
           meta.fourcutStyle = input.fourcutStyle;
@@ -197,6 +212,7 @@ export function GenerationProvider({ children }: { children: React.ReactNode }) 
         await clearPendingGen();
         patch(id, { status: "done", images });
         refreshQuota();
+        void noteDone();
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
       } catch (err) {
         const e = err as ApiError;
@@ -209,7 +225,7 @@ export function GenerationProvider({ children }: { children: React.ReactNode }) 
       }
     })();
     return id;
-  }, [patch, refreshQuota, tryRecover]);
+  }, [patch, refreshQuota, tryRecover, noteDone]);
 
   const dismiss = useCallback((jobId: string) => setJobs((prev) => prev.filter((j) => j.id !== jobId)), []);
   const job = useCallback((jobId: string | undefined) => jobs.find((j) => j.id === jobId), [jobs]);

@@ -17,6 +17,9 @@ const SUPABASE_ANON_KEY =
   process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ??
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhlZGdqemRyaXZpbGNsbXd1bW9jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2OTk1MjksImV4cCI6MjA5NTI3NTUyOX0.Hp88oUR53x4dEwnfYoxreDHUvZWZHiA4Skm_2nozVa8";
 
+// RevenueCat 공개 키(goog_…) — 1.x .env.local VITE_RC_ANDROID_KEY 와 같은 값. 공개 키다(비밀 아님).
+const RC_ANDROID_KEY = process.env.EXPO_PUBLIC_RC_ANDROID_KEY ?? "goog_YIKsqWRnzWfBZURnwnGHSBqeauh";
+
 // SPEC §1 바탕색. theme/tokens.ts 의 color.bg 와 손으로 같게 유지한다(네이티브 설정은
 // RN 토큰 모듈을 import 할 수 없다).
 const BG = "#FBF8F3";
@@ -38,6 +41,8 @@ const config: ExpoConfig = {
   android: {
     package: "com.rimikimi.app",
     versionCode: 100,
+    // FCM (rimikimi-ad8aa) — 1.x android/app/google-services.json 사본. 완료 푸시 + 드롭 토픽(drop_p540).
+    googleServicesFile: "./google-services.json",
     adaptiveIcon: {
       backgroundColor: BG,
       foregroundImage: "./assets/images/adaptive-icon.png",
@@ -69,6 +74,11 @@ const config: ExpoConfig = {
     "expo-router",
     "expo-web-browser",
     "expo-secure-store",
+    "@react-native-firebase/app",
+    "@react-native-firebase/messaging",
+    // ⚠️ icon 은 Android 8+ 상태바용 흰색·투명 배경 단색 PNG 여야 한다 — 지금은 앱 아이콘을 임시로
+    //    꽂아 둔 것(회색 사각으로 보일 수 있음). 96×96 단색 벨 아이콘으로 교체 필요.
+    ["expo-notifications", { icon: "./assets/images/icon.png", color: "#E6403C", defaultChannel: "default" }],
     [
       "expo-splash-screen",
       { backgroundColor: BG, image: "./assets/images/splash-icon.png", imageWidth: 160 },
@@ -98,6 +108,7 @@ const config: ExpoConfig = {
     apiBase: API_BASE,
     supabaseUrl: SUPABASE_URL,
     supabaseAnonKey: SUPABASE_ANON_KEY,
+    rcAndroidKey: RC_ANDROID_KEY,
     router: {},
   },
 };

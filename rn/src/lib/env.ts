@@ -47,5 +47,13 @@ export function envProblem(): string | null {
   }
 }
 
+/** RevenueCat 공개 키(goog_/appl_). 없으면 null — 스토어 UI 는 뜨되 구매 버튼이 "준비 중"으로 막힌다. */
+export function getRcApiKey(platform: "ios" | "android"): string | null {
+  const v = platform === "ios"
+    ? process.env.EXPO_PUBLIC_RC_IOS_KEY ?? extra("rcIosKey")
+    : process.env.EXPO_PUBLIC_RC_ANDROID_KEY ?? extra("rcAndroidKey");
+  return typeof v === "string" && v.length > 0 ? v : null;
+}
+
 /** 네이티브 OAuth 복귀 딥링크 — Supabase Redirect URL 에 등록된 값 그대로(SPEC §3). */
 export const NATIVE_REDIRECT = "com.rimikimi.app://login-callback";

@@ -8,6 +8,7 @@ import { Chip } from "@/ui/Chip";
 import { Text } from "@/ui/Text";
 import { Spinner } from "@/ui/Spinner";
 import { ConceptCard, ConceptRail } from "@/ui/ConceptCard";
+import { InviteCard } from "@/ui/InviteCard";
 import { useStore } from "@/lib/store";
 import { byNewest, categoriesOf } from "@/lib/concepts";
 import { copy } from "@/lib/copy";
@@ -38,6 +39,8 @@ export default function GalleryTab() {
       header={<AppHeader />}
       refreshControl={<RefreshControl refreshing={refreshing} tintColor={color.accent} onRefresh={() => { setRefreshing(true); reload(); setTimeout(() => setRefreshing(false), 800); }} />}
     >
+      {/* 첫 생성 완료 후 1회 — 홈 상단 초대 카드 */}
+      <InviteCard />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} overScrollMode="never">
         {chips.map((c, i) => {
           const on = active === c.name;

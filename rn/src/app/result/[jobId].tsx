@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Alert, ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { Image } from "expo-image";
@@ -12,6 +12,8 @@ import { Text } from "@/ui/Text";
 import { Button } from "@/ui/Button";
 import { ConceptRail } from "@/ui/ConceptCard";
 import { IconDownload, IconShare, IconWand } from "@/ui/icons";
+import { FitSheet } from "@/ui/FitSheet";
+import { needsFit } from "@/lib/fit";
 import { useGeneration, type ResultImage } from "@/lib/generation";
 import { useStore } from "@/lib/store";
 import { similarConcepts } from "@/lib/concepts";
@@ -45,12 +47,24 @@ export default function Result() {
   const { width } = useWindowDimensions();
   const [saving, setSaving] = useState(false);
   const [idx, setIdx] = useState(0);
+  // 정방향 맞춤 — 잘라 맞춘 결과로 표시 이미지를 바꾼다(원본은 서버 갤러리에 그대로).
+  const [fitted, setFitted] = useState<Record<number, string>>({});
+  const [fitOpen, setFitOpen] = useState(false);
+  const [fitAsked, setFitAsked] = useState(false);
 
   const job = findJob(jobId);
   const images: ResultImage[] = useMemo(
-    () => (job ? job.images : url ? [{ uri: url }] : []),
-    [job, url]
+    () => (job ? job.images : url ? [{ uri: url }] : []).map((im, i) => (fitted[i] ? { ...im, uri: fitted[i] } : im)),
+    [job, url, fitted]
   );
+
+  // 3:4 가 아니면(복원 컨셉 등) 한 번 제안한다.
+  useEffect(() => {
+    const first = images[0];
+    if (!first || fitAsked || first.uri.startsWith("data:")) return;
+    setFitAsked(true);
+    needsFit(first.uri).then((yes) => { if (yes) setFitOpen(true); });
+  }, [images, fitAsked]);
   const concept = job ? byId(job.concept.id) ?? job.concept : byId(conceptId) ?? (title ? { id: conceptId ?? "", title } : undefined);
   const img = images[idx];
   const w = width - space.screen * 2;
@@ -122,6 +136,7 @@ export default function Result() {
           <ConceptRail title={copy.result.similar} items={similar} />
         </View>
       ) : null}
+      <FitSheet open={fitOpen} uri={img?.uri ?? null} onClose={() => setFitOpen(false)} onFitted={(p) => setFitted((f) => ({ ...f, [idx]: p.uri }))} />
     </Screen>
   );
 }

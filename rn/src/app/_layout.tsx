@@ -9,7 +9,10 @@ import { AuthProvider } from "@/lib/auth";
 import { QuotaProvider } from "@/lib/quota";
 import { StoreProvider } from "@/lib/store";
 import { GenerationProvider } from "@/lib/generation";
+import { CreditGateProvider } from "@/lib/creditGate";
+import { installPushHandlers, setupNotifications } from "@/lib/push";
 import { LoginSheet } from "@/ui/LoginSheet";
+import { CreditSheet } from "@/ui/CreditSheet";
 import { Text } from "@/ui/Text";
 import { envProblem } from "@/lib/env";
 import { color, space } from "@/theme/tokens";
@@ -38,6 +41,14 @@ export default function RootLayout() {
     if (problem) SplashScreen.hideAsync().catch(() => undefined);
   }, [problem]);
 
+  // 푸시: 배너·탭 라우팅 설치 + 이미 허용한 사람만 조용히 설정(ask=false). 권한 팝업은 프로필 토글에서만.
+  useEffect(() => {
+    if (problem) return;
+    const off = installPushHandlers();
+    void setupNotifications(false);
+    return off;
+  }, [problem]);
+
   if (problem) {
     return (
       <SafeAreaProvider>
@@ -56,6 +67,7 @@ export default function RootLayout() {
         <AuthProvider>
           <QuotaProvider>
             <StoreProvider>
+              <CreditGateProvider>
               <GenerationProvider>
                 <StatusBar style="dark" />
                 <Stack
@@ -72,12 +84,18 @@ export default function RootLayout() {
                   <Stack.Screen name="concept/[id]" options={{ animation: "slide_from_right", animationDuration: transitions.stepForward.duration }} />
                   <Stack.Screen name="result/[jobId]" options={{ animation: "slide_from_right", animationDuration: transitions.stepForward.duration }} />
                   <Stack.Screen name="category/[name]" options={{ animation: "slide_from_right", animationDuration: transitions.stepForward.duration }} />
+                  <Stack.Screen name="store" options={{ animation: "slide_from_right", animationDuration: transitions.stepForward.duration }} />
                   <Stack.Screen name="camera" options={{ presentation: "modal", animationDuration: transitions.sheetIn.duration }} />
                   <Stack.Screen name="editor" options={{ presentation: "modal", animationDuration: transitions.sheetIn.duration }} />
+                  {/* dev 전용 화면 프리뷰 (scripts/previews.tsx) — 릴리스 번들에서는 라우트가 빈 화면 */}
+                  <Stack.Screen name="dev/index" />
+                  <Stack.Screen name="dev/[name]" options={{ animation: "slide_from_right" }} />
                 </Stack>
-                {/* 로그인 시트 — 어느 화면에서든 requireLogin 이 띄운다. 스택 위에 그린다. */}
+                {/* 로그인 시트 · 크레딧 부족 시트 — 어느 화면에서든 띄운다. 스택 위에 그린다. */}
                 <LoginSheet />
+                <CreditSheet />
               </GenerationProvider>
+              </CreditGateProvider>
             </StoreProvider>
           </QuotaProvider>
         </AuthProvider>

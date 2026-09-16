@@ -62,18 +62,29 @@ src/app/camera.tsx · editor.tsx   웹뷰 자리표시(https://rimikimi-app.verc
 - 결과: 앨범 저장(expo-media-library, writeOnly), 공유(expo-sharing), 한 장 더, 비슷한 컨셉.
 - 햅틱은 확정 시점(만들기 시작·완료·앨범 저장)에만.
 
-## 자리표시(stub) / 2주차
+## 2주차에 된 것
 
-- 카메라·편집기(다듬기): 웹뷰 자리표시. 세션 토큰을 URL 해시로 넘기지만 웹이 `?tool=&native=1` 을 읽어 바로 도구를 여는지는 웹 쪽 확인 필요. 저장·공유·앨범 네이티브 브리지 미구현.
-- 필터 프리셋 목록: 키 27종 중 23개를 하드코딩. 정본은 웹 `src/filters.js` — 공유 JSON 으로 빼야 세 플랫폼이 같아진다. 썸네일 `thumbs/fs_{key}.webp` 존재 여부 미확인.
-- 프로필: 스토어(RevenueCat) · 초대(`/api/referral/claim`) · 알림 설정(expo-notifications, 푸시 토큰을 `/api/generate` `pushToken` 으로 전달) · 계정 삭제(`/api/account/delete`) 는 "곧 열려요" / 웹 링크.
-- 크레딧 부족 시트(팩 3·구독 1·초대) 미구현 — 지금은 서버 402/429 메시지가 진행 카드에 실패로 뜬다.
-- 첫 생성 완료 후 ATT → 초대 카드, 완료 푸시(`notifyDone`) 수신 처리, 만료 리마인드.
+- **스토어·구독** (`src/lib/iap.ts`, `src/lib/storeFlow.ts`, `src/app/store.tsx`, `src/ui/StoreList.tsx`): react-native-purchases, 1.x `src/iap.js` 흐름 그대로 — configure(appUserID) → logIn(user.id) → getProducts(NON_SUBSCRIPTION + SUBSCRIPTION 각각) → purchaseStoreProduct → `POST /api/iap/grant {productId, transactionId}` (202 면 1.8s×6 재시도, 구독은 웹훅 적립이라 grant 실패 무시). 상품 ID 7종 + 옛 구독 ID. 모든 네이티브 호출 타임아웃. Play `subId:basePlanId` 접미사 대응. 구매 복원. RC 안드로이드 공개 키는 `app.config.ts extra.rcAndroidKey`(1.x `VITE_RC_ANDROID_KEY` 값) — 없으면 스토어 UI 는 뜨고 버튼은 "준비 중".
+- **크레딧 부족 시트** (`src/lib/creditGate.tsx`, `src/ui/CreditSheet.tsx`): 만들기 → 잔액 < 비용이면 팩 3 · 구독(먼슬리) · "친구 초대로 무료 3장" 시트. 구매 성공 → 잔액 갱신 → 하던 생성 이어서 시작.
+- **푸시** (`src/lib/push.ts`): expo-notifications 권한·FCM 토큰(`getDevicePushTokenAsync`), 토큰은 서버에 등록하지 않고 1.x 처럼 `/api/generate` `pushToken` 에 실어 보냄. 드롭: ① `/api/drops` 일정으로 로컬 예약(현지 20:00) ② `@react-native-firebase/messaging` 로 시간대 토픽 `drop_p540` 구독(서버 dropNotice.js 규칙). 권한 팝업은 프로필 "새 컨셉 알림 켜기" 토글에서만; 앱 시작 시엔 이미 허용된 경우만 조용히 설정. `google-services.json` 은 1.x `android/app/` 사본(미추적).
+- **첫 실행 가이드 1장**: 1.x Guide.jsx intro "3단계면 끝나요" 문구. 실행 시 다른 팝업 없음. **첫 생성 완료 후 홈 상단 초대 카드 1회** (`src/ui/InviteCard.tsx`, 플래그 `rimikimi_invite_card_due/done`). ATT 는 iOS 전용이라 없음.
+- **프로필**: 초대 코드(내 코드 탭 복사·공유 + 친구 코드 6자 입력 → `POST /api/referral/claim {ref}`, 실패 사유별 문구), 계정 삭제(`POST /api/account/delete` → 로컬 사진·페이스 프로필 정리 → 로그아웃), 법적 고지 링크(약관·개인정보·환불), 알림 토글, 페이스 프로필(등록 사진으로 앵커 생성 → 기기 저장 → 생성 때 `faceRefs`).
+- **정방향 맞춤(클라)** (`src/lib/fit.ts`, `src/ui/FitSheet.tsx`): 결과 화면에서 3:4(±2%) 가 아니면 제안 시트. EXIF 바로 세우기(ImageManipulator 재인코딩) + 3:4 크롭. **얼굴 검출은 미장착** — `expo-face-detector` 는 SDK 51 에서 제거됐고 ML Kit 바인딩은 실빌드 검증 없이 넣지 않았다. `FaceDetector` 인터페이스(`setFaceDetector`)만 두고 기본은 **중앙·상단 가중 크롭**(가로 중앙, 위쪽 여백 = 남는 높이의 30%). "채워 맞춤 · 1 크레딧" 은 버튼만("곧 열려요").
+- **필터 프리셋 = 웹 사본** (`src/filters.ts`): `src/filters.js` 를 그대로 복사해 타입만 붙인 것(27종 + `applyLook`/`applyLookWithStrength` 전부). 필터 탭은 `groupedPresets()` 로 그린다. 2.1 Skia 포팅의 기준.
+- **faceRefs / pushToken** 을 `/api/generate` 요청에 1.x 와 동일하게(아트 변환 제외 시 faceRefs).
+- **dev 프리뷰** (`scripts/previews.tsx`, `src/app/dev/`): 앱에서 `/dev` 로 가면 토큰·컴포넌트 / 로그인 시트 / 크레딧 시트 / 스토어 목록 / 시트·정방향 맞춤 / 카드 프리뷰 + 실제 화면 바로가기. `__DEV__` 가 아니면 빈 화면.
+
+## 자리표시(stub) / 남은 것
+
+- 카메라·편집기(다듬기): 웹뷰 자리표시. 저장·공유·앨범 네이티브 브리지 미구현. 편집기 쪽 정방향 맞춤 제안은 웹뷰라 미연결.
+- 얼굴 검출(정방향 맞춤): 위 참고 — ML Kit(`@react-native-ml-kit/face-detection`) 을 붙이려면 실기기 빌드 검증 후 `setFaceDetector()` 로 연결.
+- 알림 아이콘: `expo-notifications` 플러그인 `icon` 에 앱 아이콘을 임시로 꽂았다 — 96×96 흰색·투명 단색 PNG 로 교체 필요(Android 8+ 상태바).
+- 완료 푸시 수신 시 결과 화면 직행(지금은 내 사진 탭으로), 만료 리마인드 알림.
 - 증명사진(idphoto) 옵션(정장/배경색) 미구현 — 기본 프롬프트로 나간다.
-- 페이스 프로필(`faceRefs`) 미전송.
-- 결과 사진 768×1024 재크롭(웹 `fitToSize`) 생략 — 서버 결과 그대로. 정방향 맞춤(§3 신규) 미구현.
+- 결과 사진 768×1024 재크롭(웹 `fitToSize`) 생략 — 서버 결과 그대로.
 - 다크 모드: 토큰에 주석만. 라이트 전용 출시.
-- 앱 아이콘/스플래시: `store_assets/play-icon-512.png` 그대로 씀. 어댑티브 전경 이미지는 여백 있는 전용 에셋으로 교체 필요.
+- 앱 아이콘/스플래시: `store_assets/play-icon-512.png` 그대로. 어댑티브 전경 이미지 전용 에셋 필요.
+- 실기기 미검증 항목: Play 결제(거래ID 가 서버 `purchaseTxId` 와 맞는지 — 1.x 와 같이 `transactionIdentifier` 우선, `purchaseToken` 폴백), FCM 토큰 형식, 네이버 magic link 해시 복귀.
 
 ## 확인된 명세 모호점
 

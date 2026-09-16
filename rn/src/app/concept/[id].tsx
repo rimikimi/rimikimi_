@@ -14,6 +14,7 @@ import { GarmentRow, PhotoRow } from "@/ui/PhotoSlot";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { useGeneration } from "@/lib/generation";
+import { useCreditGate } from "@/lib/creditGate";
 import { FOURCUT_COUNTS, GARMENT_MAX, isArtOnly, isCoupleConcept, isDressroom, isFourcut, thumbUrl } from "@/lib/concepts";
 import { pickPhotos, registerPhoto, type PhotoRef } from "@/lib/photo";
 import { copy } from "@/lib/copy";
@@ -32,6 +33,7 @@ export default function ConceptOptions() {
   const { byId, photo, setPhoto, fourcutStyles } = useStore();
   const { requireLogin } = useAuth();
   const { start } = useGeneration();
+  const gate = useCreditGate();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const concept = byId(id);
@@ -93,20 +95,23 @@ export default function ConceptOptions() {
     if (dress && garments.length === 0) { Alert.alert(copy.options.dress.needGarment); return; }
     if (couple && !partner) { Alert.alert(copy.options.partnerNeed); return; }
     const route = `/concept/${String(concept.id)}`;
+    // 만들기 → (로그인 → 크레딧 부족이면 팩·구독·초대 시트, 구매 즉시 이어감) → 홈 복귀 + 진행 카드
     requireLogin("make", () => {
-      start({
-        concept,
-        photo: mainPhoto,
-        partner: couple ? partner : null,
-        garments: dress ? garments : undefined,
-        dressStyle: dress ? dressStyle : undefined,
-        batchCount,
-        fourcutCount: fourcut ? fourcutCount : undefined,
-        fourcutStyle: fourcut ? fourcutStyle : undefined,
+      gate.request(cost, () => {
+        start({
+          concept,
+          photo: mainPhoto,
+          partner: couple ? partner : null,
+          garments: dress ? garments : undefined,
+          dressStyle: dress ? dressStyle : undefined,
+          batchCount,
+          fourcutCount: fourcut ? fourcutCount : undefined,
+          fourcutStyle: fourcut ? fourcutStyle : undefined,
+        });
+        // 홈으로 복귀 + 내 사진 진행 카드 (SPEC §3): 스택을 탭까지 걷고 내 사진 탭으로.
+        router.dismissAll();
+        router.navigate("/(tabs)/photos");
       });
-      // 홈으로 복귀 + 내 사진 진행 카드 (SPEC §3): 스택을 탭까지 걷고 내 사진 탭으로.
-      router.dismissAll();
-      router.navigate("/(tabs)/photos");
     }, route);
   };
 

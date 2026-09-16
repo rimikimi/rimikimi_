@@ -1,0 +1,589 @@
+// ============================================================
+// 필터 엔진 — 웹 src/filters.js 를 그대로 옮긴 TypeScript 판(2.1 Skia 포팅의 기준).
+// ⚠️ 정본은 웹 파일이다. 여기 수식을 고치면 웹도 같이 고친다(미리보기=저장본 픽셀 동일 원칙).
+// ============================================================
+
+// ============================================================
+// 사진 필터 엔진 — 필름 프리셋 15종 + 효과(그레인/비네트/빛샘)
+//
+// 전부 ImageData 픽셀 연산(순수 JS)이다. ctx.filter 를 쓰지 않는 이유:
+//   · Safari(iOS WKWebView 포함)가 ctx.filter 를 지원하지 않는다
+//   · 지원하는 브라우저끼리도 색 결과가 미묘하게 다르다
+// 픽셀을 직접 계산하면 iOS/안드/웹/노드(검증 스크립트) 어디서나 같은 결과가
+// 나오고, 노드에서 돌려 실측 검증할 수 있다.
+//
+// 프리셋은 실제 필름 색과학(코닥 골드/포트라, 후지 벨비아, 시네스틸 800T 등)을
+// 참고해 만들었지만 이름에 브랜드/제품명은 쓰지 않는다 — 스토어 심사(5.2.1
+// 지재권)와 상표 리스크 때문. 색감은 재현하되 이름은 느낌만 딴다.
+//
+// 파이프라인(applyLook, 픽셀당 1패스):
+//   ① 채널 LUT — 온도/틴트 게인 + 노출 + 톤커브(대비 S커브·페이드·화이트풀)를
+//      256칸 테이블로 미리 구움 (프리셋당 1회)
+//   ② 흑백 믹서(모노 계열만)
+//   ③ 채도/바이브런스 — 바이브런스는 이미 쨍한 픽셀은 덜 올린다(피부 보호)
+//   ④ 스플릿톤 — 그림자/하이라이트에 각각 색을 얹음 (필름 특유의 색 편향)
+//   ⑤ 효과 — 그레인(밝기 가중 모노 노이즈), 비네트, 빛샘(스크린 블렌드)
+// ============================================================
+
+/* ---------- 프리셋 ----------
+   temp: 색온도(+따뜻 -차가움) / tint: +마젠타 -그린 / ex: 노출(EV)
+   con: 대비 S커브 강도 / fade: 블랙 들어올림(빛바랜 느낌) / whitePull: 하이라이트 눌러 롤오프
+   sat: 채도 / vib: 바이브런스 / sh·hi: 그림자·하이라이트 스플릿톤 [r,g,b]
+   bw: 흑백 채널 믹서 [wr,wg,wb] (합=1) */
+// group: "film"(필름 스톡) | "camera"(카메라 룩). 오너 지시 — "상징적인 카메라와 필름".
+// hsl: 색상 대역 조정(applyHslBands) / fx: 프리셋 기본 효과(칩 탭 = 원탭 완성 룩)
+export interface HslBand { c: number; w: number; h?: number; s?: number; l?: number }
+export interface Effects { grain?: number; vignette?: number; leak?: number; blur?: number; shake?: number; glow?: number; seed?: number }
+export interface Preset {
+  key: string; ko: string; en: string; group?: "film" | "camera" | "fun" | string;
+  temp?: number; tint?: number; ex?: number; con?: number; fade?: number; whitePull?: number;
+  sat?: number; vib?: number; sh?: number[]; hi?: number[]; bw?: number[]; hsl?: HslBand[];
+  fx?: Effects; special?: "duotone" | "thermal" | "glitch" | "vhs" | "pixelate" | "sketch"; c1?: number[]; c2?: number[];
+}
+export type Pixels = Uint8ClampedArray;
+
+export const FILM_PRESETS: Preset[] = [
+  { key: "none",     ko: "원본",      en: "Original" },
+
+  /* ── 필름 스톡 (코닥/후지/시네스틸/아그파/일포드 색과학 참고, 이름은 느낌만) ── */
+  { key: "golden",   ko: "골든",      en: "Golden", group: "film", // Kodak Gold 200
+    temp: 20, tint: 0,  ex: 0.04,  con: 0.18, fade: 10, whitePull: 8,  sat: 0.12,  vib: 0.15, sh: [6, 3, -8],   hi: [12, 9, -12],
+    hsl: [{ c: 110, w: 60, h: -18, s: -0.12 }, { c: 30, w: 25, s: 0.08, l: 0.02 }] },
+  { key: "peach",    ko: "피치",      en: "Peach", group: "film", // Portra 400
+    temp: 12, tint: 6,  ex: 0.07,  con: 0.08, fade: 14, whitePull: 14, sat: -0.08, vib: 0.25, sh: [4, 2, 0],    hi: [10, 5, -2],
+    hsl: [{ c: 30, w: 28, s: -0.06, l: 0.04 }, { c: 110, w: 60, h: -10, s: -0.15 }] },
+  { key: "slide",    ko: "슬라이드",  en: "Slide", group: "film", // Ektachrome
+    temp: -6, tint: -2, ex: 0,     con: 0.26, fade: 4,  whitePull: 0,  sat: 0.2,   vib: 0.1,  sh: [-3, 0, 8],   hi: [0, 0, 0],
+    hsl: [{ c: 225, w: 55, s: 0.25, l: -0.05 }, { c: 120, w: 50, s: 0.1 }] },
+  { key: "retro",    ko: "레트로",    en: "Retro", group: "film", // Kodachrome
+    temp: 6,  tint: 2,  ex: -0.05, con: 0.32, fade: 2,  whitePull: 4,  sat: 0.18,  vib: 0,    sh: [4, -2, -4],  hi: [6, 2, -6],
+    hsl: [{ c: 0, w: 30, s: 0.2, l: -0.06 }, { c: 60, w: 35, h: -10, s: 0.1 }, { c: 220, w: 60, s: -0.15, l: -0.05 }] },
+  { key: "vivid",    ko: "비비드",    en: "Vivid", group: "film", // Velvia
+    temp: 0,  tint: 0,  ex: 0,     con: 0.28, fade: 0,  whitePull: 0,  sat: 0.18,  vib: 0.12, sh: [0, -2, 4],   hi: [2, 0, -2],
+    hsl: [{ c: 225, w: 60, s: 0.3, l: -0.04 }, { c: 120, w: 55, s: 0.25, l: -0.03 }, { c: 0, w: 25, s: 0.2 }, { c: 30, w: 18, s: -0.1 }] },
+  { key: "green",    ko: "그린",      en: "Green", group: "film", // Superia
+    temp: 4,  tint: -8, ex: 0,     con: 0.15, fade: 8,  whitePull: 6,  sat: 0.1,   vib: 0.12, sh: [0, 6, -2],   hi: [6, 4, -4],
+    hsl: [{ c: 120, w: 60, h: 6, s: 0.2, l: -0.03 }, { c: 60, w: 25, h: 20, s: -0.1 }] },
+  { key: "pastel",   ko: "파스텔",    en: "Pastel", group: "film", // Pro 400H
+    temp: -4, tint: -10, ex: 0.18, con: -0.05, fade: 24, whitePull: 16, sat: -0.15, vib: 0.2,  sh: [-2, 7, 5],   hi: [2, 5, 3],
+    hsl: [{ c: 120, w: 70, h: 8, s: -0.2, l: 0.05 }, { c: 220, w: 60, s: -0.15, l: 0.05 }, { c: 30, w: 25, s: -0.08 }] },
+  { key: "cine",     ko: "시네",      en: "Cine", group: "film", // CineStill 800T
+    temp: -14, tint: 6, ex: 0,     con: 0.20, fade: 12, whitePull: 6,  sat: 0.05,  vib: 0.1,  sh: [-6, 4, 10],  hi: [14, 2, -4],
+    hsl: [{ c: 120, w: 70, h: 55, s: -0.2 }, { c: 220, w: 50, h: -18 }, { c: 30, w: 22, s: 0.05 }],
+    fx: { grain: 0.3 } },
+  { key: "newtro",   ko: "뉴트로",    en: "Newtro", group: "film", // Agfa Vista
+    temp: 8,  tint: 8,  ex: 0,     con: 0.22, fade: 8,  whitePull: 6,  sat: 0.16,  vib: 0,    sh: [6, -2, 0],   hi: [8, 2, -4],
+    hsl: [{ c: 0, w: 35, s: 0.15 }, { c: 180, w: 60, s: -0.2 }, { c: 30, w: 20, s: 0.05 }] },
+  { key: "softmono", ko: "소프트 모노", en: "Soft Mono", group: "film", // Ilford HP5
+    ex: 0.05, con: 0.12, fade: 16, whitePull: 12, bw: [0.28, 0.56, 0.16],
+    fx: { grain: 0.35 } },
+
+  /* ── 카메라 룩 (상징적인 카메라들의 렌더링) ── */
+  { key: "warm",     ko: "웜톤",      en: "Warm", group: "camera", // 캐논풍 스킨톤
+    temp: 10, tint: 10, ex: 0.08,  con: 0.10, fade: 6,  whitePull: 4,  sat: 0.06,  vib: 0.15, sh: [2, 0, 0],    hi: [9, 2, 2],
+    hsl: [{ c: 30, w: 25, l: 0.03 }, { c: 220, w: 50, s: -0.1 }] },
+  { key: "cool",     ko: "쿨톤",      en: "Cool", group: "camera", // 니콘풍 뉴트럴
+    temp: -14, tint: -4, ex: 0,    con: 0.16, fade: 6,  whitePull: 4,  sat: 0.04,  vib: 0.1,  sh: [-2, 2, 5],   hi: [0, 2, 5],
+    hsl: [{ c: 225, w: 60, s: 0.12 }, { c: 110, w: 50, h: 15, s: -0.08 }] },
+  { key: "vintage",  ko: "빈티지",    en: "Vintage", group: "camera", // 미놀타 90년대 자동카메라
+    temp: 14, tint: 2,  ex: -0.02, con: -0.08, fade: 22, whitePull: 18, sat: -0.15, vib: 0.05, sh: [6, 4, -2],   hi: [8, 6, -6],
+    hsl: [{ c: 120, w: 60, h: -25, s: -0.3 }, { c: 220, w: 60, s: -0.25 }, { c: 30, w: 30, s: -0.05, l: 0.03 }],
+    fx: { grain: 0.25 } },
+  { key: "docu",     ko: "다큐",      en: "Docu", group: "camera", // 후지 클래식크롬풍
+    temp: -4, tint: 0,  ex: -0.03, con: 0.20, fade: 10, whitePull: 10, sat: -0.28, vib: 0.1,  sh: [0, 2, 6],    hi: [4, 2, -2],
+    hsl: [{ c: 220, w: 70, h: -10, s: 0.05 }, { c: 0, w: 30, s: -0.15 }, { c: 30, w: 25, s: -0.12 }] },
+  { key: "mono",     ko: "모노",      en: "Mono", group: "camera", // 라이카 모노크롬풍
+    ex: 0,    con: 0.35, fade: 2,  whitePull: 0,  bw: [0.35, 0.5, 0.15] },
+  { key: "digicam",  ko: "디지캠",    en: "Digicam", group: "camera", // 2000년대 CCD 컴팩트 (Y2K)
+    temp: -8, tint: -2, ex: 0.06,  con: 0.22, fade: 0,  whitePull: 0,  sat: 0.15,  vib: 0.1,  sh: [0, 2, 6],    hi: [4, 4, 10],
+    hsl: [{ c: 225, w: 60, s: 0.2 }, { c: 180, w: 40, s: 0.15 }],
+    fx: { grain: 0.15 } },
+  { key: "toy",      ko: "토이",      en: "Toy", group: "camera", // 로모/홀가 토이카메라
+    temp: 4,  tint: 6,  ex: 0,     con: 0.3,  fade: 4,  whitePull: 0,  sat: 0.24,  vib: 0,    sh: [0, -4, 8],   hi: [6, 0, -6],
+    hsl: [{ c: 225, w: 55, s: 0.3, l: -0.06 }, { c: 0, w: 30, s: 0.15 }],
+    fx: { vignette: 0.65, grain: 0.25 } },
+  { key: "dispo",    ko: "일회용",    en: "Dispo", group: "camera", // 일회용 카메라 + 플래시
+    temp: 6,  tint: 0,  ex: 0.1,   con: 0.25, fade: 6,  whitePull: 0,  sat: 0.12,  vib: 0.08, sh: [-2, 4, 0],   hi: [10, 8, 2],
+    hsl: [{ c: 110, w: 50, h: -8, s: -0.05 }],
+    fx: { grain: 0.45, leak: 0.12 } },
+  { key: "instant",  ko: "인스턴트",  en: "Instant", group: "camera", // 폴라로이드 인화지 색
+    temp: -2, tint: -6, ex: 0.06,  con: -0.06, fade: 20, whitePull: 14, sat: -0.12, vib: 0.08, sh: [-4, 6, 4],   hi: [6, 4, -2],
+    hsl: [{ c: 120, w: 60, h: 10, s: -0.15, l: 0.03 }],
+    fx: { grain: 0.2 } },
+
+  /* ── 재미 (SNOW류 — 특수 렌더 모드, special 필드가 전용 코드 경로를 탄다) ── */
+  { key: "sepia",    ko: "세피아",    en: "Sepia", group: "fun",
+    ex: 0.02, con: 0.12, fade: 8, whitePull: 6, bw: [0.3, 0.55, 0.15], sh: [18, 6, -14], hi: [24, 10, -18] },
+  { key: "duopink",  ko: "듀오 핑크", en: "Duo Pink", group: "fun",
+    special: "duotone", c1: [38, 18, 66], c2: [255, 158, 201] },
+  { key: "neon",     ko: "네온",      en: "Neon", group: "fun",
+    special: "duotone", c1: [24, 8, 66], c2: [90, 255, 240],
+    fx: { glow: 0.5 } },
+  { key: "thermal",  ko: "서모",      en: "Thermal", group: "fun",
+    special: "thermal" },
+  { key: "glitch",   ko: "글리치",    en: "Glitch", group: "fun",
+    special: "glitch" },
+  { key: "vhs",      ko: "VHS",      en: "VHS", group: "fun",
+    special: "vhs", fx: { grain: 0.35 } },
+  { key: "pixelate", ko: "모자이크",  en: "Pixel", group: "fun",
+    special: "pixelate" },
+  { key: "sketch",   ko: "스케치",    en: "Sketch", group: "fun",
+    special: "sketch" },
+];
+
+// 필터 목록은 그룹별로 묶어서 보여준다 — 27개를 한 줄로 쭉 펼치면 "다 펼쳐진" 느낌이라
+// 갤러리 홈처럼 그룹 제목 + 가로 줄로 접는다(오너 지시 2026-09-13).
+// 순서 = 화면에 뜨는 순서. 여기 없는 group 은 "재미" 뒤에 자동으로 붙는다.
+export interface FilterGroup { key: string; labelKey: string; emoji: string }
+export const FILTER_GROUPS: FilterGroup[] = [
+  { key: "film",   labelKey: "filter.gFilm", emoji: "🎞️" },
+  { key: "camera", labelKey: "filter.gCam",  emoji: "📷" },
+  { key: "fun",    labelKey: "filter.gFun",  emoji: "✨" },
+];
+
+// [{ key, emoji, labelKey, items }] — 원본(none) 제외, FILM_PRESETS 순서 유지.
+export function groupedPresets(): (FilterGroup & { items: Preset[] })[] {
+  const rest = FILM_PRESETS.filter((p) => p.key !== "none");
+  const known = new Set(FILTER_GROUPS.map((g) => g.key));
+  const groups = FILTER_GROUPS.map((g) => ({ ...g, items: rest.filter((p) => p.group === g.key) }));
+  const orphans = rest.filter((p) => !known.has(p.group ?? ""));
+  if (orphans.length) groups.push({ key: "etc", labelKey: "filter.gEtc", emoji: "🎨", items: orphans });
+  return groups.filter((g) => g.items.length);
+}
+
+export function presetByKey(key: string): Preset {
+  return FILM_PRESETS.find((p) => p.key === key) || FILM_PRESETS[0];
+}
+
+/* ---------- 강도 조절 적용 (오너 지시 2026-08-26) ----------
+   슬라이더 0..1, 기본 0.7. "지금의 풀 프리셋" = 0.7 지점이 되도록
+   k = strength/0.7 로 원본↔프리셋 결과를 보간(1 초과는 외삽 = 더 진하게).
+   효과(그레인·비네트·빛샘·뽀샤시·흐림·흔들림)는 강도와 무관하게 그대로 얹는다
+   — 사용자가 슬라이더로 직접 조절하는 값이라 이중 스케일하면 헷갈린다. */
+export function applyLookWithStrength(data: Pixels, w: number, h: number, preset: Preset | null | undefined, effects: Effects = {}, strength = 0.7): Pixels {
+  const p = preset && preset.key !== "none" ? preset : null;
+  const k = strength / 0.7;
+  const seedOnly = { seed: effects.seed };
+  if (p) {
+    if (Math.abs(k - 1) > 0.01) {
+      const orig = new Uint8ClampedArray(data);
+      applyLook(data, w, h, p, seedOnly); // 프리셋만 (효과 제외)
+      for (let i = 0; i < data.length; i += 4) {
+        data[i] = clamp8(orig[i] + (data[i] - orig[i]) * k);
+        data[i + 1] = clamp8(orig[i + 1] + (data[i + 1] - orig[i + 1]) * k);
+        data[i + 2] = clamp8(orig[i + 2] + (data[i + 2] - orig[i + 2]) * k);
+      }
+    } else {
+      applyLook(data, w, h, p, seedOnly);
+    }
+  }
+  // 효과는 항상 원 강도로 (프리셋 위에)
+  if (effects.grain || effects.vignette || effects.leak || effects.blur || effects.shake || effects.glow) {
+    applyLook(data, w, h, null, effects);
+  }
+  return data;
+}
+
+const clamp8 = (v: number): number => (v < 0 ? 0 : v > 255 ? 255 : v);
+
+/* ---------- ① 채널 LUT 굽기 ---------- */
+// 온도/틴트 → 채널 게인. ±40 스케일을 게인 ±6.4% 로 매핑 (실측으로 잡은 감도).
+function channelGains(temp = 0, tint = 0) {
+  return [
+    1 + temp * 0.0016 + tint * 0.0008,
+    1 - tint * 0.0016,
+    1 - temp * 0.0016 + tint * 0.0008,
+  ];
+}
+
+// 톤커브: 대비 S커브(시그모이드) → 페이드(그림자 리프트) → 화이트풀(숄더 압축)
+function toneCurve(v01: number, con = 0, fade = 0, whitePull = 0): number {
+  let v = v01;
+  if (con) {
+    // 0.5 중심 시그모이드. con>0 이면 S커브(대비↑), con<0 이면 역S(대비↓)
+    const k = 1 + Math.abs(con) * 6;
+    const sig = (x: number) => 1 / (1 + Math.exp(-k * (x - 0.5)));
+    const lo = sig(0), hi = sig(1);
+    const s = (sig(v) - lo) / (hi - lo);
+    v = con > 0 ? s : v + (v - s); // 역S = 시그모이드 반대 방향으로 밀기
+  }
+  // 페이드: 깊은 그림자만 들어올린다((1-v)³ 가중). 전 구간 선형 리프트는 미드톤까지
+  // 부옇게 만들어 "물 빠진 싸구려 톤"이 된다 — 오너 피드백("밤티")의 주범 1.
+  const f = fade / 255;
+  if (f) v = v + f * Math.pow(1 - v, 3);
+  // 화이트풀: 0.65 위 어깨(shoulder)만 곡선으로 압축. 선형 스케일다운은 밝은 영역
+  // 전체가 회색으로 죽는다 — 주범 2. (t - wp·0.9·t² 는 wp≤0.1 에서 단조증가)
+  const wp = whitePull / 255;
+  if (wp && v > 0.65) {
+    const t = (v - 0.65) / 0.35;
+    v = 0.65 + 0.35 * (t - wp * 0.9 * t * t);
+  }
+  return v;
+}
+
+/* ---------- 색상 대역(HSL) 조정 ----------
+   진짜 필름 룩의 핵심 — "초록만 틸로 민다 / 피부(주황)는 보호한다" 같은
+   대역별 처리. 전역 보정만으로는 어떤 프리셋이든 싸구려 인스타 필터처럼 보인다.
+   band: { c: 중심 색상(0~360), w: 반경, h: 색상 이동(±도), s: 채도 배율 δ, l: 밝기 배율 δ } */
+function rgb2hsl(r: number, g: number, b: number): [number, number, number] {
+  r /= 255; g /= 255; b /= 255;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+  const l = (mx + mn) / 2;
+  if (mx === mn) return [0, 0, l];
+  const d = mx - mn;
+  const s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
+  let h;
+  if (mx === r) h = ((g - b) / d + (g < b ? 6 : 0)) * 60;
+  else if (mx === g) h = ((b - r) / d + 2) * 60;
+  else h = ((r - g) / d + 4) * 60;
+  return [h, s, l];
+}
+function hue2rgbc(p: number, q: number, t: number): number {
+  if (t < 0) t += 1;
+  if (t > 1) t -= 1;
+  if (t < 1 / 6) return p + (q - p) * 6 * t;
+  if (t < 1 / 2) return q;
+  if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+  return p;
+}
+function hsl2rgb(h: number, s: number, l: number): number[] {
+  if (s <= 0) { const v = l * 255; return [v, v, v]; }
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+  const hh = h / 360;
+  return [hue2rgbc(p, q, hh + 1 / 3) * 255, hue2rgbc(p, q, hh) * 255, hue2rgbc(p, q, hh - 1 / 3) * 255];
+}
+function applyHslBands(r: number, g: number, b: number, bands: HslBand[]): number[] {
+  let [h, s, l] = rgb2hsl(r, g, b);
+  if (s < 0.03) return [r, g, b]; // 무채색은 색상 정보가 무의미 — 건드리면 노이즈만 는다
+  let dh = 0, ds = 0, dl = 0;
+  for (const bd of bands) {
+    let dist = Math.abs(h - bd.c);
+    if (dist > 180) dist = 360 - dist;
+    if (dist >= bd.w) continue;
+    const wgt = 1 - dist / bd.w; // 중심에서 1, 가장자리 0 (선형 falloff)
+    dh += (bd.h || 0) * wgt;
+    ds += (bd.s || 0) * wgt;
+    dl += (bd.l || 0) * wgt;
+  }
+  if (!dh && !ds && !dl) return [r, g, b];
+  h = (h + dh + 360) % 360;
+  s = Math.min(1, Math.max(0, s * (1 + ds)));
+  l = Math.min(1, Math.max(0, l * (1 + dl)));
+  return hsl2rgb(h, s, l);
+}
+
+// 프리셋 → 채널별 256칸 LUT. 프리셋당 1회만 계산하고 픽셀 루프는 테이블 조회만 한다.
+export function buildLuts(p: Preset): Uint8Array[] {
+  const gains = channelGains(p.temp, p.tint);
+  const exGain = Math.pow(2, p.ex || 0);
+  const luts = [new Uint8Array(256), new Uint8Array(256), new Uint8Array(256)];
+  for (let c = 0; c < 3; c++) {
+    for (let v = 0; v < 256; v++) {
+      const lin = Math.min(1, (v / 255) * gains[c] * exGain);
+      luts[c][v] = clamp8(Math.round(toneCurve(lin, p.con, p.fade, p.whitePull) * 255));
+    }
+  }
+  return luts;
+}
+
+/* ---------- 이웃 연산 효과 (블러 계열 — 픽셀 단독으론 불가) ---------- */
+
+// 분리형 박스 블러(가로→세로, 슬라이딩 합) — O(n), 반경 무관 상수 시간.
+// 알파는 건드리지 않는다.
+function boxBlurRGBA(data: Pixels, w: number, h: number, radius: number): void {
+  const r = Math.max(1, radius | 0);
+  const tmp = new Uint8ClampedArray(data.length);
+  const div = r * 2 + 1;
+  // 가로
+  for (let y = 0; y < h; y++) {
+    const row = y * w;
+    let sR = 0, sG = 0, sB = 0;
+    for (let i = -r; i <= r; i++) {
+      const x = Math.min(w - 1, Math.max(0, i));
+      const k = (row + x) * 4;
+      sR += data[k]; sG += data[k + 1]; sB += data[k + 2];
+    }
+    for (let x = 0; x < w; x++) {
+      const k = (row + x) * 4;
+      tmp[k] = sR / div; tmp[k + 1] = sG / div; tmp[k + 2] = sB / div; tmp[k + 3] = data[k + 3];
+      const xAdd = Math.min(w - 1, x + r + 1), xSub = Math.max(0, x - r);
+      const ka = (row + xAdd) * 4, ks = (row + xSub) * 4;
+      sR += data[ka] - data[ks]; sG += data[ka + 1] - data[ks + 1]; sB += data[ka + 2] - data[ks + 2];
+    }
+  }
+  // 세로
+  for (let x = 0; x < w; x++) {
+    let sR = 0, sG = 0, sB = 0;
+    for (let i = -r; i <= r; i++) {
+      const y = Math.min(h - 1, Math.max(0, i));
+      const k = (y * w + x) * 4;
+      sR += tmp[k]; sG += tmp[k + 1]; sB += tmp[k + 2];
+    }
+    for (let y = 0; y < h; y++) {
+      const k = (y * w + x) * 4;
+      data[k] = sR / div; data[k + 1] = sG / div; data[k + 2] = sB / div;
+      const yAdd = Math.min(h - 1, y + r + 1), ySub = Math.max(0, y - r);
+      const ka = (yAdd * w + x) * 4, ks = (ySub * w + x) * 4;
+      sR += tmp[ka] - tmp[ks]; sG += tmp[ka + 1] - tmp[ks + 1]; sB += tmp[ka + 2] - tmp[ks + 2];
+    }
+  }
+}
+
+// 흔들림(모션 블러) — 살짝 기운 방향(약 8도)으로 탭 평균. 손떨림 스냅 느낌.
+function motionBlurRGBA(data: Pixels, w: number, h: number, amount: number): void {
+  const len = Math.max(2, Math.round(Math.min(w, h) * 0.05 * amount)); // 이동 길이(px)
+  const taps = Math.min(11, Math.max(3, Math.round(len / 2) * 2 + 1));
+  const src = new Uint8ClampedArray(data);
+  const ang = 8 * Math.PI / 180;
+  const dx = Math.cos(ang), dy = Math.sin(ang);
+  const half = (taps - 1) / 2;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      let sR = 0, sG = 0, sB = 0;
+      for (let t = -half; t <= half; t++) {
+        const step = (t / half) * (len / 2);
+        const sx = Math.min(w - 1, Math.max(0, Math.round(x + dx * step)));
+        const sy = Math.min(h - 1, Math.max(0, Math.round(y + dy * step)));
+        const k = (sy * w + sx) * 4;
+        sR += src[k]; sG += src[k + 1]; sB += src[k + 2];
+      }
+      const k = (y * w + x) * 4;
+      data[k] = sR / taps; data[k + 1] = sG / taps; data[k + 2] = sB / taps;
+    }
+  }
+}
+
+/* ---------- 메인: 프리셋 + 효과 적용 ----------
+   data: ImageData.data (RGBA, 제자리 수정)
+   effects: { grain, vignette, leak, blur(흐림), shake(흔들림), glow(뽀샤시), seed }
+   순서: 흔들림/흐림(기하) → 색·그레인·비네트·빛샘(1패스) → 뽀샤시(블룸, 마지막) */
+export function applyLook(data: Pixels, w: number, h: number, preset: Preset | null | undefined, effects: Effects = {}): Pixels {
+  const p = preset && preset.key !== "none" ? preset : null;
+  const luts = p ? buildLuts(p) : null;
+  const sat = p?.sat || 0;
+  const vib = p?.vib || 0;
+  const sh = p?.sh, hi = p?.hi, bw = p?.bw, hslBands = p?.hsl;
+
+  const grain = effects.grain || 0;
+  const vig = effects.vignette || 0;
+  const leak = effects.leak || 0;
+  const blur = effects.blur || 0;
+  const shake = effects.shake || 0;
+  const glow = effects.glow || 0;
+  const seed = (effects.seed || 7) | 0;
+
+  if (shake) motionBlurRGBA(data, w, h, shake);
+  if (blur) boxBlurRGBA(data, w, h, Math.round(Math.min(w, h) * 0.02 * blur) + 1);
+
+  // ── 재미(특수 렌더) 프리셋 — 표준 색 파이프라인 대신/이전에 전용 처리 ──
+  if (p?.special === "pixelate") {
+    const bs = Math.max(4, Math.round(Math.min(w, h) * 0.02)); // 블록 크기
+    for (let by = 0; by < h; by += bs) {
+      for (let bx = 0; bx < w; bx += bs) {
+        let sR = 0, sG = 0, sB = 0, n = 0;
+        for (let y = by; y < Math.min(h, by + bs); y++)
+          for (let x = bx; x < Math.min(w, bx + bs); x++) {
+            const k = (y * w + x) * 4; sR += data[k]; sG += data[k + 1]; sB += data[k + 2]; n++;
+          }
+        sR /= n; sG /= n; sB /= n;
+        for (let y = by; y < Math.min(h, by + bs); y++)
+          for (let x = bx; x < Math.min(w, bx + bs); x++) {
+            const k = (y * w + x) * 4; data[k] = sR; data[k + 1] = sG; data[k + 2] = sB;
+          }
+      }
+    }
+    return data;
+  }
+  if (p?.special === "sketch") {
+    // 연필 스케치 = 그레이 + (반전본 블러) 컬러닷지 — 고전 포토샵 레시피
+    const g = new Uint8ClampedArray(data.length);
+    for (let i = 0; i < data.length; i += 4) {
+      const L = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+      g[i] = g[i + 1] = g[i + 2] = L; g[i + 3] = 255;
+    }
+    const inv = new Uint8ClampedArray(g);
+    for (let i = 0; i < inv.length; i += 4) { inv[i] = 255 - inv[i]; inv[i + 1] = 255 - inv[i + 1]; inv[i + 2] = 255 - inv[i + 2]; }
+    boxBlurRGBA(inv, w, h, Math.max(2, Math.round(Math.min(w, h) * 0.008)));
+    for (let i = 0; i < data.length; i += 4) {
+      const base = g[i], bl = inv[i];
+      const dodge = bl >= 255 ? 255 : Math.min(255, (base * 255) / (255 - bl));
+      // 종이빛 살짝 (순백 대신 미색)
+      data[i] = clamp8(dodge * 0.985 + 2);
+      data[i + 1] = clamp8(dodge * 0.975 + 2);
+      data[i + 2] = clamp8(dodge * 0.95 + 2);
+    }
+    return data;
+  }
+  if (p?.special === "glitch") {
+    const src = new Uint8ClampedArray(data);
+    // 행 블록 수평 오프셋 (시드 고정) + RGB 채널 어긋남 + 스캔라인
+    let rnd = (seed * 2654435761) >>> 0;
+    const nextR = () => { rnd ^= rnd << 13; rnd ^= rnd >>> 17; rnd ^= rnd << 5; return (rnd >>> 0) / 4294967296; };
+    const bandH = Math.max(6, Math.round(h * 0.03));
+    for (let by = 0; by < h; by += bandH) {
+      const off = nextR() < 0.35 ? Math.round((nextR() - 0.5) * w * 0.08) : 0;
+      const chShift = Math.round(w * 0.008) + 1;
+      for (let y = by; y < Math.min(h, by + bandH); y++) {
+        for (let x = 0; x < w; x++) {
+          const sx = Math.min(w - 1, Math.max(0, x + off));
+          const k = (y * w + x) * 4;
+          const kR = (y * w + Math.min(w - 1, Math.max(0, sx + chShift))) * 4;
+          const kB = (y * w + Math.min(w - 1, Math.max(0, sx - chShift))) * 4;
+          data[k] = src[kR]; data[k + 1] = src[(y * w + sx) * 4 + 1]; data[k + 2] = src[kB + 2];
+        }
+      }
+    }
+    for (let y = 0; y < h; y += 3) // 스캔라인
+      for (let x = 0; x < w; x++) { const k = (y * w + x) * 4; data[k] *= 0.88; data[k + 1] *= 0.88; data[k + 2] *= 0.88; }
+    return data;
+  }
+  // 듀오톤/서모 — 밝기를 팔레트로 매핑. 표준 색 패스는 건너뛰고
+  // 그레인/비네트/빛샘/뽀샤시는 이어서 적용된다.
+  let skipColor = false;
+  if (p?.special === "duotone") {
+    const [r1, g1, b1] = p.c1 as [number, number, number], [r2, g2, b2] = p.c2 as [number, number, number];
+    for (let i = 0; i < data.length; i += 4) {
+      const t = (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114) / 255;
+      data[i] = r1 + (r2 - r1) * t; data[i + 1] = g1 + (g2 - g1) * t; data[i + 2] = b1 + (b2 - b1) * t;
+    }
+    skipColor = true;
+  }
+  if (p?.special === "thermal") {
+    // 열화상 팔레트: 남색→보라→빨강→주황→노랑→흰색
+    const stops = [[8, 8, 60], [90, 20, 120], [210, 40, 40], [255, 130, 20], [255, 220, 60], [255, 255, 255]];
+    for (let i = 0; i < data.length; i += 4) {
+      const t = (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114) / 255 * (stops.length - 1);
+      const s0 = Math.min(stops.length - 2, Math.floor(t)), f = t - s0;
+      const a = stops[s0], b2 = stops[s0 + 1];
+      data[i] = a[0] + (b2[0] - a[0]) * f; data[i + 1] = a[1] + (b2[1] - a[1]) * f; data[i + 2] = a[2] + (b2[2] - a[2]) * f;
+    }
+    skipColor = true;
+  }
+  if (p?.special === "vhs") {
+    const src = new Uint8ClampedArray(data);
+    const chShift = Math.max(1, Math.round(w * 0.004));
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const k = (y * w + x) * 4;
+        const kR = (y * w + Math.min(w - 1, x + chShift)) * 4;
+        const kB = (y * w + Math.max(0, x - chShift)) * 4;
+        data[k] = src[kR]; data[k + 2] = src[kB + 2];
+      }
+    }
+    boxBlurRGBA(data, w, h, 1);
+    for (let y = 0; y < h; y += 2) // 굵은 스캔라인
+      for (let x = 0; x < w; x++) { const k = (y * w + x) * 4; data[k] *= 0.9; data[k + 1] *= 0.9; data[k + 2] *= 0.9; }
+    // 이후 표준 패스가 grain 을 얹는다 (프리셋 fx.grain)
+  }
+
+  // 비네트/빛샘용 좌표 상수 (픽셀 루프 밖에서 준비)
+  const cx = w / 2, cy = h / 2;
+  const maxD = Math.sqrt(cx * cx + cy * cy);
+  // 빛샘: 우상단 모서리에서 번지는 주황 + 좌하단의 약한 마젠타 (스크린 블렌드)
+  const leakR1 = Math.hypot(w, h) * 0.55;
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      let r = data[i], g = data[i + 1], b = data[i + 2];
+
+      if (luts && !skipColor) {
+        r = luts[0][r]; g = luts[1][g]; b = luts[2][b];
+
+        if (bw) {
+          const v = r * bw[0] + g * bw[1] + b * bw[2];
+          r = g = b = v;
+        } else {
+          const L = r * 0.299 + g * 0.587 + b * 0.114;
+          if (sat || vib) {
+            // 바이브런스: 이미 채도가 높은 픽셀(max-min 큼)은 덜 올린다 — 피부 붉어짐 방지
+            const mx = r > g ? (r > b ? r : b) : (g > b ? g : b);
+            const mn = r < g ? (r < b ? r : b) : (g < b ? g : b);
+            const boost = 1 + sat + vib * (1 - (mx - mn) / 255);
+            r = L + (r - L) * boost;
+            g = L + (g - L) * boost;
+            b = L + (b - L) * boost;
+          }
+          if (hslBands) {
+            const o = applyHslBands(r, g, b, hslBands);
+            r = o[0]; g = o[1]; b = o[2];
+          }
+          if (sh || hi) {
+            const l01 = L / 255;
+            const ws = (1 - l01) * (1 - l01); // 그림자 가중
+            const wh = l01 * l01;             // 하이라이트 가중
+            if (sh) { r += sh[0] * ws; g += sh[1] * ws; b += sh[2] * ws; }
+            if (hi) { r += hi[0] * wh; g += hi[1] * wh; b += hi[2] * wh; }
+          }
+        }
+      }
+
+      if (grain) {
+        // 결정적 해시 노이즈(시드 고정 → 미리보기/저장 결과 동일). 2옥타브 —
+        // 픽셀 단위 백색소음만 쓰면 디지털 노이즈처럼 보인다. 2px 굵은 결을 섞어야
+        // 필름 입자의 뭉침이 난다. 미드톤에 세고 극단부엔 약하게(실제 입자 특성).
+        let n = (x * 374761393 + y * 668265263 + seed * 974711) | 0;
+        n = (n ^ (n >> 13)) * 1274126177; n = (n ^ (n >> 16)) >>> 0;
+        let m = ((x >> 1) * 668265263 + (y >> 1) * 374761393 + seed * 434371) | 0;
+        m = (m ^ (m >> 13)) * 1274126177; m = (m ^ (m >> 16)) >>> 0;
+        const rand = 0.65 * (n / 4294967296 - 0.5) + 0.35 * (m / 4294967296 - 0.5);
+        const L = r * 0.299 + g * 0.587 + b * 0.114;
+        const mid = 1 - Math.abs(L - 128) / 160;
+        const amt = grain * 46 * (mid < 0.25 ? 0.25 : mid);
+        const add = rand * amt;
+        r += add; g += add; b += add;
+      }
+
+      if (vig) {
+        const dx = x - cx, dy = y - cy;
+        const d = Math.sqrt(dx * dx + dy * dy) / maxD; // 0(중앙)..1(모서리)
+        // 0.55 부터 서서히 어두워짐
+        const t = d < 0.55 ? 0 : (d - 0.55) / 0.45;
+        const f = 1 - vig * 0.5 * t * t;
+        r *= f; g *= f; b *= f;
+      }
+
+      if (leak) {
+        // 우상단 주황 번짐
+        const d1 = Math.hypot(x - w, y) / leakR1;
+        const s1 = d1 < 1 ? (1 - d1) * (1 - d1) * leak : 0;
+        if (s1 > 0.003) {
+          // screen: out = 255 - (255-v)(255-c)/255
+          r = 255 - ((255 - r) * (255 - 235 * s1)) / 255;
+          g = 255 - ((255 - g) * (255 - 110 * s1)) / 255;
+          b = 255 - ((255 - b) * (255 - 40 * s1)) / 255;
+        }
+        // 좌측 세로 마젠타 줄기 (더 약하게)
+        const d2 = Math.abs(x - w * 0.08) / (w * 0.1);
+        const s2 = d2 < 1 ? (1 - d2) * leak * 0.45 : 0;
+        if (s2 > 0.003) {
+          r = 255 - ((255 - r) * (255 - 190 * s2)) / 255;
+          b = 255 - ((255 - b) * (255 - 120 * s2)) / 255;
+        }
+      }
+
+      data[i] = clamp8(r + 0.5) | 0;
+      data[i + 1] = clamp8(g + 0.5) | 0;
+      data[i + 2] = clamp8(b + 0.5) | 0;
+    }
+  }
+
+  // 뽀샤시(소프트 글로우) — 밝게 띄운 블러본을 스크린 블렌드 (2000년대 뽀샤시 보정).
+  // 색 패스 뒤에 둬야 필터 톤 위에 은은하게 얹힌다.
+  if (glow) {
+    const soft = new Uint8ClampedArray(data);
+    boxBlurRGBA(soft, w, h, Math.round(Math.min(w, h) * 0.015) + 2);
+    const amt = glow * 0.85;
+    const lift = glow * 10; // 전체를 살짝 환하게 — 뽀샤시 특유의 화사함
+    for (let i = 0; i < data.length; i += 4) {
+      for (let c = 0; c < 3; c++) {
+        const v = data[i + c];
+        const s = soft[i + c];
+        const screen = 255 - ((255 - v) * (255 - s)) / 255;
+        data[i + c] = clamp8(v + (screen - v) * amt + lift);
+      }
+    }
+  }
+  return data;
+}
