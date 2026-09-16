@@ -11,6 +11,7 @@ import UIKit
 ///   com.rimikimi.app://dev/pushtap?kind=genDone[&galleryId=<id>]  완료 푸시 탭(4주차: galleryId 있으면 정확 매칭)
 ///   com.rimikimi.app://dev/fitsheet?forceOutpaintPhase=running|error  채워 맞춤 진행/에러 상태 강제(캡처용)
 ///   com.rimikimi.app://dev/fitsheet?realOutpaint=1  실제 서버로 채워 맞춤 호출(크레딧 부족 시 크레딧 시트)
+///   com.rimikimi.app://dev/legacymigration[?write=1]  1.x→2.0 로그인 이전 매커니즘 검증(토스트로 결과)
 @MainActor
 enum DevRoutes {
     /// 처리했으면 true.
@@ -92,6 +93,23 @@ enum DevRoutes {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
                         app.requestOutpaint(wide) { _ in AppLog.ui.info("dev.realOutpaint.success") }
                     }
+                }
+            }
+        case "/signout":
+            app.signOut()
+        case "/legacymigration":
+            // 5주차 — 1.x→2.0 로그인 이전 매커니즘 검증(같은 오리진 영구 WKWebsiteDataStore 왕복).
+            // ?write=1 : "쓰기→다시 읽기" 왕복만 검증(시뮬레이터엔 진짜 1.x 데이터가 없어서).
+            // 그 외    : 실제 마이그레이션 시도(1.x 데이터 없으면 정상적으로 "없음" 처리).
+            Task {
+                if q["write"] == "1" {
+                    let result = await LegacySessionMigration.debugSeedAndVerify()
+                    AppLog.auth.info("dev.legacymigration.write \(result, privacy: .public)")
+                    app.showToast(result)
+                } else {
+                    let ok = await LegacySessionMigration.attemptOnce()
+                    AppLog.auth.info("dev.legacymigration.attempt ok=\(ok)")
+                    app.showToast(ok ? "이전 성공 — 로그인됨" : "이전 데이터 없음(정상 — 시뮬레이터엔 1.x 데이터가 없음)")
                 }
             }
         case "/tab":

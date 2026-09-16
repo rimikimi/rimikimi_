@@ -26,6 +26,12 @@ settings:
   configs:
     Debug:
       CODE_SIGN_STYLE: Automatic
+      # xcodegen 은 Xcode GUI 템플릿과 달리 이 값을 자동으로 넣어주지 않는다 — 없으면 `#if DEBUG`
+      # (DevRoutes.swift 등)가 `xcodebuild` 커맨드라인 빌드에서 통째로 컴파일에서 빠진다
+      # (5주차에 dev 라우트가 전부 무반응이라 발견 — 시뮬레이터 딥링크/런치 인자 테스트가 그동안
+      # 이 값 없이도 "성공"으로 보였던 건 우연이 아니라 해당 분기 자체가 항상 no-op 였기 때문일 수 있다).
+      SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG
+      GCC_PREPROCESSOR_DEFINITIONS: "$(inherited) DEBUG=1"
     Release:
       CODE_SIGN_STYLE: Manual
       CODE_SIGN_IDENTITY: "Apple Distribution"

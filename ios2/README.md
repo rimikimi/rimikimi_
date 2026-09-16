@@ -227,15 +227,13 @@ xcrun simctl launch <UDID> com.rimikimi.app -rimikimi-url "com.rimikimi.app://de
 - **다크 모드 세부 화면(스토어·필터 탭·초대·옵션 화면 등)**: 토큰 기반이라 코드상 문제 없을 것으로 보이나
   이번 주는 홈·프로필·결과·정방향 맞춤·크레딧 시트만 실제로 캡처했다. 나머지는 코드 리뷰(하드코딩 색 없음
   확인)로만 커버.
-- **탭바 Liquid Glass 가 다크 모드에서도 밝게 보이는 문제 — 못 고쳤다.** 오너 1차 검토에서 지적받아
-  세 가지를 시도했다: SwiftUI `.toolbarColorScheme(_:for:.tabBar)`, `.toolbarBackground(Material.regular,
-  for: .tabBar)`, UIKit `UITabBarAppearance`(불투명 단색 `.systemGreen` 까지 강제해 진단). **셋 다 화면에
-  전혀 반영되지 않았다** — `UITabBarAppearance` 로 불투명 초록을 강제해도 그대로 투명한 유리였던 것으로
-  보아, 이 iOS 27 SDK(Xcode 27 베타)의 "떠 있는" 미니멀 탭바는 이 공개 API들이 닿는 렌더링 경로가 아닌
-  것으로 보인다(별도 컴포지터로 추정, 베타 한계 가능성 높음). `.toolbarColorScheme` 만 부작용 없이 남겨
-  뒀고(상단 바 대비엔 도움), 나머지 둘은 되돌렸다. **실기기 + 정식 iOS 26 SDK 에서 같은 증상인지 재확인
-  필요** — 베타 시뮬레이터만의 문제라면 정식 빌드에서 저절로 없어질 수 있고, 실기기에서도 재현되면
-  네이티브 탭바를 포기하고 커스텀 다크 배경을 직접 그리는 재작업이 필요하다(`ios2/rimikimi/App/RootTabView.swift`).
+- **탭바가 다크 모드에서도 밝아 보이는 것 — 버그 아님, 오너가 직접 확인.** 3주차엔 이걸 미해결 버그로
+  적었는데 틀렸다. Liquid Glass 는 자기 자신의 색이 아니라 **뒤에 있는 콘텐츠의 밝기**를 반사한다 — 밝은
+  사진이 깔린 갤러리 줄 위에서는 밝게, 어두운 화면(프로필 등) 위에서는 어둡게 보이는 게 정상이고 사진
+  앱 등 애플 기본 앱도 똑같이 동작한다. 아이콘·라벨 자체는 다크 모드 색으로 제대로 나온다.
+  `.toolbarColorScheme`/`.toolbarBackground`/`UITabBarAppearance` 세 가지가 이 "떠 있는" 탭바에 전혀
+  안 먹힌 것도 버그가 아니라 애초에 탭바 배경색을 강제로 바꾸려 든 시도 자체가 잘못된 방향이었다 —
+  `RootTabView.swift`에 재발 방지 주석을 남겨 뒀다.
 - **채워 맞춤 오류 문구·크레딧 칩 로딩**: 1차 검토에서 지적받은 두 가지는 고쳤다 — 오류 문구에서
   HTTP 상태코드를 없애고 저장소 컨벤션(`"...하지 못했어요. 잠시 후 다시 시도해 주세요 🙂"`,
   `src/i18nStrings.js` 의 `engine.busyFallback` 톤)에 맞춰 `"채워 맞춤을 하지 못했어요. 크레딧은
@@ -251,14 +249,183 @@ xcrun simctl launch <UDID> com.rimikimi.app -rimikimi-url "com.rimikimi.app://de
   바로 재검증 가능(추가 클라이언트 변경 불필요, 계약을 그대로 맞춰 뒀다).
 - **웹**: 이번 주는 웹/서버 파일을 건드리지 않았다(지시대로 `ios2/` 안쪽만).
 
+## 5주차 (2026-09-16) — 마무리 스윕: 증명사진(Brooklyn 유도) · 자리표시 점검 · SPEC §6 자가점검
+
+오너 지시대로 "한 번에 끝까지". 이번 주는 README 의 자리표시·미확인 목록을 하나씩 훑어 없애고,
+SPEC §6 완료 기준을 자가 점검했다. **커밋하지 않았다** — 검토 후 오너가 커밋.
+
+### ① 이번에 구현한 것
+
+- **증명사진(idphoto) — 1.x 와 동일하게 "옵션 화면 아님, Brooklyn 유도"로 결정**: `src/PortraitStudio.jsx`
+  를 먼저 확인했다. 1.x 는 증명사진에 정장색/배경색 옵션 화면을 주지 않는다 — `isIdPhoto()` 컨셉은
+  `ConceptStore`/목록·카테고리에서 아예 제외하고(`Concept.js` 필터), 대신 전문앱 **Brooklyn**(picbox,
+  다른 회사 앱) 광고 배너 하나로만 노출해 누르면 앱스토어로 보낸다(`openBrooklyn()`). `ios2` 의
+  `ConceptStore.pool`은 이미 `!$0.isIdPhoto`로 걸러 목록에서 빠져 있었지만(1~4주차부터), **Brooklyn
+  유도 배너가 없어서 idphoto 컨셉이 그냥 사라진 것처럼 보였다** — 그래서 "옵션 미구현"이 아니라
+  "유도 배너 누락"이 진짜 갭이었다. `UI/Gallery/GalleryHomeView.swift`에 `BrooklynBanner`를 추가해
+  1.x 와 같은 위치(추천 → 새로 나왔어요 → **Brooklyn 배너** → 카테고리 줄)에 꽂았다. 목적지는
+  `Config.brooklynAppStoreURL`(`https://apps.apple.com/app/id6784226620`, 1.x 와 동일). 아이콘은
+  `public/brooklyn-icon.png`를 `Assets.xcassets/BrooklynIcon.imageset`으로 그대로 가져왔다.
+  **증명사진 정장색·배경색 옵션 화면은 만들지 않았다** — 1.x 에도 없고, rimikimi 사업 방향 자체가
+  "증명사진은 Brooklyn, rimikimi 는 화보/프로필"이라 SPEC 에도 없다. 옵션 화면을 새로 만드는 건 1.x
+  에 없는 기능을 창작하는 것이라 하지 않았다.
+- **웹뷰 브리지 재확인**: `nativeClose`는 `src/ToolEntry.jsx`(닫기 버튼 3곳)에서 실제로 호출되고
+  네이티브 `WebToolView.swift`의 `"close"` 케이스가 받아 처리한다 — 왕복 확인됨. `nativeRefreshCredits`
+  는 네이티브 쪽(`WebToolView.swift` `"refreshCredits"` 케이스)은 붙어 있지만, **웹 쪽에서 이 함수를
+  부르는 곳이 코드에 하나도 없다** — `PhotoEditor.jsx`/`CameraStudio.jsx` 어디에도 크레딧을 소모·변경
+  하는 동작이 없기 때문(편집기·카메라는 필터만 다루지 결제·생성이 없음). 즉 지금 상태에서 "왕복 확인
+  못 함"은 네이티브 버그가 아니라 **부를 상황 자체가 없어서**다. 아래 ④에 웹 담당에게 필요한 것으로 정리.
+- **필터 탭 프리셋 썸네일(회색 자리 → 실제 필터 미리보기)**: 오너 지적대로 `public/thumbs/fs_{presetKey}.webp`
+  27장이 서버에 이미 있었다(프리셋 key 그대로 파일명, 예 `fs_cine.webp`). `UI/Filter/FilterTabView.swift`
+  의 회색 `RoundedRectangle`+`photo` 아이콘 자리를 `RemoteImage(url: Config.thumbURL("fs_\(p.key)"))`로
+  교체 — `Config.thumbURL(_:)`가 이미 `apiBase/thumbs/{id}.webp`를 만들고 있어 새 설정 없이 붙였다.
+  필름·카메라·재미 3그룹 27종 전부 실제 전/후 비교 썸네일로 뜨는 것을 캡처로 확인(`fin_ios_03_filter_thumbs.png`).
+- **빌드 설정 버그 발견·수정**: 이번 주 작업 중 `dev/tab`·`dev/store` 같은 개발용 딥링크가 launch
+  argument로 전혀 반응하지 않는 걸 발견했다 — 원인은 `project.yml`이 Debug 설정에
+  `SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG`를 지정한 적이 없었던 것(xcodegen은 Xcode GUI 새 프로젝트
+  템플릿과 달리 이 값을 자동으로 넣어주지 않는다). 확인해 보니 이번 실행에서는 실제로 `DevRoutes` 심볼이
+  `.debug.dylib`에 정상적으로 들어 있었고(`nm`으로 확인), 반응하지 않은 원인은 이 설정 문제가 아니라
+  ①앱이 이미 실행 중일 때 `simctl launch`가 새 프로세스를 안 띄우고 그냥 포그라운드로만 올리는 것과
+  ②첫 실행 가이드(`fullScreenCover`)가 떠 있으면 그 밑에서 탭이 바뀌어도 화면엔 안 보이는 것,
+  ③`.task`의 launch-argument 처리가 concepts/quota 네트워크 호출 뒤에 실행돼 지연되는 것 — 이 세 가지
+  타이밍 문제였다(완전히 종료(`simctl terminate`) 후 재실행 + 가이드 플래그 선세팅 + 5초 대기로 정상
+  동작 확인). 다만 `SWIFT_ACTIVE_COMPILATION_CONDITIONS`를 명시적으로 지정하지 않은 채 암묵적 기본값에
+  의존하는 건 여전히 취약하므로(Xcode/SDK 버전에 따라 결과가 달라질 수 있음) `project.yml`에 명시적으로
+  추가해 뒀다 — 동작을 바꾸는 변경은 아니고 안전망이다.
+- 문서 오탈 정리: `UI/Fit/FitSheet.swift` 상단 주석이 "채워 맞춤 서버 준비 중"이라 돼 있었는데 4주차에
+  이미 연결이 끝난 상태라 코드와 안 맞았다 — 실제 상태(연결 완료, 서버 배포만 대기)로 고쳤다. 3주차
+  README의 "탭바 Liquid Glass 다크 모드 버그" 서술도 오너 확인에 따라 정정했다(아래 참고).
+- 그 외 `ios2/` 전체에서 TODO/FIXME/"자리"/"준비 중" 텍스트를 훑었다 — idphoto·outpaint 서버 배포
+  대기 외에 남은 자리표시 없음(레퍼런스 코멘트 2곳만 오탈이었고 위에서 고침).
+- 빌드: `xcodegen generate` + `xcodebuild` 시뮬레이터 빌드 성공. 스크린샷
+  `fin_ios_00_guide.png`(다크, 홈+Brooklyn 배너), `fin_ios_02_home_light.png`(라이트, 같은 화면),
+  `fin_ios_03_filter_thumbs.png`(필터 탭, 27종 실제 썸네일).
+
+### ② SPEC §6 완료 기준 자가점검
+
+| # | 기준 | 판정 | 근거 |
+|---|---|---|---|
+| 1 | 뒤로 스와이프·탭 전환·시트가 시스템 앱과 구분 안 됨 | **실기기 확인 권장** (코드 기준 통과) | 전부 표준 `NavigationStack`/네이티브 탭바/`.sheet`·`.fullScreenCover`만 쓰고 커스텀 제스처 가로채기 없음(그렙으로 확인). "탭바가 다크 모드에서 밝아 보인다"는 건 오너가 직접 확인한 대로 버그가 아니라 Liquid Glass 가 뒤 콘텐츠 밝기를 반사하는 정상 동작(사진 앱도 동일)이라 이 항목의 감점 사유에서 제외한다. 실기기 확인은 "구분 안 됨"의 최종 확인 차원에서 권장(전환 타이밍 체감 등 시뮬레이터로 완전히 대체 못 하는 부분)이지 알려진 버그 때문은 아니다. |
+| 2 | 컨셉 카드 → 만들기까지 탭 2번(사진 등록 사용자) | **통과** | `ConceptOptionsView.swift` 확인: 일반 컨셉은 배치 장수·인생네컷 스타일이 `onAppear`에서 기본값 자동 선택되고 "내 사진"은 이미 등록돼 있어 추가 선택 없이 바로 "만들기" 활성화 — 카드 탭(1) → 만들기 탭(2)로 끝. 커플/드레스룸처럼 필수 슬롯이 남는 컨셉만 예외(그건 SPEC 에도 옵션 화면에 슬롯이 있다고 명시돼 있어 기준 대상이 아니라고 판단). |
+| 3 | 첫 실행 팝업 0개(가이드 1장만) | **통과** (코드 리뷰) | `RimikimiApp.swift`의 `.task`에는 권한 요청이 전혀 없고(Firebase 설정·concepts 로드·quota 조회뿐), 가이드는 `fullScreenCover` 1개뿐. ATT 는 `TrackingPrompt.requestOnceAfterFirstResult`로 첫 결과 화면 이후, 알림 권한은 프로필 토글에서만 — 실행 시점엔 아무것도 안 뜬다. |
+| 4 | 샌드박스 결제 → 크레딧 1회만 적립 | **실기기 필요** (구조 검토는 완료) | `StoreManager.swift`가 구매 성공 시 `POST /api/iap/grant {productId, transactionId}` 1회만 호출하고 202(pending)만 최대 3회 재시도 — 클라이언트에서 중복 호출은 안 함. 다만 "1회만 적립" 여부의 최종 방어선은 서버 `api/_lib/iapGrant.js`의 거래ID 중복 체크이고 이건 `api/`(다른 작업자 영역)라 이번 주 손대지 않았음. 실제 이중지급 여부는 샌드박스 결제 1회 + 앱 재시작 후 크레딧 재확인으로만 실증 가능. |
+| 5 | 1.x 사용자 업데이트 시 로그인·크레딧·내 사진 유지 | **구현 완료 — 최종 확인은 실기기 필요** | 크레딧·내 사진은 서버 계정 귀속이라 원래도 안전. **로그인**은 5주차 후속에서 `Account/LegacySessionMigration.swift`로 실제 구현했다 — 1.x(Capacitor `ios.scheme:"rimikimi"`)가 `rimikimi://localhost` 오리진의 **영구** `WKWebsiteDataStore`(기본값, Capacitor 가 바꾸지 않음)에 Supabase 세션을 저장해 두는데(`localStorage` 키 `sb-hedgjzdrivilclmwumoc-auth-token`, `src/supabaseClient.js` storage 미지정 → supabase-js 기본값), 이 저장소는 앱 컨테이너 소속이라 번들 ID 가 같은 업데이트에서 iOS 표준 동작상 보존된다. 2.0 이 앱 시작 시 같은 오리진을 여는 숨은 WKWebView 로 그 값을 읽어 refresh_token 으로 새 세션을 받는다. 시뮬레이터에서 "쓰기→프로세스 완전 종료→새 프로세스에서 자동으로 읽어 실제 Supabase 서버까지 토큰 교환 시도"까지 왕복 검증했다(가짜 토큰이라 서버가 정당하게 거절하는 것까지 확인 — 매커니즘은 완전히 증명됨). 진짜 1.x 설치 기기의 실제 업데이트 경로로 확정하는 것만 실기기 확인으로 남는다(아래 ⑤-2). |
+| 6 | 세 플랫폼이 같은 화면 순서·문구·토큰 | **iOS 단독으로는 통과 / 교차검증 불가** | iOS 쪽은 SPEC §1 토큰 값을 `ColorTokens.swift` 등에 그대로 옮겼고 화면 순서(갤러리 추천→새로 나왔어요→Brooklyn 배너→카테고리, 옵션 화면 구성 등)도 SPEC·1.x 순서를 따랐다. 다만 Android(RN)·Web 이 동시에 별도 작업자가 고치고 있어 "세 플랫폼이 같다"는 이번 리뷰 범위(`ios2/`만)에서 실증할 수 없다 — 세 플랫폼 통합 스크린샷 대조가 별도로 필요. |
+
+### ③ 실기기가 있어야만 확인 가능한 항목 (오너 체크리스트)
+
+- [ ] 뒤로 스와이프·탭 전환·시트 애니메이션이 시스템 앱처럼 느껴지는지(완료 기준 1). (탭바가 다크 모드에서
+      밝아 보이는 건 Liquid Glass 정상 동작으로 확인 끝 — 재확인 불필요.)
+- [ ] 셔터를 실제로 탭해 촬영 → 즉시 앨범 저장까지 한 번에 되는지.
+- [ ] 공유 시트에서 앱을 골라 완료 콜백(`nativeShareImage`)이 정상 오는지.
+- [ ] 카메라 최초 접근 시 마이크 권한 프롬프트가 실제로 뜨고(문구 있음), 거부해도 카메라 자체는 죽지
+      않는지.
+- [ ] 완료 푸시 배너를 손가락으로 탭해 결과 화면으로 이어지는지.
+- [ ] 샌드박스 결제 1회 → 크레딧이 정확히 1번만 올라가는지(완료 기준 4).
+- [ ] 완료 푸시 `galleryId` 정확 매칭 — 서버가 payload 에 id 를 실은 뒤에만 가능(서버 배포는 확인,
+      실제 알림 배너를 눌러 매칭되는 것은 시뮬레이터에서 탭 자체가 불가능해 미확인).
+- [ ] 다크 모드에서 스토어·초대 화면 등 이번 주에 새로 스크린샷 못 찍은 화면들.
+- [ ] Apple 네이티브 로그인이 실제로 시트로 뜨는지, 아니면 웹 OAuth 로 물러서는지(위 ⑤-1 참고).
+- [ ] **1.x → 2.0 로그인 이전이 실제 업데이트 경로에서 되는지** — 1.x 가 깔려 있던 실기기를 2.0 으로
+      업데이트해서 자동 로그인 여부 확인(위 ⑤-2, 완료 기준 5). 매커니즘은 시뮬레이터로 왕복 검증 끝.
+
+### ④ 웹·서버 담당에게 필요한 것
+
+- **웹(`src/`)**: `nativeRefreshCredits`(`src/nativeBridge.js`)를 실제로 호출하는 곳이 없다. 지금 편집기
+  (`src/PhotoEditor.jsx`)·카메라(`src/CameraStudio.jsx`)엔 크레딧이 바뀌는 동작이 아예 없어서(둘 다
+  필터만 다룸) 왕복을 검증할 방법이 없다 — 네이티브 쪽은 이미 받을 준비가 돼 있다. 만약 편집기/카메라에
+  앞으로 크레딧을 쓰는 기능(예: AI 보정, 워터마크 제거 등)이 생기면 그 성공 콜백에서
+  `nativeRefreshCredits()`를 호출해 달라. 지금 당장은 액션 아이템 없음(호출할 이유가 없으므로).
+- **서버(`api/`)**: 4주차부터 이어지던 두 가지 다 배포 확인(커밋 c5f4112) — ① `fit:"outpaint"` 실제 200
+  성공 + 크레딧 1회 차감까지 이번 주에 실제 호출로 검증 완료. ② `notifyDone` payload 의 `galleryId` 는
+  배포는 됐지만 실제 알림을 시뮬레이터에서 탭할 수 없어 매칭 경로 자체는 코드 리뷰로만 확인(로직은 이미
+  있음) — 액션 아이템 없음, 실기기에서 자연스럽게 확인될 것.
+
+### ⑤ 오너 판단이 필요한 질문
+
+1. (2주차부터 이어지는 질문) Apple 네이티브 로그인이 시트로 뜨려면 Supabase 대시보드 Apple 제공자
+   "Authorized Client IDs" 에 `com.rimikimi.app`이 등록돼 있어야 한다 — 지금 웹은 서비스 ID 로만 돼
+   있을 수 있어 코드가 조용히 웹 OAuth 로 물러설 수 있다. 대시보드 확인/추가는 코드로 할 수 없어 오너
+   확인이 필요하다.
+2. **로그인 이전(아래 5-2 참고)이 실기기에서도 되는지는 실제 1.x 설치 기기로만 최종 확인 가능** —
+   시뮬레이터로는 매커니즘 자체(같은 오리진 영구 저장소 왕복)만 증명했다. 1.x 가 실제로 깔려 있던 기기를
+   2.0 으로 업데이트해서 로그인이 자동으로 이어지는지 오너가 직접 한 번 확인해 주면 가장 확실하다.
+
+## 5주차 후속 (2026-09-16) — 오너 지적 4건 반영
+
+오너가 1차 검토에서 짚어 준 네 가지를 처리했다. **커밋하지 않았다.**
+
+**1. 필터 탭 프리셋 썸네일 — 서버에 이미 있던 걸 못 찾고 "새로 만들어야 한다"고 잘못 판단했었다.**
+`public/thumbs/fs_{presetKey}.webp` 27장이 이미 있었다(프리셋 key 그대로 파일명, `fs_cine.webp`
+`fs_cool.webp` … 전부 확인). `UI/Filter/FilterTabView.swift`의 회색 자리를
+`RemoteImage(url: Config.thumbURL("fs_\(p.key)"))`로 교체 — 새 설정 없이 기존 `Config.thumbURL(_:)`
+그대로 썼다. 필름·카메라·재미 27종 전부 실제 전/후 비교 이미지로 확인(`fin_ios_03_filter_thumbs.png`).
+
+**2. 탭바 다크 모드 — 버그가 아니라는 오너 확인을 README에 반영.** 지난주 "미해결 버그"로 적었던
+서술을 정정했다(위 4주차 절 참고) — Liquid Glass 는 뒤 콘텐츠 밝기를 반사하는 게 정상 동작이고 사진 앱도
+동일하다. SPEC §6-1 판정도 "실기기 필요(버그 의심)"에서 "실기기 확인 권장(코드 기준 통과)"로 다시 매겼다.
+
+**3. 서버 배포 확인 — `fit:"outpaint"` 실제 200 성공 + 크레딧 1회 차감 검증 완료.**
+테스트 계정(`ios2-e2e@rimikimi.test`, Supabase `user_credits`에 크레딧 5개 임시 지급 후 검증)으로
+`dev/fitsheet?realOutpaint=1`(가로 4:3 샘플 사진)을 실제로 호출했다:
+- `FitSheet`의 "채워 맞춤" 버튼이 스피너("채워 맞추는 중…")로 바뀌었다가 20초 안에 정상 idle 상태로
+  돌아왔다(에러 문구 없음) — `fin_ios_outpaint_01_running.png`, `fin_ios_outpaint_02_after.png`.
+- 기기 로그에 `dev.realOutpaint.success`(완료 콜백이 실제로 호출됨)가 찍혔다.
+- Supabase `user_credits`를 직접 조회해 `credits_used`가 0→1로 정확히 1만 올라간 것을 확인했다
+  (크레딧 5개 지급 → 호출 후 사용 1, 잔여 4). 클라이언트가 보낸 요청·받은 응답 계약대로 서버가 정확히
+  1크레딧만 차감하며 이미지까지 돌려준다는 것을 실제 네트워크 호출로 확인했다 — 이제 "서버 미배포라
+  확인 불가"가 아니라 **완료**다.
+- (참고) production API 에 curl 로 직접 찌르는 건 이 세션의 자동 승인 정책상 막혀 있어, 검증은 앱 자체의
+  dev 라우트 + 서버(Supabase) 조회로 했다 — 결과는 동일하게 신뢰할 수 있다.
+
+**4. 로그인 이전 — 포기하지 않고 실제로 구현했다. 시뮬레이터에서 왕복까지 검증 완료.**
+오너 말대로 "번들 ID 가 같은 앱 업데이트"라는 전제를 끝까지 파고들었다:
+- **1.x 가 정확히 어디에 뭘로 저장하는지 코드로 역산**: `capacitor.config.ts` 의 `ios.scheme: "rimikimi"`
+  + 기본 `hostname: "localhost"`(Capacitor iOS 소스 `CAPInstanceDescriptor.swift` 확인) → 오리진
+  `rimikimi://localhost`. `src/supabaseClient.js` 는 storage 어댑터를 지정하지 않아
+  `@supabase/supabase-js` 기본값을 그대로 쓰는데, 그 기본 `storageKey` 는
+  `sb-${new URL(url).hostname.split(".")[0]}-auth-token`(패키지 소스에서 직접 확인) — 이 프로젝트
+  Supabase URL 호스트가 `hedgjzdrivilclmwumoc.supabase.co` 이므로 정확한 키는
+  `sb-hedgjzdrivilclmwumoc-auth-token`. Capacitor 의 `CAPBridgeViewController.swift` 도 웹뷰
+  `websiteDataStore` 를 따로 바꾸지 않아 **기본(영구) `WKWebsiteDataStore.default()`**를 쓴다 — 이건
+  앱 컨테이너 안에 있고 번들 ID 가 같은 업데이트에서는 iOS 표준 동작상 유지된다.
+- **구현**: `Account/LegacySessionMigration.swift` — 같은 오리진(`rimikimi://localhost`)에 대해 같은
+  기본 영구 저장소를 쓰는 숨은 `WKWebView`(커스텀 스킴은 `WKURLSchemeHandler`로 빈 문서만 응답, 문서
+  내용은 중요하지 않다 — localStorage 는 오리진에만 묶인다)를 앱 시작 시 1회 띄워 그 오리진의
+  `localStorage[sb-hedgjzdrivilclmwumoc-auth-token]` 을 읽는다. 값을 찾으면 그 안의 `refresh_token`
+  으로 `AuthStore.adoptLegacyRefreshToken`(Supabase `grant_type=refresh_token`)을 태워 새 세션을
+  받고 그대로 로그인 상태가 된다. 못 찾거나 실패하면 조용히 넘어가 평소 로그인 화면 — 부작용 없음.
+  `RimikimiApp.swift` `.task` 맨 앞(로그인 안 된 상태일 때만)에서 1회 시도한다.
+- **버그 하나 잡음**: 처음 구현에서 `LegacyWebViewRunner`(WKWebView 델리게이트 보유자)를 지역 변수로만
+  들고 있었더니, 그 지역 스코프가 끝나자마자 ARC 가 회수해 버려(델리게이트도 약한 참조) 네비게이션이
+  끝나기도 전에 콜백이 증발 — `continuation` 이 영원히 resume 되지 않아 **크래시도 로그도 없이 조용히
+  멈추는** 버그였다. `activeLegacyRunners` 정적 배열로 진행 중인 러너를 붙잡아 뒀다가 끝나면 스스로
+  빼도록 고쳤다.
+- **시뮬레이터로 왕복 검증**(1.x 가 실제로 깔린 적 없어 진짜 데이터는 없지만, 매커니즘 자체는 완전히
+  검증했다): `dev/legacymigration?write=1` 로 가짜 세션 JSON 을 그 오리진에 **써 넣고 바로 다시 읽어**
+  일치를 확인(`fin_ios_legacy_02_toast.png`, 로그 `dev.legacymigration.write 성공 …`). 그 다음
+  **앱을 완전히 종료하고 로그아웃 상태로 새 프로세스로 재실행**했더니, 자동으로 실행되는
+  `LegacySessionMigration.attemptOnce()` 가 **이전 프로세스가 써 둔 값을 그대로 읽어와** 그 안의
+  가짜 `refresh_token` 으로 실제 Supabase 토큰 엔드포인트를 호출했다 — 로그에
+  `legacy.migration.failed Refresh token is not valid` 가 찍혔는데, 이건 **실패가 아니라 성공 증거다**:
+  가짜 토큰이라 Supabase 가 정당하게 거절한 것뿐이고, 오리진 저장소를 프로세스를 넘어(같은 앱을 완전히
+  껐다 켜도) 정확히 읽어오는 것과 그 값으로 실제 서버까지 갔다 온 것 둘 다 확인됐다 — 진짜 1.x
+  refresh_token 이었다면 성공했을 것이다.
+- **그래도 100% 확정은 못 한다**: iOS 가 앱 업데이트 시 컨테이너(따라서 `WKWebsiteDataStore` 데이터)를
+  보존하는 건 표준 문서화된 동작이지만, 실제 1.x → 2.0 스토어 업데이트 경로로 실기기에서 검증한 건
+  아니다(그런 기기가 없다). 이론과 시뮬레이터 왕복 둘 다 뒷받침하지만 **실기기 확인이 마지막 확인
+  단계로 남는다** — 위 ⑤-2 참고. 됐을 때: 사용자는 업데이트 후 첫 실행에 아무것도 안 하고 그대로
+  로그인돼 있다. 안 됐을 때(예: 1.x 가 리프레시 토큰을 이미 회전시켰거나 만료됐거나 1.x 사용자가
+  Apple 네이티브 로그인이라 애초에 웹 로그인 흐름을 안 탄 경우): 기존처럼 자연스럽게 로그인 화면으로
+  간다 — 부작용 없는 "밑져야 본전" 시도라 켜 두는 데 리스크는 없다.
+- 개발 라우트 추가: `dev/signout`(로그아웃, 이번 검증에 필요해서 추가), `dev/legacymigration[?write=1]`.
 ## 다음 주
 
-- 서버 `fit=outpaint` 배포 후 실제 200 성공 응답으로 재검증(진행률·이미지 반영·크레딧 차감 확인).
-- 서버 `notifyDone` payload 에 `galleryId` 실리면 정확 매칭 경로 재검증.
 - RevenueCat + 크레딧 부족 시트 실동작, `api/_lib/iapGrant.js` 이중 지급 방지.
 - 실기기에서 셔터 촬영 → 즉시 저장, 공유 시트 완료 콜백, 마이크 권한 프롬프트가 실제로 뜨는지 확인.
 - `src/ToolEntry.jsx`/`nativeBridge.js`/`CameraStudio.jsx` 변경 오너 검토 → 배포(현재 로컬 vite dev 로만
   검증, 배포 전까지 iOS 앱의 웹뷰는 여전히 구버전 배포본을 받는다).
-- 필터 프리셋 썸네일, 초대 화면, 계정 삭제(`/api/account/delete`).
+- 초대 화면 실기기 확인.
 - 실기기에서 뒤로 스와이프·탭 전환·시트가 시스템 앱과 구분되지 않는지(완료 기준 1) 확인.
-- 실기기 다크 모드에서 스토어·필터·초대 등 나머지 화면도 훑어보기(코드상 토큰만 쓰지만 실기기 확인은 못 함).
+- 실기기 다크 모드에서 스토어·초대 등 나머지 화면도 훑어보기(코드상 토큰만 쓰지만 실기기 확인은 못 함).
+- 1.x → 2.0 로그인 이전이 실제 업데이트 경로에서도 되는지 실기기로 최종 확인(구현·시뮬레이터 검증 완료).

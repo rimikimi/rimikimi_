@@ -1,6 +1,8 @@
 import SwiftUI
 
-/// 정방향 맞춤 제안 시트 — 사진이 3:4 가 아닐 때. ① 잘라 맞춤(얼굴 기준 크롭, 무료) ② 채워 맞춤(서버 준비 중).
+/// 정방향 맞춤 제안 시트 — 사진이 3:4 가 아닐 때. ① 잘라 맞춤(얼굴 기준 크롭, 무료) ② 채워 맞춤
+/// (`POST /api/generate {fit:"outpaint"}` 연결 완료 — 서버가 아직 이 필드를 처리하지 않아 실기기 200 응답은
+/// 서버 배포 후 재검증 필요, `AppState.requestOutpaint`/`runOutpaint` 참고).
 struct FitSheet: View {
     var image: UIImage
     var onCropped: (UIImage) -> Void

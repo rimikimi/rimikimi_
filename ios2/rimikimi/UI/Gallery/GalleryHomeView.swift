@@ -20,6 +20,7 @@ struct GalleryHomeView: View {
                 } else {
                     ConceptRail(title: "추천", concepts: app.concepts.featured)
                     ConceptRail(title: "새로 나왔어요", concepts: app.concepts.newest, isNew: true)
+                    BrooklynBanner()
                     ForEach(app.concepts.rows) { row in
                         ConceptRail(title: row.name, concepts: row.items, more: Route.category(row.name))
                     }
@@ -121,6 +122,48 @@ struct CategoryChipsRow: View {
         guard active != name else { return }
         active = name
         HapticPlayer.selection()
+    }
+}
+
+/// 증명사진 광고 배너 — rimikimi 는 화보/프로필 컨셉에 집중하고 증명사진은 전문앱 Brooklyn 으로
+/// 유도한다(1.x `PortraitStudio.jsx` `openBrooklyn()`과 같은 목적: id/mode="idphoto" 컨셉은
+/// `ConceptStore.pool` 에서 이미 제외돼 목록·카테고리에 안 뜨고, 이 배너로만 노출).
+struct BrooklynBanner: View {
+    @Environment(\.openURL) private var openURL
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.s1) {
+            Text("AD")
+                .font(.system(size: 9, weight: .bold))
+                .tracking(0.4)
+                .foregroundStyle(Color.ink3)
+                .padding(.horizontal, 6).padding(.vertical, 2)
+                .background(Color.ink.opacity(0.06), in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+
+            Button { openURL(Config.brooklynAppStoreURL) } label: {
+                HStack(spacing: Spacing.s3) {
+                    Image("BrooklynIcon")
+                        .resizable().scaledToFill()
+                        .frame(width: 46, height: 46)
+                        .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("증명사진이 필요하다면, Brooklyn").font(AppFont.calloutEmphasis).foregroundStyle(Color.ink)
+                        Text("여권·이력서·배우 프로필까지\n셀카 한 장이면 스튜디오급으로")
+                            .font(AppFont.footnote).foregroundStyle(Color.ink2)
+                    }
+                    Spacer(minLength: 0)
+                    Text("받기")
+                        .font(AppFont.calloutEmphasis)
+                        .foregroundStyle(Color.accent)
+                }
+                .padding(Spacing.s3)
+                .frame(maxWidth: .infinity)
+                .background(Color.card, in: RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
+            }
+            .buttonStyle(PressScaleButtonStyle())
+        }
+        .padding(.horizontal, Spacing.page)
+        .padding(.bottom, Spacing.s5)
     }
 }
 

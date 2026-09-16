@@ -173,6 +173,25 @@ final class AuthStore {
         return true
     }
 
+    /// 5주차 — 1.x → 2.0 로그인 이전(`LegacySessionMigration`). 1.x WKWebView(`localStorage`)에서 건진
+    /// refresh_token 으로 새 세션을 발급받아 그대로 채택한다. 실패하면 그냥 false(평소처럼 로그인 화면).
+    @discardableResult
+    func adoptLegacyRefreshToken(_ refreshToken: String) async -> Bool {
+        guard session == nil else { return false }
+        do {
+            let json = try await SupabaseAuthAPI.token(grant: "refresh_token", body: ["refresh_token": refreshToken])
+            adopt(json: json, provider: nil)
+            if session != nil {
+                signInTick += 1
+                AppLog.auth.info("legacy.migration.ok")
+                return true
+            }
+        } catch {
+            AppLog.auth.notice("legacy.migration.failed \(error.localizedDescription, privacy: .public)")
+        }
+        return false
+    }
+
     private func adopt(json: [String: Any], provider: String?) {
         guard let access = json["access_token"] as? String,
               var s = AuthSession.from(accessToken: access, refreshToken: json["refresh_token"] as? String) else { return }

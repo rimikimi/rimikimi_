@@ -64,6 +64,9 @@ enum Config {
     static let termsURL = apiBase.appendingPathComponent("terms")
     static let privacyURL = apiBase.appendingPathComponent("privacy")
     static let refundURL = apiBase.appendingPathComponent("refund")
+    /// 증명사진(idphoto) 컨셉은 1.x 와 동일하게 rimikimi 안에서 만들지 않고 전문앱 Brooklyn 으로 유도한다
+    /// (`src/PortraitStudio.jsx` `openBrooklyn()`과 같은 목적지 — iOS 앱스토어 상세 페이지).
+    static let brooklynAppStoreURL = URL(string: "https://apps.apple.com/app/id6784226620")!
 
     static func thumbURL(_ id: String) -> URL { apiBase.appendingPathComponent("thumbs/\(id).webp") }
     static let bundleID = "com.rimikimi.app"

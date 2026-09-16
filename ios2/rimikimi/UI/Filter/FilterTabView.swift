@@ -59,10 +59,8 @@ struct FilterTabView: View {
                             ForEach(g.presets) { p in
                                 Button { app.requireLogin(.filterPick(presetKey: p.key)) } label: {
                                     VStack(spacing: Spacing.s2) {
-                                        RoundedRectangle(cornerRadius: Radius.card, style: .continuous)
-                                            .fill(Color.fill)
+                                        RemoteImage(url: Config.thumbURL("fs_\(p.key)"), cornerRadius: Radius.card)
                                             .frame(width: 96, height: 128)
-                                            .overlay { Image(systemName: "photo").font(.system(size: 22)).foregroundStyle(Color.ink3) }
                                         Text(p.label).font(AppFont.footnote).foregroundStyle(Color.ink)
                                     }
                                 }
