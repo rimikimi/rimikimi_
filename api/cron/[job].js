@@ -12,11 +12,35 @@
 // ============================================================
 
 import { refreshAppleSecret } from "../_lib/appleSecret.js";
-import { notifyConceptDrop } from "../_lib/dropNotice.js";
+import { notifyConceptDrop, dropTopicFor } from "../_lib/dropNotice.js";
+import { sendToTopic } from "../_lib/push.js";
+
+// 일회성 공지 푸시. 크론 스케줄에 등록하지 않고 **수동으로만** 호출한다
+// (CRON_SECRET 이 있어야 하므로 아무나 못 쏜다).
+//   /api/cron/announce?title=...&body=...[&dry=1]
+// 대상은 드롭 알림과 같은 토픽(한국 = drop_p540) — 앱이 이미 구독해 둔 유일한 토픽이다.
+// ⚠️ 알림을 켠 사람에게만 간다. 전체 가입자 수와 도달 수는 다르다.
+async function announce(req, res) {
+  const title = String(req.query?.title || "").slice(0, 120);
+  const body = String(req.query?.body || "").slice(0, 300);
+  if (!title || !body) {
+    return res.status(400).json({ error: "title 과 body 가 필요합니다." });
+  }
+  const topic = dropTopicFor(540); // KST
+  if (req.query?.dry) {
+    return res.status(200).json({ ok: true, sent: false, dry: true, topic, title, body });
+  }
+  const r = await sendToTopic(topic, { title, body, data: { kind: "announce" } });
+  return res.status(r?.ok ? 200 : 502).json({
+    ok: !!r?.ok, sent: !!r?.ok, topic, title, body,
+    error: r?.ok ? undefined : String(r?.error || "").slice(0, 200),
+  });
+}
 
 const JOBS = {
   "refresh-apple-secret": refreshAppleSecret,
   "notify-drop": notifyConceptDrop,
+  "announce": announce,
 };
 
 export default async function handler(req, res) {
