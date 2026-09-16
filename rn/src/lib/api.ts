@@ -154,6 +154,57 @@ export async function requestFaceAnchor(token: string, shots: EncodedPhoto[]): P
   return { mimeType: j.mimeType || "image/jpeg", base64: j.base64 };
 }
 
+// ---- /api/generate?fit=outpaint ---------------------------------------------
+export interface OutpaintResult {
+  imageDataUrl: string;
+  credits?: number;
+  quotaUsed?: number;
+  quotaLimit?: number;
+}
+
+/**
+ * 채워 맞춤(SPEC §3 신규): 원본 사진 → 세로 3:4, 1 크레딧. 계약은 고정(서버 작업 중,
+ * 아직 미배포일 수 있다) — 같은 /api/generate 에 `fit:"outpaint"` 를 실어 보내고,
+ * 응답 모양은 기존 generate 와 같다 `{mimeType, base64, credits, quotaUsed, quotaLimit}`.
+ * 크레딧 부족(402/429)은 ApiError.quotaExceeded 로 구분해 기존 크레딧 시트로 넘긴다.
+ */
+export async function outpaintImage(token: string, photo: EncodedPhoto): Promise<OutpaintResult> {
+  if (!token) throw new ApiError("로그인이 필요해요.", 401);
+  let res: Response;
+  try {
+    res = await fetch(`${getEnv().apiBase}/api/generate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...auth(token) },
+      body: JSON.stringify({ mimeType: photo.mimeType, base64: photo.base64, fit: "outpaint" }),
+    });
+  } catch {
+    throw new ApiError("네트워크 요청에 실패했어요. 잠시 후 다시 시도해 주세요.", 0, { networkFail: true });
+  }
+  let json: Record<string, unknown>;
+  try {
+    json = (await res.json()) as Record<string, unknown>;
+  } catch {
+    throw new ApiError("서버 응답을 읽을 수 없어요 (오류 " + res.status + ")", res.status);
+  }
+  if (!res.ok) {
+    const msg = (json?.error as string) || "채워 맞춤 실패 (오류 " + res.status + ")";
+    throw new ApiError(msg, res.status, {
+      quotaExceeded: res.status === 402 || res.status === 429,
+      quotaUsed: typeof json?.quotaUsed === "number" ? json.quotaUsed : undefined,
+      quotaLimit: typeof json?.quotaLimit === "number" ? json.quotaLimit : undefined,
+    });
+  }
+  if (!json?.base64 || !json?.mimeType) {
+    throw new ApiError("채워 맞춤 결과를 받지 못했어요.", res.status);
+  }
+  return {
+    imageDataUrl: "data:" + json.mimeType + ";base64," + json.base64,
+    credits: json.credits as number | undefined,
+    quotaUsed: json.quotaUsed as number | undefined,
+    quotaLimit: json.quotaLimit as number | undefined,
+  };
+}
+
 export interface GenerateResult {
   imageDataUrl: string;
   batch: { imageDataUrl: string; galleryId?: string; galleryExpiresAt?: string }[] | null;

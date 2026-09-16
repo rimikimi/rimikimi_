@@ -6,7 +6,7 @@ import { Logo } from "@/ui/Logo";
 import { Text } from "@/ui/Text";
 import { Button } from "@/ui/Button";
 import { copy } from "@/lib/copy";
-import { color, space } from "@/theme/tokens";
+import { color, space, themedStyles } from "@/theme/tokens";
 import { GUIDE_SEEN_KEY } from "@/lib/prefs";
 
 // 첫 실행 가이드 — 딱 1장(1.x Guide.jsx intro "3단계면 끝나요" 문구 재사용). 실행 시 다른 팝업 없음.
@@ -39,10 +39,10 @@ export default function Guide() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   root: { flex: 1, backgroundColor: color.bg, paddingHorizontal: space.s5 },
   body: { flex: 1, alignItems: "center", justifyContent: "center" },
   steps: { alignSelf: "stretch", marginTop: space.s5 },
   step: { paddingVertical: space.s3, gap: 2 },
   stepLine: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: color.line },
-});
+}));

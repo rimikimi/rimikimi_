@@ -5,7 +5,7 @@ import { Image } from "expo-image";
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { Text } from "./Text";
 import { thumbUrl, type Concept } from "@/lib/concepts";
-import { color, radius, space } from "@/theme/tokens";
+import { color, radius, space, themedStyles } from "@/theme/tokens";
 import { CARD_PRESS_SCALE, duration, ease } from "@/theme/motion";
 
 // 컨셉 카드 — 3:4 썸네일 + 제목. 누름 0.985. 탭 = 옵션 화면 푸시(slide_from_right).
@@ -58,8 +58,8 @@ export function ConceptRail({ title, items, big, onMore }: { title: string; item
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   rail: { gap: space.s3 },
   railHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: space.screen },
   railRow: { paddingHorizontal: space.screen, gap: space.s3 },
-});
+}));

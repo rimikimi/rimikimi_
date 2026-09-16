@@ -21,7 +21,8 @@ const SUPABASE_ANON_KEY =
 const RC_ANDROID_KEY = process.env.EXPO_PUBLIC_RC_ANDROID_KEY ?? "goog_YIKsqWRnzWfBZURnwnGHSBqeauh";
 
 // SPEC §1 바탕색. theme/tokens.ts 의 color.bg 와 손으로 같게 유지한다(네이티브 설정은
-// RN 토큰 모듈을 import 할 수 없다).
+// RN 토큰 모듈을 import 할 수 없다). 스플래시·어댑티브 아이콘은 라이트 값 그대로(이 플러그인
+// 버전엔 안드로이드 다크 스플래시 옵션이 없다 — 부팅 스플래시는 아주 잠깐이라 범위 밖으로 둔다).
 const BG = "#FBF8F3";
 
 const config: ExpoConfig = {
@@ -31,7 +32,9 @@ const config: ExpoConfig = {
   orientation: "portrait",
   scheme: "com.rimikimi.app",
   icon: "./assets/images/icon.png",
-  userInterfaceStyle: "light",
+  // 4주차: 기기 다크 모드를 따라간다(SPEC §1 다크 토큰). 화면 쪽은 src/theme/tokens.ts 가
+  // 시스템 설정을 읽어 반영한다 — 여기는 네이티브 셸(상태바 배경 등)이 같은 방향을 보게만 한다.
+  userInterfaceStyle: "automatic",
 
   ios: {
     bundleIdentifier: "com.rimikimi.app",

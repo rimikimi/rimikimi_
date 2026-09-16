@@ -5,7 +5,7 @@ import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { ReduceMotion, runOnJS, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { Text } from "@/ui/Text";
-import { color, radius, space } from "@/theme/tokens";
+import { color, radius, space, themedStyles } from "@/theme/tokens";
 import { ease, transitions } from "@/theme/motion";
 
 const { height: SCREEN_H } = Dimensions.get("window");
@@ -63,7 +63,7 @@ export function Sheet({ open, title, onClose, children }: { open: boolean; title
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   scrim: { backgroundColor: color.scrim },
   sheet: {
     position: "absolute", left: 0, right: 0, bottom: 0,
@@ -74,4 +74,4 @@ const styles = StyleSheet.create({
   },
   grabber: { alignSelf: "center", width: 36, height: 5, borderRadius: 3, backgroundColor: color.fillPress },
   title: { marginTop: space.s2 },
-});
+}));

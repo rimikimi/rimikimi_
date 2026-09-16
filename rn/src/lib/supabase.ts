@@ -1,6 +1,7 @@
 import * as SecureStore from "expo-secure-store";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { AppState } from "react-native";
+import { AppState, Platform } from "react-native";
 import { getEnv } from "./env";
 
 // ============================================================================
@@ -53,6 +54,15 @@ const chunkedStore = {
   },
 };
 
+// 웹 `/dev` 프리뷰 전용: expo-secure-store 는 웹에서 `getValueWithKeyAsync is not a function` 로
+// 부팅 자체를 막는다(SecureStore 는 네이티브 키체인/키스토어 전용, 웹 구현이 없다). Android 는
+// 여전히 위 chunkedStore(SecureStore) 를 쓴다 — 이 분기는 웹에서만 갈린다.
+const webStore = {
+  getItem: (key: string) => AsyncStorage.getItem(key),
+  setItem: (key: string, value: string) => AsyncStorage.setItem(key, value),
+  removeItem: (key: string) => AsyncStorage.removeItem(key),
+};
+
 let client: SupabaseClient | null = null;
 
 export function supabase(): SupabaseClient {
@@ -60,7 +70,7 @@ export function supabase(): SupabaseClient {
   const env = getEnv();
   client = createClient(env.supabaseUrl, env.supabaseAnonKey, {
     auth: {
-      storage: chunkedStore,
+      storage: Platform.OS === "web" ? webStore : chunkedStore,
       autoRefreshToken: true,
       persistSession: true,
       detectSessionInUrl: false,

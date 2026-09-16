@@ -20,7 +20,7 @@ import { disableNotifications, getPermissionState, setupNotifications } from "@/
 import { NOTIFY_ON_KEY, getFlag } from "@/lib/prefs";
 import { clearRegisteredPhoto } from "@/lib/photo";
 import { copy } from "@/lib/copy";
-import { color, radius, space } from "@/theme/tokens";
+import { color, radius, space, themedStyles } from "@/theme/tokens";
 
 // ============================================================================
 // 프로필 (SPEC §2): 크레딧 · 스토어 · 초대(내 코드 복사 + 친구 코드 입력 → /api/referral/claim)
@@ -260,7 +260,7 @@ export default function ProfileTab() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   content: { paddingHorizontal: space.screen, gap: space.s4 },
   me: { flexDirection: "row", alignItems: "center", gap: space.s3 },
   avatar: { width: 52, height: 52, borderRadius: radius.pill, backgroundColor: color.fill, alignItems: "center", justifyContent: "center", overflow: "hidden" },
@@ -274,4 +274,4 @@ const styles = StyleSheet.create({
   myCode: { alignItems: "center", gap: 2, padding: space.s3, borderRadius: radius.btn, backgroundColor: color.fill },
   codeRow: { flexDirection: "row", alignItems: "center", gap: space.s2 },
   codeInput: { flex: 1, height: 44, borderRadius: radius.btn, backgroundColor: color.fill, paddingHorizontal: space.s3, color: color.ink, fontSize: 17, letterSpacing: 2 },
-});
+}));

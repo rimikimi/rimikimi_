@@ -12,7 +12,7 @@ import { useAuth } from "@/lib/auth";
 import { useGeneration } from "@/lib/generation";
 import { deleteGalleryItem, fetchGallery, type GalleryItem } from "@/lib/api";
 import { copy } from "@/lib/copy";
-import { color, radius, space } from "@/theme/tokens";
+import { color, radius, space, themedStyles } from "@/theme/tokens";
 import { duration } from "@/theme/motion";
 
 // 내 사진 — 서버 갤러리 그리드(/api/gallery, Bearer) + 맨 위 진행 카드(SPEC §2).
@@ -103,9 +103,9 @@ export default function PhotosTab() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   empty: { paddingVertical: space.s7, paddingHorizontal: space.s5, alignItems: "center", gap: space.s4 },
   notice: { paddingHorizontal: space.screen, marginBottom: space.s3 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: space.s1, paddingHorizontal: space.screen },
   thumb: { borderRadius: radius.thumb - 4, backgroundColor: color.mat },
-});
+}));

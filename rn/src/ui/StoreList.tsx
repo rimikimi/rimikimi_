@@ -8,7 +8,7 @@ import { IconHeart } from "./icons";
 import { CREDIT_PACKS, SUB_PLANS, packDiscountPercent, perUnitKrw, won } from "@/lib/packs";
 import type { StoreFlow } from "@/lib/storeFlow";
 import { copy } from "@/lib/copy";
-import { color, radius, space } from "@/theme/tokens";
+import { color, radius, space, themedStyles } from "@/theme/tokens";
 
 // 팩 행 + 구독 행. 가격은 스토어(RevenueCat)가 준 priceString 을 우선 표시하고, 상품을 못 불러왔으면 원화 참고가.
 
@@ -106,7 +106,7 @@ export function RestoreButton({ flow }: { flow: StoreFlow }) {
   return <Button label={flow.restoring ? copy.store.restoring : copy.store.restore} variant="quiet" size="sm" loading={flow.restoring} disabled={!flow.available || !!flow.busyId} onPress={() => { void flow.restore(); }} />;
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", minHeight: 62, paddingHorizontal: space.s4, paddingVertical: space.s3 },
   lead: { flexDirection: "row", alignItems: "center", gap: space.s3 },
   titleRow: { flexDirection: "row", alignItems: "center", gap: space.s2 },
@@ -114,4 +114,4 @@ const styles = StyleSheet.create({
   trail: { minWidth: 72, alignItems: "flex-end" },
   sep: { height: StyleSheet.hairlineWidth, backgroundColor: color.line, marginLeft: space.s4 },
   subHead: { padding: space.s4, gap: 2 },
-});
+}));

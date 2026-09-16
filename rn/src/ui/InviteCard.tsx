@@ -8,7 +8,7 @@ import { Button } from "./Button";
 import { IconClose } from "./icons";
 import { INVITE_CARD_DONE_KEY, INVITE_CARD_DUE_KEY, getFlag, setFlag } from "@/lib/prefs";
 import { copy } from "@/lib/copy";
-import { color, space } from "@/theme/tokens";
+import { color, space, themedStyles } from "@/theme/tokens";
 import { transitions } from "@/theme/motion";
 
 // 첫 생성 완료 후 홈 상단 초대 카드 — 1회. 닫거나 열면 다시 안 뜬다.
@@ -41,7 +41,7 @@ export function InviteCard() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   wrap: { paddingHorizontal: space.screen, marginBottom: space.s4 },
   head: { flexDirection: "row", alignItems: "center", gap: space.s2 },
-});
+}));

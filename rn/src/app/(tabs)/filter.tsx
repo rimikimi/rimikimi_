@@ -12,7 +12,7 @@ import { useAuth } from "@/lib/auth";
 import { getEnv } from "@/lib/env";
 import { copy } from "@/lib/copy";
 import { groupedPresets } from "@/filters";
-import { color, radius, space } from "@/theme/tokens";
+import { color, radius, space, themedStyles } from "@/theme/tokens";
 import { duration } from "@/theme/motion";
 
 // 필터 탭 — 필름 · 카메라 · 재미 세 그룹 가로줄, 맨 위 "카메라로 찍기" (SPEC §2).
@@ -64,7 +64,7 @@ export default function FilterTab() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   top: { paddingHorizontal: space.screen, marginBottom: space.s5 },
   shoot: { flexDirection: "row", alignItems: "center", gap: space.s3, padding: space.s3 },
   shootIcon: { width: 44, height: 44, borderRadius: radius.pill, backgroundColor: color.cameraBg, alignItems: "center", justifyContent: "center" },
@@ -74,4 +74,4 @@ const styles = StyleSheet.create({
   row: { paddingHorizontal: space.screen, gap: space.s3 },
   preset: { width: 96, gap: space.s2 },
   presetImg: { width: 96, height: 128, borderRadius: radius.thumb, backgroundColor: color.mat },
-});
+}));

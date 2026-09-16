@@ -9,7 +9,7 @@ import { Logo } from "./Logo";
 import { CreditChip } from "./CreditChip";
 import { IconArrowLeft, IconUser } from "./icons";
 import { useAuth } from "@/lib/auth";
-import { chrome, color, radius, space } from "@/theme/tokens";
+import { chrome, color, radius, space, themedStyles } from "@/theme/tokens";
 
 // ============================================================================
 // Pinned top bar. Glass — chrome only (SPEC §0).
@@ -57,7 +57,7 @@ export function AppHeader({ title, back, right }: { title?: string; back?: boole
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   bar: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: color.line },
   row: { height: chrome.headerH, flexDirection: "row", alignItems: "center", paddingHorizontal: space.screen },
   side: { flex: 1, flexDirection: "row", alignItems: "center", gap: space.s2 },
@@ -66,4 +66,4 @@ const styles = StyleSheet.create({
   iconBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center", marginLeft: -space.s2 },
   avatar: { width: 32, height: 32, borderRadius: radius.pill, backgroundColor: color.fill, alignItems: "center", justifyContent: "center", overflow: "hidden" },
   avatarImg: { width: 32, height: 32 },
-});
+}));

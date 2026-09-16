@@ -16,7 +16,7 @@ import { useGeneration, type ResultImage } from "@/lib/generation";
 import { useStore } from "@/lib/store";
 import { similarConcepts } from "@/lib/concepts";
 import { copy } from "@/lib/copy";
-import { color, radius, space } from "@/theme/tokens";
+import { color, radius, space, themedStyles } from "@/theme/tokens";
 import { duration } from "@/theme/motion";
 
 // ============================================================================
@@ -151,7 +151,7 @@ export default function Result() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   content: { paddingHorizontal: space.screen, gap: space.s4 },
   empty: { borderRadius: radius.card, backgroundColor: color.mat, alignItems: "center", justifyContent: "center" },
   thumb: { width: 60, height: 80, borderRadius: radius.thumb, backgroundColor: color.mat, opacity: 0.6 },
@@ -159,4 +159,4 @@ const styles = StyleSheet.create({
   actions: { flexDirection: "row", gap: space.s2 },
   action: { flex: 1, paddingHorizontal: space.s2 },
   similar: { marginHorizontal: -space.screen, marginTop: space.s2 },
-});
+}));

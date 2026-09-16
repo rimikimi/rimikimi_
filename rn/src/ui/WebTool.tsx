@@ -10,7 +10,7 @@ import { useAuth } from "@/lib/auth";
 import { useQuota } from "@/lib/quota";
 import { getEnv } from "@/lib/env";
 import { saveDataUrlToAlbum, shareDataUrlOrUrl } from "@/lib/nativeMedia";
-import { color, chrome, space } from "@/theme/tokens";
+import { chrome, color, space, themedStyles } from "@/theme/tokens";
 
 // 1단계(2.0, SPEC §5): 편집기·카메라는 현재 웹(src/PhotoEditor.jsx · CameraStudio.jsx)을 웹뷰로 임베드.
 // 저장·공유·앨범·닫기·크레딧 갱신만 네이티브 브리지(3주차) — postMessage 규약.
@@ -131,10 +131,10 @@ export function WebTool({ title, tool, query }: { title: string; tool: "filter" 
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   root: { flex: 1, backgroundColor: color.bg },
   bar: { height: chrome.headerH, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: space.screen, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: color.line },
   side: { width: 40 },
   web: { flex: 1, backgroundColor: color.bg },
   loading: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center" },
-});
+}));

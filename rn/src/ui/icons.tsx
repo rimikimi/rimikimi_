@@ -12,9 +12,15 @@ export interface IconProps {
 }
 
 function Base({ size = 24, color = "currentColor", children, rotate }: IconProps & { children: React.ReactNode; rotate?: number }) {
+  // 회전은 `origin`/`rotation` 축약 prop 대신 표준 SVG `transform` 문자열로 준다 — 둘 다
+  // react-native-svg 가 같은 행렬로 계산해 동작은 같지만, `origin` 축약형은 웹 전용 내부 구현이
+  // 별도로 `transform-origin`(대시 포함 DOM 속성)을 만들어 react-native-web 에서만
+  // "Invalid DOM property `transform-origin`" 콘솔 경고를 낸다(node_modules/react-native-svg/
+  // lib/commonjs/web/utils/prepare.js). 네이티브(안드로이드/iOS)엔 이 파일 자체가 없어 원래도
+  // 영향이 없었다 — 이건 순수 웹 프리뷰 콘솔 노이즈였고, 표준 transform 문자열로 바꿔 아예 없앤다.
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <G stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" origin="12, 12" rotation={rotate ?? 0}>
+      <G stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" transform={`rotate(${rotate ?? 0} 12 12)`}>
         {children}
       </G>
     </Svg>

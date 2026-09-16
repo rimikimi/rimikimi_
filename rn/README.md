@@ -82,22 +82,34 @@ src/app/camera.tsx · editor.tsx   웹뷰 자리표시(https://rimikimi-app.verc
 - **알림 상태바 아이콘** (`assets/images/notification-icon.png`): 96×96, 흰색(255,255,255) + 알파만 있는 하트 실루엣(로고 워드마크의 모노크롬 버전, 파라메트릭 하트 커브로 생성) — `expo-notifications`·FCM 기본 아이콘 둘 다 이걸로 바꿨다. `expo prebuild` 로 `drawable-{m,h,xh,xxh,xxxh}dpi/notification_icon.png` 5종에 실제로 깔리는 것과 `AndroidManifest.xml` 의 `default_notification_icon` meta-data 를 확인했다. ⚠️ `assets/` 전체가 `.gitignore` 대상(기존 앱 아이콘·스플래시도 마찬가지 — 이 저장소 관례)이라 이 PNG 도 git 에는 안 잡힌다, 커밋과 별도로 전달 필요.
 - **부수 수정**: `nativeMedia.ts`·`result/[jobId].tsx` 의 `expo-media-library`/`expo-sharing`/`expo-file-system` import 를 최상단에서 함수 안 지연 import 로 바꿨다 — 최상단에 두면 네이티브 모듈이 없는 빌드(웹 `/dev` 프리뷰 등)에서 그 화면이 번들에 물려 있는 것만으로 전체가 크래시났다(실기기 Android 동작엔 영향 없음, 검증 중 발견).
 
+## 4주차에 된 것
+
+- **채워 맞춤 연결** (`src/lib/api.ts` `outpaintImage()`, `src/ui/FitSheet.tsx`): 서버 계약(고정) `POST /api/generate` + `fit:"outpaint"` → 응답 `{mimeType,base64,credits,quotaUsed,quotaLimit}` 그대로 붙였다. 버튼 누르면 크레딧 게이트(`useCreditGate`) 를 먼저 거쳐(부족하면 기존 크레딧 시트 → 구매 후 자동 재시도) 원본을 1024 로 인코딩해 보내고, 결과를 그 자리에서 표시 이미지로 바꾼다(`onFitted`). 진행 중 스피너·실패 시 Alert. **서버가 이 워크트리에 아직 배포됐는지 실호출로 확인 못 함**(서버는 `api/` — 이번 작업 범위 밖) — 에러 경로(네트워크 실패·402/429·응답 파싱 실패)만 코드로 확인, 실제 성공 응답은 서버 배포 후 재검증 필요.
+- **완료 푸시 → 정확한 결과 직행**: 서버 `api/generate.js` 가 이미 push data 에 `galleryId` 를 얹고 있는 걸 확인했다(기존 kind/count 유지, 추가만 — 계약대로). 라우팅 로직을 `push.ts` 에서 `src/lib/pushRouting.tsx` 의 `usePushResultRouting()` 훅으로 분리했다(galleryId 룩업에 `useAuth`/`useGeneration` 이 필요해서). 우선순위: ① 이 기기 메모리(GenerationProvider)에 같은 galleryId 이미지를 가진 job 이 있으면 그 job 전체(여러 장) 로 ② 없으면 `/api/gallery` 를 한 번 조회해 그 항목 하나로 ③ galleryId 자체가 없거나 못 찾으면 기존 로컬 TTL(`lastJob.ts`, 10분) 폴백. `_layout.tsx` 에 `<PushRouting />` 을 GenerationProvider 안에 심었다.
+- **다크 모드**: 기기 설정을 그대로 따른다(`app.config.ts` `userInterfaceStyle: "automatic"`). `src/theme/tokens.ts` 가 `color` 객체 하나를 계속 유지하며 `applyScheme()` 이 라이트/다크 값으로 in-place 로 바꾸고, `_layout.tsx` 가 `useColorScheme()` 로 감지해 렌더 시점에 적용한다(메모이제이션이 없어 전체 트리가 새 값으로 다시 그려진다). 색이 바뀌는 걸 반영하려면 스타일이 "매 렌더 다시 계산"돼야 하는데, 화면들이 전부 모듈 스코프 `StyleSheet.create({...color.x...})` 를 쓰고 있어(스킴이 바뀌어도 값이 얼어붙는다) 그 28개 파일 전부를 `themedStyles(() => StyleSheet.create({...}))` 로 감쌌다(테마 버전이 바뀔 때만 다시 계산, 그 사이는 캐시). 같은 이유로 `src/ui/Text.tsx` 의 톤별 색 맵(모듈 스코프 `tones`)도 렌더 시점 함수로 바꿨고, `src/ui/Screen.tsx` 의 `Glass` 폴백 배경·블러 tint 도 스킴을 따르게 했다. `src/ui/LoginSheet.tsx` 의 구글 버튼(고정 흰 배경)은 글자색을 `color.ink` 대신 고정 진한 잉크로 되돌렸다(다크에서 흰 배경 위에 흰 글자가 될 뻔한 걸 잡음). 라이트 값은 3주차와 완전히 동일 — 실측(아래 캡처)으로 확인.
+- **웹 `/dev` 프리뷰 부팅 크래시 고침** (`src/lib/supabase.ts`): `expo-secure-store` 가 웹에 없어(`getValueWithKeyAsync is not a function`) 앱 부팅 자체가 막히던 문제 — 웹(`Platform.OS==="web"`) 에서만 Supabase 세션 저장소를 `AsyncStorage` 로 바꾸는 분기를 추가했다. Android 는 여전히 `expo-secure-store` 청크 저장 그대로(분기 안 탐). 이제 `npx expo start --web` 으로 `/dev`, 실제 탭 라우트(`/(tabs)/gallery` 등) 스크린샷이 실제로 나온다 — 라이트/다크 모두 캡처해 확인함(`w4_rn_*.png`, 아래 검증 항목).
+
 ## 확인 못 한 것 (3주차)
 
 - **`src/` 쪽 라우팅 미완**: `WebTool.tsx` 가 `?tool=camera|filter&native=1` 로 웹을 띄우는데, `src/CameraStudio.jsx`/`PhotoEditor.jsx`/`main.jsx` 어디에도 이 쿼리를 읽는 코드가 없다(1·2주차부터 있던 자리표시 가정, 이번 주도 그대로) — 웹 쪽이 이 파라미터로 실제 카메라/편집기 화면을 곧장 띄우도록 라우팅해야 브리지가 눈에 보이는 동작으로 이어진다. `nativeClose`/`nativeRefreshCredits`(`src/nativeBridge.js`)도 정의만 있고 `CameraStudio.jsx`/`PhotoEditor.jsx` 어느 버튼에서도 아직 안 부른다.
 - **실기기/에뮬레이터 미검증**: 이 환경엔 Android SDK 는 있는데 Java 런타임이 없어(`java -version` 실패) `gradle`/`expo run:android` 자체가 안 된다 — 브리지 postMessage 왕복, 카메라 실권한 프롬프트, 저장/공유 실동작, 알림 아이콘 실제 표시는 전부 미검증(타입·번들·prebuild 매니페스트 배선만 확인).
 - **웹(`/dev`) 스크린샷 실패**: `rn/src/lib/supabase.ts` 의 세션 스토리지(`expo-secure-store`)가 웹에서 `ExpoSecureStore.default.getValueWithKeyAsync is not a function` 로 앱 부팅 자체를 막는다(1주차부터 있던 기존 코드, 이번 주 변경 아님) — `/dev`·`/camera`·`/editor` 어느 라우트를 열어도 이 오류 오버레이가 화면을 덮어 실제 UI 스크린샷을 못 찍었다. 캡처는 시도했으나(에러 화면만) 의미가 없어 버렸다.
 - **얼굴 검출(ML Kit) — 조사만, 안 붙임**: `@react-native-ml-kit/face-detection`(npm 최신 2.0.1, 2025-09-01 배포) 을 확인했다. New Architecture/TurboModule 지원 근거가 없고(레거시 브리지 네이티브 모듈, RN `>=0.60 <1.0.x` 만 명시), Expo config plugin 도 없다(수동 링킹 전제). 이 프로젝트는 RN 0.86 — 최근 React Native 는 New Architecture 가 기본/사실상 필수라 구형 레거시 모듈은 빌드 실패나 런타임 크래시 위험이 크다. 게다가 이 환경엔 Java 가 없어 실빌드로 확인할 방법 자체가 없다 → **지시대로 실빌드 검증 없이는 안 붙였다.** `rn/src/lib/fit.ts` 의 `setFaceDetector()` 인터페이스는 그대로 열려 있으니, 실기기 빌드가 되는 환경에서 붙여 검증하면 된다.
-- 완료 푸시 결과 직행이 커버 못 하는 경우: 알림이 10분 넘게 방치됐다 탭되면(TTL) 예전처럼 내 사진 탭으로 간다 — 서버가 payload 에 jobId/URL 을 안 실어 주는 한 구조적 한계.
+- 완료 푸시 결과 직행이 커버 못 하는 경우: 알림이 10분 넘게 방치됐다 탭되면(TTL) 예전처럼 내 사진 탭으로 간다 — 서버가 payload 에 jobId/URL 을 안 실어 주는 한 구조적 한계(4주차: galleryId 가 이제 있어서 이 경로 자체가 크게 줄었다 — TTL 폴백은 galleryId 조차 없거나 갤러리 조회도 실패했을 때만 남는다).
+
+## 확인 못 한 것 (4주차)
+
+- **채워 맞춤 실호출 미검증**: 서버가 `fit:"outpaint"` 를 실제로 처리하는 배포본인지 이 워크트리에서 확인할 방법이 없다(서버 코드는 `api/` — 범위 밖, 다른 작업자 담당). 코드는 계약대로 짜여 있고 에러 처리(네트워크 실패·크레딧 부족 402/429·응답 파싱 실패)는 확인했지만, **성공 경로(실제 3:4 이미지가 돌아오는지)는 서버 배포 후 재검증 필요**.
+- **실기기 미검증 유지**: 3주차와 같은 이유(Java 런타임 없음)로 채워 맞춤 버튼의 실제 탭 → 진행 → 결과 교체, 다크 모드 전환 애니메이션(기기 설정 토글 시 재부팅 없이 즉시 바뀌는지), 푸시 galleryId 라우팅의 실제 도착·탭 동작은 타입·번들·웹 프리뷰로만 확인했다.
 
 ## 자리표시(stub) / 남은 것
 
 - 얼굴 검출(정방향 맞춤): 위 "확인 못 한 것" 참고 — ML Kit 조사 완료, 미장착.
 - 증명사진(idphoto) 옵션(정장/배경색) 미구현 — 기본 프롬프트로 나간다.
 - 결과 사진 768×1024 재크롭(웹 `fitToSize`) 생략 — 서버 결과 그대로.
-- 다크 모드: 토큰에 주석만. 라이트 전용 출시.
-- 앱 아이콘/스플래시: `store_assets/play-icon-512.png` 그대로. 어댑티브 전경 이미지 전용 에셋 필요.
-- 실기기 미검증 항목: Play 결제(거래ID 가 서버 `purchaseTxId` 와 맞는지 — 1.x 와 같이 `transactionIdentifier` 우선, `purchaseToken` 폴백), FCM 토큰 형식, 네이버 magic link 해시 복귀.
+- ~~다크 모드: 토큰에 주석만. 라이트 전용 출시.~~ → 4주차에 구현(기기 설정을 따른다).
+- 앱 아이콘/스플래시: `store_assets/play-icon-512.png` 그대로. 어댑티브 전경 이미지 전용 에셋 필요. 스플래시는 라이트 값 고정(이 `expo-splash-screen` 버전엔 Android 다크 스플래시 옵션이 없다 — 부팅 순간뿐이라 범위 밖으로 뒀다).
+- 실기기 미검증 항목: Play 결제(거래ID 가 서버 `purchaseTxId` 와 맞는지 — 1.x 와 같이 `transactionIdentifier` 우선, `purchaseToken` 폴백), FCM 토큰 형식, 네이버 magic link 해시 복귀, 채워 맞춤 서버 실호출.
 
 ## 확인된 명세 모호점
 

@@ -7,16 +7,18 @@ import { Logo } from "./Logo";
 import { Spinner } from "./Spinner";
 import { useAuth, type Provider } from "@/lib/auth";
 import { copy } from "@/lib/copy";
-import { chrome, color, radius, space } from "@/theme/tokens";
+import { chrome, color, radius, space, themedStyles } from "@/theme/tokens";
 
 // 로그인 시트 — Apple · 카카오 · 네이버 · Google. 시점은 만들기/필터/카메라 뿐(SPEC §3).
 // 브랜드 버튼 색은 각 제공자 가이드의 고정값이라 토큰이 아니다(웹 LoginGate.jsx 와 같은 값).
 
+// 브랜드 버튼 자체가 고정 배경(구글=흰 배경)이라 글자색도 테마 무관 고정값이어야 한다 —
+// `color.ink` 를 쓰면 다크 모드에서 흰 배경 위에 흰 글자가 돼 안 보인다(4주차에 잡음).
 const BRAND = {
   apple: { bg: "#000000", fg: "#FFFFFF" },
   kakao: { bg: "#FEE500", fg: "#191919" },
   naver: { bg: "#03C75A", fg: "#FFFFFF" },
-  google: { bg: "#FFFFFF", fg: color.ink },
+  google: { bg: "#FFFFFF", fg: "#231F20" },
 } as const;
 
 function ProviderIcon({ p, colorFg }: { p: Provider; colorFg: string }) {
@@ -75,10 +77,10 @@ export function LoginSheet() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   logo: { alignItems: "center", marginTop: space.s2 },
   buttons: { gap: space.s3, marginTop: space.s2 },
   btn: { height: chrome.buttonH, borderRadius: radius.btn, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: space.s2 },
   googleBorder: { borderWidth: 1.5, borderColor: color.line },
   slot: { width: 20, height: 20, alignItems: "center", justifyContent: "center" },
-});
+}));

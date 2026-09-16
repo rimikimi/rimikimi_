@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, View, type ViewStyle } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { Text } from "./Text";
 import { Spinner } from "./Spinner";
-import { chrome, color, radius, space } from "@/theme/tokens";
+import { chrome, color, radius, space, themedStyles } from "@/theme/tokens";
 import { PRESS_SCALE, PRESS_SCALE_WIDE, duration, ease } from "@/theme/motion";
 
 // Button — self-made, no UI kit.
@@ -72,8 +72,8 @@ export function Button({ label, onPress, variant = "primary", size = "md", disab
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   base: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: space.s2 },
   full: { alignSelf: "stretch", width: "100%" },
   slot: { width: 20, height: 20, alignItems: "center", justifyContent: "center" },
-});
+}));

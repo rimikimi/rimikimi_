@@ -6,7 +6,7 @@ import { Text } from "./Text";
 import { IconHeart } from "./icons";
 import { useQuota } from "@/lib/quota";
 import { useAuth } from "@/lib/auth";
-import { color, radius, space } from "@/theme/tokens";
+import { color, radius, space, themedStyles } from "@/theme/tokens";
 import { transitions } from "@/theme/motion";
 
 // 크레딧 칩 — 헤더 오른쪽. 누르면 프로필(스토어 자리). 숫자는 tabular + 고정 폭이라 헤더가 안 흔들린다.
@@ -36,7 +36,7 @@ export function CreditChip() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   chip: { flexDirection: "row", alignItems: "center", gap: space.s1, height: 32, paddingHorizontal: space.s3, borderRadius: radius.pill },
   value: { minWidth: 16, alignItems: "flex-end" },
-});
+}));

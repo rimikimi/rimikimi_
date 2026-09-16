@@ -12,7 +12,7 @@ import { InviteCard } from "@/ui/InviteCard";
 import { useStore } from "@/lib/store";
 import { byNewest, categoriesOf } from "@/lib/concepts";
 import { copy } from "@/lib/copy";
-import { color, space } from "@/theme/tokens";
+import { color, space, themedStyles } from "@/theme/tokens";
 import { transitions } from "@/theme/motion";
 
 // 갤러리 = 홈. 로고 헤더 → 카테고리 칩(필터 칩 없음, 활성 = 하트 4색) → 추천 → 새로 나왔어요 → 카테고리별 줄.
@@ -86,9 +86,9 @@ export default function GalleryTab() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   chips: { paddingHorizontal: space.screen, gap: space.s2, paddingBottom: space.s4 },
   rails: { gap: space.s5 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: space.s3, paddingHorizontal: space.screen },
   center: { paddingVertical: space.s7, alignItems: "center" },
-});
+}));

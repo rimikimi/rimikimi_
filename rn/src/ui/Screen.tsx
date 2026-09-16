@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { BlurView } from "expo-blur";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { chrome, color, space } from "@/theme/tokens";
+import { chrome, color, currentScheme, space, themedStyles } from "@/theme/tokens";
 
 // ============================================================================
 // Screen shell + the glass surface (Justin 셸 그대로, 토큰만 SPEC 값).
@@ -97,17 +97,17 @@ export function Glass({ children, style, intensity = 40 }: { children?: React.Re
   const reduceTransparency = useReduceTransparency();
   const androidOld = Platform.OS === "android" && (Number(Platform.Version) || 0) < 31;
   if (androidOld || reduceTransparency) {
-    return <View style={[{ backgroundColor: "rgba(251,248,243,0.96)" }, style]}>{children}</View>;
+    return <View style={[{ backgroundColor: color.glassFallback }, style]}>{children}</View>;
   }
   return (
-    <BlurView intensity={intensity} tint="light" experimentalBlurMethod="dimezisBlurView" style={style}>
+    <BlurView intensity={intensity} tint={currentScheme() === "dark" ? "dark" : "light"} experimentalBlurMethod="dimezisBlurView" style={style}>
       {children}
     </BlurView>
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   root: { flex: 1 },
   flex: { flex: 1 },
   headerHost: { position: "absolute", top: 0, left: 0, right: 0 },
-});
+}));

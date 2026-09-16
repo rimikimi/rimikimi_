@@ -11,7 +11,7 @@ import { IconClose } from "./icons";
 import { thumbUrl } from "@/lib/concepts";
 import { useGeneration, type Job } from "@/lib/generation";
 import { copy } from "@/lib/copy";
-import { color, radius, space } from "@/theme/tokens";
+import { color, radius, space, themedStyles } from "@/theme/tokens";
 import { transitions } from "@/theme/motion";
 
 // 진행 카드 — 내 사진 맨 위. 생성 중 → 완료(결과 보기) / 실패. 진입 260 / 종료 160.
@@ -70,11 +70,11 @@ function ProgressCard({ job }: { job: Job }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   stack: { gap: space.s3, paddingHorizontal: space.screen, marginBottom: space.s4 },
   row: { flexDirection: "row", alignItems: "center", gap: space.s3, padding: space.s3 },
   thumb: { width: 60, height: 80, borderRadius: radius.thumb, backgroundColor: color.mat },
   body: { flex: 1, gap: space.s1 },
   cta: { alignSelf: "flex-start", marginTop: space.s1 },
   trail: { width: 28, alignItems: "center" },
-});
+}));

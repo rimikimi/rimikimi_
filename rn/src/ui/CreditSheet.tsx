@@ -9,7 +9,7 @@ import { PackRows, StoreMessage, SubRows } from "./StoreList";
 import { useCreditGate } from "@/lib/creditGate";
 import { useStoreFlow } from "@/lib/storeFlow";
 import { copy } from "@/lib/copy";
-import { color, space } from "@/theme/tokens";
+import { color, space, themedStyles } from "@/theme/tokens";
 
 // 크레딧 부족 시트 — 팩 3개 · 구독 1개(먼슬리) · "친구 초대로 무료 3장". 구매 즉시 하던 생성 이어짐.
 export function CreditSheet() {
@@ -38,6 +38,6 @@ export function CreditSheet() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   invite: { flexDirection: "row", alignItems: "center", gap: space.s3, padding: space.s4 },
-});
+}));

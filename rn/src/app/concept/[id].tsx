@@ -18,7 +18,7 @@ import { useCreditGate } from "@/lib/creditGate";
 import { FOURCUT_COUNTS, GARMENT_MAX, isArtOnly, isCoupleConcept, isDressroom, isFourcut, thumbUrl } from "@/lib/concepts";
 import { pickPhotos, registerPhoto, type PhotoRef } from "@/lib/photo";
 import { copy } from "@/lib/copy";
-import { color, radius, space } from "@/theme/tokens";
+import { color, radius, space, themedStyles } from "@/theme/tokens";
 import { duration } from "@/theme/motion";
 
 // ============================================================================
@@ -175,9 +175,9 @@ export default function ConceptOptions() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   content: { paddingHorizontal: space.screen, gap: space.s4 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: space.s2 },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   actionBar: { position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: space.screen, paddingTop: space.s3, backgroundColor: color.bg, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: color.line },
-});
+}));

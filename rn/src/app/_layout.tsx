@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { View } from "react-native";
+import { View, useColorScheme } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import * as SplashScreen from "expo-splash-screen";
@@ -11,15 +11,22 @@ import { StoreProvider } from "@/lib/store";
 import { GenerationProvider } from "@/lib/generation";
 import { CreditGateProvider } from "@/lib/creditGate";
 import { installPushHandlers, setupNotifications } from "@/lib/push";
+import { usePushResultRouting } from "@/lib/pushRouting";
 import { LoginSheet } from "@/ui/LoginSheet";
 import { CreditSheet } from "@/ui/CreditSheet";
 import { Text } from "@/ui/Text";
 import { envProblem } from "@/lib/env";
-import { color, space } from "@/theme/tokens";
+import { applyScheme, color, space } from "@/theme/tokens";
 import { transitions } from "@/theme/motion";
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
 const BOOT_SPLASH_CAP_MS = 4000;
+
+// galleryId 룩업엔 useAuth/useGeneration 이 필요해 훅으로 분리했다 — Provider 트리 안에서만 쓸 수 있다.
+function PushRouting() {
+  usePushResultRouting();
+  return null;
+}
 
 // ============================================================================
 // Root stack. Stack policy (Justin 셸 그대로):
@@ -32,6 +39,12 @@ const BOOT_SPLASH_CAP_MS = 4000;
 export default function RootLayout() {
   // 렌더 시점에 동기로 평가한다 — useEffect 에 두면 자식이 먼저 getEnv() 를 불러 죽는다.
   const [problem] = useState<string | null>(() => envProblem());
+  // 다크 모드: 기기 설정을 그대로 따른다(app.config.ts userInterfaceStyle: "automatic").
+  // useColorScheme 이 바뀌면 RootLayout 이 다시 렌더되고, applyScheme 이 `color` 값을 in-place
+  // 로 바꾼 뒤 그 아래 전체 트리가(메모이제이션 없음) 새 값으로 다시 그려진다 — 화면마다
+  // 하드코딩 없이 tokens.ts 하나로만 나간다.
+  const osScheme = useColorScheme();
+  applyScheme(osScheme);
 
   useEffect(() => {
     const t = setTimeout(() => { SplashScreen.hideAsync().catch(() => undefined); }, BOOT_SPLASH_CAP_MS);
@@ -69,7 +82,8 @@ export default function RootLayout() {
             <StoreProvider>
               <CreditGateProvider>
               <GenerationProvider>
-                <StatusBar style="dark" />
+                <PushRouting />
+                <StatusBar style="auto" />
                 <Stack
                   screenOptions={{
                     headerShown: false,

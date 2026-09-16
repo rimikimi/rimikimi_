@@ -1,9 +1,7 @@
 import { Platform } from "react-native";
-import { router } from "expo-router";
 import { fetchDrops, type Drop } from "./api";
 import { copy } from "./copy";
 import { NOTIFY_ON_KEY, getFlag, setFlag } from "./prefs";
-import { peekLastDoneJob } from "./lastJob";
 
 // ============================================================================
 // 푸시 — 1.x src/push.js + src/notify.js 와 같은 구조:
@@ -18,7 +16,8 @@ import { peekLastDoneJob } from "./lastJob";
 
 type NotificationsModule = typeof import("expo-notifications");
 let notifMod: NotificationsModule | null | undefined;
-function notifications(): NotificationsModule | null {
+/** pushRouting.tsx 도 같은 지연 로드 모듈을 쓴다(응답 리스너 등록용). */
+export function notifications(): NotificationsModule | null {
   if (notifMod !== undefined) return notifMod;
   notifMod = null;
   try {
@@ -91,7 +90,11 @@ export async function getPermissionState(): Promise<PermState> {
   }
 }
 
-/** 앱이 떠 있는 동안 알림이 오면 배너로 보여준다 + 알림 탭 → 내 사진 탭. */
+/**
+ * 앱이 떠 있는 동안 알림이 오면 배너로 보여준다 + 활성화 시 알림 센터를 비운다.
+ * 알림 탭 → 결과 화면 라우팅은 `pushRouting.tsx` 의 `usePushResultRouting()` 이 맡는다
+ * (galleryId 룩업에 useAuth/useGeneration 이 필요해서 훅으로 분리했다).
+ */
 export function installPushHandlers(): () => void {
   const N = notifications();
   if (!N) return () => undefined;
@@ -101,30 +104,8 @@ export function installPushHandlers(): () => void {
   if (Platform.OS === "android") {
     N.setNotificationChannelAsync("default", { name: "알림", importance: N.AndroidImportance.DEFAULT }).catch(() => undefined);
   }
-  let lastHandled: string | null = null;
-  // 완료 푸시 탭 → 결과 화면 직행(SPEC §3). 서버 payload 는 kind/count 뿐이라 어떤 결과인지
-  // 담고 있지 않다 — 대신 이 기기가 방금 완료한 생성(lastJob.ts, 10분 이내)으로 연다.
-  // 드롭 알림 등 "완료된 게 없는" 탭이면 그냥 내 사진 탭으로(기존 동작).
-  const go = (r: { notification: { request: { identifier: string } } } | null) => {
-    if (!r) return;
-    const id = r.notification.request.identifier;
-    if (id && id === lastHandled) return;
-    lastHandled = id;
-    setTimeout(() => {
-      void peekLastDoneJob().then((j) => {
-        if (j) {
-          router.navigate({ pathname: "/result/[jobId]", params: { jobId: j.jobId, url: j.url, conceptId: j.conceptId, title: j.title } });
-        } else {
-          router.navigate("/(tabs)/photos");
-        }
-      });
-    }, 350);
-  };
-  const sub = N.addNotificationResponseReceivedListener(go);
-  N.getLastNotificationResponseAsync().then(go).catch(() => undefined);
-  // 앱이 활성화되면 알림 센터를 비운다(1.x clearNotifications)
   N.dismissAllNotificationsAsync().catch(() => undefined);
-  return () => sub.remove();
+  return () => undefined;
 }
 
 /**

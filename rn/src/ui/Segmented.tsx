@@ -3,7 +3,7 @@ import { useCallback, useState } from "react";
 import { LayoutChangeEvent, Pressable, StyleSheet, View, ViewStyle } from "react-native";
 import Animated, { ReduceMotion, useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 import { Text } from "@/ui/Text";
-import { color, radius, space } from "@/theme/tokens";
+import { color, radius, space, themedStyles } from "@/theme/tokens";
 import { transitions } from "@/theme/motion";
 
 export interface SegmentedOption<T extends string> { value: T; label: string }
@@ -55,8 +55,8 @@ export function Segmented<T extends string>({ options, value, onChange, style }:
 }
 
 const PAD = 3;
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   track: { flexDirection: "row", backgroundColor: color.fill, borderRadius: radius.btn, padding: PAD },
   pill: { position: "absolute", top: PAD, bottom: PAD, left: PAD, borderRadius: radius.btn - 2, backgroundColor: color.card },
   cell: { flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: space.s2 + 1, minHeight: 36 - PAD * 2 },
-});
+}));

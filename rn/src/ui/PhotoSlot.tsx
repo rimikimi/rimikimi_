@@ -5,7 +5,7 @@ import { Card } from "./Card";
 import { Text } from "./Text";
 import { IconClose, IconImage, IconPlus } from "./icons";
 import type { PhotoRef } from "@/lib/photo";
-import { color, radius, space } from "@/theme/tokens";
+import { color, radius, space, themedStyles } from "@/theme/tokens";
 
 /** "내 사진: 등록된 사진 사용 · 변경" 한 줄 카드. 사진이 없으면 여기서 고른다. */
 export function PhotoRow({ label, hint, photo, actionLabel, onPress }: {
@@ -62,7 +62,7 @@ export function GarmentRow({ garments, max, onAdd, onRemove, addFirst, addMore }
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", gap: space.s3, padding: space.s3 },
   thumb: { width: 56, height: 56, borderRadius: radius.thumb, backgroundColor: color.mat },
   thumbEmpty: { alignItems: "center", justifyContent: "center" },
@@ -72,4 +72,4 @@ const styles = StyleSheet.create({
   garmentImg: { width: "100%", height: "100%" },
   remove: { position: "absolute", top: 4, right: 4, width: 22, height: 22, borderRadius: radius.pill, backgroundColor: "rgba(35,31,32,0.6)", alignItems: "center", justifyContent: "center" },
   add: { backgroundColor: color.fill, alignItems: "center", justifyContent: "center", gap: space.s1, padding: space.s1 },
-});
+}));

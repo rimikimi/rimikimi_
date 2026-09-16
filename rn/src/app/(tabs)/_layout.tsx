@@ -8,7 +8,7 @@ import { Text } from "@/ui/Text";
 import { IconCamera, IconFilter, IconGallery, IconGrid, IconUser, type IconProps } from "@/ui/icons";
 import { useAuth } from "@/lib/auth";
 import { copy } from "@/lib/copy";
-import { chrome, color, radius, shadow, space } from "@/theme/tokens";
+import { chrome, color, radius, shadow, space, themedStyles } from "@/theme/tokens";
 import { CARD_PRESS_SCALE, PRESS_SCALE, duration, ease } from "@/theme/motion";
 
 // ============================================================================
@@ -135,7 +135,7 @@ export default function TabsLayout() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   floatWrap: { position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: chrome.tabBarSide, alignItems: "center" },
   // 유리 아래 불투명 베이스 — 어두운 사진 그리드 위에서 바가 묻히지 않게.
   barBase: { width: "100%", borderRadius: radius.pill, backgroundColor: color.card, overflow: "hidden", ...shadow.float },
@@ -158,4 +158,4 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     ...shadow.camera,
   },
-});
+}));

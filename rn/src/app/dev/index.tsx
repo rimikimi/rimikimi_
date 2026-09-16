@@ -6,7 +6,7 @@ import { AppHeader } from "@/ui/AppHeader";
 import { Card } from "@/ui/Card";
 import { Text } from "@/ui/Text";
 import { IconChevron } from "@/ui/icons";
-import { color, space } from "@/theme/tokens";
+import { color, space, themedStyles } from "@/theme/tokens";
 
 // dev 전용 프리뷰 목록 — 릴리스에서는 빈 화면. 목록은 scripts/previews.tsx.
 const PREVIEWS: { name: string; title: string }[] = __DEV__
@@ -54,7 +54,7 @@ export default function DevIndex() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", minHeight: 50, paddingHorizontal: space.s4 },
   line: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: color.line },
-});
+}));
