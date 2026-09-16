@@ -40,6 +40,13 @@ struct RootTabView: View {
         }
         .tabBarMinimizeBehavior(.onScrollDown)
         .tint(Color.accent)
+        // ⚠️ 탭바 배경을 강제하려 들지 말 것 (2026-09-16 에 한 번 헛수고했다).
+        //    "다크 모드인데 탭바만 밝다" 는 버그가 아니다. Liquid Glass 는 **뒤에 있는 내용**의
+        //    밝기를 가져온다 — 밝은 사진 줄 위에서는 밝게, 어두운 화면(프로필 등) 위에서는
+        //    어둡게 보이는 게 정상이고, 사진 앱을 비롯한 애플 기본 앱이 똑같이 동작한다.
+        //    아이콘·라벨은 양쪽 모두 다크 모드 색으로 제대로 나온다.
+        //    `.toolbarColorScheme` / `.toolbarBackground` / `UITabBarAppearance` 는 이 떠 있는
+        //    탭바에 아무 효과가 없다(불투명 단색까지 강제해 확인).
         // 안쪽 화면(푸시)에서는 탭바가 숨으므로 카메라 원도 함께 숨긴다 — 만들기 바 위에 겹치던 문제.
         .overlay(alignment: .bottom) {
             if app.galleryPath.isEmpty && app.myPhotosPath.isEmpty && app.profilePath.isEmpty {
@@ -71,8 +78,9 @@ struct RootTabView: View {
         // 완료 푸시 탭 → 결과 화면 직행(4주차).
         .onChange(of: app.push.pendingTapKind) { _, kind in
             guard let kind else { return }
+            let galleryId = app.push.pendingGalleryId
             app.push.clearTapKind()
-            if kind == "genDone" { app.openLatestGalleryResult() }
+            if kind == "genDone" { app.openGalleryResult(galleryId: galleryId) }
         }
         .sheet(isPresented: $app.loginSheet) {
             LoginSheet(message: app.loginMessage)

@@ -78,6 +78,14 @@ struct GenerateRequest {
     var displayCount: Int { concept.isFourcut ? (cutCount ?? 4) : count }
 }
 
+/// `POST /api/generate {fit:"outpaint", mimeType, base64}` 응답 — generate 와 같은 모양 중 필요한 것만.
+struct OutpaintResult {
+    var image: UIImage
+    var credits: Int?
+    var quotaUsed: Int?
+    var quotaLimit: Int?
+}
+
 struct GenerateResult {
     struct Item: Identifiable {
         let id: String
@@ -219,6 +227,40 @@ final class RimikimiAPI {
                               quotaLimit: json["quotaLimit"] as? Int,
                               unlimited: json["unlimited"] as? Bool,
                               busyFallback: json["busyFallback"] as? Bool ?? false)
+    }
+
+    /// 정방향 맞춤 "채워 맞춤" — `POST /api/generate {fit:"outpaint", mimeType, base64}` → 세로 3:4, 1 크레딧.
+    /// 계약은 4주차 지시대로 고정: 응답은 기존 generate 와 같은 모양 `{mimeType, base64, credits, quotaUsed, quotaLimit}`.
+    /// **서버 미배포 시 404/400 이 날 수 있다** — 그대로 APIError 로 던져 호출부가 에러 화면을 보여준다.
+    func outpaint(image: UIImage, token: String) async throws -> OutpaintResult {
+        let photo = ImageUtil.jpegPayload(image, maxSide: 1536, quality: 0.9)
+        var req = authed("api/generate", token: token)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let body: [String: Any] = ["fit": "outpaint", "mimeType": photo.mimeType, "base64": photo.base64]
+        req.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let data: Data, resp: URLResponse
+        do { (data, resp) = try await session.data(for: req) }
+        catch { throw APIError(message: "네트워크 요청에 실패했어요. 잠시 후 다시 시도해 주세요.", networkFail: true) }
+
+        let status = (resp as? HTTPURLResponse)?.statusCode ?? 0
+        // 상태코드·서버 원문은 로그로만 — 사용자 화면엔 절대 숫자를 띄우지 않는다(오너 지시, 4주차).
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            AppLog.ui.error("outpaint.badResponse status=\(status, privacy: .public)")
+            throw APIError(message: "채워 맞춤을 하지 못했어요. 잠시 후 다시 시도해 주세요 🙂", status: status)
+        }
+        guard (200...299).contains(status) else {
+            AppLog.ui.error("outpaint.failed status=\(status, privacy: .public) body=\(String(describing: json["error"]), privacy: .private)")
+            // 부족한 크레딧(429)은 클라이언트가 네트워크 전에 이미 걸러낸다 — 여기 오는 건 그 밖의 서버 거절.
+            throw APIError(message: "채워 맞춤을 하지 못했어요. 크레딧은 차감되지 않았어요 🙂", status: status)
+        }
+        guard let b64 = json["base64"] as? String, let img = ImageUtil.decode(base64: b64) else {
+            AppLog.ui.error("outpaint.emptyResult status=\(status, privacy: .public)")
+            throw APIError(message: "채워 맞춤 결과를 받지 못했어요. 잠시 후 다시 시도해 주세요 🙂", status: status)
+        }
+        return OutpaintResult(image: img, credits: json["credits"] as? Int,
+                              quotaUsed: json["quotaUsed"] as? Int, quotaLimit: json["quotaLimit"] as? Int)
     }
 
     // MARK: 결제 · 초대 · 계정

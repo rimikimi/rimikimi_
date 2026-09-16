@@ -20,6 +20,9 @@ final class PushManager: NSObject {
     private(set) var newConceptAlerts: Bool = UserDefaults.standard.bool(forKey: "push.newConcept.v1")
     /// 알림을 탭해서 앱이 열렸을 때의 `data.kind`("genDone" 등). `RootTabView` 가 지켜보다 결과 화면을 연다.
     private(set) var pendingTapKind: String?
+    /// 완료 알림 payload 의 `galleryId`(4주차, 서버가 추가하면 도착) — 있으면 정확한 결과를, 없으면(구버전 서버·
+    /// 이미 깔린 앱) `pendingTapKind` 만 보고 최신 갤러리 항목으로 폴백한다.
+    private(set) var pendingGalleryId: String?
 
     private var configured = false
 
@@ -70,11 +73,11 @@ final class PushManager: NSObject {
     }
 
     /// `RootTabView.onChange` 가 처리한 뒤 되돌린다.
-    func clearTapKind() { pendingTapKind = nil }
+    func clearTapKind() { pendingTapKind = nil; pendingGalleryId = nil }
 
     #if DEBUG
     /// 시뮬레이터엔 알림 배너를 탭할 방법이 없다 — dev 라우트가 이 경로를 대신 태운다.
-    func simulateTap(kind: String) { pendingTapKind = kind }
+    func simulateTap(kind: String, galleryId: String? = nil) { pendingGalleryId = galleryId; pendingTapKind = kind }
     #endif
 
     // MARK: AppDelegate 브리지
@@ -108,8 +111,13 @@ extension PushManager: UNUserNotificationCenterDelegate {
     /// "생성 완료" 알림(`api/generate.js` notifyDone, `data.kind == "genDone"`)만 결과 화면으로 연다.
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
                                             didReceive response: UNNotificationResponse) async {
-        let kind = response.notification.request.content.userInfo["kind"] as? String
-        guard let kind else { return }
-        await MainActor.run { PushManager.shared.pendingTapKind = kind }
+        let info = response.notification.request.content.userInfo
+        guard let kind = info["kind"] as? String else { return }
+        // galleryId 는 숫자·문자열이 섞여 올 수 있다(다른 서버 응답과 동일).
+        let galleryId: String? = (info["galleryId"] as? String) ?? (info["galleryId"] as? NSNumber)?.stringValue
+        await MainActor.run {
+            PushManager.shared.pendingGalleryId = galleryId
+            PushManager.shared.pendingTapKind = kind
+        }
     }
 }

@@ -57,12 +57,17 @@ struct GalleryHeader: View {
             BrandLogo(height: 24)
             Spacer()
             Button { app.tab = .profile } label: {
-                Text(app.auth.isSignedIn ? (app.quota?.chipLabel ?? "🎟 –") : "로그인")
-                    .font(AppFont.footnote)
-                    .foregroundStyle(Color.ink)
-                    .padding(.horizontal, Spacing.s3)
-                    .frame(height: 30)
-                    .background(Color.fill, in: Capsule())
+                // 로그인 직후엔 크레딧이 아직 안 와 있을 수 있다 — "–" 대신 로딩 중임이 보이는 스켈레톤.
+                if app.auth.isSignedIn, app.quota == nil {
+                    SkeletonBlock(cornerRadius: 15).frame(width: 52, height: 30)
+                } else {
+                    Text(app.auth.isSignedIn ? (app.quota?.chipLabel ?? "🎟 –") : "로그인")
+                        .font(AppFont.footnote)
+                        .foregroundStyle(Color.ink)
+                        .padding(.horizontal, Spacing.s3)
+                        .frame(height: 30)
+                        .background(Color.fill, in: Capsule())
+                }
             }
             .buttonStyle(PressScaleButtonStyle())
             .accessibilityLabel("크레딧")

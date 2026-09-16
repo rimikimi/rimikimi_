@@ -55,9 +55,29 @@ struct FitSheet: View {
                     .buttonStyle(PrimaryButtonStyle(isDisabled: preview == nil))
                     .disabled(preview == nil)
                 Button {
-                    app.showToast("채워 맞춤은 준비 중이에요 (서버 fit=outpaint)")
-                } label: { Label("채워 맞춤 · 1 크레딧 (준비 중)", systemImage: "arrow.up.left.and.arrow.down.right") }
-                    .buttonStyle(SecondaryButtonStyle())
+                    HapticPlayer.commit()
+                    app.requestOutpaint(image) { out in
+                        onCropped(out)
+                        app.showToast("채워 맞춤으로 3:4 를 만들었어요")
+                        dismiss()
+                    }
+                } label: {
+                    if app.outpaintPhase == .running {
+                        HStack(spacing: Spacing.s2) {
+                            ProgressView().tint(Color.ink)
+                            Text("채워 맞추는 중…")
+                        }
+                    } else {
+                        Label("채워 맞춤 · 1 크레딧", systemImage: "arrow.up.left.and.arrow.down.right")
+                    }
+                }
+                .buttonStyle(SecondaryButtonStyle())
+                .disabled(app.outpaintPhase == .running)
+
+                if case .error(let message) = app.outpaintPhase {
+                    Text(message).font(AppFont.footnote).foregroundStyle(Color.accent)
+                        .multilineTextAlignment(.leading).fixedSize(horizontal: false, vertical: true)
+                }
             }
             Text("잘라 맞춤은 기기 안에서만 처리돼요. 채워 맞춤은 원본 픽셀을 유지하고 바깥만 채워요.")
                 .font(AppFont.caption).foregroundStyle(Color.ink3)
@@ -70,5 +90,7 @@ struct FitSheet: View {
             preview = await FaceCrop.crop(image)
             working = false
         }
+        .onAppear { app.resetOutpaintPhase() }
+        .onDisappear { app.resetOutpaintPhase() }
     }
 }

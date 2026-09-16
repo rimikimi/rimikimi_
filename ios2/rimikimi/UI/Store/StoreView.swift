@@ -135,7 +135,7 @@ struct CreditsSheet: View {
                     }
                     .buttonStyle(.plain).accessibilityLabel("닫기")
                 }
-                Text(app.pendingAfterPurchase != nil ? "충전하면 하던 생성이 바로 이어져요." : "크레딧 1장으로 이미지 한 장을 만들 수 있어요.")
+                Text(app.willContinueAfterPurchase ? "충전하면 하던 작업이 바로 이어져요." : "크레딧 1장으로 이미지 한 장을 만들 수 있어요.")
                     .font(AppFont.callout).foregroundStyle(Color.ink2)
 
                 ForEach(packs) { p in PackRow(pack: p, busy: busyID == p.id) { buy(p) } }

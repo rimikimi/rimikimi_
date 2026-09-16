@@ -8,6 +8,9 @@ import UIKit
 ///   com.rimikimi.app://dev/generate?concept=<id>   옵션 화면 열고 만들기 실행
 ///   com.rimikimi.app://dev/tab?name=gallery|filter|myPhotos|profile[&pop=1]
 ///   com.rimikimi.app://dev/photo                   샘플 사진만 등록
+///   com.rimikimi.app://dev/pushtap?kind=genDone[&galleryId=<id>]  완료 푸시 탭(4주차: galleryId 있으면 정확 매칭)
+///   com.rimikimi.app://dev/fitsheet?forceOutpaintPhase=running|error  채워 맞춤 진행/에러 상태 강제(캡처용)
+///   com.rimikimi.app://dev/fitsheet?realOutpaint=1  실제 서버로 채워 맞춤 호출(크레딧 부족 시 크레딧 시트)
 @MainActor
 enum DevRoutes {
     /// 처리했으면 true.
@@ -36,7 +39,8 @@ enum DevRoutes {
             app.openLatestGalleryResult()
         case "/pushtap":
             // 실제 알림 배너는 시뮬레이터에서 탭할 수 없다 — "완료 푸시 탭" 경로(PushManager → RootTabView)를 그대로 태운다.
-            app.push.simulateTap(kind: q["kind"] ?? "genDone")
+            // galleryId 를 실으면 4주차 "정확한 결과 열기" 경로, 안 실으면 기존 "최신 항목" 폴백 경로를 탄다.
+            app.push.simulateTap(kind: q["kind"] ?? "genDone", galleryId: q["galleryId"])
         case "/store": app.tab = .profile; app.profilePath = [.store]
         case "/invite": app.tab = .profile; app.profilePath = [.invite]
         case "/profile": app.tab = .profile; app.profilePath = []
@@ -65,6 +69,17 @@ enum DevRoutes {
         case "/invitecard": app.tab = .gallery; app.galleryPath = []; app.showInviteCard = true
         case "/fit", "/fitsheet":
             if url.path == "/fitsheet" { app.devAutoOpenFit = true }
+            // 채워 맞춤 진행/에러 상태 캡처용 — 시뮬레이터엔 버튼 탭 자동화가 없어 상태를 직접 세팅한다.
+            if let phase = q["forceOutpaintPhase"] {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                    switch phase {
+                    case "running": app.outpaintPhase = .running
+                    // 실제 사용자 문구와 정확히 같은 텍스트를 캡처하려고 RimikimiAPI.outpaint() 의 실패 문구를 그대로 쓴다(상태코드 없음).
+                    case "error": app.outpaintPhase = .error("채워 맞춤을 하지 못했어요. 크레딧은 차감되지 않았어요 🙂")
+                    default: break
+                    }
+                }
+            }
             // 샘플 사진을 4:3 로 잘라 "3:4 아님" 상황을 만든 뒤 결과 화면으로 연다(정방향 맞춤 제안 캡처용).
             installSamplePhoto(app)
             if let img = app.userPhoto.image, let cg = img.cgImage {
@@ -72,6 +87,12 @@ enum DevRoutes {
                 let wide = cg.cropping(to: CGRect(x: 0, y: max(0, CGFloat(cg.height) / 2 - h / 2), width: w, height: h)).map { UIImage(cgImage: $0) } ?? img
                 app.present([.init(id: "dev-fit", image: wide, url: nil, expiresAt: nil)],
                             job: .init(conceptId: "766", conceptTitle: "정방향 맞춤 데모", startedAt: Date(), count: 1))
+                // 실제 네트워크 채워 맞춤 호출 검증용 — 크레딧 부족이면 크레딧 시트, 아니면 실서버 응답(현재 미배포 → 오류)을 그대로 탄다.
+                if q["realOutpaint"] == "1" {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        app.requestOutpaint(wide) { _ in AppLog.ui.info("dev.realOutpaint.success") }
+                    }
+                }
             }
         case "/tab":
             switch q["name"] {

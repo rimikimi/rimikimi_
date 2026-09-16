@@ -168,13 +168,97 @@ xcrun simctl launch <UDID> com.rimikimi.app -rimikimi-url "com.rimikimi.app://de
 5. 카테고리 칩 "전체" 를 맨 앞에 두었다(웹과 동일). 명세엔 없어서 뺄 수도 있다.
 6. 로그인 시트를 프로필·내 사진의 "로그인" 버튼에서도 열 수 있게 했다(명세의 세 시점 외). 사용자가 직접 누르는 것이라 문제는 없다고 봤다.
 
+## 4주차 (2026-09-16) — 채워 맞춤 연결 · 완료 푸시 정확 매칭 · 다크 모드
+
+- **채워 맞춤(outpaint) 연결** (`Backend/RimikimiAPI.swift` `outpaint(image:token:)`, `App/AppState.swift`
+  `requestOutpaint`/`runOutpaint`, `UI/Fit/FitSheet.swift`): 서버 계약대로 `POST /api/generate
+  {fit:"outpaint", mimeType, base64}` → 응답은 기존 generate 와 같은 모양에서 `base64`(세로 3:4 결과)·
+  `credits`·`quotaUsed`·`quotaLimit` 만 사용. 버튼을 누르면 크레딧 부족 여부를 **먼저 클라이언트에서**
+  판정해(서버에 보내 봐야 429) 부족하면 기존 `CreditsSheet` 를 그대로 띄우고, 구매 성공(`continueAfterPurchase`)
+  뒤 미뤄둔 원본 이미지로 채워 맞춤을 이어간다(생성 크레딧 부족 흐름과 같은 `creditsSheet`/구매 콜백을 공유,
+  `pendingOutpaintPhoto` 로 분기). 진행 중엔 버튼이 스피너로, 실패하면 버튼 아래 빨간 오류 문구로 바뀐다
+  (`AppState.OutpaintPhase`). **서버가 아직 이 필드를 배포하지 않았다** — 실기기 계정(크레딧 0)으로
+  실제 호출해 보니 클라이언트 사전 판정대로 크레딧 시트가 먼저 뜨고(`w4_ios_06_outpaint_creditsheet_dark.png`),
+  별도로 `curl -X POST .../api/generate -d '{"fit":"outpaint",...}'` 로 직접 찔러 보면 **429**(크레딧 부족,
+  서버가 fit 필드를 아직 특별 취급하지 않고 일반 generate 크레딧 게이트를 그대로 탄다)가 온다 — 크레딧이
+  있는 계정으로 서버 배포 후 재검증 필요.
+- **완료 푸시 → 정확한 결과 열기** (`Backend/PushManager.swift` `pendingGalleryId`, `App/AppState.swift`
+  `openGalleryResult(galleryId:)`): 알림 payload 에 `galleryId` 가 오면(서버가 추가하는 대로) 그 항목을
+  갤러리에서 찾아 결과 화면으로 열고, 없으면(구버전 서버·이미 깔린 앱) 기존처럼 **최신 항목**으로 폴백한다
+  (찾는 id 가 목록에 아직 없는 드문 타이밍 어긋남도 최신 항목으로 물러선다). `dev/pushtap?galleryId=` 로
+  두 경로 모두 태울 수 있다. **서버가 아직 payload 에 galleryId 를 안 실어서** 지금은 항상 폴백 경로만
+  실동작 확인 가능 — id 매칭 경로는 코드 리뷰로만 확인, 서버 배포 후 실제 매칭 재검증 필요.
+- **다크 모드**: 토큰(`UI/Tokens/ColorTokens.swift`)에 SPEC §1 다크 값(바탕 `#17161A`, 카드 `#201E23` 등)이
+  1주차부터 `Color.dynamic(light:dark:)` 로 이미 들어가 있었다 — 화면 코드가 전부 토큰만 참조해 하드코딩된
+  배경색이 없는 걸 이번 주에 확인했다(`grep` 으로 `systemBackground`/직접 hex/`.white` 배경 전수 점검,
+  `UIUserInterfaceStyle` 강제도 없음). 실제로 새로 한 일은 **검증**과 웹뷰 컨테이너 확인
+  (`UI/Components/WebToolView.swift` 는 이미 `isOpaque=false`+`.clear`+`Color.bg` 컨테이너라 흰 번쩍임 없음,
+  웹뷰 내부 페이지 배경은 범위 밖). 다크 모드에서 홈·프로필·결과·정방향 맞춤 시트(진행·에러)·크레딧 시트
+  스크린샷을 새로 찍어 대비를 확인했고, 라이트 모드도 같은 화면(홈·프로필)을 다시 찍어 3주차와 동일함을
+  확인했다.
+- **개발 라우트 추가**: `dev/pushtap?galleryId=`, `dev/fitsheet?forceOutpaintPhase=running|error`(진행/에러
+  상태를 강제로 세팅 — 시뮬레이터엔 버튼 탭 자동화가 없어서), `dev/fitsheet?realOutpaint=1`(실제 서버 호출).
+
+### 검증 (시뮬레이터, 실서버 계정) — 2026-09-16
+
+`xcodebuild` 빌드 성공. 스크린샷 `w4_ios_*.png`(scratchpad `shots/`).
+
+- 다크: 홈(`w4_ios_00_login_dark.png`), 프로필(`w4_ios_01_profile_dark.png`), 결과
+  (`w4_ios_02_result_dark_v2.png`), 정방향 맞춤 시트 기본(`w4_ios_03_fit_running_dark.png` 이전 프레임),
+  채워 맞춤 진행 스피너(`w4_ios_04_fit_outpaint_running_dark.png`), 채워 맞춤 오류
+  (`w4_ios_05_fit_outpaint_error_dark.png`), 채워 맞춤 → 크레딧 시트(실제 네트워크 호출,
+  `w4_ios_06_outpaint_creditsheet_dark.png`).
+- 라이트: 홈(`w4_ios_07_home_light.png`), 프로필(`w4_ios_08_profile_light.png`) — 3주차와 동일(배경
+  `#FBF8F3`, 카드 흰색, 글자 검정) 확인.
+- 채워 맞춤 실호출: `dev/fitsheet?realOutpaint=1` — 테스트 계정(크레딧 0)이라 네트워크 호출 전에 클라이언트가
+  크레딧 시트를 띄웠다. 서버가 실제로 `fit=outpaint` 를 처리하는지는 `curl` 직접 호출로만 봤다(429, 크레딧
+  부족 게이트 — fit 특수 처리 여부는 이걸로는 구분 안 됨). **크레딧 있는 계정으로 실제 200 응답 받는 것은
+  서버 배포 전이라 확인 못 했다.**
+
+### 안 된 것 / 확인 못 한 것
+
+- **채워 맞춤 실제 200 성공 응답**: 서버 미배포로 확인 불가. 클라이언트 요청 계약(`fit`, `mimeType`,
+  `base64`)과 응답 파싱(`base64`→이미지, `credits`/`quotaUsed`/`quotaLimit`)은 코드로 고정해 뒀다 — 서버
+  배포 후 재검증 필요.
+- **완료 푸시의 galleryId 정확 매칭**: 서버가 아직 payload 에 안 실어서 폴백(최신 항목) 경로만 실동작
+  확인. 매칭 로직 자체는 코드 리뷰로만 봤다.
+- **시뮬레이터 버튼 탭으로 채워 맞춤 진행/에러 유도**: 3주차와 같은 한계(탭 자동화 없음) — `forceOutpaintPhase`
+  dev 라우트로 상태만 강제로 보여줬다. 실기기에서 버튼을 실제로 눌러보는 확인 필요.
+- **다크 모드 세부 화면(스토어·필터 탭·초대·옵션 화면 등)**: 토큰 기반이라 코드상 문제 없을 것으로 보이나
+  이번 주는 홈·프로필·결과·정방향 맞춤·크레딧 시트만 실제로 캡처했다. 나머지는 코드 리뷰(하드코딩 색 없음
+  확인)로만 커버.
+- **탭바 Liquid Glass 가 다크 모드에서도 밝게 보이는 문제 — 못 고쳤다.** 오너 1차 검토에서 지적받아
+  세 가지를 시도했다: SwiftUI `.toolbarColorScheme(_:for:.tabBar)`, `.toolbarBackground(Material.regular,
+  for: .tabBar)`, UIKit `UITabBarAppearance`(불투명 단색 `.systemGreen` 까지 강제해 진단). **셋 다 화면에
+  전혀 반영되지 않았다** — `UITabBarAppearance` 로 불투명 초록을 강제해도 그대로 투명한 유리였던 것으로
+  보아, 이 iOS 27 SDK(Xcode 27 베타)의 "떠 있는" 미니멀 탭바는 이 공개 API들이 닿는 렌더링 경로가 아닌
+  것으로 보인다(별도 컴포지터로 추정, 베타 한계 가능성 높음). `.toolbarColorScheme` 만 부작용 없이 남겨
+  뒀고(상단 바 대비엔 도움), 나머지 둘은 되돌렸다. **실기기 + 정식 iOS 26 SDK 에서 같은 증상인지 재확인
+  필요** — 베타 시뮬레이터만의 문제라면 정식 빌드에서 저절로 없어질 수 있고, 실기기에서도 재현되면
+  네이티브 탭바를 포기하고 커스텀 다크 배경을 직접 그리는 재작업이 필요하다(`ios2/rimikimi/App/RootTabView.swift`).
+- **채워 맞춤 오류 문구·크레딧 칩 로딩**: 1차 검토에서 지적받은 두 가지는 고쳤다 — 오류 문구에서
+  HTTP 상태코드를 없애고 저장소 컨벤션(`"...하지 못했어요. 잠시 후 다시 시도해 주세요 🙂"`,
+  `src/i18nStrings.js` 의 `engine.busyFallback` 톤)에 맞춰 `"채워 맞춤을 하지 못했어요. 크레딧은
+  차감되지 않았어요 🙂"` 로 교체했고, 상태코드는 `AppLog.ui.error` 로만 남긴다(`RimikimiAPI.swift`).
+  홈 크레딧 칩은 로그인 직후 `app.quota` 가 아직 안 온 순간 "–" 대신 작은 스켈레톤을 보여주게 했다
+  (`GalleryHomeView.swift`) — 원인은 실제 버그가 아니라 순수 타이밍(로그인 직후 `/api/quota` 왕복 전에
+  찍은 캡처였다), 프로필 화면은 그 사이 시간차 덕에 이미 로드된 값을 보여준 것이었다.
+
+### 서버 · 웹에 필요한 요청사항
+
+- **서버**: `fit:"outpaint"` 처리를 실제로 배포해 응답 `{mimeType, base64, credits, quotaUsed, quotaLimit}`
+  형태로 돌려주는지, `notifyDone` payload 에 `galleryId` 를 추가하는지 — 둘 다 배포되면 이 클라이언트 코드로
+  바로 재검증 가능(추가 클라이언트 변경 불필요, 계약을 그대로 맞춰 뒀다).
+- **웹**: 이번 주는 웹/서버 파일을 건드리지 않았다(지시대로 `ios2/` 안쪽만).
+
 ## 다음 주
 
+- 서버 `fit=outpaint` 배포 후 실제 200 성공 응답으로 재검증(진행률·이미지 반영·크레딧 차감 확인).
+- 서버 `notifyDone` payload 에 `galleryId` 실리면 정확 매칭 경로 재검증.
 - RevenueCat + 크레딧 부족 시트 실동작, `api/_lib/iapGrant.js` 이중 지급 방지.
 - 실기기에서 셔터 촬영 → 즉시 저장, 공유 시트 완료 콜백, 마이크 권한 프롬프트가 실제로 뜨는지 확인.
-- 서버 `notifyDone` payload 에 galleryId 를 실어 "완료 푸시 탭 → 정확히 그 결과" 로 좁히는 것 검토
-  (지금은 최신 갤러리 항목으로 근사).
 - `src/ToolEntry.jsx`/`nativeBridge.js`/`CameraStudio.jsx` 변경 오너 검토 → 배포(현재 로컬 vite dev 로만
   검증, 배포 전까지 iOS 앱의 웹뷰는 여전히 구버전 배포본을 받는다).
 - 필터 프리셋 썸네일, 초대 화면, 계정 삭제(`/api/account/delete`).
 - 실기기에서 뒤로 스와이프·탭 전환·시트가 시스템 앱과 구분되지 않는지(완료 기준 1) 확인.
+- 실기기 다크 모드에서 스토어·필터·초대 등 나머지 화면도 훑어보기(코드상 토큰만 쓰지만 실기기 확인은 못 함).
