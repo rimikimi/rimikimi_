@@ -55,6 +55,8 @@ targets:
         # 1.x 와 같은 문구 (사진 접근에 편집 용도 반영, 1.40).
         NSPhotoLibraryAddUsageDescription: "만든 사진과 편집한 사진을 앨범에 저장하기 위해 사용합니다."
         NSCameraUsageDescription: "필터를 보면서 사진을 찍기 위해 카메라를 사용합니다."
+        # ATT — 실행 시가 아니라 첫 생성 완료 후 1회(TrackingPrompt). 문구는 1.x 와 동일.
+        NSUserTrackingUsageDescription: "맞춤형 광고를 제공하기 위해 사용돼요."
         LSApplicationQueriesSchemes:
           - kakaokompassauth
           - kakaolink

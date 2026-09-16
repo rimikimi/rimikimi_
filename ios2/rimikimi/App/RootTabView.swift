@@ -19,8 +19,11 @@ struct RootTabView: View {
             Tab("필터", systemImage: "camera.filters", value: .filter) {
                 NavigationStack { FilterTabView() }
             }
-            Tab("", systemImage: "camera", value: .camera) {
+            // 가운데 슬롯: 아이콘·라벨을 비워 두고(투명 이미지, 빈 문자열) 떠 있는 원만 보이게 한다.
+            Tab(value: .camera) {
                 Color.bg.ignoresSafeArea()
+            } label: {
+                Label { Text("") } icon: { Image(uiImage: UIImage.clearTabIcon) }
             }
             Tab("내 사진", systemImage: "photo.on.rectangle", value: .myPhotos) {
                 NavigationStack(path: $app.myPhotosPath) {
@@ -51,6 +54,8 @@ struct RootTabView: View {
             guard ids != nil, let items = app.generation.pendingPresentation else { return }
             app.generation.pendingPresentation = nil
             app.present(items, job: app.generation.job)
+            // ATT 는 첫 생성 완료 후에만 — 결과 화면이 뜬 뒤 1초, 1회(SPEC §3).
+            TrackingPrompt.requestOnceAfterFirstResult()
         }
         .sheet(isPresented: $app.loginSheet) {
             LoginSheet(message: app.loginMessage)
@@ -71,6 +76,17 @@ struct RootTabView: View {
     private func openCamera() {
         app.requireLogin(.camera)
     }
+}
+
+extension UIImage {
+    /// 탭 아이템 자리를 차지하되 아무것도 그리지 않는 투명 아이콘.
+    static let clearTabIcon: UIImage = {
+        let size = CGSize(width: 28, height: 28)
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = 1
+        return UIGraphicsImageRenderer(size: size, format: format).image { _ in }
+            .withRenderingMode(.alwaysOriginal)
+    }()
 }
 
 /// 가운데 카메라 원 — 54pt, 잉크 배경, 탭바 위로 14pt 띄움. 탭바가 스크롤로 최소화돼도 원은 남는다.

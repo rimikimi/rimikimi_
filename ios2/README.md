@@ -47,6 +47,9 @@ rimikimi/
 - **생성**: `POST /api/generate` 본문은 웹 `generateImage()` 와 같은 키(mimeType/base64/prompt/conceptId/conceptTitle/skipFacePrecheck/count/cutCount/fourcutStyle/garments+dressStyle/mimeType2+base64_2+couple/proSample). 사진 1024·의상 896 JPEG 0.85. 만들기 → 홈 스택 비우고 **내 사진 탭 진행 카드**. fetch 가 죽었을 때만(networkFail) `/api/gallery` 를 5초 간격 5분 폴링(오프라인 3연속이면 중단), 429/402 는 즉시 실패. 앱 재시작·복귀 때 마커 보고 폴링 재개. 완료 → 카드가 결과로 + 결과 화면 1회 자동 표시.
 - **결과**: 사진(묶음이면 페이지), "내 사진에 저장됐어요 · 앨범에도 저장", 앨범에 저장(PHPhotoLibrary) / 다듬기(웹뷰 자리) / 공유(ShareLink) / 한 장 더 / 비슷한 컨셉 줄.
 - **내 사진**: `/api/gallery`(Bearer) 3열 그리드 + 만료 타이머, 진행 카드. **프로필**: `/api/quota` 크레딧, 스토어·초대·알림·계정·법적 고지 행(자리), 로그아웃.
+- **ATT**: 실행 시 호출 없음. 첫 결과 화면이 뜬 뒤 1초에 1회만(`App/TrackingPrompt.swift`, UserDefaults 플래그). 시뮬레이터에서 실행 직후 ATT 가 뜬다면 그 기기에 1.x 앱(같은 번들 ID)이 남긴 SpringBoard 알림이다 — 시뮬레이터 재부팅으로 사라진다(2026-09-16 확인).
+- **썸네일**: `RemoteImage` 는 `AsyncImage` 가 아니라 `URLSession` + `UIImage(data:)`(WebP 네이티브 디코드) + NSCache/URLCache 캐시형 로더.
+- 가운데 탭 아이템은 투명 아이콘 + 빈 라벨 — 떠 있는 카메라 원만 보인다.
 - 햅틱: 만들기 확정·완료·저장·옵션 확정에만. 누름 0.97(전체폭 0.985) 110/140ms. Reduce Motion 은 스켈레톤·토스트·스태거에서 존중.
 
 ## 자리만 잡은 것(스텁)
