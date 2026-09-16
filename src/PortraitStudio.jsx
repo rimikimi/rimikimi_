@@ -1433,7 +1433,22 @@ export default function PortraitStudio() {
   const filterPresetRef = useRef("none"); // 카드에서 고른 프리셋 — 에디터가 이걸 켠 채 열린다
   const filterInputRef = useRef(null);
   const garmentInputRef = useRef(null);
+  // 로그인 필수 — 필터·카메라도 예외 없이(오너 지시 2026-09-17 "로그인은 필터든 뭐든 무조건 필수").
+  // 편집기 진입 직전(사진 고르기/카메라 열기 전)에 묻고, 로그인이 끝나면 하던 동작을 이어 준다.
+  const PENDING_TOOL_KEY = "rimikimi_pending_tool";
+  function requireLoginFor(tool) {
+    if (session) return true;
+    try { localStorage.setItem(PENDING_TOOL_KEY, JSON.stringify(tool)); } catch (_) {}
+    setShowLoginSheet(true);
+    return false;
+  }
+  function openCamera(presetKey = "none") {
+    if (!requireLoginFor({ kind: "camera", preset: presetKey })) return;
+    setCameraPreset(presetKey || "none");
+  }
+
   async function openFilterStudio(presetKey = "none") {
+    if (!requireLoginFor({ kind: "filter", preset: presetKey })) return;
     filterPresetRef.current = presetKey;
     if (isNative()) {
       const paths = await nativePickPhotos(FILTER_MAX);
@@ -1621,6 +1636,20 @@ export default function PortraitStudio() {
       isArtConcept(p) !== isArtConcept(selected) ||
       isCoupleConcept(p) !== isCoupleConcept(selected)
     ) setAgeConfirmed(false);
+    // 로그인돼 있고 프로필 사진이 이미 등록돼 있으면 STEP 02(사진 업로드)를 건너뛰고
+    // 바로 STEP 03(옵션)으로 간다(오너 지시 2026-09-17). 두 번째 생성부터 STEP 02 는
+    // 아무것도 안 하는 화면이었다. 사진이 따로 필요한 컨셉(매직 부스 일회용 사진, 커플 상대 사진,
+    // 드레스룸 의상)은 그대로 STEP 02 로 — 거기서 받는다.
+    const plain = !isArtConcept(p) && !isCoupleConcept(p) && !isDressroom(p);
+    if (session && plain && photo) {
+      setScreen("confirm");
+      return;
+    }
+    if (session && plain && !photo) {
+      // 사진이 없으면 STEP 02 로 보내되, 왜 왔는지 알려준다
+      setPayToast(t("home.needPhoto"));
+      setTimeout(() => setPayToast(""), 2600);
+    }
     setScreen("home"); // 컨셉 선택 후 사진 업로드 화면으로
   }
 
@@ -1722,6 +1751,7 @@ export default function PortraitStudio() {
   function closeLoginSheet() {
     // 사용자가 로그인을 건너뛰기로 함 — 남겨두면 나중에 무관한 로그인 때 엉뚱하게 이어붙는다
     clearPendingContinue();
+    try { localStorage.removeItem(PENDING_TOOL_KEY); } catch (_) {}
     setShowLoginSheet(false);
   }
 
@@ -1733,6 +1763,15 @@ export default function PortraitStudio() {
   //    있었다 — 사용자는 로그인이 안 된 줄 알고 다시 누른다.
   useEffect(() => {
     if (session) setShowLoginSheet(false);
+  }, [session]);
+  // 로그인 성공 → 필터/카메라에서 멈췄던 동작 재개
+  useEffect(() => {
+    if (!session) return;
+    let tool = null;
+    try { tool = JSON.parse(localStorage.getItem(PENDING_TOOL_KEY) || "null"); localStorage.removeItem(PENDING_TOOL_KEY); } catch (_) {}
+    if (!tool) return;
+    if (tool.kind === "camera") setCameraPreset(tool.preset || "none");
+    else if (tool.kind === "filter") openFilterStudio(tool.preset || "none");
   }, [session]);
 
   useEffect(() => {
@@ -2534,7 +2573,7 @@ export default function PortraitStudio() {
             popular={popular}
             onBrooklyn={openBrooklyn}
             onFilterStudio={openFilterStudio}
-            onCamera={(key) => setCameraPreset(key || "none")}
+            onCamera={(key) => openCamera(key || "none")}
           />
         )}
         {screen === "confirm" && selected && (
@@ -2707,7 +2746,7 @@ export default function PortraitStudio() {
           if (key === "gallery" && activeCat === t("filter.cat")) setActiveCat("전체");
           goTab(key);
         }}
-        onCamera={() => setCameraPreset("none")}
+        onCamera={() => openCamera("none")}
         filterActive={screen === "gallery" && activeCat === t("filter.cat")}
       />
 
