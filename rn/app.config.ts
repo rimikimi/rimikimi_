@@ -1,0 +1,105 @@
+import type { ExpoConfig } from "expo/config";
+
+// rimikimi 2.0 — Android (React Native / Expo) native config.
+//
+// · package = com.rimikimi.app (1.x Capacitor 앱과 같은 패키지 — 업데이트로 이어져야
+//   로그인·크레딧·내 사진이 유지된다, SPEC §6-5).
+// · OAuth 딥링크 = com.rimikimi.app://login-callback (SPEC §3, Supabase Redirect URL 에
+//   이미 등록돼 있는 값 그대로).
+// · Supabase anon key 는 공개 키(브라우저에도 노출되는 값)라 여기 리터럴로 둔다. 다른
+//   비밀은 절대 이 파일에 넣지 않는다.
+// · 글꼴: 시스템(Roboto / Noto Sans KR). 번들 글꼴 없음 → expo-font 플러그인 없음.
+
+const API_BASE = process.env.EXPO_PUBLIC_API_BASE ?? "https://rimikimi-app.vercel.app";
+const SUPABASE_URL =
+  process.env.EXPO_PUBLIC_SUPABASE_URL ?? "https://hedgjzdrivilclmwumoc.supabase.co";
+const SUPABASE_ANON_KEY =
+  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ??
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhlZGdqemRyaXZpbGNsbXd1bW9jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2OTk1MjksImV4cCI6MjA5NTI3NTUyOX0.Hp88oUR53x4dEwnfYoxreDHUvZWZHiA4Skm_2nozVa8";
+
+// SPEC §1 바탕색. theme/tokens.ts 의 color.bg 와 손으로 같게 유지한다(네이티브 설정은
+// RN 토큰 모듈을 import 할 수 없다).
+const BG = "#FBF8F3";
+
+const config: ExpoConfig = {
+  name: "리미키미",
+  slug: "rimikimi",
+  version: "2.0.0",
+  orientation: "portrait",
+  scheme: "com.rimikimi.app",
+  icon: "./assets/images/icon.png",
+  userInterfaceStyle: "light",
+
+  ios: {
+    bundleIdentifier: "com.rimikimi.app",
+    supportsTablet: false,
+  },
+
+  android: {
+    package: "com.rimikimi.app",
+    versionCode: 100,
+    adaptiveIcon: {
+      backgroundColor: BG,
+      foregroundImage: "./assets/images/adaptive-icon.png",
+    },
+    // OAuth 딥링크: com.rimikimi.app://login-callback — scheme 만으로 intent-filter 가 생긴다.
+    intentFilters: [
+      {
+        action: "VIEW",
+        autoVerify: false,
+        data: [{ scheme: "com.rimikimi.app", host: "login-callback" }],
+        category: ["BROWSABLE", "DEFAULT"],
+      },
+    ],
+    permissions: ["android.permission.INTERNET"],
+    blockedPermissions: [
+      "android.permission.RECORD_AUDIO",
+      "android.permission.ACCESS_MEDIA_LOCATION",
+      "android.permission.SYSTEM_ALERT_WINDOW",
+      "android.permission.READ_MEDIA_AUDIO",
+      "android.permission.READ_MEDIA_VIDEO",
+      // 고르기는 시스템 Photo Picker(권한 0개), 저장은 writeOnly 라 읽기 권한이 필요 없다.
+      "android.permission.READ_MEDIA_IMAGES",
+      "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+      "android.permission.READ_EXTERNAL_STORAGE",
+    ],
+  },
+
+  plugins: [
+    "expo-router",
+    "expo-web-browser",
+    "expo-secure-store",
+    [
+      "expo-splash-screen",
+      { backgroundColor: BG, image: "./assets/images/splash-icon.png", imageWidth: 160 },
+    ],
+    [
+      "expo-image-picker",
+      {
+        photosPermission: "내 사진과 의상 사진을 골라 컨셉 사진을 만들기 위해 사진 접근이 필요해요.",
+        cameraPermission: "셀카를 바로 찍어 컨셉 사진을 만들기 위해 카메라를 사용해요.",
+        microphonePermission: false,
+      },
+    ],
+    [
+      "expo-media-library",
+      {
+        savePhotosPermission: "완성한 사진을 앨범에 저장하기 위해 사진 추가 권한이 필요해요.",
+        photosPermission: "완성한 사진을 앨범에 저장하기 위해 사진 접근이 필요해요.",
+        isAccessMediaLocationEnabled: false,
+      },
+    ],
+    ["expo-build-properties", { android: { compileSdkVersion: 36, targetSdkVersion: 36 } }],
+  ],
+
+  experiments: { typedRoutes: true },
+
+  extra: {
+    apiBase: API_BASE,
+    supabaseUrl: SUPABASE_URL,
+    supabaseAnonKey: SUPABASE_ANON_KEY,
+    router: {},
+  },
+};
+
+export default config;
