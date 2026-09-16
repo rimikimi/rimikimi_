@@ -10,6 +10,7 @@ struct MyPhotosView: View {
     private let columns = [GridItem(.flexible(), spacing: 6), GridItem(.flexible(), spacing: 6), GridItem(.flexible(), spacing: 6)]
 
     var body: some View {
+        ScrollViewReader { proxy in
         ScrollView {
             LazyVStack(spacing: Spacing.s4) {
                 ProgressCard()
@@ -53,9 +54,10 @@ struct MyPhotosView: View {
                     }
                     .padding(.horizontal, Spacing.page)
                 }
+                Color.clear.frame(height: 1).id("bottomAnchor")
             }
             .padding(.top, Spacing.s2)
-            .padding(.bottom, TabBarMetrics.contentBottomPad)
+            .padding(.bottom, app.contentBottomPad)
         }
         .scrollIndicators(.hidden)
         .background(Color.bg)
@@ -65,7 +67,32 @@ struct MyPhotosView: View {
             if case .done = s { Task { await reload() } }
         }
         .refreshable { await reload() }
+        #if DEBUG
+        // 결함 #4 검증 캡처용 — `reload()` 가 늦게 끝나 콘텐츠가 나중에 자라는 경우까지 커버(`GalleryHomeView`
+        // 와 같은 이유, 기기별 로드 타이밍 차이로 재현됨).
+        .defaultScrollAnchor(app.devScrollToBottom ? .bottom : .top)
+        .onChange(of: loading) { _, isLoading in
+            guard app.devScrollToBottom, !isLoading else { return }
+            devRepeatScrollToBottom(proxy)
+        }
+        .onAppear {
+            guard app.devScrollToBottom, !loading else { return }
+            devRepeatScrollToBottom(proxy)
+        }
+        #endif
+        }
     }
+
+    #if DEBUG
+    /// `GalleryHomeView.devRepeatScrollToBottom` 과 같은 이유(`LazyVGrid` 레이아웃 수렴 여러 프레임 필요).
+    private func devRepeatScrollToBottom(_ proxy: ScrollViewProxy) {
+        for delay in [0.2, 0.5, 0.9, 1.4] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                proxy.scrollTo("bottomAnchor", anchor: .bottom)
+            }
+        }
+    }
+    #endif
 
     private func reload() async {
         guard let token = await app.auth.validAccessToken() else { items = []; return }

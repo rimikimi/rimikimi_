@@ -29,15 +29,26 @@ enum ControlHeight {
     static let avatar: CGFloat = 32
 }
 
-/// 탭바 — 높이 62 · 하단 14 · 좌우 12 · 가운데 카메라 원 54(위로 14 띄움).
+/// 탭바 — 높이 62 · 하단 14 · 좌우 12 · 가운데 카메라 원 54.
 /// iOS 26 네이티브 탭바가 자기 크기를 정하므로, 이 값은 카메라 원과 콘텐츠 하단 여백에만 쓴다.
 enum TabBarMetrics {
     static let height: CGFloat = 62
     static let bottom: CGFloat = 14
     static let sideMargin: CGFloat = 12
     static let cameraSize: CGFloat = 54
-    static let cameraRaise: CGFloat = 14
-    /// 탭 화면 스크롤 콘텐츠의 하단 여백 (탭바 아래로 흘러 들어가되 마지막 줄이 가려지지 않게)
+    /// build 90 실기기 결함 #2(오너 지시) — 예전엔 `bottom + 14` 고정 pt 로 카메라 원을 띄웠는데, 실제
+    /// 탭바는 iOS 가 그리는 떠 있는 탭바라 기기마다(홈 인디케이터 유무) 위치가 달라 실기기에서 원이
+    /// 공중에 분리돼 보였다(시뮬레이터에선 우연히 맞아 보였음). 지금은 `RootTabView.TabBarFrameReader` 가
+    /// 실측한 탭바 상단 Y 좌표를 기준으로 배치하고, 이 값은 그 위에 원이 "살짝 겹쳐 떠 있는" 정도(SPEC §1)
+    /// 로만 쓴다 — 탭바 위 절대 여백이 아니다.
+    static let cameraOverlap: CGFloat = 10
+    /// 탭바 프레임을 아직 측정하지 못했을 때(첫 프레임)의 폴백 — 이전 고정값과 동일하게 둬서 깜빡임 최소화.
+    static let cameraFallbackBottom: CGFloat = 28
+    /// 탭바가 없는(푸시된) 화면의 하단 여백, 그리고 탭바 실측 전(첫 프레임) `AppState.contentBottomPad`
+    /// 의 폴백값. **탭바가 실제로 떠 있는 탭 루트 화면**(갤러리·필터·내 사진·프로필)에서는 이 고정값 대신
+    /// `AppState.contentBottomPad`(탭바 프레임 실측, 결함 #4 재작업 — 오너 지시)를 써야 한다. 고정 24pt로는
+    /// 탭바(높이 62 + 하단 14 + 안전영역)에 마지막 콘텐츠가 가려진다 — `UI/Filter/` 는 이번 작업 범위 밖이라
+    /// 그대로 두었으니 필터 작업자가 같은 방식으로 옮겨야 한다.
     static let contentBottomPad: CGFloat = 24
 }
 

@@ -113,7 +113,9 @@ struct InviteView: View {
     }
 }
 
-/// 홈 상단 초대 카드 — 첫 생성 완료 → ATT 뒤 1회.
+/// 홈 상단 초대 카드 — 결함 #5(오너 지시): 1.x 처럼 홈 맨 위에 상시 노출하고, 사용자가 닫아야만
+/// (X 버튼, `AppState.dismissInviteCard()`) 사라지며 그 상태를 영구 기억한다. "공유하기"로 초대 화면에
+/// 가는 것만으로는 닫지 않는다 — 홈으로 돌아왔을 때도 계속 보이는 게 상시 노출 취지에 맞다.
 struct InviteCard: View {
     @Environment(AppState.self) private var app
     var body: some View {
@@ -124,12 +126,11 @@ struct InviteCard: View {
             }
             Spacer()
             Button("공유하기") {
-                app.showInviteCard = false
                 app.tab = .profile
                 app.profilePath = [.invite]
             }
             .buttonStyle(SecondaryButtonStyle(small: true, fullWidth: false))
-            Button { withAnimation(Motion.exitCurve()) { app.showInviteCard = false } } label: {
+            Button { withAnimation(Motion.exitCurve()) { app.dismissInviteCard() } } label: {
                 Image(systemName: "xmark").font(.system(size: 11, weight: .bold)).foregroundStyle(Color.ink2)
                     .frame(width: 24, height: 24).background(Color.fill, in: Circle())
             }

@@ -64,11 +64,41 @@ final class AppState {
     var webTool: WebTool?
     /// 첫 실행 가이드 1장 — 실행 시 다른 팝업은 없다.
     var showGuide = !UserDefaults.standard.bool(forKey: "guide.done.v2")
-    /// 첫 생성 완료 → ATT → 초대 카드(홈 상단 1회).
-    var showInviteCard = false
+    /// 홈 상단 초대 카드 — build 90 실기기 결함 #5(오너 지시): 예전엔 첫 생성 완료 후 1회만 떴는데
+    /// 1.x 는 홈 맨 위에 항상 있었다. 이제 사용자가 닫기 전까진 상시 노출하고, 닫으면 그 상태를
+    /// `inviteCardDismissedKey` 로 영구 기억한다. 초대는 크레딧이 도는 유일한 통로라 이미 친구를
+    /// 초대해 본 사용자에게도 계속 보여준다 — 서버에 "1회성" 제한이 없고(재초대해도 계속 크레딧을
+    /// 받을 수 있어 보임, `RimikimiAPI.referralCount` 참고) 언제든 닫을 수 있으니 상시 노출 쪽이 낫다고
+    /// 판단했다. 명시적으로 "이미 초대를 다 쓴 사용자"를 구분하는 서버 플래그는 없다(`api/` 미확인 범위 —
+    /// 필요하면 별도 확인).
+    var showInviteCard = !UserDefaults.standard.bool(forKey: AppState.inviteCardDismissedKey)
+    private static let inviteCardDismissedKey = "invite.card.dismissed.v1"
+
+    /// build 90 실기기 결함 #4(오너 지시, 재작업) — `RootTabView.TabBarFrameReader` 가 실측한 탭바
+    /// 상단 Y(윈도우 좌표). 탭 루트 화면들이 스크롤 하단 여백(`contentBottomPad`)을 실제 탭바 높이 +
+    /// 안전영역 기준으로 계산하는 데 쓴다. 아직 못 쟀으면 `nil`.
+    var tabBarTopY: CGFloat?
+
+    /// 탭 화면 스크롤 콘텐츠의 하단 여백 — 고정 24pt였던 걸 실측 탭바 프레임 기준으로 바꿨다(결함 #4).
+    /// 탭바는 높이 62 + 하단 14 + 안전영역(홈 인디케이터 기기 ~34)까지 화면 아래에서 100pt 넘게 차지해서
+    /// 고정 24pt로는 마지막 콘텐츠가 항상 가려졌다 — 오너가 캡처(`fix_2_camera_proMax.png` 하단의
+    /// Brooklyn 배너, 프로필 사업자 정보)에서 직접 확인. 탭바 상단 Y 를 실측해 "화면 바닥부터 탭바 상단까지"
+    /// 거리 + 여유 12pt 를 쓴다. 측정 전(첫 프레임)엔 예전 고정값으로 폴백.
+    var contentBottomPad: CGFloat {
+        guard let topY = tabBarTopY else { return TabBarMetrics.contentBottomPad }
+        let screenBottom = UIScreen.main.bounds.height
+        let pad = screenBottom - topY + 12
+        return max(pad, TabBarMetrics.contentBottomPad)
+    }
     #if DEBUG
     /// dev/fit 캡처용 — 결과 화면이 뜨면 정방향 맞춤 시트를 바로 연다.
     var devAutoOpenFit = false
+    /// 결함 #4 검증 캡처용(`dev/devscrollbottom`) — 탭 루트 화면들이 처음부터 맨 아래로 스크롤된
+    /// 상태로 뜨게 한다. 실기기 터치 없이 "스크롤 끝까지 내렸을 때 탭바에 안 가리는지"를 캡처하기 위함.
+    /// `RimikimiApp.task` 의 `DevRoutes.handleLaunchArguments` 는 `concepts.load()` 등 여러 await
+    /// 뒤에 실행돼 GalleryHomeView 가 이미 첫 렌더(스크롤 위치 확정)를 끝낸 뒤라 `.defaultScrollAnchor`
+    /// 가 안 먹는다 — 그래서 여기 `init()` 에서 launch argument 를 동기적으로 직접 읽는다.
+    var devScrollToBottom = ProcessInfo.processInfo.arguments.contains { $0.contains("devscrollbottom") }
     #endif
 
     struct WebTool: Identifiable {
@@ -244,14 +274,20 @@ final class AppState {
         }
     }
 
-    /// 첫 생성 완료 직후 1회: ATT → 초대 카드.
+    /// 첫 생성 완료 직후 1회: ATT 권한 요청. 초대 카드는 더 이상 여기서 켜지 않는다 — 홈에 상시
+    /// 노출로 바뀌었다(결함 #5, `showInviteCard` 초기값 참고). 키 이름은 예전 그대로 재사용(ATT 1회
+    /// 트리거 용도로만 씀, 마이그레이션 불필요).
     func afterFirstResult() {
         let key = "invite.card.shown.v1"
         guard !UserDefaults.standard.bool(forKey: key) else { return }
         UserDefaults.standard.set(true, forKey: key)
-        TrackingPrompt.requestOnceAfterFirstResult { [weak self] in
-            self?.showInviteCard = true
-        }
+        TrackingPrompt.requestOnceAfterFirstResult()
+    }
+
+    /// 홈 초대 카드를 닫는다 — 닫힌 상태를 영구 기억해 다음 실행에도 다시 뜨지 않게 한다(결함 #5).
+    func dismissInviteCard() {
+        showInviteCard = false
+        UserDefaults.standard.set(true, forKey: Self.inviteCardDismissedKey)
     }
 
     func finishGuide() {

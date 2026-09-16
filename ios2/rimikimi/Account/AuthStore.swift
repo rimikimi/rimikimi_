@@ -42,6 +42,15 @@ final class AuthStore {
 
     var isSignedIn: Bool { session != nil }
 
+    #if DEBUG
+    /// 캡처/개발용 — 실제 OAuth 없이 로그인 상태만 흉내낸다. `DevRoutes` `dev/devsignin` 참고.
+    func devSetSession(_ s: AuthSession) {
+        session = s
+        keychain.write(s)
+        signInTick += 1
+    }
+    #endif
+
     var displayLabel: String {
         guard let s = session else { return "로그인 안 함" }
         if let n = s.displayName, !n.isEmpty { return n }

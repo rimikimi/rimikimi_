@@ -17,10 +17,13 @@ import UIKit
 /// 있는지 확인할 수 있다 — 이게 이 파일이 하는 일이다. 성공하면 `AuthStore.adoptLegacyRefreshToken`
 /// 으로 새 액세스 토큰을 받아 그대로 로그인 상태가 된다. 실패해도 부작용 없음(그냥 평소 로그인 화면).
 ///
-/// 시뮬레이터에는 1.x 앱이 심어 둔 진짜 데이터가 없어 "빈 값 → 실패"로 끝나는 게 정상이다. 이 메커니즘
-/// 자체가 실제로 값을 건져 오는지는 **1.x가 실제로 깔려 있던 실기기에서 2.0으로 업데이트했을 때만
-/// 확정적으로 검증 가능** — 코드 경로는 여기서 시뮬레이터로 "쓰기→다시 읽기" 왕복까지 확인했다
-/// (`DevRoutes` `dev/legacymigration` 참고).
+/// **build 90 실기기 결함 수정(오너 지시)**: 예전 구현은 시도 "전에" `attemptedFlag` 를 찍었다 — 앱
+/// 시작 `.task` 시점엔 `UIApplication.shared.connectedScenes...keyWindow` 가 아직 준비되지 않아
+/// 숨은 WKWebView 가 창에 못 붙는 경우가 실기기에서 실제로 있었고, 그러면 JS 평가가 안 돌아 3초
+/// 타임아웃으로 빠지는데 그 애매한 실패에도 플래그가 이미 찍혀 있어 **영원히 재시도하지 않았다**.
+/// 지금은 "확정적 결과"(성공적으로 세션까지 교환했음 / 웹뷰가 제대로 로드돼 JS 도 돌았는데 값이
+/// 정말 없음·파싱 불가)일 때만 플래그를 찍고, 창 없음·웹뷰 로드 실패·타임아웃 같은 애매한 실패는
+/// 플래그를 찍지 않아 다음 실행에 다시 시도한다. 무한 재시도를 막기 위해 최대 시도 횟수를 둔다.
 @MainActor
 enum LegacySessionMigration {
     /// 1.x 가 실제로 쓴 값. `capacitor.config.ts`(`ios.scheme`) + `src/supabaseClient.js`(스토리지 미지정
@@ -28,23 +31,54 @@ enum LegacySessionMigration {
     static let legacyOrigin = "rimikimi://localhost"
     static let storageKey = "sb-hedgjzdrivilclmwumoc-auth-token"
 
+    /// 확정적 결과가 나왔을 때만 찍는다(더 이상 재시도하지 않아도 되는 상태).
     private static let attemptedFlag = "legacyMigration.attempted.v1"
+    /// 애매한 실패(창 없음/로드 실패/타임아웃) 횟수 — 무한 재시도 방지용 상한.
+    private static let ambiguousCountKey = "legacyMigration.ambiguousCount.v1"
+    private static let maxAmbiguousAttempts = 5
 
-    /// 앱 시작 시 1회만: 이미 로그인돼 있거나 이미 시도했으면 즉시 반환. 성공하면 true.
+    /// 앱 시작 시: 이미 로그인돼 있거나 이미 확정된 결과가 있으면 즉시 반환. 성공하면 true.
+    /// 애매한 실패는 플래그를 찍지 않고 그대로 반환 — 다음 실행에서 다시 호출된다.
     @discardableResult
     static func attemptOnce() async -> Bool {
         guard !AuthStore.shared.isSignedIn else { return false }
         guard !UserDefaults.standard.bool(forKey: attemptedFlag) else { return false }
-        UserDefaults.standard.set(true, forKey: attemptedFlag)
-        guard let raw = await readLegacyLocalStorage(key: storageKey) else {
+
+        let ambiguousCount = UserDefaults.standard.integer(forKey: ambiguousCountKey)
+        guard ambiguousCount < maxAmbiguousAttempts else {
+            AppLog.auth.notice("legacy.migration.giveup ambiguousCount=\(ambiguousCount, privacy: .public)")
+            UserDefaults.standard.set(true, forKey: attemptedFlag)
+            return false
+        }
+
+        AppLog.auth.info("legacy.migration.start ambiguousCount=\(ambiguousCount, privacy: .public)")
+        let outcome = await readLegacyLocalStorage(key: storageKey)
+
+        switch outcome {
+        case .ambiguous(let reason):
+            UserDefaults.standard.set(ambiguousCount + 1, forKey: ambiguousCountKey)
+            AppLog.auth.notice("legacy.migration.ambiguous reason=\(reason, privacy: .public) willRetryNextLaunch=true")
+            return false
+
+        case .definitiveEmpty:
             AppLog.auth.info("legacy.migration.none")
+            UserDefaults.standard.set(true, forKey: attemptedFlag)
             return false
+
+        case .value(let raw):
+            AppLog.auth.info("legacy.migration.value.found len=\(raw.count, privacy: .public)")
+            guard let refreshToken = Self.refreshToken(fromRawValue: raw) else {
+                AppLog.auth.notice("legacy.migration.unparseable")
+                UserDefaults.standard.set(true, forKey: attemptedFlag)
+                return false
+            }
+            AppLog.auth.info("legacy.migration.token.parsed len=\(refreshToken.count, privacy: .public)")
+            let ok = await AuthStore.shared.adoptLegacyRefreshToken(refreshToken)
+            AppLog.auth.info("legacy.migration.exchange.result ok=\(ok, privacy: .public)")
+            // 성공/실패(파싱된 토큰으로 교환까지 시도) 모두 확정적 결과 — 재시도해도 값이 안 바뀐다.
+            UserDefaults.standard.set(true, forKey: attemptedFlag)
+            return ok
         }
-        guard let refreshToken = Self.refreshToken(fromRawValue: raw) else {
-            AppLog.auth.notice("legacy.migration.unparseable")
-            return false
-        }
-        return await AuthStore.shared.adoptLegacyRefreshToken(refreshToken)
     }
 
     /// 1.x localStorage 값(JSON 문자열, GoTrue `Session` 모양) → refresh_token.
@@ -58,10 +92,10 @@ enum LegacySessionMigration {
     }
 
     /// 숨은 WKWebView 로 `rimikimi://localhost` 오리진의 localStorage[key] 를 읽는다.
-    private static func readLegacyLocalStorage(key: String) async -> String? {
+    private static func readLegacyLocalStorage(key: String) async -> LegacyReadOutcome {
         await withCheckedContinuation { continuation in
-            let runner = LegacyWebViewRunner(key: key) { value in
-                continuation.resume(returning: value)
+            let runner = LegacyWebViewRunner(key: key) { outcome in
+                continuation.resume(returning: outcome)
             }
             runner.start()
         }
@@ -83,11 +117,36 @@ enum LegacySessionMigration {
         }
         guard wrote else { return "쓰기 실패" }
         let readBack = await readLegacyLocalStorage(key: storageKey)
-        return readBack == fakeSession
-            ? "성공 — 같은 오리진(\(legacyOrigin))의 영구 저장소에 쓰고 다시 읽었다: \(readBack ?? "")"
-            : "실패 — 쓴 값과 읽은 값이 다름: \(readBack ?? "nil")"
+        switch readBack {
+        case .value(let raw) where raw == fakeSession:
+            return "성공 — 같은 오리진(\(legacyOrigin))의 영구 저장소에 쓰고 다시 읽었다: \(raw)"
+        case .value(let raw):
+            return "실패 — 쓴 값과 읽은 값이 다름: \(raw)"
+        case .definitiveEmpty:
+            return "실패 — 다시 읽었더니 비어 있음"
+        case .ambiguous(let reason):
+            return "실패(애매함) — \(reason)"
+        }
+    }
+
+    /// 재시도 카운터/확정 플래그를 초기화 — 개발용(`dev/legacymigration?reset=1`).
+    static func debugResetFlags() {
+        UserDefaults.standard.removeObject(forKey: attemptedFlag)
+        UserDefaults.standard.removeObject(forKey: ambiguousCountKey)
     }
     #endif
+}
+
+/// 숨은 WKWebView 읽기 시도의 결과. "확정적"(더 재시도해도 결과가 안 바뀜) vs "애매함"(환경 문제로
+/// 실제로 값을 확인 못 했음 — 다음 실행에 다시 시도해야 함)을 구분한다.
+enum LegacyReadOutcome {
+    /// 웹뷰가 정상적으로 로드되고 JS 평가까지 끝났고, 값이 있었다.
+    case value(String)
+    /// 웹뷰가 정상적으로 로드되고 JS 평가까지 끝났는데, 키에 값이 정말 없었다(1.x 데이터가 없는 게 정상 —
+    /// 새 설치 등).
+    case definitiveEmpty
+    /// 창을 못 찾았거나, 웹뷰 로드가 실패했거나, 타임아웃이 걸렸거나 — 실제로 값을 확인하지 못했다.
+    case ambiguous(String)
 }
 
 /// `WKURLSchemeHandler` — "rimikimi" 스킴에 빈 문서 하나를 즉시 응답해 그 오리진에서 자바스크립트를
@@ -118,17 +177,20 @@ private var activeLegacyRunners: [LegacyWebViewRunner] = []
 private final class LegacyWebViewRunner: NSObject, WKNavigationDelegate {
     private let key: String
     private let writeValue: String?
-    private let onString: ((String?) -> Void)?
+    private let onOutcome: ((LegacyReadOutcome) -> Void)?
     private let onBool: ((Bool) -> Void)?
     private var webView: WKWebView?
     private let schemeHandler = EmptyDocSchemeHandler()
     private var finished = false
+    /// 창을 기다리는 동안의 폴링 횟수(최대 ~2초: 20 * 0.1s).
+    private var windowWaitTicks = 0
+    private let maxWindowWaitTicks = 20
 
     /// 읽기 전용.
-    init(key: String, completion: @escaping (String?) -> Void) {
+    init(key: String, completion: @escaping (LegacyReadOutcome) -> Void) {
         self.key = key
         self.writeValue = nil
-        self.onString = completion
+        self.onOutcome = completion
         self.onBool = nil
     }
 
@@ -136,12 +198,33 @@ private final class LegacyWebViewRunner: NSObject, WKNavigationDelegate {
     init(writeKey: String, writeValue: String, completion: @escaping (Bool) -> Void) {
         self.key = writeKey
         self.writeValue = writeValue
-        self.onString = nil
+        self.onOutcome = nil
         self.onBool = completion
     }
 
     func start() {
         activeLegacyRunners.append(self)
+        attachToWindowThenLoad()
+    }
+
+    /// 앱 시작 `.task` 시점엔 `keyWindow` 가 아직 없을 수 있다(실기기에서 실제로 관측된 애매한 실패
+    /// 원인) — 즉시 포기하지 않고 잠깐 폴링하며 기다린다. 그래도 못 찾으면 애매한 실패로 처리해
+    /// 다음 실행에 재시도되게 한다(값을 확인 못 했다는 뜻이지, "값이 없다"는 뜻이 아니다).
+    private func attachToWindowThenLoad() {
+        guard !finished else { return }
+        guard let window = UIApplication.shared.connectedScenes
+            .compactMap({ ($0 as? UIWindowScene)?.keyWindow }).first else {
+            windowWaitTicks += 1
+            guard windowWaitTicks <= maxWindowWaitTicks else {
+                AppLog.auth.notice("legacy.migration.step window.notFound afterTicks=\(self.windowWaitTicks, privacy: .public)")
+                finish(.ambiguous("noWindow"))
+                return
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in self?.attachToWindowThenLoad() }
+            return
+        }
+
+        AppLog.auth.info("legacy.migration.step window.attached afterTicks=\(self.windowWaitTicks, privacy: .public)")
         let config = WKWebViewConfiguration()
         config.setURLSchemeHandler(schemeHandler, forURLScheme: "rimikimi")
         // 명시적으로 기본(영구) 저장소 — 1.x(Capacitor) 가 별도 설정 없이 쓰던 것과 같은 저장소.
@@ -150,38 +233,79 @@ private final class LegacyWebViewRunner: NSObject, WKNavigationDelegate {
         wv.navigationDelegate = self
         webView = wv
         // JS 타이머/평가가 확실히 돌도록 키 윈도우에 잠깐 붙인다(화면엔 보이지 않음, 크기 0).
-        if let window = UIApplication.shared.connectedScenes
-            .compactMap({ ($0 as? UIWindowScene)?.keyWindow }).first {
-            window.addSubview(wv)
-        }
+        window.addSubview(wv)
         wv.load(URLRequest(url: URL(string: "rimikimi://localhost/")!))
         // 네트워크가 전혀 없는 스킴이라 즉시 끝나야 정상이지만, 혹시 몰라 타임아웃을 둔다.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in self?.finish(string: nil, bool: false) }
+        // 타임아웃은 "확인 못 함"이지 "값이 없음"이 아니므로 애매한 실패로 처리한다.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
+            guard let self, !self.finished else { return }
+            AppLog.auth.notice("legacy.migration.step timeout")
+            self.finish(.ambiguous("timeout"))
+        }
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        AppLog.auth.info("legacy.migration.step webview.didFinish")
         if let writeValue {
             let escaped = writeValue.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
-            webView.evaluateJavaScript("window.localStorage.setItem(\"\(key)\", \"\(escaped)\"); true") { [weak self] result, _ in
-                self?.finish(string: nil, bool: (result as? Bool) ?? false)
+            webView.evaluateJavaScript("window.localStorage.setItem(\"\(key)\", \"\(escaped)\"); true") { [weak self] result, error in
+                if let error {
+                    AppLog.auth.notice("legacy.migration.step js.error(write) \(error.localizedDescription, privacy: .public)")
+                    self?.finish(.ambiguous("jsWriteError"), boolOverride: false)
+                    return
+                }
+                self?.finish(.definitiveEmpty, boolOverride: (result as? Bool) ?? false)
             }
         } else {
-            webView.evaluateJavaScript("window.localStorage.getItem(\"\(key)\")") { [weak self] result, _ in
-                self?.finish(string: result as? String, bool: false)
+            webView.evaluateJavaScript("window.localStorage.getItem(\"\(key)\")") { [weak self] result, error in
+                if let error {
+                    AppLog.auth.notice("legacy.migration.step js.error(read) \(error.localizedDescription, privacy: .public)")
+                    self?.finish(.ambiguous("jsReadError"))
+                    return
+                }
+                if let value = result as? String {
+                    AppLog.auth.info("legacy.migration.step js.result present len=\(value.count, privacy: .public)")
+                    self?.finish(.value(value))
+                } else {
+                    // JS 는 정상적으로 돌았고(에러 없음) 결과가 nil/NSNull — 키에 값이 정말 없다는 확정적 결과.
+                    AppLog.auth.info("legacy.migration.step js.result absent")
+                    self?.finish(.definitiveEmpty)
+                }
             }
         }
     }
 
-    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { finish(string: nil, bool: false) }
-    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) { finish(string: nil, bool: false) }
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        AppLog.auth.notice("legacy.migration.step nav.didFail \(error.localizedDescription, privacy: .public)")
+        finish(.ambiguous("navFailed"))
+    }
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        AppLog.auth.notice("legacy.migration.step nav.didFailProvisional \(error.localizedDescription, privacy: .public)")
+        finish(.ambiguous("navFailedProvisional"))
+    }
 
-    private func finish(string: String?, bool: Bool) {
+    /// 공통 종료 지점. 읽기 경로면 `onOutcome`, 쓰기 경로면 `onBool`(성공 여부는 `boolOverride`,
+    /// 없으면 outcome 이 `.value`/`.definitiveEmpty` 인지로 판단)을 호출한다. 타임아웃/네비게이션 실패처럼
+    /// 두 경로 모두에서 걸릴 수 있는 지점이 있어 하나로 합쳤다 — 쓰기 경로에서 타임아웃이 나도 `onBool` 이
+    /// 반드시 호출돼야 `debugSeedAndVerify()` 의 continuation 이 멈추지 않는다.
+    private func finish(_ outcome: LegacyReadOutcome, boolOverride: Bool? = nil) {
         guard !finished else { return }
         finished = true
         webView?.removeFromSuperview()
         webView = nil
-        onString?(string)
-        onBool?(bool)
+        if let onOutcome {
+            onOutcome(outcome)
+        } else {
+            let ok: Bool
+            if let boolOverride {
+                ok = boolOverride
+            } else if case .value = outcome {
+                ok = true
+            } else {
+                ok = false
+            }
+            onBool?(ok)
+        }
         activeLegacyRunners.removeAll { $0 === self }
     }
 }

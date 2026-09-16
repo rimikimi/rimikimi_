@@ -7,32 +7,63 @@ struct GalleryHomeView: View {
     @State private var activeCategory: String?
 
     var body: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 0) {
-                GalleryHeader()
-                if app.showInviteCard { InviteCard() }
-                CategoryChipsRow(categories: app.concepts.categories, active: $activeCategory)
-                if app.concepts.isLoading && app.concepts.concepts.isEmpty {
-                    loadingRails
-                } else if let cat = activeCategory {
-                    ConceptGrid(concepts: app.concepts.concepts(in: cat))
-                        .padding(.top, Spacing.s3)
-                } else {
-                    ConceptRail(title: "추천", concepts: app.concepts.featured)
-                    ConceptRail(title: "새로 나왔어요", concepts: app.concepts.newest, isNew: true)
-                    BrooklynBanner()
-                    ForEach(app.concepts.rows) { row in
-                        ConceptRail(title: row.name, concepts: row.items, more: Route.category(row.name))
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    GalleryHeader()
+                    if app.showInviteCard { InviteCard() }
+                    CategoryChipsRow(categories: app.concepts.categories, active: $activeCategory)
+                    if app.concepts.isLoading && app.concepts.concepts.isEmpty {
+                        loadingRails
+                    } else if let cat = activeCategory {
+                        ConceptGrid(concepts: app.concepts.concepts(in: cat))
+                            .padding(.top, Spacing.s3)
+                    } else {
+                        ConceptRail(title: "추천", concepts: app.concepts.featured)
+                        ConceptRail(title: "새로 나왔어요", concepts: app.concepts.newest, isNew: true)
+                        BrooklynBanner()
+                        ForEach(app.concepts.rows) { row in
+                            ConceptRail(title: row.name, concepts: row.items, more: Route.category(row.name))
+                        }
                     }
+                    Color.clear.frame(height: 1).id("bottomAnchor")
                 }
+                .padding(.bottom, app.contentBottomPad)
             }
-            .padding(.bottom, TabBarMetrics.contentBottomPad)
+            .scrollIndicators(.hidden)
+            .background(Color.bg)
+            .toolbar(.hidden, for: .navigationBar)
+            .refreshable { await app.concepts.load() }
+            #if DEBUG
+            // 결함 #4 검증 캡처용 — `.defaultScrollAnchor` 는 "초기 위치" 힌트일 뿐이라 `concepts.load()`가
+            // 늦게 끝나 콘텐츠가 나중에 자라면 이미 확정된 스크롤 위치가 진짜 바닥이 아니게 된다(실기기/기기별로
+            // 로드 타이밍이 달라 재현됨 — SE 시뮬레이터에서 실제로 관측). 그래서 로딩이 완전히 끝난 뒤
+            // 명시적으로 `bottomAnchor` 로 스크롤해 진짜 마지막 콘텐츠까지 확실히 캡처되게 한다.
+            .onChange(of: app.concepts.isLoading) { _, loading in
+                guard app.devScrollToBottom, !loading else { return }
+                devRepeatScrollToBottom(proxy)
+            }
+            .onAppear {
+                guard app.devScrollToBottom, !app.concepts.isLoading else { return }
+                devRepeatScrollToBottom(proxy)
+            }
+            #endif
         }
-        .scrollIndicators(.hidden)
-        .background(Color.bg)
-        .toolbar(.hidden, for: .navigationBar)
-        .refreshable { await app.concepts.load() }
     }
+
+    #if DEBUG
+    /// `LazyVStack` 은 화면 밖 줄의 실제 높이를 스크롤이 거기 닿기 전까진 모른다 — 맨 아래로 한 번에
+    /// `scrollTo` 해도 그 시점엔 아직 계산 안 된 줄들이 있어 한 번으로는 진짜 끝까지 안 간다(SE 시뮬레이터
+    /// 캡처에서 실제로 관측: 마지막 줄 다음 줄이 탭바 뒤로 살짝 비쳐 보임). 점점 늘어나는 지연으로 여러 번
+    /// 다시 호출해 레이아웃이 수렴하게 한다.
+    private func devRepeatScrollToBottom(_ proxy: ScrollViewProxy) {
+        for delay in [0.2, 0.5, 0.9, 1.4] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                proxy.scrollTo("bottomAnchor", anchor: .bottom)
+            }
+        }
+    }
+    #endif
 
     private var loadingRails: some View {
         VStack(alignment: .leading, spacing: Spacing.s3) {
@@ -174,7 +205,7 @@ struct CategoryListView: View {
         ScrollView {
             ConceptGrid(concepts: app.concepts.concepts(in: name))
                 .padding(.top, Spacing.s3)
-                .padding(.bottom, TabBarMetrics.contentBottomPad)
+                .padding(.bottom, app.contentBottomPad)
         }
         .background(Color.bg)
         .inlineTitle(name)

@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// `v2/SPEC.md` §2 — 탭 5슬롯: 갤러리 · 필터 · ⦿카메라(가운데, 떠 있음) · 내 사진 · 프로필.
 /// iOS 26 Liquid Glass 탭바 + 스크롤 시 최소화. 가운데 슬롯은 탭이 아니라 **동작**(카메라 열기)이라
@@ -48,9 +49,10 @@ struct RootTabView: View {
         //    `.toolbarColorScheme` / `.toolbarBackground` / `UITabBarAppearance` 는 이 떠 있는
         //    탭바에 아무 효과가 없다(불투명 단색까지 강제해 확인).
         // 안쪽 화면(푸시)에서는 탭바가 숨으므로 카메라 원도 함께 숨긴다 — 만들기 바 위에 겹치던 문제.
+        .background(TabBarFrameReader(topY: $app.tabBarTopY))
         .overlay(alignment: .bottom) {
             if app.galleryPath.isEmpty && app.myPhotosPath.isEmpty && app.profilePath.isEmpty {
-                CameraTabButton { openCamera() }
+                CameraTabButton(bottomPadding: cameraBottomPadding) { openCamera() }
                     .transition(.opacity.combined(with: .scale(scale: 0.9)))
             }
         }
@@ -101,6 +103,69 @@ struct RootTabView: View {
     private func openCamera() {
         app.requireLogin(.camera)
     }
+
+    /// 실측한 탭바 상단 Y(윈도우 좌표) 기준 카메라 원의 `.padding(.bottom)` 값. 결함 #2(오너 지시) —
+    /// 고정 pt 대신 실제 탭바 프레임을 써서 기기(홈 인디케이터 유무)에 관계없이 원이 탭바 위에
+    /// 일관되게 살짝 겹쳐 뜨게 한다.
+    private var cameraBottomPadding: CGFloat {
+        guard let topY = app.tabBarTopY else { return TabBarMetrics.cameraFallbackBottom }
+        let screenBottom = UIScreen.main.bounds.height
+        let pad = screenBottom - topY - TabBarMetrics.cameraOverlap
+        return max(pad, TabBarMetrics.bottom)
+    }
+}
+
+/// UIKit 계층에서 실제 `UITabBar`(iOS 26 떠 있는 탭바) 를 찾아 그 상단 Y(윈도우 좌표)를 알려준다.
+/// SwiftUI `TabView` 가 만드는 탭바는 고정 pt 로 예측할 수 없어(기기마다 다름, 결함 #2) 직접 잰다.
+private struct TabBarFrameReader: UIViewRepresentable {
+    @Binding var topY: CGFloat?
+
+    func makeUIView(context: Context) -> TrackerView {
+        let v = TrackerView()
+        v.onUpdate = { topY = $0 }
+        return v
+    }
+    func updateUIView(_ uiView: TrackerView, context: Context) {}
+
+    final class TrackerView: UIView {
+        var onUpdate: ((CGFloat) -> Void)?
+        private var displayLink: CADisplayLink?
+
+        override init(frame: CGRect) {
+            super.init(frame: frame)
+            isUserInteractionEnabled = false
+            backgroundColor = .clear
+        }
+        required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            displayLink?.invalidate()
+            displayLink = nil
+            guard window != nil else { return }
+            // 탭바가 스크롤에 따라 최소화/복귀되는 애니메이션을 따라가려면 매 프레임 다시 재야 한다.
+            let link = CADisplayLink(target: self, selector: #selector(tick))
+            link.add(to: .main, forMode: .common)
+            displayLink = link
+            tick()
+        }
+
+        deinit { displayLink?.invalidate() }
+
+        @objc private func tick() {
+            guard let window, let tabBar = Self.findTabBar(in: window) else { return }
+            let topY = tabBar.convert(tabBar.bounds, to: nil).minY
+            onUpdate?(topY)
+        }
+
+        private static func findTabBar(in view: UIView) -> UITabBar? {
+            if let bar = view as? UITabBar { return bar }
+            for sub in view.subviews {
+                if let found = findTabBar(in: sub) { return found }
+            }
+            return nil
+        }
+    }
 }
 
 extension UIImage {
@@ -114,8 +179,10 @@ extension UIImage {
     }()
 }
 
-/// 가운데 카메라 원 — 54pt, 잉크 배경, 탭바 위로 14pt 띄움. 탭바가 스크롤로 최소화돼도 원은 남는다.
+/// 가운데 카메라 원 — 54pt, 잉크 배경. `bottomPadding` 은 `RootTabView` 가 실측한 탭바 프레임 기준으로
+/// 매 프레임 계산해 넘긴다(결함 #2, 오너 지시) — 탭바 위에 살짝 겹쳐 떠 있는 모습을 기기 불문 유지.
 struct CameraTabButton: View {
+    var bottomPadding: CGFloat
     var action: () -> Void
     var body: some View {
         Button(action: action) {
@@ -129,7 +196,7 @@ struct CameraTabButton: View {
         }
         .buttonStyle(PressScaleButtonStyle(scale: 0.94))
         .accessibilityLabel("카메라")
-        .padding(.bottom, TabBarMetrics.bottom + TabBarMetrics.cameraRaise)
+        .padding(.bottom, bottomPadding)
     }
 }
 

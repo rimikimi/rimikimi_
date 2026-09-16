@@ -11,7 +11,10 @@ import UIKit
 ///   com.rimikimi.app://dev/pushtap?kind=genDone[&galleryId=<id>]  완료 푸시 탭(4주차: galleryId 있으면 정확 매칭)
 ///   com.rimikimi.app://dev/fitsheet?forceOutpaintPhase=running|error  채워 맞춤 진행/에러 상태 강제(캡처용)
 ///   com.rimikimi.app://dev/fitsheet?realOutpaint=1  실제 서버로 채워 맞춤 호출(크레딧 부족 시 크레딧 시트)
-///   com.rimikimi.app://dev/legacymigration[?write=1]  1.x→2.0 로그인 이전 매커니즘 검증(토스트로 결과)
+///   com.rimikimi.app://dev/devsignin                가짜 세션으로 로그인 상태 흉내(캡처용, 실제 OAuth 없음)
+///   com.rimikimi.app://dev/devscrollbottom[?tab=gallery|myPhotos|profile]  탭 루트를 맨 아래로 스크롤된 채로 열기(결함 #4 캡처용)
+///   com.rimikimi.app://dev/legacymigration[?write=1|?reset=1]  1.x→2.0 로그인 이전 매커니즘 검증(토스트로 결과).
+///                                                             reset=1 은 attemptedFlag/ambiguousCount 초기화(재시도 유도).
 @MainActor
 enum DevRoutes {
     /// 처리했으면 true.
@@ -68,6 +71,17 @@ enum DevRoutes {
         case "/guide": app.showGuide = true
         case "/guidedone": app.finishGuide()
         case "/invitecard": app.tab = .gallery; app.galleryPath = []; app.showInviteCard = true
+        case "/devscrollbottom":
+            // 결함 #4 검증 캡처용 — 탭 루트 화면을 처음부터 맨 아래로 스크롤된 상태로 띄운다(터치 자동화 없음).
+            app.devScrollToBottom = true
+            if let name = q["tab"] {
+                switch name {
+                case "gallery": app.tab = .gallery
+                case "myPhotos": app.tab = .myPhotos
+                case "profile": app.tab = .profile
+                default: break
+                }
+            }
         case "/fit", "/fitsheet":
             if url.path == "/fitsheet" { app.devAutoOpenFit = true }
             // 채워 맞춤 진행/에러 상태 캡처용 — 시뮬레이터엔 버튼 탭 자동화가 없어 상태를 직접 세팅한다.
@@ -97,19 +111,44 @@ enum DevRoutes {
             }
         case "/signout":
             app.signOut()
+        case "/devsignin":
+            // build 90 실기기 결함 #3 캡처용 — 실제 OAuth 없이 로그인 상태를 흉내내 "계정" 카드가
+            // 보이는 프로필 화면을 시뮬레이터에서 찍을 수 있게 한다. 서명 없는 가짜 JWT(alg=none).
+            let exp = Int(Date().addingTimeInterval(3600).timeIntervalSince1970)
+            func b64url(_ obj: [String: Any]) -> String {
+                let data = (try? JSONSerialization.data(withJSONObject: obj)) ?? Data()
+                return data.base64EncodedString()
+                    .replacingOccurrences(of: "+", with: "-")
+                    .replacingOccurrences(of: "/", with: "_")
+                    .replacingOccurrences(of: "=", with: "")
+            }
+            let header = b64url(["alg": "none", "typ": "JWT"])
+            let payload = b64url(["sub": "dev-user-0001", "email": "dev@example.com", "exp": exp,
+                                   "user_metadata": ["full_name": "테스트 사용자"],
+                                   "app_metadata": ["provider": "apple"]])
+            if let s = AuthSession.from(accessToken: "\(header).\(payload).", refreshToken: "dev-refresh") {
+                app.auth.devSetSession(s)
+            }
+            installSamplePhoto(app)
         case "/legacymigration":
             // 5주차 — 1.x→2.0 로그인 이전 매커니즘 검증(같은 오리진 영구 WKWebsiteDataStore 왕복).
             // ?write=1 : "쓰기→다시 읽기" 왕복만 검증(시뮬레이터엔 진짜 1.x 데이터가 없어서).
             // 그 외    : 실제 마이그레이션 시도(1.x 데이터 없으면 정상적으로 "없음" 처리).
-            Task {
-                if q["write"] == "1" {
-                    let result = await LegacySessionMigration.debugSeedAndVerify()
-                    AppLog.auth.info("dev.legacymigration.write \(result, privacy: .public)")
-                    app.showToast(result)
-                } else {
-                    let ok = await LegacySessionMigration.attemptOnce()
-                    AppLog.auth.info("dev.legacymigration.attempt ok=\(ok)")
-                    app.showToast(ok ? "이전 성공 — 로그인됨" : "이전 데이터 없음(정상 — 시뮬레이터엔 1.x 데이터가 없음)")
+            if q["reset"] == "1" {
+                LegacySessionMigration.debugResetFlags()
+                AppLog.auth.info("dev.legacymigration.reset")
+                app.showToast("이전 플래그 초기화됨 — 다음 attemptOnce()에서 다시 시도")
+            } else {
+                Task {
+                    if q["write"] == "1" {
+                        let result = await LegacySessionMigration.debugSeedAndVerify()
+                        AppLog.auth.info("dev.legacymigration.write \(result, privacy: .public)")
+                        app.showToast(result)
+                    } else {
+                        let ok = await LegacySessionMigration.attemptOnce()
+                        AppLog.auth.info("dev.legacymigration.attempt ok=\(ok)")
+                        app.showToast(ok ? "이전 성공 — 로그인됨" : "이전 데이터 없음(정상 — 시뮬레이터엔 1.x 데이터가 없음)")
+                    }
                 }
             }
         case "/tab":
