@@ -63,10 +63,11 @@ struct ResultView: View {
                     .disabled(currentImage == nil || saving)
 
                     HStack(spacing: Spacing.s2) {
-                        Button { app.webTool = .init(url: Config.filterToolURL, title: "다듬기") } label: {
+                        Button { if let img = currentImage { app.openEditor(image: img) } } label: {
                             Label("다듬기", systemImage: "slider.horizontal.3")
                         }
                         .buttonStyle(SecondaryButtonStyle())
+                        .disabled(currentImage == nil)
                         if let img = currentImage {
                             ShareLink(item: Image(uiImage: img), preview: SharePreview("rimikimi", image: Image(uiImage: img))) {
                                 Label("공유", systemImage: "square.and.arrow.up")

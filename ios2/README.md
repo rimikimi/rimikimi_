@@ -81,12 +81,83 @@ xcrun simctl launch <UDID> com.rimikimi.app -rimikimi-url "com.rimikimi.app://de
 - **faceRefs / pushToken**: `/api/generate` 에 1.x 와 같이 `faceRefs:[{mimeType,base64,angle:"anchor"}]`(등록 사진, 매직부스 제외) 와 `pushToken` 을 실어 보낸다.
 - 개발 라우트 추가: `dev/store`, `dev/credits?concept=`, `dev/invite`, `dev/profile`, `dev/guide`, `dev/invitecard`, `dev/fit`.
 
-## 자리만 잡은 것(스텁)
+## 3주차 (2026-09-16) — 편집기·카메라 웹뷰 + 네이티브 브리지 + 푸시 탭
 
-- 필터 편집기·카메라: `WKWebView` 로 `https://rimikimi-app.vercel.app/?tool=filter|camera` 를 연다(SPEC §5 1단계). 저장·공유·앨범 브리지 없음. 필터 프리셋 카드는 회색 자리(썸네일 없음).
-- 결제 실구매는 시뮬레이터에서 불가 — UI·에러 경로만 확인. StoreKit 설정 파일(.storekit) 없음.
-- 채워 맞춤(서버 outpaint): 버튼만.
-- 다듬기 버튼: 편집기 웹뷰를 열 뿐 결과 사진을 넘기지 않는다.
+- **웹뷰 = 배포 URL, 로컬 번들 아님**: `ios2/README` 1·2주차 Config 가 이미 `https://rimikimi-app.vercel.app`
+  를 썼고(원격 로드 원칙과 동일), `src/PhotoEditor.jsx`·`src/CameraStudio.jsx` 는 web/iOS/Android 셋이
+  같은 배포 파이프라인을 타야 유지보수가 된다 — 번들에 복사하면 세 곳을 매번 동기화해야 한다. 그대로 이어감.
+- **`src/` 에 새 진입점을 추가했다** — 이번 주 지시는 "대상은 ios2/ 안쪽만"이었지만, 배포된 웹에
+  `?tool=camera|filter` 를 받는 라우팅이 아예 없어서(1·2주차 Config 는 URL만 정해뒀고 웹 쪽 구현은
+  없었다) 웹뷰 임베드 자체가 안 되는 상태였다. 최소 변경으로 새 파일 `src/ToolEntry.jsx` 하나와
+  `src/main.jsx`(분기 3줄), `src/nativeBridge.js`(WKWebView 브릿지 추가), `src/CameraStudio.jsx`
+  (Capacitor 카메라 프리체크를 우리 웹뷰에서는 건너뛰는 조건 1곳)만 건드렸다. **커밋 전에 오너 검토 필요**
+  — 이 변경은 배포되면 web/1.x 앱에도 영향이 미친다(단, `?tool=` 파라미터가 없으면 동작 100% 그대로).
+- **네이티브 브리지** (`ios2/…/UI/Components/WebToolView.swift`): `WKScriptMessageHandler` 이름
+  `rimikimi`. 웹 → 네이티브 `postMessage({id,type,payload})`, 네이티브 → 웹
+  `window.__rimikimiResolve(id,result)`. `saveToAlbum`(PHPhotoLibrary) · `share`
+  (UIActivityViewController) · `close`(dismiss) · `refreshCredits`(`/api/quota` 재조회) · `ready`
+  (핸드셰이크, 응답으로 `window.__rimikimiInit(payload)` 1회 호출 — 결과 화면 "다듬기"가 사진을
+  여기로 실어 보낸다). 카메라 웹뷰는 `WKUIDelegate.requestMediaCapturePermissionFor` 를 자동 `.grant`
+  — 카메라 열기 자체가 이미 로그인 게이트 뒤라 1.x 가 Capacitor 웹뷰에서 하던 것과 같은 이유.
+  웹 쪽 대응은 `src/nativeBridge.js` 의 `isRimikimiWebView()`/`wkCall` — 1.x 가 Capacitor 로 부르던
+  `nativeSaveToAlbum`/`nativeShareImage` 와 반환 모양(`{ok}`/`{error}`)을 맞춰 최소 변경으로 끼워 넣었다.
+- **편집기**: 결과 화면 "다듬기" → `AppState.openEditor(image:)` 가 지금 보고 있는 사진을 base64 로
+  실어 `?tool=filter&mode=edit` 을 연다 → `ToolEntry` 가 `PhotoEditor` 를 그 사진 1장으로 바로 띄운다
+  (사진 선택 화면 생략). 필터 탭 프리셋 → `?tool=filter&mode=pick&preset=` → 표준
+  `<input type=file multiple>` (WKWebView 가 네이티브 사진 피커를 그대로 띄운다, 최대 10장) → 편집기.
+- **카메라**: `?tool=camera` → `CameraStudio` 라이브 필터 뷰파인더 → 셔터 → **즉시 `nativeSaveToAlbum`**
+  → "다듬기 · 공유 · 닫기" 화면(SPEC §3, 1.x 처럼 곧장 편집기로 넘기지 않음 — 이번 주 새 동작).
+  마이크 권한 문구(`NSMicrophoneUsageDescription`)를 `project.yml` 에 추가했다 — **1.x 가 이미 물린
+  함정 그대로**: WKWebView 의 `getUserMedia({audio:false})` 도 iOS 가 마이크 권한을 확인하고, 문구가
+  없으면 앱이 죽는다(1.x TestFlight 크래시 기록, `ios/App/App/Info.plist` 참고). 없었다면 실기기에서
+  카메라 열자마자 크래시였을 것 — 시뮬레이터에선 재현이 안 돼서(위 파일 코멘트대로) 놓치기 쉬운 함정이었다.
+- **완료 푸시 탭 → 결과 화면**: `PushManager` 가 `UNUserNotificationCenterDelegate.didReceive(response:)`
+  를 새로 구현해 `pendingTapKind` 를 세우고, `RootTabView` 가 그걸 지켜보다 `AppState.openLatestGalleryResult()`
+  를 부른다. **한계**: 서버 `api/generate.js` 의 `notifyDone` 이 보내는 알림 payload 는
+  `{kind:"genDone", count}` 뿐 — 이미지/갤러리 id 가 없다(SPEC §0 "서버는 그대로" 라 서버를 못 늘렸다).
+  그래서 "그 결과" 를 정확히 지목하지 못하고 **갤러리 최신 항목**을 연다. 보통 알림이 온 시점엔 그게
+  이번 결과와 같지만, 완전히 정확하려면 서버가 payload 에 galleryId 를 실어야 한다.
+- **개발 라우트 추가**: `dev/tool?kind=camera|filter|edit`(웹뷰 직접 열기 — 시뮬레이터엔 탭바 가운데
+  원/필터 프리셋을 누를 방법이 없다), `dev/pushtap?kind=genDone`(알림 탭 경로를 그대로 태움, 실제
+  배너는 시뮬레이터에서 탭할 수 없다).
+
+### 검증 (시뮬레이터, 실서버 계정) — 2026-09-16
+
+`xcodebuild` 시뮬레이터 빌드 성공. 로컬 `vite dev`(호스트 loopback, ATS 예외 불필요)로 웹 변경을
+실제 코드로 띄워 확인했다 — `-rimikimi-web-base http://127.0.0.1:PORT` 실행 인자(DEBUG 전용, Release
+빌드엔 없음). 스크린샷은 `w3_ios_*.png`.
+
+- **편집기**: `dev/tool?kind=edit` — 결과 사진(e2e 샘플)이 그대로 편집기에 실려 필터 6종·Save/Share 가
+  뜬다(`w3_ios_05_editor.png`). "다듬기 버튼이 사진을 안 넘긴다"던 2주차 한계가 해소됐다.
+- **카메라**: `dev/tool?kind=camera` — 라이브 필터 뷰파인더(시뮬레이터 합성 카메라 피드에 실시간
+  필터가 걸린 채로 보인다), 셔터, 필터 칩 3그룹(`w3_ios_03_camera.png`). `WKUIDelegate` 자동 승인이
+  없었다면 매 실행마다 WebKit 시스템 프롬프트가 떴을 것 — 프롬프트 자체도 1회 별도로 확인했다.
+- **저장 브리지**: `dev/tool?kind=cameraShot`(테스트용 1px 이미지로 "촬영 직후" 경로만 검증 — 시뮬레이터
+  카메라로 실촬영은 못 한다) — `nativeSaveToAlbum` 이 실제 `PHPhotoLibrary` 앨범 추가 권한 프롬프트를
+  띄우고(최초 1회) "앨범에 저장됐어요" 로 이어졌다(`w3_ios_04_shot_result.png`).
+- **완료 푸시 탭 → 결과**: `dev/pushtap` — `PushManager.pendingTapKind` → `RootTabView` → 실제
+  `/api/gallery` 최신 항목("산악 곤돌라 승강장")을 결과 화면으로 열었다(`w3_ios_06_pushtap.png`,
+  실서버 계정 `ios2-e2e@rimikimi.test`).
+- **필터 사진 선택**: `dev/tool?kind=filter&preset=golden` — "사진 선택 (최대 10장)" 화면
+  (`w3_ios_02_filter_picker.png`). 실제 `<input type=file multiple>` 로 넘기는 것까지는 확인, 그 다음
+  편집기 렌더는 "다듬기" 경로(같은 컴포넌트)로 이미 확인했다.
+
+### 확인 못 한 것 / 안 된 것
+
+- **셔터를 실제로 눌러 촬영 → 저장까지 한 번에**: 시뮬레이터엔 UI 자동화(탭 주입) 수단이 없어서
+  (README 1주차 문서 그대로) 셔터 탭은 못 했다. `cameraShot` 더미 경로로 "촬영 직후" 화면 로직만
+  따로 검증했다. 실기기 확인 필요.
+- **공유(공유 시트)**: `UIActivityViewController` 코드는 붙였지만 시뮬레이터에서 시트를 실제로
+  띄우고 앱을 골라 완료 콜백까지 받는 건 확인 못 했다(자동 탭 불가).
+- **`refreshCredits` 브리지**: 코드는 붙였지만(편집기에서 크레딧 변경을 트리거하는 화면이 없어서)
+  실제로 왕복하는 걸 이번 주엔 못 봤다.
+- **실제 알림 배너를 손가락으로 탭하는 경로**: `dev/pushtap` 으로 `PushManager` 델리게이트 이후
+  단계는 확인했지만, "배너가 뜬다 → 사용자가 그걸 탭한다" 자체는 시뮬레이터 UI 자동화가 없어 못 봤다
+  (`xcrun simctl push` 로 배너 전달까지는 가능하나 탭은 별개).
+- **결과 payload 의 정확한 갤러리 id 매칭**: 위에 적었듯 서버 payload 에 id 가 없어 "최신 항목" 으로
+  근사했다 — 사용자가 짧은 시간에 두 개를 만들면 어긋날 수 있다.
+- **필터 탭 프리셋 썸네일**: 여전히 회색 자리(2주차와 동일, 이번 주 범위 아님).
+- 결제 실구매·채워 맞춤(서버 outpaint)은 여전히 2주차와 동일하게 자리만.
 
 ## 명세상 애매한 점 / 확인 필요
 
@@ -100,7 +171,10 @@ xcrun simctl launch <UDID> com.rimikimi.app -rimikimi-url "com.rimikimi.app://de
 ## 다음 주
 
 - RevenueCat + 크레딧 부족 시트 실동작, `api/_lib/iapGrant.js` 이중 지급 방지.
-- 푸시 등록·완료 알림, 첫 실행 가이드, ATT/알림 권한 시점.
-- 편집기·카메라 웹뷰 저장/공유 브리지, 결과 → 다듬기 사진 전달.
+- 실기기에서 셔터 촬영 → 즉시 저장, 공유 시트 완료 콜백, 마이크 권한 프롬프트가 실제로 뜨는지 확인.
+- 서버 `notifyDone` payload 에 galleryId 를 실어 "완료 푸시 탭 → 정확히 그 결과" 로 좁히는 것 검토
+  (지금은 최신 갤러리 항목으로 근사).
+- `src/ToolEntry.jsx`/`nativeBridge.js`/`CameraStudio.jsx` 변경 오너 검토 → 배포(현재 로컬 vite dev 로만
+  검증, 배포 전까지 iOS 앱의 웹뷰는 여전히 구버전 배포본을 받는다).
 - 필터 프리셋 썸네일, 초대 화면, 계정 삭제(`/api/account/delete`).
 - 실기기에서 뒤로 스와이프·탭 전환·시트가 시스템 앱과 구분되지 않는지(완료 기준 1) 확인.

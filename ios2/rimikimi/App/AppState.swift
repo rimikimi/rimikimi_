@@ -1,5 +1,6 @@
 import SwiftUI
 import Observation
+import UIKit
 
 /// 탭 밖에서 공유되는 화면 상태 — 탭 선택, 스택 경로, 로그인 시트, 하던 동작(pending) 재개.
 enum TabID: Hashable { case gallery, filter, camera, myPhotos, profile }
@@ -23,7 +24,7 @@ struct ResultPayload: Hashable, Identifiable {
 /// 로그인 뒤 자동으로 이어갈 동작 (1.x `rimikimi_pending_tool` / `pendingContinue` 와 같은 뜻).
 enum PendingAction {
     case generate(GenerateRequest)
-    case filterPick
+    case filterPick(presetKey: String?)
     case camera
 }
 
@@ -53,7 +54,11 @@ final class AppState {
     var devAutoOpenFit = false
     #endif
 
-    struct WebTool: Identifiable { let id = UUID(); let url: URL; let title: String }
+    struct WebTool: Identifiable {
+        let id = UUID(); let url: URL; let title: String
+        /// 편집기에 실어 보낼 초기 데이터(결과 화면 "다듬기" → 사진 1장). `WebBridgeCoordinator.initialPayload`.
+        var initialPayload: [String: Any]? = nil
+    }
 
     let auth = AuthStore.shared
     let generation = GenerationCoordinator()
@@ -106,11 +111,19 @@ final class AppState {
             // 홈으로 복귀 + 내 사진 진행 카드 (SPEC §3).
             galleryPath.removeAll()
             tab = .myPhotos
-        case .filterPick:
-            webTool = WebTool(url: Config.filterToolURL, title: "필터")
+        case .filterPick(let presetKey):
+            webTool = WebTool(url: Config.filterToolURL(mode: "pick", presetKey: presetKey), title: "필터")
         case .camera:
             webTool = WebTool(url: Config.cameraToolURL, title: "카메라")
         }
+    }
+
+    /// 결과 화면 "다듬기" — 지금 보고 있는 사진을 편집기에 바로 실어 보낸다(사진 선택 화면 생략).
+    func openEditor(image: UIImage) {
+        let data = image.jpegData(compressionQuality: 0.92) ?? Data()
+        let dataUrl = "data:image/jpeg;base64,\(data.base64EncodedString())"
+        webTool = WebTool(url: Config.filterToolURL(mode: "edit"), title: "다듬기",
+                           initialPayload: ["mode": "edit", "src": dataUrl])
     }
 
     /// 생성이 429 로 실패하면 크레딧 시트를 띄우고, 구매 뒤 같은 요청을 이어간다.
@@ -149,6 +162,20 @@ final class AppState {
         let payload = ResultPayload(items: items, conceptId: job?.conceptId, conceptTitle: job?.conceptTitle ?? "")
         tab = .myPhotos
         myPhotosPath = [.result(payload)]
+    }
+
+    /// 완료 푸시 탭 → 결과 화면. 알림 payload 엔 `{kind:"genDone", count}` 뿐이라(서버 `api/generate.js`
+    /// `notifyDone`, 이미지·갤러리 id 없음) 정확히 "그 결과"를 지목할 수 없다 — 서버 payload 를 늘리지
+    /// 않는 한(SPEC §0 "서버는 그대로") 최선은 **완료 직후 갤러리 최신 항목**을 여는 것. 보통 알림이 온
+    /// 시점엔 그게 곧 이번 결과다.
+    func openLatestGalleryResult() {
+        Task {
+            guard let token = await auth.validAccessToken(),
+                  let item = try? await RimikimiAPI.shared.fetchGallery(token: token).first else { return }
+            present([.init(id: item.id, image: nil, url: item.url, expiresAt: item.expiresAt)],
+                    job: .init(conceptId: item.conceptId ?? "", conceptTitle: item.conceptTitle ?? "",
+                               startedAt: item.createdAt ?? Date(), count: 1))
+        }
     }
 
     /// 첫 생성 완료 직후 1회: ATT → 초대 카드.

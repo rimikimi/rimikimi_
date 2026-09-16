@@ -33,12 +33,10 @@ enum DevRoutes {
             }
         case "/result":
             // 갤러리의 최신 항목을 결과 화면으로 연다(자동 표시는 1회뿐이라 캡처용).
-            Task {
-                guard let token = await app.auth.validAccessToken(),
-                      let item = try? await RimikimiAPI.shared.fetchGallery(token: token).first else { return }
-                app.present([.init(id: item.id, image: nil, url: item.url, expiresAt: item.expiresAt)],
-                            job: .init(conceptId: item.conceptId ?? "", conceptTitle: item.conceptTitle ?? "", startedAt: item.createdAt ?? Date(), count: 1))
-            }
+            app.openLatestGalleryResult()
+        case "/pushtap":
+            // 실제 알림 배너는 시뮬레이터에서 탭할 수 없다 — "완료 푸시 탭" 경로(PushManager → RootTabView)를 그대로 태운다.
+            app.push.simulateTap(kind: q["kind"] ?? "genDone")
         case "/store": app.tab = .profile; app.profilePath = [.store]
         case "/invite": app.tab = .profile; app.profilePath = [.invite]
         case "/profile": app.tab = .profile; app.profilePath = []
@@ -48,6 +46,20 @@ enum DevRoutes {
                 app.pendingAfterPurchase = GenerateRequest(concept: c, photo: photo)
             }
             app.creditsSheet = true
+        case "/tool":
+            // 편집기·카메라 웹뷰를 직접 연다(3주차 캡처용) — 시뮬레이터엔 탭바 가운데 원/필터 프리셋을 누를 방법이 없다.
+            switch q["kind"] {
+            case "camera": app.webTool = .init(url: Config.cameraToolURL, title: "카메라")
+            case "cameraShot":
+                // 시뮬레이터엔 실카메라가 없어 셔터를 못 누른다 — "촬영 직후"(즉시 저장 → 다듬기·공유) 화면만 캡처.
+                var c = URLComponents(url: Config.cameraToolURL, resolvingAgainstBaseURL: false)!
+                c.queryItems = (c.queryItems ?? []) + [URLQueryItem(name: "debugShot", value: "1")]
+                app.webTool = .init(url: c.url!, title: "카메라")
+            case "edit":
+                installSamplePhoto(app)
+                if let img = app.userPhoto.image { app.openEditor(image: img) }
+            default: app.webTool = .init(url: Config.filterToolURL(mode: "pick", presetKey: q["preset"]), title: "필터")
+            }
         case "/guide": app.showGuide = true
         case "/guidedone": app.finishGuide()
         case "/invitecard": app.tab = .gallery; app.galleryPath = []; app.showInviteCard = true

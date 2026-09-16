@@ -57,7 +57,7 @@ struct FilterTabView: View {
                     ScrollView(.horizontal) {
                         HStack(spacing: Spacing.s3) {
                             ForEach(g.presets) { p in
-                                Button { app.requireLogin(.filterPick) } label: {
+                                Button { app.requireLogin(.filterPick(presetKey: p.key)) } label: {
                                     VStack(spacing: Spacing.s2) {
                                         RoundedRectangle(cornerRadius: Radius.card, style: .continuous)
                                             .fill(Color.fill)

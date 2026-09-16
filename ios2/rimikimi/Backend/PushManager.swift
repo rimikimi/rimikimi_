@@ -18,6 +18,8 @@ final class PushManager: NSObject {
     private(set) var authorization: UNAuthorizationStatus = .notDetermined
     /// 사용자가 켠 "새 컨셉 알림" — UserDefaults.
     private(set) var newConceptAlerts: Bool = UserDefaults.standard.bool(forKey: "push.newConcept.v1")
+    /// 알림을 탭해서 앱이 열렸을 때의 `data.kind`("genDone" 등). `RootTabView` 가 지켜보다 결과 화면을 연다.
+    private(set) var pendingTapKind: String?
 
     private var configured = false
 
@@ -67,6 +69,14 @@ final class PushManager: NSObject {
         UNUserNotificationCenter.current().setBadgeCount(0)
     }
 
+    /// `RootTabView.onChange` 가 처리한 뒤 되돌린다.
+    func clearTapKind() { pendingTapKind = nil }
+
+    #if DEBUG
+    /// 시뮬레이터엔 알림 배너를 탭할 방법이 없다 — dev 라우트가 이 경로를 대신 태운다.
+    func simulateTap(kind: String) { pendingTapKind = kind }
+    #endif
+
     // MARK: AppDelegate 브리지
 
     func didRegister(deviceToken: Data) {
@@ -92,5 +102,14 @@ extension PushManager: UNUserNotificationCenterDelegate {
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
                                             willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
         [.banner, .list, .sound]
+    }
+
+    /// 알림 탭(포그라운드/백그라운드/콜드 스타트 전부 이 한 델리게이트로 온다).
+    /// "생성 완료" 알림(`api/generate.js` notifyDone, `data.kind == "genDone"`)만 결과 화면으로 연다.
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                            didReceive response: UNNotificationResponse) async {
+        let kind = response.notification.request.content.userInfo["kind"] as? String
+        guard let kind else { return }
+        await MainActor.run { PushManager.shared.pendingTapKind = kind }
     }
 }

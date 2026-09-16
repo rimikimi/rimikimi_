@@ -68,6 +68,9 @@ targets:
         # 1.x 와 같은 문구 (사진 접근에 편집 용도 반영, 1.40).
         NSPhotoLibraryAddUsageDescription: "만든 사진과 편집한 사진을 앨범에 저장하기 위해 사용합니다."
         NSCameraUsageDescription: "필터를 보면서 사진을 찍기 위해 카메라를 사용합니다."
+        # WKWebView 의 getUserMedia 는 audio:false 로 요청해도 iOS 가 마이크 권한 문구를 확인한다
+        # (1.x 가 이미 물린 함정 — ios/App/App/Info.plist 참고). 없으면 카메라 웹뷰가 크래시/거부된다.
+        NSMicrophoneUsageDescription: "필터 카메라를 열 때 iOS가 확인하는 항목이에요. 리미키미는 소리를 녹음하지 않아요."
         # ATT — 실행 시가 아니라 첫 생성 완료 후 1회(TrackingPrompt). 문구는 1.x 와 동일.
         NSUserTrackingUsageDescription: "맞춤형 광고를 제공하기 위해 사용돼요."
         # 원격 푸시(FCM). APNs 토큰은 AppDelegate 가 Messaging 에 직접 넘긴다(스위즐링 끔).

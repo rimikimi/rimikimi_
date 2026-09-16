@@ -68,6 +68,12 @@ struct RootTabView: View {
         .onChange(of: app.generation.state) { _, s in
             if case .failed = s { app.handleGenerationFailure() }
         }
+        // 완료 푸시 탭 → 결과 화면 직행(4주차).
+        .onChange(of: app.push.pendingTapKind) { _, kind in
+            guard let kind else { return }
+            app.push.clearTapKind()
+            if kind == "genDone" { app.openLatestGalleryResult() }
+        }
         .sheet(isPresented: $app.loginSheet) {
             LoginSheet(message: app.loginMessage)
                 .presentationDetents([.medium, .large])
@@ -79,7 +85,7 @@ struct RootTabView: View {
                 .presentationCornerRadius(Radius.sheet)
         }
         .fullScreenCover(item: $app.webTool) { tool in
-            WebToolScreen(url: tool.url, title: tool.title)
+            WebToolScreen(url: tool.url, title: tool.title, initialPayload: tool.initialPayload)
         }
         .toast($app.toast)
     }

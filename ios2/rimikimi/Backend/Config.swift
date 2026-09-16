@@ -16,9 +16,38 @@ enum Config {
         c.queryItems = [URLQueryItem(name: "redirectTo", value: oauthRedirect)]
         return c.url!
     }
-    /// 편집기·카메라 1단계(웹뷰 임베드, SPEC §5).
-    static let filterToolURL = URL(string: "https://rimikimi-app.vercel.app/?tool=filter")!
-    static let cameraToolURL = URL(string: "https://rimikimi-app.vercel.app/?tool=camera")!
+    /// 편집기·카메라 1단계(웹뷰 임베드, SPEC §5) — 배포된 웹(`https://rimikimi-app.vercel.app`)을 그대로 연다.
+    /// 로컬 번들이 아니라 배포 URL 을 쓰는 이유: 이미 1주차 Config 가 이렇게 정했고(원격 로드 원칙과 동일),
+    /// `src/PhotoEditor.jsx`·`src/CameraStudio.jsx` 는 웹 배포 파이프라인 하나로 web/iOS/Android 세 곳이
+    /// 같이 갱신된다 — 번들에 복사하면 그 셋을 매번 따로 동기화해야 한다.
+    #if DEBUG
+    /// 로컬 `vite dev` 로 미검증 웹 변경을 시뮬레이터에서 확인할 때만 쓴다.
+    /// `-rimikimi-web-base http://127.0.0.1:5173` 실행 인자로 넘긴다. Release 빌드엔 없다.
+    static let webToolBaseOverride: URL? = {
+        let args = ProcessInfo.processInfo.arguments
+        if let i = args.firstIndex(of: "-rimikimi-web-base"), i + 1 < args.count { return URL(string: args[i + 1]) }
+        return nil
+    }()
+    #endif
+    static var webToolBase: URL {
+        #if DEBUG
+        if let o = webToolBaseOverride { return o }
+        #endif
+        return apiBase
+    }
+    /// mode: "pick"(필터 프리셋 → 사진 최대 10장 → 편집기) · "edit"(결과 화면 "다듬기", 사진 1장 바로 편집).
+    static func filterToolURL(mode: String, presetKey: String? = nil) -> URL {
+        var c = URLComponents(url: webToolBase, resolvingAgainstBaseURL: false)!
+        var items = [URLQueryItem(name: "tool", value: "filter"), URLQueryItem(name: "mode", value: mode)]
+        if let presetKey { items.append(URLQueryItem(name: "preset", value: presetKey)) }
+        c.queryItems = items
+        return c.url!
+    }
+    static var cameraToolURL: URL {
+        var c = URLComponents(url: webToolBase, resolvingAgainstBaseURL: false)!
+        c.queryItems = [URLQueryItem(name: "tool", value: "camera")]
+        return c.url!
+    }
 
     /// RevenueCat Apple 공개 SDK 키(`VITE_RC_IOS_KEY`, 클라이언트 노출용). 비어 있으면 스토어는 자리만 보여 준다.
     static let revenueCatIOSKey = "appl_apQGEEGcMgFjBaHTxGCvrSTgbux"
