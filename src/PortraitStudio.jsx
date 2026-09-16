@@ -740,12 +740,13 @@ function TabIcon({ name, active }) {
 // 탭이 3개면 가운데가 안 맞아서(2|1) "필터" 탭을 하나 더 두어 2|2 로 정중앙을 잡았다.
 // 필터 탭은 별도 화면이 아니라 갤러리의 필터 카테고리로 간다(카메라 옆에 있는 게 자연스럽다).
 function BottomNav({ screen, go, onCamera, filterActive = false }) {
+  // 순서: 갤러리 · 필터 · [카메라] · 내 사진 · 프로필 (오너 지시 2026-09-16 — 내 사진↔필터 자리 교체)
   const left = [
     { key: "gallery", label: "갤러리", match: ["gallery", "home", "confirm", "result"] },
-    { key: "mygallery", label: "내 사진", match: ["mygallery"] },
+    { key: "filter", label: "필터", match: [] },
   ];
   const right = [
-    { key: "filter", label: "필터", match: [] },
+    { key: "mygallery", label: "내 사진", match: ["mygallery"] },
     { key: "profile", label: "프로필", match: ["profile", "store"] },
   ];
   const btn = (tb) => {
