@@ -229,6 +229,9 @@ const SUB_IDS = SUB_PLANS.map((p) => p.id);
 
 const FREE_DAILY = 1;
 
+// 푸시된(스택) 화면 — 탭바를 숨기고 상단 바에 뒤로가기를 둔다.
+const PUSHED_SCREENS = ["confirm", "result", "store"];
+
 /* 로고에서 추출한 브랜드 컬러 */
 const HEARTS = ["#e6403c", "#f9c83c", "#60c9de", "#8a5da7"];
 
@@ -742,7 +745,7 @@ function TabIcon({ name, active }) {
 function BottomNav({ screen, go, onCamera, filterActive = false }) {
   // 순서: 갤러리 · 필터 · [카메라] · 내 사진 · 프로필 (오너 지시 2026-09-16 — 내 사진↔필터 자리 교체)
   const left = [
-    { key: "gallery", label: "갤러리", match: ["gallery", "home", "confirm", "result"] },
+    { key: "gallery", label: "갤러리", match: ["gallery", "confirm", "result"] },
     { key: "filter", label: "필터", match: [] },
   ];
   const right = [
@@ -800,7 +803,11 @@ export default function PortraitStudio() {
   const screenRef = useRef("gallery");
   const navDirRef = useRef("fwd");
   const lastDirRef = useRef("fwd");
+  // 2.0: STEP 02(사진 업로드 "home") 화면은 없다. 옛 경로가 "home" 을 요청하면
+  // 컨셉이 있으면 옵션 화면(confirm), 없으면 갤러리로 보낸다 — 코드 경로는 그대로 살아있다.
+  const selectedRef = useRef(null);
   const setScreen = useCallback((next) => {
+    if (next === "home") next = selectedRef.current ? "confirm" : "gallery";
     const cur = screenRef.current;
     if (next === cur) return;
     const dir = navDirRef.current;
@@ -852,6 +859,7 @@ export default function PortraitStudio() {
   const [batchCount, setBatchCount] = useState(1);
   const [resultBatch, setResultBatch] = useState(null);
   const [selected, setSelected] = useState(null);
+  selectedRef.current = selected;
   // 화면 전환 방향. 실제 재생은 navDirRef 를 읽는 setScreen 이 하고,
   // 이 state 는 data-navdir 속성(스타일 훅)만 담당한다.
   const [navDir, _setNavDir] = useState("fwd");
@@ -860,6 +868,11 @@ export default function PortraitStudio() {
   // 로그인 시트 — 비로그인으로 컨셉·사진까지 고르고 "다음"을 누른 순간 뜬다.
   // 그 전(둘러보기·컨셉 선택·사진 업로드)까진 비로그인으로 전부 가능.
   const [showLoginSheet, setShowLoginSheet] = useState(false);
+  // 크레딧 부족 → 토스트 대신 시트(팩·구독·초대). §3 크레딧 부족.
+  const [showCreditSheet, setShowCreditSheet] = useState(false);
+  // 로그인 뒤 "만들기" 를 자동으로 이어 누른다(하던 동작 재개)
+  const autoGenRef = useRef(false);
+  const startGenRef = useRef(() => {});
   // null=닫힘 | "intro"=첫 실행 3장 | "photo"=사진 가이드만
   const [guideMode, setGuideMode] = useState(null);
   const swipeRef = useRef(null); // 왼쪽 엣지 스와이프 추적
@@ -1318,7 +1331,7 @@ export default function PortraitStudio() {
   async function handleLogout() {
     await supabase.auth.signOut();
     // 메인 화면 상태 초기화
-    setScreen("home");
+    setScreen("gallery");
     setPhoto(null);
     setPartnerPhoto(null); // 상대 사진도 남기지 않는다
     setSelected(null);
@@ -1338,7 +1351,7 @@ export default function PortraitStudio() {
       // 로컬 사진/상태 정리 후 로그아웃
       try { localStorage.clear(); } catch (_) {}
       await supabase.auth.signOut();
-      setScreen("home");
+      setScreen("gallery");
       setPhoto(null);
       setSelected(null);
       setResultImage(null);
@@ -1636,21 +1649,9 @@ export default function PortraitStudio() {
       isArtConcept(p) !== isArtConcept(selected) ||
       isCoupleConcept(p) !== isCoupleConcept(selected)
     ) setAgeConfirmed(false);
-    // 로그인돼 있고 프로필 사진이 이미 등록돼 있으면 STEP 02(사진 업로드)를 건너뛰고
-    // 바로 STEP 03(옵션)으로 간다(오너 지시 2026-09-17). 두 번째 생성부터 STEP 02 는
-    // 아무것도 안 하는 화면이었다. 사진이 따로 필요한 컨셉(매직 부스 일회용 사진, 커플 상대 사진,
-    // 드레스룸 의상)은 그대로 STEP 02 로 — 거기서 받는다.
-    const plain = !isArtConcept(p) && !isCoupleConcept(p) && !isDressroom(p);
-    if (session && plain && photo) {
-      setScreen("confirm");
-      return;
-    }
-    if (session && plain && !photo) {
-      // 사진이 없으면 STEP 02 로 보내되, 왜 왔는지 알려준다
-      setPayToast(t("home.needPhoto"));
-      setTimeout(() => setPayToast(""), 2600);
-    }
-    setScreen("home"); // 컨셉 선택 후 사진 업로드 화면으로
+    // 2.0: 컨셉 카드 → 옵션 화면으로 바로. 사진(프로필/일회용/상대/의상)은 옵션 화면 안 슬롯에서 받는다.
+    // 로그인은 여기서 묻지 않는다 — '만들기' 를 누를 때(startGenerate) 묻는다.
+    setScreen("confirm");
   }
 
   // ── 확인화면에서 좌우로 넘겨 다른 컨셉 보기 ──
@@ -1689,16 +1690,9 @@ export default function PortraitStudio() {
     //    밖에서 처음 들어올 때(pickPrompt)는 그대로 비운다 — 일회용 사진 원칙 유지.
     if (isArtConcept(next) && !isArtConcept(selected)) setArtPhoto(null);
 
-    // ⚠️ 매직 부스는 photo(프로필 사진)가 아니라 artPhoto 를 쓴다. 예전 조건은
-    //    두 슬롯을 구분하지 않아 매직 부스인데 프로필 사진 유무를 보고 있었다.
-    const needsPhoto = isArtConcept(next)
-      ? !artPhoto                                        // 변환할 사진이 없을 때만
-      : (!photo ||                                       // 본인 사진 없음
-         (isCoupleConcept(next) && !partnerPhoto));      // 상대 사진 없음
-
+    // 2.0: 사진이 부족해도 옵션 화면에 머문다 — 슬롯이 옵션 화면 안에 있다.
     setNavDir("fwd");
     setSelected(next);
-    if (consentChanged || needsPhoto) setScreen("home");
     return true;
   }
 
@@ -1727,13 +1721,11 @@ export default function PortraitStudio() {
   // 넘어가는 이 시점에만 로그인을 요구한다. 이미 여기까지 온 사용자는 컨셉·사진을 다
   // 골라둔 상태이므로, 로그인 왕복에서 그걸 잃지 않도록 남겨두고 로그인 성공 시
   // 첫 화면이 아니라 바로 옵션 화면(confirm)으로 이어서 보낸다(아래 복원 effect).
-  function handleContinueFromHome() {
-    if (session) {
-      setNavDir("fwd");
-      setScreen("confirm");
-      return;
-    }
-    if (!selected) return; // 방어적 — home 화면은 항상 selected 와 함께 온다
+  // 2.0: 로그인 게이트는 '만들기' 버튼이다(§3). 컨셉·사진·옵션을 다 고른 상태를 남겨두고,
+  // 로그인 성공 시 옵션 화면으로 복귀한 뒤 '만들기' 를 자동으로 이어 누른다(하던 동작 재개).
+  function requireLoginForGenerate() {
+    if (session) return true;
+    if (!selected) return false;
     const needArt = isArtConcept(selected) && !isDressroom(selected);
     writePendingContinue({
       savedAt: Date.now(),
@@ -1741,11 +1733,11 @@ export default function PortraitStudio() {
       conceptTitle: selected.title || "",
       conceptText: selected.text || "",
       needArt,
-      // profile/partner 사진은 이미 rimikimi_photo / rimikimi_partner_photo 로 저장돼 살아남는다.
-      // art 사진(매직부스)만 원래 휘발성이라 로그인 왕복에서 유일하게 사라질 수 있어 같이 담아둔다.
       artPhoto: needArt ? artPhoto : null,
+      autoGenerate: true,
     });
     setShowLoginSheet(true);
+    return false;
   }
 
   function closeLoginSheet() {
@@ -1786,7 +1778,18 @@ export default function PortraitStudio() {
     setShowLoginSheet(false);
     setNavDir("fwd");
     setScreen("confirm");
+    if (pc.autoGenerate) autoGenRef.current = true;
   }, [session, conceptsLoading, concepts]);
+
+  // 로그인 복귀 후 옵션 화면이 실제로 그려진 다음 '만들기' 를 이어 누른다.
+  // quota(크레딧) 응답을 기다렸다가 누른다 — 안 그러면 잔액 0 으로 보고 크레딧 시트가 뜬다.
+  useEffect(() => {
+    if (!autoGenRef.current) return;
+    if (screen !== "confirm" || !selected || !session || !quotaLoaded) return;
+    autoGenRef.current = false;
+    const id = setTimeout(() => startGenRef.current(), 250);
+    return () => clearTimeout(id);
+  }, [screen, selected, session, quotaLoaded]);
 
   // 스토어는 어느 화면에서든 열 수 있다(헤더 크레딧 칩·확인화면·결과화면·프로필).
   // "왔던 화면"을 기억해 두지 않으면 뒤로가기가 무조건 confirm 으로 가버려서,
@@ -1800,9 +1803,7 @@ export default function PortraitStudio() {
 
   // 뒤로가기 목적지만 계산 (엣지 스와이프가 시작 시점에 "뒤에 깔 화면"을 알아야 한다)
   function backTarget() {
-    if (screen === "confirm") return "home";
-    if (screen === "home" || screen === "result" || screen === "profile") return "gallery";
-    if (screen === "mygallery") return "profile";
+    if (screen === "confirm" || screen === "result") return "gallery";
     if (screen === "store") {
       const from = storeFromRef.current;
       if (from && from !== "store" && (from !== "confirm" || selected)) return from;
@@ -1814,11 +1815,8 @@ export default function PortraitStudio() {
   // ── 화면별 뒤로가기 목적지 (뒤로가기 애니메이션 방향도 설정) ──
   function goBack() {
     setNavDir("back");
-    if (screen === "confirm") setScreen("home");
-    else if (screen === "home") { setSelected(null); setScreen("gallery"); }
+    if (screen === "confirm") { setSelected(null); setScreen("gallery"); }
     else if (screen === "result") { setSelected(null); setScreen("gallery"); }
-    else if (screen === "profile") setScreen("gallery");
-    else if (screen === "mygallery") setScreen("profile");
     else if (screen === "store") {
       const from = storeFromRef.current;
       storeFromRef.current = null;
@@ -1840,7 +1838,7 @@ export default function PortraitStudio() {
   //   4) touchcancel 처리가 없어 제스처가 취소되면 상태가 남음
   // → 컨테이너 기준 좌표 + 끄는 동안 실시간 추종 + 거리/속도 판정으로 다시 짬.
   function canSwipeBack() {
-    return !showBrooklyn && !showLoginSheet && screen !== "gallery";
+    return !showBrooklyn && !showLoginSheet && !showCreditSheet && !TAB_ORDER.includes(screen);
   }
 
   // 하단 탭 순서 — 좌우 스와이프로 이 순서를 오간다 (갤러리 ↔ 내 사진 ↔ 프로필)
@@ -1903,7 +1901,7 @@ export default function PortraitStudio() {
 
   function onTouchStartRoot(e) {
     swipeRef.current = null;
-    if (showBrooklyn || showLoginSheet) return;
+    if (showBrooklyn || showLoginSheet || showCreditSheet) return;
     // 모달(사진 편집기 등)이 떠 있으면 뒤로가기·탭 전환 스와이프를 받지 않는다.
     // 안 그러면 편집기 안에서 필터 칩을 옆으로 넘길 때 화면 전체가 밀린다.
     if (document.body.dataset.modalOpen) return;
@@ -2032,6 +2030,7 @@ export default function PortraitStudio() {
   backRef.current = () => {
     if (showBrooklyn) { setShowBrooklyn(false); return "handled"; }
     if (showLoginSheet) { closeLoginSheet(); return "handled"; }
+    if (showCreditSheet) { setShowCreditSheet(false); return "handled"; }
     return goBack() ? "handled" : "exit";
   };
   useEffect(() => {
@@ -2072,37 +2071,33 @@ export default function PortraitStudio() {
   }, [screen, navDir]);
 
   async function startGenerate() {
-    // 사진부터 확인 — 스토어 화면을 거쳐 돌아오면 사진 없이 confirm 에 설 수 있다.
-    // (그대로 두면 스피너 → 네트워크 왕복 → 에러라서 "왜 안 되지" 가 된다)
+    if (!selected || generating) return;
+    // 사진부터 확인 — 2.0 은 사진 슬롯이 옵션 화면 안에 있으므로 화면을 옮기지 않고 안내만 한다.
     const needArt = isArtConcept(selected) && !isDressroom(selected);
     if (!(needArt ? artPhoto : photo)) {
-      setScreen("home");
       setPayToast(needArt ? "먼저 변환할 사진을 올려주세요 🙂" : "먼저 사진을 올려주세요 🙂");
       setTimeout(() => setPayToast(""), 3000);
       return;
     }
     // 드레스룸은 의상이 최소 1장 있어야 생성된다
     if (isDressroom(selected) && garmentPhotos.length === 0) {
-      setScreen("home");
       setPayToast(t("dress.needGarment"));
       setTimeout(() => setPayToast(""), 3000);
       return;
     }
     // 커플 컨셉은 두 사람 사진이 다 있어야 생성된다
     if (isCoupleConcept(selected) && !partnerPhoto) {
-      setScreen("home");
       setPayToast(t("couple.needPartner"));
       setTimeout(() => setPayToast(""), 3000);
       return;
     }
 
+    // 로그인은 여기(만들기)에서만 묻는다 — §3. 로그인 후 자동 재개.
+    if (!requireLoginForGenerate()) return;
+
+    // 크레딧 부족 → 시트(팩 3 · 구독 1 · 초대). 구매/초대 후 같은 화면에서 다시 만들기.
     if (!canGenerate) {
-      if (PAYMENTS_ENABLED) {
-        openStore();
-      } else {
-        setPayToast("오늘 무료 횟수를 다 썼어요. 친구를 초대하면 크레딧을 받을 수 있어요 🙂");
-        setTimeout(() => setPayToast(""), 3500);
-      }
+      setShowCreditSheet(true);
       return;
     }
 
@@ -2115,8 +2110,7 @@ export default function PortraitStudio() {
       //    나노바나나 프로는 한 장에 N분할을 일관되게 그린다 → 크레딧도 1장.
       const available = unlimited ? Infinity : freeLeft + credits;
       if (available < 1) {
-        setPayToast("오늘 무료 횟수를 다 썼어요 🙂");
-        setTimeout(() => setPayToast(""), 3500);
+        setShowCreditSheet(true);
         return;
       }
       setGenError(null);
@@ -2126,7 +2120,8 @@ export default function PortraitStudio() {
       setCanTryPro(false); // 인생네컷은 Pro 비교 미제공 (스트립이라)
       setResultGalleryId(null);
       setGenerating(true);
-      setScreen("result");
+      // 2.0: 만들기 → 갤러리로 복귀 + 내 사진 진행 카드. 완료되면 결과 화면으로 민다.
+      popTo("gallery");
       setFourcutProgress(String(fourcutCount));
       writePendingGen({ startedAt: Date.now(), conceptId: selected.id, conceptTitle: selected.title });
       try {
@@ -2140,6 +2135,8 @@ export default function PortraitStudio() {
         });
         setResultImage(r.imageDataUrl);
         setResultGalleryId(r.galleryId || null);
+        setNavDir("fwd");
+        setScreen("result");
         // 서버가 스트립을 그대로 갤러리에 저장했다 — 별도 업로드/컷 정리가 필요 없다.
         if (r.galleryId && r.galleryExpiresAt) {
           syncExpiryNotifications(
@@ -2155,9 +2152,7 @@ export default function PortraitStudio() {
         notifyGenDoneNow(1, localizedTitle(selected));
         track("generate", { engine: r.engine || null, concept: selected?.id ?? null });
         noteGeneration();
-        // 결과가 나온 지금이 알림을 물어볼 자리다 — 다음 컨셉 알림도, 생성 완료
-        // 알림도 여기서 처음 "필요하다"고 느낀다.
-        setupNotifications(true);
+        // 2.0: 알림 권한은 프로필의 "새 컨셉 알림 켜기" 에서만 묻는다(§3 첫 실행 팝업 0개).
         if (r.busyFallback) {
           setPayToast(t("engine.busyFallback"));
           setTimeout(() => setPayToast(""), 4500);
@@ -2171,6 +2166,8 @@ export default function PortraitStudio() {
           if (typeof err.quotaUsed === "number") setFreeUsed(err.quotaUsed);
           setGenError(err.message || "인생네컷 생성에 실패했어요.");
           clearPendingGen();
+          setNavDir("fwd");
+          setScreen("result");
         }
         cancelGenDoneNotice();
       } finally {
@@ -2189,7 +2186,8 @@ export default function PortraitStudio() {
     setCanTryPro(false);
     setResultGalleryId(null);
     setGenerating(true);
-    setScreen("result");
+    // 2.0: 만들기 → 갤러리로 복귀 + 내 사진 진행 카드(§3). 완료되면 결과 화면으로 민다.
+    popTo("gallery");
     // 백그라운드 복구용 마커 (생성 중 앱이 얼거나 요청이 끊겨도 결과를 되찾음)
     writePendingGen({ startedAt: Date.now(), conceptId: selected.id, conceptTitle: selected.title });
 
@@ -2235,9 +2233,11 @@ export default function PortraitStudio() {
       setResultImage(result.imageDataUrl);
       setResultBatch(result.batch || null);
       setResultGalleryId(result.galleryId || null); // 저장 시 원본(2K) 받으려고 보관
+      setNavDir("fwd");
+      setScreen("result");
       track("generate", { engine: result.engine || null, concept: selected?.id ?? null });
       noteGeneration(); // 리뷰 요청 조건(생성 2장 이상) 카운트만 올림 — 여기선 묻지 않음
-      setupNotifications(true); // 결과를 본 지금이 알림 권한을 물어볼 자리
+      // 2.0: 알림 권한은 프로필의 "새 컨셉 알림 켜기" 에서만 묻는다.
 
       // 방금 생성이 무료(기본 엔진)이고 무료 Pro 체험이 남아있으면 비교 CTA 노출
       setCanTryPro(result.engine === "base" && !!result.proSampleAvailable);
@@ -2280,6 +2280,8 @@ export default function PortraitStudio() {
         // 서버가 한도 정보를 같이 줬으면 화면 카운터도 반영
         if (typeof err.quotaUsed === "number") setFreeUsed(err.quotaUsed);
         setGenError(err.message || "이미지 생성에 실패했어요.");
+        setNavDir("fwd");
+        setScreen("result");
         // 실패로 확정 — 마커를 남겨두면 이후 앱 복귀마다 갤러리를 헛되이 조회한다
         clearPendingGen();
         // ⚠️ 실패했는데 "완성됐어요" 알림이 뜨면 안 된다
@@ -2289,6 +2291,22 @@ export default function PortraitStudio() {
       setGenerating(false);
       setGenWaiting(false);
     }
+  }
+
+  startGenRef.current = startGenerate;
+
+  // 결과 화면 "비슷한 컨셉" — 같은 카테고리의 다른 컨셉으로 옵션 화면을 연다.
+  function pickSimilar() {
+    if (!selected) { popTo("gallery"); return; }
+    const cats = selected.categories || (selected.category ? [selected.category] : []);
+    const pool = visiblePool.filter((p) =>
+      p.id !== selected.id && !isIdPhoto(p) &&
+      (p.categories || (p.category ? [p.category] : [])).some((c) => cats.includes(c))
+    );
+    if (!pool.length) { popTo("gallery"); return; }
+    const next = pool[Math.floor(Math.random() * pool.length)];
+    setResultImage(null); setResultBatch(null); setGenError(null);
+    pickPrompt(next);
   }
 
   // 결과화면: "같은 사진을 Pro로 무료 1회" — 동일 입력을 Pro 엔진으로 재생성해 비교.
@@ -2444,6 +2462,51 @@ export default function PortraitStudio() {
     ).then(addGarments).catch(() => {});
   }
 
+  // 헤더/옵션 화면 크레딧 칩 문구
+  const creditLabel = unlimited
+    ? t("header.unlimited")
+    : blocked
+    ? t("header.blocked")
+    : t("header.beta", { used: freeLeft, limit: freeLimit }) + (credits > 0 ? t("header.credits", { credits }) : "");
+
+  // 앨범 저장(카메라 즉시 저장·결과 공용): 네이티브는 사진첩, 웹은 다운로드
+  async function saveDataUrlToAlbum(dataUrl, filename = "rimikimi_camera") {
+    if (isNative()) {
+      const r = await nativeSaveToAlbum(dataUrl, filename);
+      return !!r?.ok;
+    }
+    try {
+      const a = document.createElement("a");
+      a.href = dataUrl;
+      a.download = filename + (/^data:image\/jpe?g/i.test(dataUrl) ? ".jpg" : ".png");
+      document.body.appendChild(a); a.click(); a.remove();
+      return true;
+    } catch (_) { return false; }
+  }
+
+  // 새 컨셉 알림 토글(프로필) — 권한 팝업은 여기서만 뜬다(§3).
+  const [notifyOn, setNotifyOn] = useState(() => {
+    try { return localStorage.getItem("rimikimi_notify_pref") === "1" || getNotifyPermState() === "granted"; } catch (_) { return false; }
+  });
+  async function toggleNotify() {
+    const next = !notifyOn;
+    if (next) {
+      if (isNative()) {
+        await setupNotifications(true);
+      } else if (typeof Notification !== "undefined" && Notification.requestPermission) {
+        try { await Notification.requestPermission(); } catch (_) {}
+      }
+      const st = getNotifyPermState();
+      if (st === "denied") {
+        setPayToast(t("profile.notify.denied"));
+        setTimeout(() => setPayToast(""), 3500);
+        return;
+      }
+    }
+    setNotifyOn(next);
+    try { localStorage.setItem("rimikimi_notify_pref", next ? "1" : "0"); } catch (_) {}
+  }
+
   // 스플래시는 부팅 타이머 + 세션 확인이 끝날 때까지 유지 (빈 화면 깜빡임 방지)
   // ⚠️ 로그인은 게이트가 아니다 — 세션이 없어도(비로그인) 여기서 그냥 앱을 그린다.
   //    둘러보기·컨셉 선택·사진 업로드는 전부 비로그인으로 가능하고, 로그인은
@@ -2471,41 +2534,6 @@ export default function PortraitStudio() {
         style={{ display: "none" }}
       />
 
-      <header style={S.header}>
-        <button
-          style={S.logoBtn}
-          onClick={() => popTo("gallery")}
-          aria-label="홈"
-        >
-          <Logo height={35} />
-        </button>
-        <div style={S.headerRight}>
-          <button
-            style={{ ...S.creditChip, visibility: quotaLoaded ? "visible" : "hidden" }}
-            onClick={PAYMENTS_ENABLED ? openStore : shareInvite}
-          >
-            <span style={S.creditDot} />
-            {unlimited
-              ? t("header.unlimited")
-              : blocked
-              ? t("header.blocked")
-              : t("header.beta", { used: freeLeft, limit: freeLimit }) + (credits > 0 ? t("header.credits", { credits }) : "")}
-          </button>
-          <button
-            style={S.profileBtn}
-            onClick={() => setScreen("profile")}
-            aria-label="프로필"
-            title="프로필"
-          >
-            {photo ? (
-              <img src={photo} alt="프로필" style={S.profileBtnImg} />
-            ) : (
-              <span style={S.profileBtnPlaceholder}>👤</span>
-            )}
-          </button>
-        </div>
-      </header>
-
       {payToast && (
         <div style={S.payToast} onClick={() => setPayToast("")}>
           {payToast}
@@ -2515,40 +2543,42 @@ export default function PortraitStudio() {
       {/* data-navdir: 마지막 화면 전환의 방향 — "tab" 이면 CSS 가 .fade 를 150ms 불투명도로 줄인다.
           navDirRef 는 setScreen 안에서 즉시 "fwd" 로 리셋되므로 lastDirRef 를 읽어야 한다. */}
       <main style={S.main} ref={mainRef} data-navdir={lastDirRef.current}>
-        {screen === "home" && (() => {
-          const art = isArtConcept(selected) && !isDressroom(selected);
-          const dress = isDressroom(selected);
-          const couple = isCoupleConcept(selected);
-          const currentPhoto = art ? artPhoto : photo;
-          const onPickAny = () => pickPhoto(art ? "art" : "profile");
-          const onClearAny = () => {
-            if (art) setArtPhoto(null);
-            else setPhoto(null);
-          };
-          return (
-            <HomeScreen
-              onOpenGuide={() => setGuideMode("photo")}
-              isArt={art}
-              isDress={dress}
-              garmentPhotos={garmentPhotos}
-              onPickGarments={pickGarments}
-              onRemoveGarment={removeGarmentAt}
-              isCouple={couple}
-              photo={currentPhoto}
-              onPick={onPickAny}
-              onClear={onClearAny}
-              partnerPhoto={partnerPhoto}
-              onPickPartner={() => pickPhoto("partner")}
-              ageConfirmed={ageConfirmed}
-              setAgeConfirmed={setAgeConfirmed}
-              onContinue={handleContinueFromHome}
-              onBack={() => popTo("gallery")}
-              showAds={showAds}
-            />
-          );
-        })()}
         {screen === "gallery" && (
           <GalleryScreen
+            header={
+              <div style={S.header}>
+                <Logo height={35} />
+                <div style={S.headerRight}>
+                  <button
+                    style={{ ...S.creditChip, visibility: quotaLoaded ? "visible" : "hidden" }}
+                    onClick={PAYMENTS_ENABLED ? openStore : shareInvite}
+                  >
+                    <span style={S.creditDot} />
+                    {creditLabel}
+                  </button>
+                  <button
+                    style={S.profileBtn}
+                    onClick={() => goTab("profile")}
+                    aria-label="프로필"
+                    title="프로필"
+                  >
+                    {photo ? (
+                      <img src={photo} alt="프로필" style={S.profileBtnImg} />
+                    ) : (
+                      <span style={S.profileBtnPlaceholder}>👤</span>
+                    )}
+                  </button>
+                </div>
+              </div>
+            }
+            progress={generating && selected ? (
+              <ProgressCard
+                title={t("gen.card.title", { title: localizedTitle(selected) })}
+                desc={genWaiting ? t("gen.card.resume") : t("gen.card.desc")}
+                onClick={() => goTab("mygallery")}
+                action={t("gen.card.open")}
+              />
+            ) : null}
             categories={categories}
             activeCat={activeCat}
             setActiveCat={setActiveCat}
@@ -2563,13 +2593,6 @@ export default function PortraitStudio() {
             poolTotal={visiblePool.length}
             fullPool={visiblePool}
             onPick={pickPrompt}
-            onBack={null}
-            credits={credits}
-            referralCount={referralCount}
-            untilNext={untilNext}
-            onInvite={shareInvite}
-            inviteMsg={inviteMsg}
-            unlimited={unlimited}
             popular={popular}
             onBrooklyn={openBrooklyn}
             onFilterStudio={openFilterStudio}
@@ -2577,20 +2600,24 @@ export default function PortraitStudio() {
           />
         )}
         {screen === "confirm" && selected && (
-          <ConfirmScreen
-            photo={isArtConcept(selected) && !isDressroom(selected) ? artPhoto : photo}
+          <OptionsScreen
+            prompt={selected}
+            photo={photo}
+            artPhoto={artPhoto}
             art={isArtConcept(selected) && !isDressroom(selected)}
             dressroom={isDressroom(selected)}
+            couple={isCoupleConcept(selected)}
             dressStyleKey={dressStyleKey} setDressStyleKey={setDressStyleKey}
-            garmentCount={garmentPhotos.length}
-            partnerPhoto={isCoupleConcept(selected) ? partnerPhoto : null}
-            canSwitch={(filtered.length ? filtered : visiblePool).length > 1}
+            garmentPhotos={garmentPhotos}
+            onPickGarments={pickGarments}
+            onRemoveGarment={removeGarmentAt}
+            partnerPhoto={partnerPhoto}
+            onPickPhoto={pickPhoto}
             batchCount={batchCount} setBatchCount={setBatchCount}
             unlimited={unlimited}
-            prompt={selected}
             freeLeft={freeLeft}
             credits={credits}
-            canGenerate={canGenerate}
+            creditLabel={creditLabel}
             idPhoto={isIdPhoto(selected)}
             idSuit={idSuit} setIdSuit={setIdSuit}
             idBg={idBg} setIdBg={setIdBg}
@@ -2598,9 +2625,10 @@ export default function PortraitStudio() {
             fourcutCount={fourcutCount} setFourcutCount={setFourcutCount}
             fourcutStyleKey={fourcutStyleKey} setFourcutStyleKey={setFourcutStyleKey}
             fourcutStyles={fourcutStyles}
-            onBack={() => popTo("home")}
+            generating={generating}
+            onBack={goBack}
             onGenerate={startGenerate}
-            onStore={PAYMENTS_ENABLED ? openStore : () => { setPayToast("오늘 무료 횟수를 다 썼어요. 친구 초대로 크레딧을 받아보세요 🙂"); setTimeout(() => setPayToast(""), 3500); }}
+            onOpenGuide={() => setGuideMode("photo")}
           />
         )}
         {screen === "result" && selected && (
@@ -2615,7 +2643,9 @@ export default function PortraitStudio() {
             accessToken={session?.access_token}
             genError={genError}
             onRetry={startGenerate}
-            onAgain={() => popTo("gallery")}
+            onOneMore={startGenerate}
+            onSimilar={pickSimilar}
+            onBack={goBack}
             onHome={resetToHome}
             showAds={showAds}
             canTryPro={canTryPro}
@@ -2652,20 +2682,27 @@ export default function PortraitStudio() {
             referralCode={referralCode}
             onRefreshQuota={() => setRefreshTick((n) => n + 1)}
             onInviteToast={(m) => { setInviteMsg(m); setTimeout(() => setInviteMsg(""), 3500); }}
-            onBack={() => popTo("gallery")}
-            onOpenGallery={() => setScreen("mygallery")}
             onOpenStore={PAYMENTS_ENABLED ? openStore : null}
             onLogout={handleLogout}
             onDeleteAccount={handleDeleteAccount}
             onLoginRequest={() => setShowLoginSheet(true)}
+            notifyOn={notifyOn}
+            onToggleNotify={toggleNotify}
           />
         )}
         {screen === "mygallery" && (
           <MyGalleryScreen
             accessToken={session?.access_token}
-            onBack={() => popTo("profile")}
+            refreshKey={resultGalleryId}
+            progress={generating && selected ? (
+              <ProgressCard
+                title={t("gen.card.title", { title: localizedTitle(selected) })}
+                desc={genWaiting ? t("gen.card.resume") : t("gen.card.desc")}
+              />
+            ) : null}
             onShared={() => setRefreshTick((n) => n + 1)}
             onLoginRequest={() => setShowLoginSheet(true)}
+            onGoGallery={() => goTab("gallery")}
           />
         )}
         {screen === "store" && PAYMENTS_ENABLED && (
@@ -2675,9 +2712,28 @@ export default function PortraitStudio() {
             session={session}
             freeLimit={freeLimit}
             onCredited={() => setRefreshTick((n) => n + 1)}
-            onBack={() => popTo(selected ? "confirm" : "gallery")}
+            onBack={goBack}
           />
         )}
+      {!isNative() && (screen === "gallery" || screen === "profile") && (
+        <footer style={S.footer}>
+          <div style={S.footerLinks}>
+            <a href={`${LEGAL_BASE}/terms`} target="_blank" rel="noopener noreferrer" style={S.footerLink}>{t("footer.terms")}</a>
+            <span style={S.footerDot}>·</span>
+            <a href={`${LEGAL_BASE}/privacy`} target="_blank" rel="noopener noreferrer" style={S.footerLink}>{t("footer.privacy")}</a>
+            <span style={S.footerDot}>·</span>
+            <a href={`${LEGAL_BASE}/refund`} target="_blank" rel="noopener noreferrer" style={S.footerLink}>{t("footer.refund")}</a>
+          </div>
+          {IS_KOREA && (
+            <div style={S.footerBiz}>
+              {t("footer.biz.company")}<br />
+              {t("footer.biz.reg")} · {t("footer.biz.sales")}<br />
+              {t("footer.biz.addr")}<br />
+              {t("footer.biz.contact")}
+            </div>
+          )}
+        </footer>
+      )}
       </main>
 
       {/* 필터 스튜디오 — 웹용 다중 선택 input + 에디터 */}
@@ -2703,7 +2759,8 @@ export default function PortraitStudio() {
         <CameraStudio
           initialPresetKey={cameraPreset}
           onClose={() => setCameraPreset(null)}
-          onShot={(dataUrl, presetKey) => {
+          onSave={saveDataUrlToAlbum}
+          onEdit={(dataUrl, presetKey) => {
             setCameraPreset(null);
             setFilterSrcs({ srcs: [dataUrl], preset: presetKey });
           }}
@@ -2719,27 +2776,7 @@ export default function PortraitStudio() {
         />
       )}
 
-      {!isNative() && (
-        <footer style={S.footer}>
-          <div style={S.footerLinks}>
-            <a href={`${LEGAL_BASE}/terms`} target="_blank" rel="noopener noreferrer" style={S.footerLink}>{t("footer.terms")}</a>
-            <span style={S.footerDot}>·</span>
-            <a href={`${LEGAL_BASE}/privacy`} target="_blank" rel="noopener noreferrer" style={S.footerLink}>{t("footer.privacy")}</a>
-            <span style={S.footerDot}>·</span>
-            <a href={`${LEGAL_BASE}/refund`} target="_blank" rel="noopener noreferrer" style={S.footerLink}>{t("footer.refund")}</a>
-          </div>
-          {IS_KOREA && (
-            <div style={S.footerBiz}>
-              {t("footer.biz.company")}<br />
-              {t("footer.biz.reg")} · {t("footer.biz.sales")}<br />
-              {t("footer.biz.addr")}<br />
-              {t("footer.biz.contact")}
-            </div>
-          )}
-        </footer>
-      )}
-
-      <BottomNav
+      {!PUSHED_SCREENS.includes(screen) && <BottomNav
         screen={screen}
         go={(key) => {
           if (key === "filter") { hap.tap(); setActiveCat(t("filter.cat")); goTab("gallery"); return; }
@@ -2748,7 +2785,19 @@ export default function PortraitStudio() {
         }}
         onCamera={() => openCamera("none")}
         filterActive={screen === "gallery" && activeCat === t("filter.cat")}
-      />
+      />}
+
+      {showCreditSheet && (
+        <CreditSheet
+          packs={CREDIT_PACKS}
+          subs={SUB_PLANS}
+          credits={credits}
+          native={PAYMENTS_ENABLED}
+          onClose={() => setShowCreditSheet(false)}
+          onBuy={() => { setShowCreditSheet(false); openStore(); }}
+          onInvite={() => { setShowCreditSheet(false); shareInvite(); }}
+        />
+      )}
 
       {showBrooklyn && (
         <div style={S.bkBackdrop} onClick={() => setShowBrooklyn(false)}>
@@ -2784,7 +2833,8 @@ export default function PortraitStudio() {
             style={S.loginSheetCard}
             onClick={(e) => e.stopPropagation()}
           >
-            <LoginGate Logo={Logo} embedded message={t("login.sheet.message")} onClose={closeLoginSheet} />
+            <div style={S.sheetGrab} />
+            <LoginGate Logo={Logo} embedded title={t("login.sheet.title")} message={t("login.sheet.desc")} onClose={closeLoginSheet} />
           </div>
         </div>
       )}
@@ -2820,210 +2870,104 @@ function Splash() {
 }
 
 /* ============================================================
-   홈
+   공통: 안쪽 화면 상단 바(가운데 작은 제목) · 진행 카드 · 크레딧 시트
    ============================================================ */
-function HomeScreen({
-  photo, onPick, onClear,
-  ageConfirmed, setAgeConfirmed, onContinue, onBack,
-  isArt = false, showAds = false,
-  isCouple = false, partnerPhoto = null, onPickPartner, onOpenGuide,
-  isDress = false, garmentPhotos = [], onPickGarments, onRemoveGarment,
-}) {
-  const ready = photo && (!isCouple || partnerPhoto) && (!isDress || garmentPhotos.length > 0) && ageConfirmed;
+function TopBar({ title, onBack, backLabel, right }) {
   return (
-    <div className="fade">
-      <div style={S.navRow}>
+    <div style={S.topBar}>
+      <div style={S.topBarSide}>
         {onBack && (
-          <button style={S.backBtn} onClick={onBack}>←</button>
-        )}
-        <div>
-          <div style={S.screenKicker}>STEP 02</div>
-          <div style={S.screenTitle}>
-            {isArt ? t("art.step.title") : t("step2.title")}
-          </div>
-        </div>
-      </div>
-
-      <div style={S.hero}>
-        {isArt ? (
-          <>
-            <h1 style={S.heroTitle}>{t("art.hero.title")}</h1>
-            <p style={S.heroDesc}>
-              {t("art.hero.desc1")}<br />
-              {t("art.hero.desc2")}<br />
-              {t("art.hero.desc3")}<br />
-              {t("art.hero.desc4")}
-            </p>
-          </>
-        ) : isDress ? (
-          <>
-            <h1 style={S.heroTitle}>{t("dress.hero.title")}</h1>
-            <p style={S.heroDesc}>
-              {t("dress.hero.desc1")}<br />
-              {t("dress.hero.desc2")}<br />
-              {t("dress.hero.desc3")}
-            </p>
-          </>
-        ) : isCouple ? (
-          <>
-            <h1 style={S.heroTitle}>{t("couple.hero.title")}</h1>
-            <p style={S.heroDesc}>
-              {t("couple.hero.desc1")}<br />
-              {t("couple.hero.desc2")}<br />
-              {t("couple.hero.desc3")}
-            </p>
-          </>
-        ) : (
-          <>
-            <h1 style={S.heroTitle}>{t("step2.heroTitle")}</h1>
-            <p style={S.heroDesc}>
-              {t("step2.heroDesc1")}<br />
-              {t("step2.heroDesc2")}<br />
-              {t("step2.heroDesc3")}<br />
-              {t("step2.heroDesc4")}
-            </p>
-          </>
+          <button type="button" style={S.topBack} onClick={onBack} aria-label={backLabel || t("nav.back")}>
+            <svg width="12" height="20" viewBox="0 0 12 20" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 2 2 10l8 8" /></svg>
+            <span>{backLabel || t("nav.back")}</span>
+          </button>
         )}
       </div>
+      <div style={S.topTitle}>{title}</div>
+      <div style={{ ...S.topBarSide, justifyContent: "flex-end" }}>{right}</div>
+    </div>
+  );
+}
 
-      {isDress ? (
-        <>
-          {/* 본인 사진 — 기존 프로필 슬롯 그대로 */}
-          {!photo ? (
-            <button style={S.uploadBox} onClick={onPick}>
-              <div style={S.uploadIcon}>＋</div>
-              <div style={S.uploadText}>{t("dress.uploadMe")}</div>
-              <div style={S.uploadHint}>{t("step2.uploadHint")}</div>
+// 생성 진행 카드 — 내 사진 맨 위(+갤러리 상단). 스피너 대신 얇은 진행 막대(무한).
+function ProgressCard({ title, desc, onClick, action }) {
+  const inner = (
+    <>
+      <div style={S.progSp}><i className="progBar" style={S.progBar} /></div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={S.progTitle}>{title}</div>
+        <div style={S.progDesc}>{desc}</div>
+      </div>
+      {action && <span style={S.progAction}>{action} ›</span>}
+    </>
+  );
+  return onClick
+    ? <button type="button" style={{ ...S.progCard, cursor: "pointer", textAlign: "left" }} onClick={onClick}>{inner}</button>
+    : <div style={S.progCard}>{inner}</div>;
+}
+
+// 크레딧 부족 시트 — 팩 3 · 구독 1 · "친구 초대로 무료 3장" (§3). 웹은 결제가 없어 "앱에서 결제" 로 안내.
+function CreditSheet({ packs, subs, credits, native, onClose, onBuy, onInvite }) {
+  const ko = getLang() === "ko";
+  const sub = subs.find((x) => x.period === "month") || subs[0];
+  return (
+    <div style={S.sheetBackdrop} onClick={onClose}>
+      <div style={S.sheetCard} onClick={(e) => e.stopPropagation()}>
+        <div style={S.sheetGrab} />
+        <div style={S.sheetTitle}>{t("credit.sheet.title")}</div>
+        <div style={S.sheetDesc}>{t("credit.sheet.desc")} <b>{t("store.held", { credits })}</b></div>
+
+        <div style={S.sheetLabel}>{t("credit.sheet.packs")}</div>
+        <div style={S.sheetList}>
+          {packs.slice(0, 3).map((pk, i) => (
+            <button key={pk.id} type="button" style={S.sheetRow} onClick={native ? onBuy : undefined} disabled={!native}>
+              <span style={{ ...S.sheetRowDot, background: HEARTS[i % HEARTS.length] }} />
+              <span style={S.sheetRowTitle}>{t("store.count", { n: pk.count })}</span>
+              {pk.badgeKey && <span style={S.sheetRowBadge}>{t(pk.badgeKey)}</span>}
+              <span style={S.sheetRowPrice}>{ko ? won(pk.krw) : usd(pk.usd)}</span>
+              <span style={{ ...S.sheetRowBtn, ...(native ? null : S.sheetRowBtnOff) }}>
+                {native ? t("credit.sheet.buy") : t("credit.sheet.inApp")}
+              </span>
             </button>
-          ) : (
-            <>
-              <div style={S.previewWrap}>
-                <img src={photo} alt="업로드한 사진" style={S.previewImg} />
-              </div>
-              <button style={S.changePhotoBtn} onClick={onPick}>
-                {t("step2.changePhoto")}
-              </button>
-            </>
-          )}
+          ))}
+        </div>
 
-          {/* 의상 슬롯 — 최대 5장, 1장 필수. 채워진 것 + 추가 슬롯 하나만 노출 */}
-          <div style={S.garmentLabel}>{t("dress.garmentLabel")}</div>
-          <div style={S.garmentRow} data-hscroll="">
-            {garmentPhotos.map((g, i) => (
-              <div key={i} style={S.garmentSlot}>
-                <img src={g} alt={"의상 " + (i + 1)} style={S.garmentImg} />
-                <button
-                  type="button"
-                  style={S.garmentRemove}
-                  aria-label="의상 삭제"
-                  onClick={() => onRemoveGarment && onRemoveGarment(i)}
-                >×</button>
-              </div>
-            ))}
-            {garmentPhotos.length < GARMENT_MAX && (
-              <button
-                type="button"
-                style={S.garmentAdd}
-                onClick={() => onPickGarments && onPickGarments()}
-              >
-                <span style={S.garmentAddPlus}>＋</span>
-                <span style={S.garmentAddLabel}>
-                  {garmentPhotos.length === 0 ? t("dress.addFirst") : t("dress.addMore")}
+        {sub && (
+          <>
+            <div style={S.sheetLabel}>{t("credit.sheet.sub")}</div>
+            <div style={S.sheetList}>
+              <button type="button" style={S.sheetRow} onClick={native ? onBuy : undefined} disabled={!native}>
+                <span style={{ ...S.sheetRowDot, background: INK }} />
+                <span style={S.sheetRowTitle}>
+                  rimikimi+ {ko ? sub.label_ko : sub.label_en}
+                  <span style={S.sheetRowSub}>{t("credit.sheet.subDesc", { n: sub.credits })}</span>
+                </span>
+                <span style={S.sheetRowPrice}>{ko ? won(sub.krw) : usd(sub.usd)}</span>
+                <span style={{ ...S.sheetRowBtn, ...(native ? null : S.sheetRowBtnOff) }}>
+                  {native ? t("credit.sheet.buy") : t("credit.sheet.inApp")}
                 </span>
               </button>
-            )}
-          </div>
-          {/* 확인 질문 없음 — 안내 한 줄만 (오너 확정) */}
-          <p style={S.garmentNote}>{t("dress.autoNote")}</p>
-        </>
-      ) : isCouple ? (
-        <>
-          <div style={S.coupleRow}>
-            <CoupleSlot
-              label={t("couple.slotMe")}
-              photo={photo}
-              onPick={onPick}
-            />
-            <CoupleSlot
-              label={t("couple.slotPartner")}
-              photo={partnerPhoto}
-              onPick={onPickPartner}
-            />
-          </div>
-          <p style={S.coupleHint}>{t("couple.slotHint")}</p>
-        </>
-      ) : !photo ? (
-        <button style={S.uploadBox} onClick={onPick}>
-          <div style={S.uploadIcon}>＋</div>
-          <div style={S.uploadText}>{t("step2.uploadCta")}</div>
-          <div style={S.uploadHint}>{t("step2.uploadHint")}</div>
+            </div>
+          </>
+        )}
+
+        <button type="button" style={{ ...S.sheetRow, ...S.sheetInvite }} onClick={onInvite}>
+          <span style={{ ...S.sheetRowDot, background: HEARTS[1] }} />
+          <span style={S.sheetRowTitle}>
+            {t("credit.sheet.invite")}
+            <span style={S.sheetRowSub}>{t("credit.sheet.inviteDesc")}</span>
+          </span>
+          <span style={{ ...S.sheetRowBtn, background: ACCENT, color: "#fff" }}>{t("common.share")}</span>
         </button>
-      ) : (
-        <>
-          <div style={S.previewWrap}>
-            <img src={photo} alt="업로드한 사진" style={S.previewImg} />
-          </div>
-          <button style={S.changePhotoBtn} onClick={onPick}>
-            {t("step2.changePhoto")}
-          </button>
-        </>
-      )}
 
-      {onOpenGuide && (
-        <button type="button" style={S.guideLink} onClick={onOpenGuide}>
-          {t("guide.openPhoto")}
-        </button>
-      )}
-
-      <label style={S.consentRow}>
-        <input
-          type="checkbox"
-          checked={ageConfirmed}
-          onChange={(e) => setAgeConfirmed(e.target.checked)}
-          style={S.checkbox}
-        />
-        <span style={S.consentText}>
-          {isArt ? t("art.consent") : isCouple ? t("couple.consent") : t("step2.consent")}
-        </span>
-      </label>
-
-      <button
-        style={{ ...S.primaryBtn, opacity: ready ? 1 : 0.35 }}
-        disabled={!ready}
-        onClick={onContinue}
-      >
-        {t("step2.continue")}
-      </button>
-
-      <p style={S.privacyNote}>{t("step2.privacyNote")}</p>
-
-      {showAds && <AdSlot />}
+        {!native && <div style={S.sheetNote}>{t("credit.sheet.webNote")}</div>}
+      </div>
     </div>
   );
 }
 
 /* ============================================================
-   커플 컨셉 사진 슬롯 (내 사진 / 상대 사진)
-   ============================================================ */
-function CoupleSlot({ label, photo, onPick }) {
-  return (
-    <button style={S.coupleSlot} onClick={onPick}>
-      <div style={S.coupleSlotLabel}>{label}</div>
-      <div style={S.coupleSlotBox}>
-        {photo ? (
-          <img src={photo} alt={label} style={S.coupleSlotImg} />
-        ) : (
-          <span style={S.coupleSlotPlus}>＋</span>
-        )}
-      </div>
-      <div style={S.coupleSlotAction}>
-        {photo ? t("step2.changePhoto") : t("step2.uploadCta")}
-      </div>
-    </button>
-  );
-}
-
-/* ============================================================
+   격자 아이콘/* ============================================================
    격자 아이콘
    ============================================================ */
 function GridIcon({ cells }) {
@@ -3047,14 +2991,13 @@ function GalleryScreen({
   categories, activeCat, setActiveCat, query, setQuery,
   onResetFilters,
   prompts, total, totalFiltered, visibleCount, onShowMore,
-  poolTotal, onPick, onBack,
-  credits = 0, referralCount = 0, untilNext = 1,
-  onInvite, inviteMsg = "", unlimited = false,
+  poolTotal, onPick,
   fullPool = [], popular = [], onBrooklyn,
   onFilterStudio,
   onCamera,
+  header = null, progress = null,
 }) {
-  const [cols, setCols] = useState(2);
+  const cols = 2; // 2.0: 열 전환 토글 없음
   const hasFilter =
     query.trim() !== "" || activeCat !== "전체";
   // 필터 스튜디오 화면은 컨셉 그리드가 아니라 그룹별 가로 줄이다 — 열 전환 버튼과
@@ -3124,33 +3067,9 @@ function GalleryScreen({
     return { featured, newest, rows };
   }, [showHomeLayout, fullPool, popular]);
   return (
-    <div className="fade">
-      <button style={S.inviteBanner} onClick={onInvite}>
-        <div style={S.inviteBannerLeft}>
-          <div style={S.inviteBannerTitle}>
-            {unlimited ? t("invite.adminTitle") : t("invite.testerTitle")}
-          </div>
-          <div style={S.inviteBannerDesc}>
-            {unlimited
-              ? t("invite.adminDesc")
-              : (credits > 0
-                  ? t("invite.testerDescWithCredits", { credits, n: untilNext, now: referralCount })
-                  : t("invite.testerDesc", { n: untilNext, now: referralCount }))}
-          </div>
-        </div>
-        <div style={S.inviteBannerBtn}>{t("invite.btn")}</div>
-      </button>
-      {inviteMsg && <div style={S.inviteToast}>{inviteMsg}</div>}
-
-      <div style={S.navRow}>
-        {onBack && (
-          <button style={S.backBtn} onClick={onBack}>←</button>
-        )}
-        <div>
-          <div style={S.screenKicker}>{t("step1.kicker")}</div>
-          <div style={S.screenTitle}>{t("step1.title")}</div>
-        </div>
-      </div>
+    <div className="fade" style={{ paddingTop: 0 }}>
+      {header}
+      {progress}
 
       <div style={S.stickyBar}>
         <div style={S.catRowSticky} data-hscroll>
@@ -3166,31 +3085,17 @@ function GalleryScreen({
               }}
               onClick={() => setActiveCat(c.name)}
             >
-              {localizedCategory(c.name)} <span style={S.catChipCount}>{c.count}</span>
+              {localizedCategory(c.name)} <small style={S.catChipCount}>{c.count}</small>
             </button>
           ))}
-          {!isFilterCat && (
-            <button
-              style={{ ...S.catChip, flexShrink: 0, marginLeft: 4 }}
-              onClick={() => setCols((c) => (c === 2 ? 4 : 2))}
-              aria-label={cols === 2 ? "4열로 보기" : "2열로 보기"}
-              title={cols === 2 ? "4열로 보기" : "2열로 보기"}
-            >
-              <GridIcon cells={cols === 2 ? 4 : 2} />
-            </button>
-          )}
         </div>
       </div>
 
-      <div style={S.filterMetaRow}>
-        <span style={S.resultCount}>
-          {isFilterCat
-            ? t("step1.resultCount", { n: filterCount })
-            : hasFilter
-            ? t("step1.resultCount", { n: totalFiltered })
-            : t("step1.totalCount", { n: poolTotal })}
-        </span>
-      </div>
+      {hasFilter && !isFilterCat && (
+        <div style={S.filterMetaRow}>
+          <span style={S.resultCount}>{t("step1.resultCount", { n: totalFiltered })}</span>
+        </div>
+      )}
 
       {showHomeLayout && homeData ? (
         <HomeLayout
@@ -3234,6 +3139,7 @@ function GalleryScreen({
                 {g.items.map((p) => (
                   <button
                     key={p.key}
+                    data-tile=""
                     style={S.fsRailCard}
                     onClick={() => { hap.tap(); onFilterStudio && onFilterStudio(p.key); }}
                     aria-label={getLang() === "ko" ? p.ko : p.en}
@@ -3349,28 +3255,10 @@ function HomeLayout({ data, onPick, onMore, onBrooklyn }) {
       {data.featured.length > 0 && (
         <div style={S.homeSection}>
           <div style={S.homeRowHead}>
-            <div style={S.homeRowTitle}>{t("step1.featured")}</div>
+            <div style={S.homeRowTitle}>{t("v2.featured")}</div>
           </div>
           <div style={S.homeRailFeatured} data-hscroll>
-            {data.featured.map((p) => (
-              <button
-                key={p.id}
-                style={S.featuredCard}
-                onClick={() => onPick(p)}
-                aria-label={p.title}
-              >
-                <img
-                  src={`${ASSET_BASE}/thumbs/${p.id}.webp`}
-                  alt={localizedTitle(p)}
-                  style={S.featuredImg}
-                  loading="lazy"
-                />
-                <div style={S.featuredOverlay}>
-                  <div style={S.featuredTitle}>{localizedTitle(p)}</div>
-                </div>
-                {p.hidden && <div style={{ ...S.hiddenTag, top: 8 }}>{t("step1.hiddenBadge")}</div>}
-              </button>
-            ))}
+            {data.featured.map((p) => <BigCard key={p.id} p={p} onPick={onPick} />)}
           </div>
         </div>
       )}
@@ -3380,30 +3268,12 @@ function HomeLayout({ data, onPick, onMore, onBrooklyn }) {
         <div style={S.homeSection}>
           <div style={S.homeRowHead}>
             <div style={S.homeRowTitle}>
-              {t("step1.newest")}
+              {t("v2.newest")}
               <span style={S.newBadge}>NEW</span>
             </div>
           </div>
           <div style={S.homeRailFeatured} data-hscroll>
-            {data.newest.map((p) => (
-              <button
-                key={p.id}
-                style={S.featuredCard}
-                onClick={() => onPick(p)}
-                aria-label={p.title}
-              >
-                <img
-                  src={`${ASSET_BASE}/thumbs/${p.id}.webp`}
-                  alt={localizedTitle(p)}
-                  style={S.featuredImg}
-                  loading="lazy"
-                />
-                <div style={S.featuredOverlay}>
-                  <div style={S.featuredTitle}>{localizedTitle(p)}</div>
-                </div>
-                {p.hidden && <div style={{ ...S.hiddenTag, top: 8 }}>{t("step1.hiddenBadge")}</div>}
-              </button>
-            ))}
+            {data.newest.map((p) => <BigCard key={p.id} p={p} onPick={onPick} />)}
           </div>
         </div>
       )}
@@ -3434,34 +3304,33 @@ function HomeLayout({ data, onPick, onMore, onBrooklyn }) {
               <span style={S.homeRowCount}>{row.count}</span>
             </div>
             <button style={S.homeRowMore} onClick={() => onMore(row.name)}>
-              {t("step1.rowMore")}
+              {t("v2.more")}
             </button>
           </div>
           <div style={S.homeRail} data-hscroll>
-            {row.items.map((p) => (
-              <button
-                key={p.id}
-                style={S.railCard}
-                onClick={() => onPick(p)}
-                aria-label={p.title}
-              >
-                <img
-                  src={`${ASSET_BASE}/thumbs/${p.id}.webp`}
-                  alt={localizedTitle(p)}
-                  style={S.railImg}
-                  loading="lazy"
-                />
-                {p.hidden && (
-                  <div style={{ ...S.hiddenTag, fontSize: 8.5, padding: "2px 5px", top: 8 }}>
-                    {t("step1.hiddenBadge")}
-                  </div>
-                )}
-              </button>
-            ))}
+            {row.items.map((p) => <BigCard key={p.id} p={p} onPick={onPick} small />)}
           </div>
         </div>
       ))}
     </div>
+  );
+}
+
+// 홈 줄 카드 — 흰 카드 + 3:4 썸네일 + 아래 제목 한 줄(mock .card)
+function BigCard({ p, onPick, small = false }) {
+  return (
+    <button
+      type="button"
+      style={{ ...S.bigCard, ...(small ? S.bigCardSmall : null) }}
+      onClick={() => onPick(p)}
+      aria-label={p.title}
+    >
+      <div style={S.bigCardThumb}>
+        <img src={`${ASSET_BASE}/thumbs/${p.id}.webp`} alt="" style={S.railImg} loading="lazy" />
+        {p.hidden && <div style={{ ...S.hiddenTag, fontSize: 8.5, padding: "2px 5px", top: 8 }}>{t("step1.hiddenBadge")}</div>}
+      </div>
+      <div style={{ ...S.bigCardTitle, ...(small ? { fontSize: 12.5, padding: "7px 9px 9px" } : null) }}>{localizedTitle(p)}</div>
+    </button>
   );
 }
 
@@ -3538,35 +3407,43 @@ function ProfileScreen({
   unlimited, blocked, freeUsed, freeLeft, credits,
   referralCount, untilNext, referralCode, onRefreshQuota, onInviteToast,
   onInvite, inviteMsg = "",
-  onBack, onLogout, onDeleteAccount, onOpenGallery, onOpenStore,
+  onLogout, onDeleteAccount, onOpenStore,
   onLoginRequest,
   faceMeta, onEditFace, onFaceDeleted,
+  notifyOn = false, onToggleNotify,
 }) {
-  // 비로그인 — 계정 정보/크레딧/내 갤러리/초대는 전부 로그인 후에만 의미가 있으므로
-  // 가짜 값(0/0 등)을 보여주는 대신 로그인 CTA 로 대체한다. 언어 설정만 기기 값이라 그대로 둔다.
+  const legal = (
+    <div style={S.rowGroup}>
+      <div style={S.groupLabel}>{t("profile.legal")}</div>
+      <a href={`${LEGAL_BASE}/terms`} target="_blank" rel="noopener noreferrer" style={S.row}>
+        <span style={S.rowTitle}>{t("footer.terms")}</span><span style={S.rowChevron}>›</span>
+      </a>
+      <a href={`${LEGAL_BASE}/privacy`} target="_blank" rel="noopener noreferrer" style={S.row}>
+        <span style={S.rowTitle}>{t("footer.privacy")}</span><span style={S.rowChevron}>›</span>
+      </a>
+      <a href={`${LEGAL_BASE}/refund`} target="_blank" rel="noopener noreferrer" style={{ ...S.row, borderBottom: "none" }}>
+        <span style={S.rowTitle}>{t("footer.refund")}</span><span style={S.rowChevron}>›</span>
+      </a>
+    </div>
+  );
+
+  // 비로그인 — 계정 정보/크레딧/초대는 로그인 후에만 의미가 있으므로 로그인 CTA 로 대체.
   if (!session) {
     return (
       <div className="fade">
-        <div style={S.navRow}>
-          <button style={S.backBtn} onClick={onBack}>←</button>
-          <div>
-            <div style={S.screenKicker}>{t("profile.kicker")}</div>
-            <div style={S.screenTitle}>{t("profile.title")}</div>
-          </div>
-        </div>
-
+        <TopBar title={t("profile.title")} />
         <div style={S.profileCard}>
-          <div style={S.profileAvatar}>
-            <div style={S.profileAvatarEmpty}>👤</div>
+          <div style={S.profileAvatar}><div style={S.profileAvatarEmpty}>👤</div></div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={S.profileName}>{t("profile.guest.title")}</div>
+            <div style={S.profileMeta}>{t("profile.guest.desc")}</div>
           </div>
-          <div style={S.profileName}>{t("profile.guest.title")}</div>
-          <div style={S.profileMeta}>{t("profile.guest.desc")}</div>
-          <button style={{ ...S.secondaryBtn, marginTop: 16, width: "100%" }} onClick={onLoginRequest}>
-            {t("profile.guest.cta")}
-          </button>
         </div>
-
+        <button style={{ ...S.primaryBtn, marginBottom: 16 }} onClick={onLoginRequest}>
+          {t("profile.guest.cta")}
+        </button>
         <LangSelector />
+        {legal}
       </div>
     );
   }
@@ -3577,7 +3454,6 @@ function ProfileScreen({
   const displayName =
     meta.full_name || meta.name || meta.user_name || u.email?.split("@")[0] || "사용자";
   const email = u.email || "(이메일 없음)";
-
   const providerLabel = {
     google: t("profile.provider.google"),
     kakao: t("profile.provider.kakao"),
@@ -3588,137 +3464,93 @@ function ProfileScreen({
 
   return (
     <div className="fade">
-      <div style={S.navRow}>
-        <button style={S.backBtn} onClick={onBack}>←</button>
-        <div>
-          <div style={S.screenKicker}>{t("profile.kicker")}</div>
-          <div style={S.screenTitle}>{t("profile.title")}</div>
-        </div>
-      </div>
+      <TopBar title={t("profile.title")} />
 
-      {/* 프로필 카드 */}
+      {/* 프로필 카드: 아바타 + 이름 + 사진 변경 */}
       <div style={S.profileCard}>
         <div style={S.profileAvatar}>
-          {photo ? (
-            <img src={photo} alt={t("profile.kicker")} style={S.profileAvatarImg} />
-          ) : (
-            <div style={S.profileAvatarEmpty}>📷</div>
-          )}
+          {photo ? <img src={photo} alt="" style={S.profileAvatarImg} /> : <div style={S.profileAvatarEmpty}>📷</div>}
         </div>
-        <div style={S.profileName}>{displayName}</div>
-        <div style={S.profileMeta}>{providerLabel} · {email}</div>
-
-        <div style={S.profilePhotoActions}>
-          <button style={S.secondaryBtn} onClick={onPickPhoto}>
-            {photo ? t("profile.photo.change") : t("profile.photo.register")}
-          </button>
-          {photo && (
-            <button
-              style={{ ...S.secondaryBtn, color: ACCENT, borderColor: ACCENT + "44" }}
-              onClick={onClearPhoto}
-            >
-              {t("common.delete")}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={S.profileName}>{displayName}</div>
+          <div style={S.profileMeta}>{providerLabel} · {email}</div>
+          <div style={S.profilePhotoActions}>
+            <button type="button" style={S.textBtn} onClick={onPickPhoto}>
+              {photo ? t("profile.photo.changeShort") : t("profile.photo.register")}
             </button>
-          )}
-        </div>
-        <div style={S.profileHint}>
-          {t("profile.photo.hint1")}
-          <br />
-          {t("profile.photo.hint2")}
+            {photo && (
+              <button type="button" style={{ ...S.textBtn, color: INK2 }} onClick={onClearPhoto}>{t("common.delete")}</button>
+            )}
+          </div>
         </div>
       </div>
+      <div style={S.profileHint}>{t("profile.photo.hint1")} {t("profile.photo.hint2")}</div>
 
-      {/* 얼굴 프로필 (기기 전용) — face-profile-v1.md §2-4 관리 진입점 */}
-      <FaceProfileCard meta={faceMeta} onEdit={onEditFace} onDeleted={onFaceDeleted} />
-
-      {/* 사용량 / 크레딧 */}
-      <div style={S.statRow}>
-        <div style={S.statCard}>
-          <div style={S.statLabel}>{t("profile.stat.todayUsed")}</div>
-          <div style={S.statValue}>
+      {/* 크레딧 · 스토어 */}
+      <div style={S.rowGroup}>
+        <div style={S.groupLabel}>{t("profile.credits.title")}</div>
+        <div style={S.row}>
+          <span style={S.rowTitle}>{t("profile.stat.todayUsed")}</span>
+          <span style={S.rowValue}>
             {unlimited ? "∞" : `${freeUsed} / ${freeUsed + freeLeft}`}
-          </div>
-          <div style={S.statSub}>
-            {unlimited ? t("profile.stat.unlimited") : blocked ? t("profile.stat.beta") : t("profile.stat.todayLeft", { n: freeLeft })}
-          </div>
+            <span style={S.rowValueSub}> · {unlimited ? t("profile.stat.unlimited") : blocked ? t("profile.stat.beta") : t("profile.stat.todayLeft", { n: freeLeft })}</span>
+          </span>
         </div>
-        <div style={S.statCard}>
-          <div style={S.statLabel}>{t("profile.stat.credits")}</div>
-          <div style={S.statValue}>{credits}</div>
-          <div style={S.statSub}>{t("profile.stat.creditsSub")}</div>
+        <div style={{ ...S.row, ...(onOpenStore ? null : { borderBottom: "none" }) }}>
+          <span style={S.rowTitle}>{t("profile.stat.credits")}</span>
+          <span style={S.rowValue}>{credits}</span>
         </div>
+        {onOpenStore && (
+          <button type="button" style={{ ...S.row, borderBottom: "none" }} onClick={onOpenStore}>
+            <span style={S.rowTitle}>{t("profile.store.title")}<span style={S.rowDesc}>{t("profile.store.desc")}</span></span>
+            <span style={S.rowChevron}>›</span>
+          </button>
+        )}
       </div>
 
-      {/* 크레딧 충전 (항상 노출) */}
-      {onOpenStore && (
-        <button style={S.galleryEntry} onClick={onOpenStore}>
-          <div style={S.galleryEntryLeft}>
-            <div style={S.galleryEntryTitle}>{t("profile.store.title")}</div>
-            <div style={S.galleryEntryDesc}>
-              {t("profile.store.desc")}
-            </div>
-          </div>
-          <div style={S.galleryEntryArrow}>→</div>
-        </button>
-      )}
-
-      {/* 언어 선택 */}
-      <LangSelector />
-
-      {/* 내 갤러리 */}
-      <button style={S.galleryEntry} onClick={onOpenGallery}>
-        <div style={S.galleryEntryLeft}>
-          <div style={S.galleryEntryTitle}>{t("profile.gallery.title")}</div>
-          <div style={S.galleryEntryDesc}>
-            {t("profile.gallery.desc")}
-          </div>
-        </div>
-        <div style={S.galleryEntryArrow}>→</div>
-      </button>
-
-      {/* 친구 초대 */}
-      <button style={S.inviteBanner} onClick={onInvite}>
-        <div style={S.inviteBannerLeft}>
-          <div style={S.inviteBannerTitle}>
+      {/* 친구 초대 (홈에서 여기로 이동) */}
+      <div style={S.rowGroup}>
+        <div style={S.groupLabel}>{t("profile.invite.title")}</div>
+        <button type="button" style={S.row} onClick={onInvite}>
+          <span style={S.rowTitle}>
             {unlimited ? t("invite.adminTitle") : t("invite.testerTitle")}
-          </div>
-          <div style={S.inviteBannerDesc}>
-            {unlimited
-              ? t("invite.adminDesc")
-              : t("invite.testerDesc", { n: untilNext, now: referralCount })}
-          </div>
+            <span style={S.rowDesc}>
+              {unlimited ? t("invite.adminDesc") : t("invite.testerDesc", { n: untilNext, now: referralCount })}
+            </span>
+          </span>
+          <span style={{ ...S.rowChevron, color: ACCENT, fontSize: 14, fontWeight: 600 }}>{t("common.share")}</span>
+        </button>
+        <div style={{ padding: "4px 14px 12px" }}>
+          <InviteCode code={referralCode} accessToken={session?.access_token} onClaimed={onRefreshQuota} onToast={onInviteToast} />
         </div>
-        <div style={S.inviteBannerBtn}>{t("common.share")}</div>
-      </button>
-      {session && (
-        <InviteCode
-          code={referralCode}
-          accessToken={session?.access_token}
-          onClaimed={onRefreshQuota}
-          onToast={onInviteToast}
-        />
-      )}
+      </div>
       {inviteMsg && <div style={S.inviteToast}>{inviteMsg}</div>}
 
-      {/* 로그아웃 */}
-      <button
-        style={{ ...S.secondaryBtn, marginTop: 18, color: ACCENT + "cc" }}
-        onClick={onLogout}
-      >
-        {t("profile.logout")}
-      </button>
+      {/* 알림 — 권한 팝업은 이 토글을 켤 때만 뜬다(§3) */}
+      <div style={S.rowGroup}>
+        <button type="button" style={{ ...S.row, borderBottom: "none" }} onClick={onToggleNotify} aria-pressed={notifyOn}>
+          <span style={S.rowTitle}>{t("profile.notify.title")}<span style={S.rowDesc}>{t("profile.notify.desc")}</span></span>
+          <span style={{ ...S.toggle, ...(notifyOn ? S.toggleOn : null) }}><i style={{ ...S.toggleKnob, ...(notifyOn ? S.toggleKnobOn : null) }} /></span>
+        </button>
+      </div>
 
-      {/* 계정 삭제 (App Store 요구: 인앱 즉시 삭제) */}
-      <button
-        style={{
-          ...S.secondaryBtn, marginTop: 10,
-          color: "#9aa0a6", borderColor: "#e3e3e3",
-          fontSize: 13,
-        }}
-        onClick={onDeleteAccount}
-      >
-        {t("profile.deleteAccount")}
-      </button>
+      {/* 얼굴 프로필 (기기 전용) */}
+      <FaceProfileCard meta={faceMeta} onEdit={onEditFace} onDeleted={onFaceDeleted} />
+
+      <LangSelector />
+
+      {/* 계정 */}
+      <div style={S.rowGroup}>
+        <div style={S.groupLabel}>{t("profile.account")}</div>
+        <button type="button" style={S.row} onClick={onLogout}>
+          <span style={{ ...S.rowTitle, color: ACCENT }}>{t("profile.logout")}</span>
+        </button>
+        <button type="button" style={{ ...S.row, borderBottom: "none" }} onClick={onDeleteAccount}>
+          <span style={{ ...S.rowTitle, color: INK3 }}>{t("profile.deleteAccount")}</span>
+        </button>
+      </div>
+
+      {legal}
     </div>
   );
 }
@@ -3761,7 +3593,7 @@ function LangSelector() {
 /* ============================================================
    내 갤러리 (1시간 보관)
    ============================================================ */
-function MyGalleryScreen({ accessToken, onBack, onShared, onLoginRequest }) {
+function MyGalleryScreen({ accessToken, onShared, onLoginRequest, onGoGallery, progress = null, refreshKey = null }) {
   const [items, setItems] = useState(null); // null=로딩, []=빈, [...]=있음
   const [error, setError] = useState(null);
   const [tick, setTick] = useState(0); // 1초마다 남은시간 갱신
@@ -3803,7 +3635,7 @@ function MyGalleryScreen({ accessToken, onBack, onShared, onLoginRequest }) {
         if (!cancelled) setError(e?.message || "네트워크 오류");
       });
     return () => { cancelled = true; };
-  }, [accessToken]);
+  }, [accessToken, refreshKey]);
 
   // "저장" — 공유 시트 없이 바로 사진첩에 저장(네이티브) / 앵커 다운로드(웹).
   // 성공 시에만 저장 표시 + 만료 알림 취소.
@@ -3910,13 +3742,8 @@ function MyGalleryScreen({ accessToken, onBack, onShared, onLoginRequest }) {
           {toast}
         </div>
       )}
-      <div style={S.navRow}>
-        <button style={S.backBtn} onClick={onBack}>←</button>
-        <div>
-          <div style={S.screenKicker}>{t("profile.kicker")}</div>
-          <div style={S.screenTitle}>{t("gallery.title")}</div>
-        </div>
-      </div>
+      <TopBar title={t("gallery.title")} />
+      {progress}
 
       {!accessToken ? (
         // 비로그인 — 서버 갤러리는 계정에 묶여 있어 여기선 아무것도 못 불러온다.
@@ -3928,10 +3755,7 @@ function MyGalleryScreen({ accessToken, onBack, onShared, onLoginRequest }) {
           </button>
         </div>
       ) : (
-        <div style={S.galleryNotice}>
-          {t("gallery.notice1")}<br />
-          {t("gallery.notice2")}
-        </div>
+        <div style={S.galleryNotice}>{t("gallery.notice1")} {t("gallery.notice2")}</div>
       )}
 
       {accessToken && items === null && !error && (
@@ -3947,7 +3771,7 @@ function MyGalleryScreen({ accessToken, onBack, onShared, onLoginRequest }) {
           <div>{t("gallery.empty")}</div>
           <button
             style={{ ...S.moreBtn, marginTop: 14 }}
-            onClick={onBack}
+            onClick={onGoGallery}
           >
             {t("gallery.emptyCta")}
           </button>
@@ -4038,251 +3862,201 @@ function MyGalleryScreen({ accessToken, onBack, onShared, onLoginRequest }) {
 }
 
 /* ============================================================
-   확인
+   옵션 화면 (2.0) — 컨셉 카드에서 바로 온다. STEP 02 없음.
+   상단 바 제목 = 컨셉명 · 컨셉 미리보기 · "내 사진" 카드 · 컨셉별 옵션 · 만들기
    ============================================================ */
-function ConfirmScreen({
-  photo, prompt, freeLeft, credits, canGenerate, art,
+function PhotoRow({ title, desc, photo, onPick, first = false }) {
+  return (
+    <button type="button" style={{ ...S.optCard, ...(first ? null : { marginTop: 8 }) }} onClick={onPick}>
+      {photo
+        ? <img src={photo} alt="" style={S.optThumb} />
+        : <span style={{ ...S.optThumb, ...S.optThumbEmpty }}>＋</span>}
+      <span style={{ flex: 1, minWidth: 0, textAlign: "left" }}>
+        <span style={S.optTitle}>{title}</span>
+        <span style={S.optDesc}>{desc}</span>
+      </span>
+      <span style={S.optChange}>{photo ? t("opt.change") : t("opt.pick")}</span>
+    </button>
+  );
+}
+
+function Seg({ items, value, onChange }) {
+  return (
+    <div style={S.seg}>
+      {items.map((it) => {
+        const on = it.value === value;
+        return (
+          <button
+            key={String(it.value)}
+            type="button"
+            disabled={it.disabled}
+            aria-pressed={on}
+            style={{ ...S.segItem, ...(on ? S.segItemOn : null), ...(it.disabled ? { opacity: 0.35 } : null) }}
+            onClick={() => { if (!it.disabled) { hap.tap(); onChange(it.value); } }}
+          >
+            {it.label}
+            {it.sub && <span style={S.segSub}>{it.sub}</span>}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function OptionsScreen({
+  prompt, photo, artPhoto, art, dressroom, couple,
+  dressStyleKey = "mirror", setDressStyleKey, garmentPhotos = [], onPickGarments, onRemoveGarment,
+  partnerPhoto, onPickPhoto,
+  batchCount = 1, setBatchCount, unlimited = false, freeLeft = 0, credits = 0, creditLabel = "",
   idPhoto, idSuit, setIdSuit, idBg, setIdBg,
   fourcut, fourcutCount, setFourcutCount, fourcutStyleKey, setFourcutStyleKey, fourcutStyles = FOURCUT_STYLES,
-  dressroom = false, dressStyleKey = "mirror", setDressStyleKey, garmentCount = 0,
-  onBack, onGenerate, onStore, partnerPhoto = null, canSwitch = false,
-  batchCount = 1, setBatchCount, unlimited = false,
+  generating = false, onBack, onGenerate, onOpenGuide,
 }) {
-  const useFree = freeLeft > 0;
+  const batchable = !fourcut && !art;
+  const count = batchable ? batchCount : 1;
+  const cost = batchable ? (BATCH_OPTIONS.find((b) => b.count === count)?.cost ?? count) : 1;
+  const free = !unlimited && count === 1 && freeLeft > 0;
+  const cta = (count > 1 ? t("opt.makeN", { n: count }) : t("opt.make"))
+    + (unlimited ? "" : " · " + (free ? t("opt.costFree") : t("opt.costCredits", { n: cost })));
+  const consent = art ? t("art.consent") : couple ? t("couple.consent") : t("step2.consent");
+  const cats = prompt.categories || (prompt.category ? [prompt.category] : []);
+
   return (
-    <div className="fade">
-      <div style={S.navRow}>
-        <button style={S.backBtn} onClick={onBack}>←</button>
-        <div>
-          <div style={S.screenKicker}>{t("step3.kicker")}</div>
-          <div style={S.screenTitle}>{t("step3.title")}</div>
-        </div>
+    <div className="fade" style={{ paddingTop: 0, paddingBottom: 96 }}>
+      <TopBar
+        title={localizedTitle(prompt)}
+        onBack={onBack}
+        right={creditLabel ? <span style={S.creditChipSmall}><span style={S.creditDot} />{creditLabel}</span> : null}
+      />
+
+      {/* 컨셉 미리보기 (크게) */}
+      <div style={S.hero}>
+        <img src={`${ASSET_BASE}/thumbs/${prompt.id}.webp`} alt={localizedTitle(prompt)} style={S.heroImg} />
+        {cats[0] && <span style={S.heroCat}>{localizedCategory(cats[0])}</span>}
       </div>
 
-      <div style={S.confirmPreview}>
-        {partnerPhoto ? (
-          <div style={S.confirmPair}>
-            <img src={photo} alt={t("couple.slotMe")} style={S.confirmPairImg} />
-            <img src={partnerPhoto} alt={t("couple.slotPartner")} style={S.confirmPairImg} />
-          </div>
+      {/* 사진 슬롯 — 컨셉 종류별로 옵션 화면 안에 */}
+      <div style={{ marginTop: 12 }}>
+        {art ? (
+          <PhotoRow first title={t("opt.artPhoto")} desc={artPhoto ? t("opt.useRegistered") : t("opt.artPhotoDesc")} photo={artPhoto} onPick={() => onPickPhoto("art")} />
         ) : (
-          <img src={photo} alt={t("profile.kicker")} style={S.confirmPhoto} />
+          <PhotoRow first title={t("opt.myPhoto")} desc={photo ? t("opt.useRegistered") : t("opt.pickPhoto")} photo={photo} onPick={() => onPickPhoto("profile")} />
         )}
-        <div style={S.confirmArrow}>♥</div>
-        {(prompt.id) ? (
-          <img
-            src={`${ASSET_BASE}/thumbs/${prompt.id}.webp`}
-            alt={localizedTitle(prompt)}
-            style={S.confirmPhoto}
-          />
-        ) : (
-          <div style={S.confirmStyle}>
-            <div style={S.thumbGlyph}>♡</div>
-            <div style={S.confirmStyleId}>#{prompt.id}</div>
-          </div>
+        {couple && (
+          <PhotoRow title={t("opt.partner")} desc={partnerPhoto ? t("opt.useRegistered") : t("opt.partnerDesc")} photo={partnerPhoto} onPick={() => onPickPhoto("partner")} />
+        )}
+        {!art && !photo && onOpenGuide && (
+          <button type="button" style={S.guideLink} onClick={onOpenGuide}>{t("guide.openPhoto")}</button>
         )}
       </div>
 
-      <div style={S.confirmCard}>
-        <div style={S.confirmTitle}>{localizedTitle(prompt)}</div>
-        <div style={S.confirmCat}>{localizedCategory(prompt.category)}</div>
-        <div style={S.promptPeek}>{t(art ? "step3.peekArt" : "step3.peek")}</div>
-        {canSwitch && <div style={S.swipeHint}>{t("step3.swipeHint")}</div>}
-      </div>
-
-      {/* 드레스룸: 거울셀카 / 일상컷(내부 키는 model 유지) 선택 + 안내 한 줄 */}
+      {/* 드레스룸: 의상 5칸 + 스타일 + 장수 */}
       {dressroom && (
-        <div style={S.idOptCard}>
-          <div style={S.idOptLabel}>{t("dress.styleLabel")}</div>
-          <div style={S.idSuitRow}>
-            {[
-              { key: "mirror", label: t("dress.style.mirror") },
-              { key: "model", label: t("dress.style.model") },
-            ].map((st) => (
-              <button
-                key={st.key}
-                onClick={() => { hap.tap(); setDressStyleKey && setDressStyleKey(st.key); }}
-                style={{
-                  ...S.idSuitChip,
-                  ...(dressStyleKey === st.key ? S.idSuitChipOn : null),
-                }}
-              >
-                {st.label}
-              </button>
-            ))}
-          </div>
-          <div style={S.garmentNoteSmall}>
-            {t("dress.confirmNote", { n: garmentCount })}
-          </div>
-        </div>
-      )}
-
-      {/* 한 번에 여러 장 — 유료 전용.
-          인생네컷은 자체 컷 수가 있고, 매직부스는 일회용 사진이라 제외 */}
-      {!fourcut && !art && (
-        <div style={S.idOptCard}>
-          <div style={S.idOptLabel}>
-            {t("batch.title")}
-            {!unlimited && (
-              <span style={S.batchHave}> · {t("batch.have", { n: credits })}</span>
-            )}
-          </div>
-          <div style={S.batchRow}>
-            {BATCH_OPTIONS.map((b) => {
-              // 크레딧이 모자라면 잠근다 (1장은 무료 한도로도 가능하므로 항상 열림)
-              const locked = !unlimited && b.count > 1 && credits < b.cost;
-              const on = batchCount === b.count;
-              return (
-                <button
-                  key={b.count}
-                  type="button"
-                  disabled={locked}
-                  aria-pressed={on}
-                  onClick={() => { if (!locked) { hap.tap(); setBatchCount(b.count); } }}
-                  style={{
-                    ...S.batchChip,
-                    ...(on ? S.batchChipOn : null),
-                    opacity: locked ? 0.45 : 1,
-                    cursor: locked ? "not-allowed" : "pointer",
-                  }}
-                >
-                  <span style={S.batchChipLabel}>{b.label}</span>
-                  <span style={{ ...S.batchChipCost, color: locked ? "#9a97ab" : ACCENT }}>
-                    {unlimited ? t("batch.unlimited") : locked ? "🔒 " + b.cost : t("batch.cost", { n: b.cost })}
-                  </span>
-                  {b.badge && !locked && !unlimited && (
-                    <span style={S.batchBadge}>{b.badge}</span>
-                  )}
-                </button>
+        <>
+          <div style={S.lbl}>{t("opt.garments")}</div>
+          <div style={S.pick}>
+            {Array.from({ length: GARMENT_MAX }).map((_, i) => {
+              const g = garmentPhotos[i];
+              return g ? (
+                <div key={i} style={{ ...S.pickCell, ...S.pickCellFilled }}>
+                  <img src={g} alt={"의상 " + (i + 1)} style={S.garmentImg} />
+                  <button type="button" style={S.garmentRemove} aria-label="의상 삭제" onClick={() => onRemoveGarment && onRemoveGarment(i)}>×</button>
+                </div>
+              ) : (
+                <button key={i} type="button" style={S.pickCell} onClick={() => onPickGarments && onPickGarments()} aria-label={t("dress.addFirst")}>＋</button>
               );
             })}
           </div>
-        </div>
+          <div style={S.note}>{t("opt.garmentsNote")}</div>
+          <div style={S.lbl}>{t("opt.style")}</div>
+          <Seg
+            items={[{ value: "mirror", label: t("dress.style.mirror") }, { value: "model", label: t("dress.style.model") }]}
+            value={dressStyleKey}
+            onChange={(v) => setDressStyleKey && setDressStyleKey(v)}
+          />
+        </>
       )}
 
+      {/* 인생네컷: 컷 수 + 스타일 */}
       {fourcut && (
-        <div style={S.idOptCard}>
-          <div style={S.idOptLabel}>컷 수 (몇 컷이든 1장만 차감돼요)</div>
-          <div style={S.idSuitRow}>
-            {FOURCUT_COUNTS.map((n) => (
+        <>
+          <div style={S.lbl}>{t("opt.cuts")}</div>
+          <Seg items={FOURCUT_COUNTS.map((n) => ({ value: n, label: n + "컷" }))} value={fourcutCount} onChange={setFourcutCount} />
+          <div style={S.lbl}>{t("opt.style")}</div>
+          <div style={S.chipWrap}>
+            {fourcutStyles.map((st) => (
               <button
-                key={n}
-                onClick={() => { hap.tap(); setFourcutCount(n); }}
-                style={{
-                  ...S.idSuitChip,
-                  ...(fourcutCount === n ? S.idSuitChipOn : null),
-                }}
+                key={st.key}
+                type="button"
+                style={{ ...S.chip, ...(fourcutStyleKey === st.key ? S.chipOn : null) }}
+                onClick={() => { hap.tap(); setFourcutStyleKey(st.key); }}
               >
-                {n}컷
+                {st.emoji} {st.label}
               </button>
             ))}
           </div>
-
-          <div style={{ ...S.idOptLabel, marginTop: 14 }}>스타일</div>
-          <div style={S.idSuitRow}>
-            {fourcutStyles.map((s) => (
-              <button
-                key={s.key}
-                onClick={() => setFourcutStyleKey(s.key)}
-                style={{
-                  ...S.idSuitChip,
-                  ...(fourcutStyleKey === s.key ? S.idSuitChipOn : null),
-                }}
-              >
-                {s.emoji} {s.label}
-              </button>
-            ))}
-          </div>
-          <div style={{ ...S.promptPeek, marginTop: 12 }}>
-            컷마다 포즈·표정이 다양하게 나오고, 프레임·날짜·rimikimi 로고가 자동으로 합성돼요.
-          </div>
-        </div>
+          <div style={S.note}>{t("opt.cutsNote")}</div>
+        </>
       )}
 
+      {/* 증명사진(레거시) — 정장·배경 */}
       {idPhoto && (
-        <div style={S.idOptCard}>
-          <div style={S.idOptLabel}>정장 색상</div>
-          <div style={S.idSuitRow}>
-            {ID_SUITS.map((s) => (
-              <button
-                key={s.key}
-                onClick={() => setIdSuit(s.key)}
-                style={{
-                  ...S.idSuitChip,
-                  ...(idSuit === s.key ? S.idSuitChipOn : null),
-                }}
-              >
-                <span style={{ ...S.idSuitDot, background: s.css }} />
-                {s.label}
+        <>
+          <div style={S.lbl}>정장 색상</div>
+          <div style={S.chipWrap}>
+            {ID_SUITS.map((sx) => (
+              <button key={sx.key} type="button" onClick={() => setIdSuit(sx.key)} style={{ ...S.chip, ...(idSuit === sx.key ? S.chipOn : null) }}>
+                <span style={{ ...S.idSuitDot, background: sx.css }} />{sx.label}
               </button>
             ))}
           </div>
-
-          <div style={{ ...S.idOptLabel, marginTop: 14 }}>배경 색상</div>
+          <div style={S.lbl}>배경 색상</div>
           <div style={S.idBgRow}>
             {ID_BGS.map((b) => (
-              <button
-                key={b.hex}
-                onClick={() => setIdBg(b.hex)}
-                title={b.hex}
-                style={{
-                  ...S.idBgSwatch,
-                  background: `linear-gradient(160deg, ${b.hex} 0%, ${b.hex} 45%, rgba(0,0,0,0.14) 140%)`,
-                  ...(idBg.toLowerCase() === b.hex.toLowerCase() ? S.idBgSwatchOn : null),
-                }}
-              >
-                {idBg.toLowerCase() === b.hex.toLowerCase() ? (
-                  <span style={{ ...S.idBgCheck, color: ["#1b3c5a", "#4d3f64"].includes(b.hex) ? "#fff" : "#333" }}>✓</span>
-                ) : null}
-              </button>
+              <button key={b.hex} type="button" onClick={() => setIdBg(b.hex)} title={b.hex}
+                style={{ ...S.idBgSwatch, background: b.hex, ...(idBg.toLowerCase() === b.hex.toLowerCase() ? S.idBgSwatchOn : null) }} />
             ))}
           </div>
-
-          {(() => {
-            const isCustom = !ID_BGS.some((b) => b.hex.toLowerCase() === idBg.toLowerCase());
-            return (
-              <label style={{ ...S.idCustomRow, ...(isCustom ? S.idCustomRowOn : null) }}>
-                <span
-                  style={{
-                    ...S.idCustomSwatch,
-                    background: isCustom
-                      ? idBg
-                      : "conic-gradient(from 0deg, #ff3b3b, #ffec3b, #4bff3b, #3bffe1, #3b6bff, #c43bff, #ff3bb0, #ff3b3b)",
-                  }}
-                />
-                <span style={S.idCustomText}>
-                  직접 선택{isCustom ? ` · ${idBg.toUpperCase()}` : ""}
-                </span>
-                <input
-                  type="color"
-                  value={isCustom ? idBg : "#cccccc"}
-                  onChange={(e) => setIdBg(e.target.value)}
-                  style={{ position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none" }}
-                />
-              </label>
-            );
-          })()}
-
-          <div style={S.idDisclaimer}>⚠️ {ID_DISCLAIMER}</div>
-        </div>
+          <div style={S.note}>⚠️ {ID_DISCLAIMER}</div>
+        </>
       )}
 
-      <div style={S.costRow}>
-        <span style={S.costLabel}>{t("step3.use")}</span>
-        <span style={S.costValue}>
-          {useFree ? t("step3.useFree", { n: freeLeft }) : t("step3.useCredit")}
-        </span>
+      {/* 장수 (묶음) — 인생네컷은 자체 컷 수, 매직부스는 일회용 사진이라 제외 */}
+      {batchable && (
+        <>
+          <div style={S.lbl}>
+            {t("opt.count")}
+            {!unlimited && <span style={S.lblSub}> · {t("batch.have", { n: credits })}</span>}
+          </div>
+          <Seg
+            items={BATCH_OPTIONS.map((b) => ({
+              value: b.count,
+              label: String(b.count),
+              sub: unlimited ? null : (b.count === 1 && freeLeft > 0 ? t("opt.costFree") : t("opt.costCredits", { n: b.cost })),
+              disabled: !unlimited && b.count > 1 && credits < b.cost,
+            }))}
+            value={batchCount}
+            onChange={setBatchCount}
+          />
+        </>
+      )}
+
+      <div style={S.note}>
+        {dressroom ? t("opt.dressNote") : art ? t("step3.peekArt") : t("step3.peek")}
       </div>
+      <div style={S.consentNote}>{t("opt.consentNote")}{consent}</div>
 
-      {canGenerate ? (
-        <button style={S.primaryBtn} onClick={onGenerate}>
-          {t("step3.generate")}
+      {/* 하단 고정 CTA */}
+      <div style={S.cta}>
+        <button
+          type="button"
+          style={{ ...S.primaryBtn, ...(generating ? { opacity: 0.6 } : null) }}
+          disabled={generating}
+          onClick={onGenerate}
+        >
+          {generating ? t("common.loading") : cta}
         </button>
-      ) : (
-        <button style={S.primaryBtn} onClick={onStore}>
-          {PAYMENTS_ENABLED ? t("step3.topupGenerate") : "오늘 무료 횟수 소진 · 친구 초대로 크레딧 받기"}
-        </button>
-      )}
+      </div>
     </div>
   );
 }
@@ -4345,7 +4119,7 @@ function CompareSlider({ before, after }) {
 function ResultScreen({
   generating, genWaiting = false, fourcutProgress = "", prompt, resultImage, galleryId = null, accessToken = null,
   genCount = 1,
-  genError, onRetry, onAgain, onHome, showAds = false,
+  genError, onRetry, onOneMore, onSimilar, onBack, onHome, showAds = false,
   canTryPro = false, proSampleImg = null, proSampleBusy = false, onTryPro, onUpgrade,
   onShared, resultBatch = null,
 }) {
@@ -4558,6 +4332,7 @@ function ResultScreen({
       )}
       {generating ? (
         <div style={S.genWrap}>
+          <TopBar title={localizedTitle(prompt)} onBack={onBack} />
           <div style={S.genHearts}>
             {HEARTS.map((c, i) => (
               <span
@@ -4589,19 +4364,17 @@ function ResultScreen({
           {showAds && <AdSlot />}
         </div>
       ) : genError ? (
-        <div className="fade">
-          <div style={S.screenKicker}>{t("result.fail")}</div>
-          <div style={S.screenTitle}>{t("result.failHint")}</div>
+        <div className="fade" style={{ paddingTop: 0 }}>
+          <TopBar title={t("result.fail")} onBack={onBack} />
           <div style={S.errorCard}>{genError}</div>
           <div style={S.resultActions}>
             <button style={S.secondaryBtn} onClick={onHome}>{t("result.home")}</button>
-            <button style={S.primaryBtn} onClick={onRetry}>다시 시도</button>
+            <button style={S.primaryBtn} onClick={onRetry}>{t("common.retry")}</button>
           </div>
         </div>
       ) : resultImage ? (
-        <div className="fade">
-          <div style={S.screenKicker}>{t("result.done")}</div>
-          <div style={S.screenTitle}>{localizedTitle(prompt)}</div>
+        <div className="fade" style={{ paddingTop: 0 }}>
+          <TopBar title={localizedTitle(prompt)} onBack={onBack} />
           {/* 묶음 생성이면 1컬럼 세로로 전부 보여준다. 장마다 저장/공유 가능 */}
           {resultBatch && resultBatch.length > 1 ? (
             <>
@@ -4653,14 +4426,48 @@ function ResultScreen({
             </div>
           )}
 
-          {/* 기본 vs Pro 비교 (무료 Pro 체험) */}
+          {/* 기본 vs Pro 비교 (무료 Pro 체험) — 결과가 있을 때만, 버튼 아래 작은 카드 */}
+          <div style={S.savedNote}>{t("result.savedNote")}</div>
+          {!(resultBatch && resultBatch.length > 1) && (
+            <button
+              type="button"
+              onClick={handleSaveResult}
+              disabled={saving}
+              style={{ ...S.primaryBtn, ...(saving ? { opacity: 0.6 } : {}) }}
+            >
+              {saving ? t("common.loading") : t("result.saveAlbum")}
+            </button>
+          )}
+          {!(resultBatch && resultBatch.length > 1) && (
+            <div style={S.acts}>
+              <button
+                type="button"
+                onClick={() => openEditor(resultImage, galleryId, "rimikimi_" + (prompt?.id ?? "art"))}
+                disabled={editorLoading}
+                style={{ ...S.grayBtn, ...(editorLoading ? { opacity: 0.6 } : {}) }}
+              >
+                {editorLoading ? t("common.loading") : t("result.edit")}
+              </button>
+              <button
+                type="button"
+                onClick={handleShareResult}
+                disabled={sharing}
+                style={{ ...S.grayBtn, ...(sharing ? { opacity: 0.6 } : {}) }}
+              >
+                {sharing ? t("common.loading") : t("result.shareShort")}
+              </button>
+            </div>
+          )}
+          <div style={S.acts}>
+            <button type="button" style={S.grayBtn} onClick={onOneMore}>{t("result.oneMore")}</button>
+            <button type="button" style={S.grayBtn} onClick={onSimilar}>{t("result.similar")}</button>
+          </div>
+
           {proSampleImg ? (
             <div style={S.proWrap}>
               <div style={S.proWrapTitle}>✨ 기본 vs Pro — 손잡이를 드래그해 비교해보세요</div>
               <CompareSlider before={resultImage} after={proSampleImg} />
-              <button type="button" style={S.proUpgradeBtn} onClick={onUpgrade}>
-                Pro 화질로 계속 만들기
-              </button>
+              <button type="button" style={S.proUpgradeBtn} onClick={onUpgrade}>Pro 화질로 계속 만들기</button>
               <div style={S.proWrapHint}>Pro는 저장 시 2K 고해상도로 받아져요.</div>
             </div>
           ) : canTryPro ? (
@@ -4677,46 +4484,6 @@ function ResultScreen({
               </button>
             </div>
           ) : null}
-
-          <div style={S.saveNotice}>
-            {t("result.saveNotice1")}
-            <br />
-            {t("result.saveNotice2")}
-            <br />
-            {t("result.saveNotice3")}
-            <br />
-            {t("result.saveNotice4")}
-          </div>
-          <button
-            type="button"
-            onClick={handleSaveResult}
-            disabled={saving}
-            style={{ ...S.downloadBtn, ...(saving ? { opacity: 0.6 } : {}) }}
-          >
-            {saving ? t("common.loading") : t("result.download")}
-          </button>
-          <div style={{ display: "flex", gap: 10 }}>
-            <button
-              type="button"
-              onClick={() => openEditor(resultImage, galleryId, "rimikimi_" + (prompt?.id ?? "art"))}
-              disabled={editorLoading}
-              style={{ ...S.shareResultBtn, flex: 1, ...(editorLoading ? { opacity: 0.6 } : {}) }}
-            >
-              {editorLoading ? t("common.loading") : "🎨 " + t("edit.btn")}
-            </button>
-            <button
-              type="button"
-              onClick={handleShareResult}
-              disabled={sharing}
-              style={{ ...S.shareResultBtn, flex: 1, ...(sharing ? { opacity: 0.6 } : {}) }}
-            >
-              {sharing ? t("common.loading") : t("result.share")}
-            </button>
-          </div>
-          <div style={S.resultActions}>
-            <button style={S.secondaryBtn} onClick={onHome}>{t("result.home")}</button>
-            <button style={S.primaryBtn} onClick={onAgain}>{t("result.again")}</button>
-          </div>
           {/* 부적절 콘텐츠 신고 (App Store Guideline 1.2) */}
           <a
             href={
@@ -4900,13 +4667,7 @@ function StoreScreen({ packs, credits, session, freeLimit = FREE_DAILY, onCredit
 
   return (
     <div className="fade">
-      <div style={S.navRow}>
-        <button style={S.backBtn} onClick={onBack}>←</button>
-        <div>
-          <div style={S.screenKicker}>{t("store.kicker")}</div>
-          <div style={S.screenTitle}>{t("store.title")}</div>
-        </div>
-      </div>
+      <TopBar title={t("store.title")} onBack={onBack} />
 
       <p style={S.storeIntro}>
         {t("store.intro", { n: freeLimit })}{" "}
@@ -5035,22 +4796,27 @@ function StoreScreen({ packs, credits, session, freeLimit = FREE_DAILY, onCredit
 /* ============================================================
    스타일
    ============================================================ */
-const INK = "#231f20";
-const BG = "#fffdf9";
-const ACCENT = "#e6403c";
+// ── 2.0 토큰 (v2/SPEC.md §1) — 세 플랫폼 공통 ──
+const INK = "#231F20";
+const INK2 = "rgba(35,31,32,.6)";   // 2차 글자
+const INK3 = "rgba(35,31,32,.3)";   // 3차 글자
+const BG = "#FBF8F3";               // 바탕(평면, 그라데이션 없음)
+const CARD = "#FFFFFF";
+const FILL = "#F1ECE4";             // 회색 채움(2차 버튼·칩)
+const FILL_PRESSED = "#E4DCD0";
+const SEP = "rgba(35,31,32,.14)";   // 구분선
+const ACCENT = "#E6403C";
+const ACCENT_SOFT = "rgba(230,64,60,.12)";
+const R_BTN = 12, R_CARD = 14, R_SHEET = 20;
+const FONT = '-apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", system-ui, sans-serif';
 
 const S = {
   app: {
-    // 화면 높이로 고정 + overflow hidden → 문서 자체는 스크롤/바운스 안 함.
-    // 내용이 넘치는 화면만 내부(main)에서 스크롤된다. (짧은 화면 = 자동 고정)
     height: "100dvh", maxWidth: 440, margin: "0 auto",
-    background:
-      "radial-gradient(600px 420px at 12% 4%, rgba(255,209,160,.50), transparent 55%)," +
-      "radial-gradient(600px 520px at 92% 18%, rgba(255,193,214,.45), transparent 55%)," +
-      "radial-gradient(640px 620px at 60% 100%, rgba(183,224,255,.45), transparent 60%)," +
-      "linear-gradient(160deg,#fff6ec,#fdeef6 55%,#eef4ff)",
+    background: BG, // 2.0: 평면 바탕 (오로라 그라데이션 제거)
     color: INK,
-    fontFamily: "'Quicksand', 'Jua', sans-serif",
+    fontFamily: FONT,
+    WebkitFontSmoothing: "antialiased",
     display: "flex", flexDirection: "column", position: "relative",
     overflow: "hidden",
   },
@@ -5063,14 +4829,7 @@ const S = {
   splashDots: { display: "flex", gap: 9 },
   header: {
     display: "flex", justifyContent: "space-between", alignItems: "center",
-    // 노치/상태바 안전영역만큼 위 여백 추가 (기종 자동 대응)
-    padding: "calc(env(safe-area-inset-top, 0px) + 15px) 20px 13px",
-    position: "sticky", top: 0, zIndex: 60,
-    background: "rgba(255,253,249,0.82)",
-    backdropFilter: "blur(22px) saturate(180%)",
-    WebkitBackdropFilter: "blur(22px) saturate(180%)",
-    borderBottom: "0.5px solid rgba(35,31,32,0.08)",
-    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.6)",
+    padding: "calc(env(safe-area-inset-top, 0px) + 10px) 0 6px",
   },
   headerRight: { display: "flex", alignItems: "center", gap: 8 },
   logoutBtn: {
@@ -5082,7 +4841,7 @@ const S = {
     padding: "8px 13px",
     fontSize: 11.5,
     fontWeight: 600,
-    fontFamily: "'Quicksand', sans-serif",
+    fontFamily: FONT,
     cursor: "pointer",
     letterSpacing: "0.02em",
   },
@@ -5091,50 +4850,29 @@ const S = {
     cursor: "pointer", display: "flex", alignItems: "center",
   },
   profileBtn: {
-    width: 44, height: 44, borderRadius: "50%",
-    border: "2px solid " + INK + "18", background: "#fff",
+    width: 34, height: 34, borderRadius: "50%",
+    border: "none", background: FILL_PRESSED,
     padding: 0, cursor: "pointer", overflow: "hidden",
     display: "flex", alignItems: "center", justifyContent: "center",
     flexShrink: 0,
-    boxShadow: "0 4px 12px -6px rgba(35,31,32,0.25)",
   },
-  profileBtnImg: {
-    width: "100%", height: "100%", objectFit: "cover", display: "block",
-  },
-  profileBtnPlaceholder: { fontSize: 16, opacity: 0.5, lineHeight: 1 },
+  profileBtnImg: { width: "100%", height: "100%", objectFit: "cover", objectPosition: "50% 20%", display: "block" },
+  profileBtnPlaceholder: { fontSize: 15, opacity: 0.5, lineHeight: 1 },
 
   /* === 프로필 화면 === */
   profileCard: {
-    background: "#fff", border: "1px solid " + INK + "10",
-    borderRadius: 18, padding: "24px 20px",
-    display: "flex", flexDirection: "column", alignItems: "center",
-    textAlign: "center", marginBottom: 16,
-    boxShadow: "0 4px 14px rgba(35,31,32,0.04)",
+    background: CARD, borderRadius: R_CARD, padding: 14, display: "flex", gap: 14, alignItems: "center",
+    boxShadow: "0 1px 2px rgba(35,31,32,.06)", marginBottom: 8,
   },
-  profileAvatar: {
-    width: 96, height: 96, borderRadius: "50%",
-    background: "#f0ece4", overflow: "hidden",
-    border: "3px solid " + ACCENT + "22",
-    display: "flex", alignItems: "center", justifyContent: "center",
-    marginBottom: 14,
-  },
+  profileAvatar: { width: 60, height: 60, borderRadius: "50%", background: FILL, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" },
   profileAvatarImg: {
     width: "100%", height: "100%", objectFit: "cover", display: "block",
   },
-  profileAvatarEmpty: { fontSize: 32, opacity: 0.4 },
-  profileName: {
-    fontSize: 19, fontWeight: 700, color: INK, marginBottom: 4,
-    fontFamily: "'Quicksand', sans-serif",
-  },
-  profileMeta: {
-    fontSize: 12.5, opacity: 0.55, fontWeight: 500, marginBottom: 16,
-  },
-  profilePhotoActions: {
-    display: "flex", gap: 8, width: "100%", marginBottom: 12,
-  },
-  profileHint: {
-    fontSize: 10.5, lineHeight: 1.6, opacity: 0.5, fontWeight: 500,
-  },
+  profileAvatarEmpty: { fontSize: 24, opacity: 0.4 },
+  profileName: { fontSize: 17, fontWeight: 600, color: INK, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
+  profileMeta: { fontSize: 13, color: INK2, marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
+  profilePhotoActions: { display: "flex", gap: 14, marginTop: 4 },
+  profileHint: { fontSize: 12, lineHeight: 1.5, color: INK3, margin: "0 4px 16px" },
   statRow: {
     display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10,
     marginBottom: 14,
@@ -5146,35 +4884,20 @@ const S = {
   },
   statLabel: {
     fontSize: 12, opacity: 0.6, fontWeight: 600, marginBottom: 7,
-    fontFamily: "'Quicksand', sans-serif",
+    fontFamily: FONT,
   },
   statValue: {
     fontSize: 26, fontWeight: 700, color: INK, lineHeight: 1.1,
-    fontFamily: "'Quicksand', sans-serif",
+    fontFamily: FONT,
   },
   statSub: { fontSize: 10.5, opacity: 0.5, fontWeight: 500, marginTop: 4 },
 
   /* === 언어 선택 === */
-  langBox: {
-    background: "#fff", border: "1px solid " + INK + "10",
-    borderRadius: 14, padding: "14px 16px", marginBottom: 14,
-  },
-  langTitle: {
-    fontSize: 12.5, fontWeight: 700, color: INK, marginBottom: 10,
-    fontFamily: "'Quicksand', sans-serif",
-  },
-  langOptions: {
-    display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6,
-  },
-  langOpt: {
-    background: "#fff", color: INK,
-    border: "1.5px solid " + INK + "18", borderRadius: 10,
-    padding: "9px 8px", fontSize: 12, fontWeight: 700,
-    fontFamily: "'Quicksand', sans-serif", cursor: "pointer",
-  },
-  langOptActive: {
-    background: INK, color: "#fff", borderColor: "transparent",
-  },
+  langBox: { background: CARD, borderRadius: R_CARD, padding: "12px 14px 14px", marginBottom: 14, boxShadow: "0 1px 2px rgba(35,31,32,.06)" },
+  langTitle: { fontSize: 13, fontWeight: 600, letterSpacing: "0.04em", color: INK2, marginBottom: 8 },
+  langOptions: { display: "flex", background: FILL, borderRadius: 10, padding: 3 },
+  langOpt: { flex: 1, background: "transparent", color: INK2, border: "none", borderRadius: 8, padding: "8px 4px", fontSize: 14, fontWeight: 600, fontFamily: FONT, cursor: "pointer" },
+  langOptActive: { background: CARD, color: INK, boxShadow: "0 1px 3px rgba(35,31,32,.14)" },
 
   /* === 내 갤러리 진입 버튼 (프로필 내) === */
   galleryEntry: {
@@ -5188,7 +4911,7 @@ const S = {
   galleryEntryLeft: { flex: 1, minWidth: 0 },
   galleryEntryTitle: {
     fontSize: 15.5, fontWeight: 700, color: INK, marginBottom: 3,
-    fontFamily: "'Quicksand', sans-serif",
+    fontFamily: FONT,
   },
   galleryEntryDesc: {
     fontSize: 12.5, opacity: 0.6, fontWeight: 500, lineHeight: 1.5,
@@ -5198,36 +4921,22 @@ const S = {
   },
 
   /* === 내 갤러리 화면 === */
-  galleryNotice: {
-    background: "#f9c83c22", color: "#8a6a16",
-    border: "1.5px solid #f9c83c66", borderRadius: 14,
-    padding: "12px 14px", fontSize: 12.5, lineHeight: 1.6,
-    fontWeight: 600, fontFamily: "'Quicksand', sans-serif",
-    margin: "0 0 16px", textAlign: "center",
-  },
-  myGalleryGrid: {
-    display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12,
-  },
+  galleryNotice: { fontSize: 13, color: INK2, lineHeight: 1.5, margin: "0 2px 12px" },
+  myGalleryGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 },
   // 필터 화면 맨 위 카메라 진입 버튼
   camCta: {
     width: "100%", display: "flex", alignItems: "center", gap: 12,
-    background: "#fff", border: "1px solid " + INK + "12", borderRadius: 18,
-    padding: "13px 15px", marginBottom: 18, cursor: "pointer", textAlign: "left",
-    boxShadow: "0 10px 24px -16px rgba(35,31,32,0.34)",
+    background: CARD, border: "none", borderRadius: R_CARD,
+    padding: "12px 14px", marginBottom: 16, cursor: "pointer", textAlign: "left",
+    boxShadow: "0 1px 2px rgba(35,31,32,.06)", fontFamily: FONT,
   },
-  camCtaIcon: {
-    flex: "none", width: 42, height: 42, borderRadius: 14,
-    background: "linear-gradient(140deg,#231f20,#4a4243)", color: "#fff",
-    display: "flex", alignItems: "center", justifyContent: "center",
-  },
+  camCtaIcon: { flex: "none", width: 42, height: 42, borderRadius: 12, background: INK, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center" },
   camCtaText: { flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 },
-  camCtaTitle: { fontSize: 14.5, fontWeight: 800, color: INK, letterSpacing: "-0.01em" },
-  camCtaDesc: { fontSize: 12, color: INK + "8c", lineHeight: 1.4 },
-  camCtaGo: { flex: "none", fontSize: 20, color: INK + "55", paddingRight: 2 },
+  camCtaTitle: { fontSize: 15, fontWeight: 600, color: INK },
+  camCtaDesc: { fontSize: 13, color: INK2, lineHeight: 1.4 },
+  camCtaGo: { flex: "none", fontSize: 20, color: INK3, paddingRight: 2 },
 
-  filterNotice: {
-    fontSize: 12.5, color: INK + "8c", lineHeight: 1.6, margin: "2px 2px 12px",
-  },
+  filterNotice: { fontSize: 13, color: INK2, lineHeight: 1.5, margin: "2px 2px 12px" },
   // 필터 스튜디오 히어로 카드 (🎞️ 필터 카테고리 전용)
   filterHero: {
     display: "block", width: "100%", textAlign: "left", padding: 0,
@@ -5243,143 +4952,81 @@ const S = {
     marginTop: 14, display: "inline-block", background: INK, color: "#fff",
     fontSize: 14, fontWeight: 800, borderRadius: 12, padding: "11px 18px",
   },
-  myGalleryCard: {
-    background: "#fff", border: "1px solid " + INK + "10",
-    borderRadius: 14, overflow: "hidden",
-    boxShadow: "0 3px 10px rgba(35,31,32,0.04)",
-  },
-  myGalleryImgWrap: {
-    position: "relative", aspectRatio: "3/4",
-    background: "#f0ece4",
-  },
+  myGalleryCard: { background: CARD, border: "none", borderRadius: R_CARD, overflow: "hidden", boxShadow: "0 1px 2px rgba(35,31,32,.06)" },
+  myGalleryImgWrap: { position: "relative", aspectRatio: "3/4", background: FILL },
   myGalleryImg: {
     width: "100%", height: "100%", objectFit: "cover", display: "block",
   },
-  myGalleryTimer: {
-    position: "absolute", left: 8, bottom: 8,
-    background: "rgba(35,31,32,0.78)", color: "#fff",
-    borderRadius: 999, padding: "4px 9px",
-    fontSize: 10, fontWeight: 700, fontFamily: "'Quicksand', sans-serif",
-    letterSpacing: "0.02em",
-  },
+  myGalleryTimer: { position: "absolute", left: 8, bottom: 8, background: "rgba(35,31,32,0.72)", color: "#fff", borderRadius: 999, padding: "4px 9px", fontSize: 10.5, fontWeight: 600, fontFamily: FONT, fontVariantNumeric: "tabular-nums" },
   myGalleryTimerWarn: { background: ACCENT },
-  myGallerySavedBadge: {
-    position: "absolute", left: 8, top: 8,
-    background: "rgba(46,160,90,0.92)", color: "#fff",
-    borderRadius: 999, padding: "4px 9px",
-    fontSize: 10, fontWeight: 800, fontFamily: "'Quicksand', sans-serif",
-    letterSpacing: "0.02em",
-    boxShadow: "0 2px 6px rgba(35,31,32,0.18)",
-  },
-  myGalleryFooter: { padding: "10px 11px 12px" },
-  myGalleryTitle: {
-    fontSize: 12, fontWeight: 700, color: INK,
-    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-    marginBottom: 8,
-  },
-  myGalleryActions: {
-    display: "grid", gridTemplateColumns: "1fr auto auto", gap: 6,
-  },
-  myGalleryDownload: {
-    background: INK, color: "#fff", textAlign: "center",
-    textDecoration: "none", borderRadius: 8, padding: "7px 0",
-    fontSize: 11.5, fontWeight: 700, fontFamily: "'Quicksand', sans-serif",
-    border: "none", cursor: "pointer",
-  },
-  myGalleryDownloadDone: {
-    background: "#fff", color: "#2EA05A",
-    border: "1px solid #2EA05A55",
-  },
+  myGallerySavedBadge: { position: "absolute", left: 8, top: 8, background: "rgba(46,160,90,0.92)", color: "#fff", borderRadius: 999, padding: "4px 9px", fontSize: 10.5, fontWeight: 600, fontFamily: FONT },
+  myGalleryFooter: { padding: "9px 10px 10px" },
+  myGalleryTitle: { fontSize: 13, fontWeight: 600, color: INK, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 8 },
+  myGalleryActions: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 },
+  myGalleryDownload: { background: INK, color: "#fff", textAlign: "center", borderRadius: 8, padding: "8px 0", fontSize: 12.5, fontWeight: 600, fontFamily: FONT, border: "none", cursor: "pointer" },
+  myGalleryDownloadDone: { background: FILL, color: "#1a7f4b" },
   // [공유] 버튼 — 저장/삭제와 별개 (viral-loop-and-funnel-standard.md §A)
-  myGalleryShare: {
-    background: "transparent", color: INK,
-    border: "1px solid " + INK + "33", borderRadius: 8,
-    padding: "7px 10px", fontSize: 11.5, fontWeight: 700,
-    fontFamily: "'Quicksand', sans-serif", cursor: "pointer",
-  },
-  myGalleryDelete: {
-    background: "transparent", color: ACCENT,
-    border: "1px solid " + ACCENT + "44", borderRadius: 8,
-    padding: "7px 10px", fontSize: 11.5, fontWeight: 700,
-    fontFamily: "'Quicksand', sans-serif", cursor: "pointer",
-  },
+  myGalleryShare: { background: FILL, color: INK, border: "none", borderRadius: 8, padding: "8px 0", fontSize: 12.5, fontWeight: 600, fontFamily: FONT, cursor: "pointer" },
+  myGalleryDelete: { background: FILL, color: ACCENT, border: "none", borderRadius: 8, padding: "8px 0", fontSize: 12.5, fontWeight: 600, fontFamily: FONT, cursor: "pointer" },
   creditChip: {
-    display: "flex", alignItems: "center", gap: 7,
-    background: "rgba(255,255,255,0.55)", color: INK,
-    border: "1px solid rgba(255,255,255,0.7)", borderRadius: 999,
-    backdropFilter: "blur(14px) saturate(180%)",
-    WebkitBackdropFilter: "blur(14px) saturate(180%)",
-    boxShadow: "0 8px 20px -8px rgba(40,30,30,0.28), inset 0 1px 0 rgba(255,255,255,0.9)",
-    padding: "11px 16px", fontSize: 13.5, fontFamily: "'Quicksand', sans-serif",
-    fontWeight: 700, letterSpacing: "0.02em", cursor: "pointer",
+    display: "flex", alignItems: "center", gap: 6,
+    background: CARD, color: INK,
+    border: "1px solid " + SEP, borderRadius: 999,
+    padding: "7px 12px", fontSize: 13, fontFamily: FONT,
+    fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap",
   },
-  creditDot: {
-    width: 7, height: 7, borderRadius: "50%",
-    background: "#f9c83c", display: "inline-block",
-  },
+  creditDot: { width: 8, height: 8, borderRadius: "50%", background: "#F9C83C", display: "inline-block" },
   main: {
-    flex: 1, minHeight: 0,            // minHeight:0 = flex 자식이 줄어들 수 있어야 내부 스크롤이 동작 (없으면 내용이 잘림)
+    flex: 1, minHeight: 0,
     overflowY: "auto", overflowX: "hidden",
     WebkitOverflowScrolling: "touch",
-    overscrollBehavior: "contain",     // 내부 스크롤 끝에서 문서로 바운스 전파 차단
-    // 가로 터치는 우리 제스처(뒤로가기·컨셉 넘기기) 몫이라고 WebKit 에 미리 알린다.
-    // 없으면 WebKit 이 "스크롤인가?" 판정하느라 첫 이동을 붙잡고 있다가 넘겨서 손가락보다 늦게 따라온다.
-    // 가로 스크롤 줄([data-hscroll])은 자기 자신이 스크롤 컨테이너라 이 값의 영향을 안 받는다.
+    overscrollBehavior: "contain",
     touchAction: "pan-y",
-    // top 패딩 0 = sticky 카테고리바가 헤더 바로 아래에 딱 붙음(패딩 있으면 WebKit이 그 만큼
-    // 아래에서 sticky 고정 → 헤더와 바 사이로 갤러리가 비쳐 보이는 틈 발생). 위 여백은 .fade 가 담당.
-    // 하단 플로팅 탭바(고정)에 마지막 내용이 가리지 않도록 여백 확보
-    padding: "0 20px calc(env(safe-area-inset-bottom, 0px) + 96px)",
+    padding: "0 16px calc(env(safe-area-inset-bottom, 0px) + 96px)",
   },
   tabbar: {
     position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 100,
     display: "flex", justifyContent: "center",
-    padding: "0 16px calc(env(safe-area-inset-bottom, 0px) + 10px)",
+    padding: "0 12px calc(env(safe-area-inset-bottom, 0px) + 14px)",
     pointerEvents: "none",
   },
   tabbarInner: {
     pointerEvents: "auto",
-    width: "100%", maxWidth: 460,
+    width: "100%", maxWidth: 416, height: 62,
     display: "flex", alignItems: "center",
-    padding: "7px 10px",
-    borderRadius: 30,
-    background: "rgba(255,255,255,0.40)",
-    backdropFilter: "blur(32px) saturate(200%)",
-    WebkitBackdropFilter: "blur(32px) saturate(200%)",
-    border: "1px solid rgba(255,255,255,0.6)",
-    boxShadow:
-      "0 10px 34px -8px rgba(35,31,32,0.26), 0 2px 8px -2px rgba(35,31,32,0.14), inset 0 1px 1px rgba(255,255,255,0.9), inset 0 -6px 12px -6px rgba(255,255,255,0.5)",
+    padding: "0 8px",
+    borderRadius: 31,
+    background: "rgba(255,255,255,0.72)",
+    backdropFilter: "blur(24px) saturate(180%)",
+    WebkitBackdropFilter: "blur(24px) saturate(180%)",
+    border: "1px solid rgba(255,255,255,0.75)",
+    boxShadow: "0 10px 34px -8px rgba(35,31,32,0.26), 0 2px 8px -2px rgba(35,31,32,0.14)",
   },
   tabBtn: {
     flex: 1,
     background: "transparent", border: "none", cursor: "pointer",
     display: "flex", flexDirection: "column", alignItems: "center",
     justifyContent: "center", gap: 3,
-    color: "#8a827b", padding: "6px 0", borderRadius: 20, minHeight: 44,
-    fontFamily: "'Quicksand', sans-serif",
-    // ⚠️ 탭 활성 색은 트랜지션 없이 즉시 바뀐다. 한 세션에 수십 번 누르는 곳이라
-    //    180ms 짜리 색 전환이 붙으면 그만큼 앱이 굼떠 보인다(빈도 테스트).
+    color: "#8A827B", padding: "6px 0", minHeight: 44,
+    fontFamily: FONT,
     transition: "none",
   },
   tabBtnOn: { color: ACCENT },
   // 가운데 카메라 — 탭바 위로 살짝 떠 있는 원형 버튼
-  tabCamSlot: { flex: "0 0 74px", display: "flex", justifyContent: "center", alignItems: "center" },
+  tabCamSlot: { flex: "0 0 70px", display: "flex", justifyContent: "center", alignItems: "center" },
   tabCam: {
-    width: 58, height: 58, borderRadius: "50%", border: "none", cursor: "pointer",
-    background: "linear-gradient(150deg, #2b2627, " + INK + ")", color: "#fff",
+    width: 54, height: 54, borderRadius: "50%", border: "none", cursor: "pointer",
+    background: INK, color: "#fff",
     display: "flex", alignItems: "center", justifyContent: "center",
     transform: "translateY(-14px)",
-    boxShadow: "0 10px 22px -8px rgba(35,31,32,0.55), 0 0 0 5px rgba(255,255,255,0.72)",
+    boxShadow: "0 10px 22px -8px rgba(35,31,32,0.55), 0 0 0 5px rgba(255,255,255,0.8)",
     transition: "none",
   },
-  tabLabel: { fontSize: 10.5, fontWeight: 600, letterSpacing: "0.02em" },
+  tabLabel: { fontSize: 10.5, fontWeight: 600, letterSpacing: "0.01em" },
   footer: {
     textAlign: "center",
-    // 하단 고정 탭바(BottomNav)가 사업자정보를 가리지 않도록 탭바 높이만큼 여백 확보.
-    // 전자상거래법상 상호·사업자등록번호·통신판매업 신고번호·주소·연락처는 화면에서
-    // 실제로 보여야 하며, 가려지면 PG 카드사 심사에서 보완 요구가 온다(2026-08 토스 지적).
-    padding: "16px 20px calc(env(safe-area-inset-bottom, 0px) + 96px)",
-    fontFamily: "'Quicksand', sans-serif",
+    padding: "8px 0 0",
+    fontFamily: FONT,
   },
   footerLinks: {
     display: "flex", justifyContent: "center", alignItems: "center",
@@ -5394,7 +5041,7 @@ const S = {
     fontSize: 10, letterSpacing: "0.01em", opacity: 0.4,
     lineHeight: 1.7, fontWeight: 500,
   },
-  hero: { marginBottom: 24 },
+  hero: { position: "relative", borderRadius: 16, overflow: "hidden", background: FILL, width: "100%", height: "min(46vh, 120vw)" },
   heroKicker: {
     display: "flex", alignItems: "center", gap: 7,
     fontSize: 11, fontWeight: 700, letterSpacing: "0.18em",
@@ -5405,7 +5052,7 @@ const S = {
     transform: "rotate(45deg)", display: "inline-block",
   },
   heroTitle: {
-    fontFamily: "'Jua', sans-serif", fontSize: 27, lineHeight: 1.25,
+    fontFamily: FONT, fontSize: 27, lineHeight: 1.25,
     fontWeight: 400, margin: 0, letterSpacing: "-0.02em",
     whiteSpace: "nowrap",
   },
@@ -5437,13 +5084,13 @@ const S = {
     position: "absolute", bottom: 12, right: 12,
     background: "rgba(35,31,32,0.88)", color: "#fff", border: "none",
     borderRadius: 999, padding: "8px 16px", fontSize: 11.5,
-    fontWeight: 600, fontFamily: "'Quicksand', sans-serif", cursor: "pointer",
+    fontWeight: 600, fontFamily: FONT, cursor: "pointer",
   },
   changePhotoBtn: {
     width: "100%", boxSizing: "border-box", marginTop: 10,
     background: "#fff", color: INK, border: "2px solid " + INK + "22",
     borderRadius: 14, padding: "13px", fontSize: 13.5, fontWeight: 700,
-    fontFamily: "'Quicksand', sans-serif", cursor: "pointer",
+    fontFamily: FONT, cursor: "pointer",
   },
   // ── 묶음 생성 칩 (1/3/6/12장) ──
   batchHave: { fontWeight: 600, fontSize: 11, opacity: 0.55 },
@@ -5452,7 +5099,7 @@ const S = {
     flex: 1, position: "relative", display: "flex", flexDirection: "column",
     alignItems: "center", gap: 3, padding: "11px 4px 10px",
     background: "#fff", border: "2px solid " + INK + "14", borderRadius: 14,
-    fontFamily: "'Quicksand', sans-serif",
+    fontFamily: FONT,
   },
   batchChipOn: { borderColor: ACCENT, background: ACCENT + "0d" },
   batchChipLabel: { fontSize: 15, fontWeight: 800, color: INK },
@@ -5464,10 +5111,7 @@ const S = {
   },
 
   // ── 묶음 결과 (1컬럼 세로 스크롤) ──
-  batchNotice: {
-    fontSize: 12.5, fontWeight: 700, opacity: 0.6,
-    textAlign: "center", margin: "14px 0 10px",
-  },
+  batchNotice: { fontSize: 13, color: INK2, textAlign: "center", margin: "4px 0 10px" },
   batchList: { display: "flex", flexDirection: "column", gap: 18 },
   batchItem: { position: "relative" },
   batchBar: {
@@ -5485,17 +5129,13 @@ const S = {
     background: "#fff",
   },
   garmentImg: { width: "100%", height: "100%", objectFit: "cover", display: "block" },
-  garmentRemove: {
-    position: "absolute", top: 4, right: 4, width: 22, height: 22, borderRadius: 11,
-    border: "none", background: "rgba(20,16,14,0.55)", color: "#fff",
-    fontSize: 13, lineHeight: "22px", padding: 0, cursor: "pointer",
-  },
+  garmentRemove: { position: "absolute", top: 4, right: 4, width: 22, height: 22, borderRadius: 11, border: "none", background: "rgba(20,16,14,0.55)", color: "#fff", fontSize: 13, lineHeight: "22px", padding: 0, cursor: "pointer" },
   garmentAdd: {
     flex: "0 0 auto", width: 86, height: 110, borderRadius: 12,
     border: "1.5px dashed rgba(35,31,32,0.25)", background: "rgba(255,255,255,0.6)",
     display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
     gap: 4, cursor: "pointer", color: "#8a7f6e",
-    fontFamily: "'Quicksand', sans-serif",
+    fontFamily: FONT,
   },
   garmentAddPlus: { fontSize: 22, lineHeight: 1, color: ACCENT },
   garmentAddLabel: { fontSize: 11, fontWeight: 600 },
@@ -5503,18 +5143,14 @@ const S = {
   garmentNoteSmall: { fontSize: 11.5, color: "#8a7f6e", marginTop: 8 },
   batchBtnDone: { borderColor: "#1a7f4b", color: "#1a7f4b" },
   batchIdx: { fontSize: 11.5, fontWeight: 700, opacity: 0.5, marginRight: "auto" },
-  batchBtn: {
-    background: "#fff", color: INK, border: "2px solid " + INK + "18",
-    borderRadius: 12, padding: "8px 16px", fontSize: 12.5, fontWeight: 700,
-    fontFamily: "'Quicksand', sans-serif", cursor: "pointer",
-  },
+  batchBtn: { background: FILL, color: INK, border: "none", borderRadius: 10, padding: "9px 14px", fontSize: 13.5, fontWeight: 600, fontFamily: FONT, cursor: "pointer" },
 
   // ── 커플 컨셉: 사진 두 장 슬롯 ──
   coupleRow: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 },
   coupleSlot: {
     display: "flex", flexDirection: "column", gap: 8,
     background: "none", border: "none", padding: 0, cursor: "pointer",
-    fontFamily: "'Quicksand', sans-serif", textAlign: "center",
+    fontFamily: FONT, textAlign: "center",
   },
   coupleSlotLabel: {
     fontSize: 12, fontWeight: 700, color: INK, opacity: 0.75,
@@ -5536,11 +5172,9 @@ const S = {
     margin: "12px 0 0", textAlign: "center",
   },
   guideLink: {
-    display: "block", width: "100%", margin: "10px 0 0",
-    padding: "11px 12px", borderRadius: 12,
-    border: "1px dashed rgba(0,0,0,0.16)", background: "rgba(0,0,0,0.02)",
-    fontSize: 13.5, fontWeight: 600, color: "#6b6360",
-    cursor: "pointer", textAlign: "center",
+    display: "block", width: "100%", margin: "8px 0 0", padding: "10px 12px", borderRadius: R_BTN,
+    border: "none", background: "transparent", fontSize: 14, fontWeight: 600, color: ACCENT, cursor: "pointer", textAlign: "center",
+    fontFamily: FONT,
   },
   consentRow: {
     display: "flex", gap: 10, alignItems: "flex-start",
@@ -5549,40 +5183,29 @@ const S = {
   checkbox: { marginTop: 1, width: 17, height: 17, accentColor: ACCENT },
   consentText: { fontSize: 11.5, lineHeight: 1.6, opacity: 0.7, fontWeight: 500 },
   primaryBtn: {
-    width: "100%", color: "#fff", border: "none",
-    background: "linear-gradient(135deg, #ff6b66, " + ACCENT + ")",
-    borderRadius: 18, padding: "17px", fontSize: 16, fontWeight: 700,
-    fontFamily: "'Quicksand', sans-serif", letterSpacing: "0.02em",
-    cursor: "pointer",
-    boxShadow: "0 14px 28px -10px " + ACCENT + "b8, inset 0 1px 0 rgba(255,255,255,0.5)",
+    width: "100%", maxWidth: 408, color: "#fff", border: "none",
+    background: ACCENT, // 2.0: 평면, 큰 그림자 없음
+    borderRadius: R_BTN, height: 50, padding: "0 16px", fontSize: 17, fontWeight: 600,
+    fontFamily: FONT, letterSpacing: "-0.01em",
+    cursor: "pointer", pointerEvents: "auto",
+    display: "flex", alignItems: "center", justifyContent: "center",
   },
   secondaryBtn: {
     width: "100%", color: INK,
-    background: "rgba(255,255,255,0.6)",
-    backdropFilter: "blur(14px) saturate(180%)",
-    WebkitBackdropFilter: "blur(14px) saturate(180%)",
-    border: "1px solid rgba(255,255,255,0.78)", borderRadius: 18, padding: "16px",
-    fontSize: 16, fontWeight: 700, fontFamily: "'Quicksand', sans-serif",
-    cursor: "pointer",
-    boxShadow: "0 8px 20px -8px rgba(40,30,30,0.22), inset 0 1px 0 rgba(255,255,255,0.9)",
+    background: FILL, border: "none", borderRadius: R_BTN, height: 50, padding: "0 16px",
+    fontSize: 17, fontWeight: 600, fontFamily: FONT, cursor: "pointer",
+    display: "flex", alignItems: "center", justifyContent: "center",
   },
   moreBtn: {
-    background: "#fff", color: INK,
-    border: "1.5px solid " + INK + "22", borderRadius: 999,
-    padding: "10px 22px", fontSize: 12.5, fontWeight: 700,
-    fontFamily: "'Quicksand', sans-serif", cursor: "pointer",
-    letterSpacing: "0.02em",
+    background: FILL, color: INK, border: "none", borderRadius: 999,
+    padding: "10px 20px", fontSize: 14, fontWeight: 600, fontFamily: FONT, cursor: "pointer",
   },
 
   /* === 홈 레이아웃 (G) === */
-  homeSection: { marginBottom: 24 },
+  homeSection: { marginBottom: 18 },
 
   // NEW 배지 (새로 나왔어요 섹션)
-  newBadge: {
-    marginLeft: 7, fontSize: 9.5, fontWeight: 800, letterSpacing: 0.4,
-    color: "#fff", background: ACCENT, borderRadius: 6, padding: "2px 6px",
-    verticalAlign: "middle",
-  },
+  newBadge: { marginLeft: 2, fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", color: "#fff", background: ACCENT, borderRadius: 5, padding: "2px 6px", verticalAlign: 2 },
 
   // ── Brooklyn 광고 배너 (시안 A · 미니멀 카드) ──
   adTag: {
@@ -5590,13 +5213,7 @@ const S = {
     color: "#8a7f6e", background: "rgba(35,31,32,0.06)",
     padding: "2px 6px", borderRadius: 5, marginBottom: 6,
   },
-  bkAd: {
-    display: "flex", alignItems: "center", gap: 12, width: "100%",
-    boxSizing: "border-box", padding: 14, borderRadius: 20, textAlign: "left",
-    background: "rgba(255,255,255,0.75)", border: "1px solid rgba(35,31,32,0.08)",
-    boxShadow: "0 6px 18px -12px rgba(35,31,32,0.35)",
-    cursor: "pointer", fontFamily: "'Quicksand', sans-serif",
-  },
+  bkAd: { display: "flex", alignItems: "center", gap: 12, width: "100%", boxSizing: "border-box", padding: 12, borderRadius: R_CARD, textAlign: "left", background: CARD, border: "none", boxShadow: "0 1px 2px rgba(35,31,32,.06)", cursor: "pointer", fontFamily: FONT },
   bkAdIcon: {
     width: 46, height: 46, borderRadius: 13, flex: "0 0 auto",
     overflow: "hidden", background: "#111", display: "block",
@@ -5608,46 +5225,24 @@ const S = {
     display: "block", fontSize: 11.5, color: "#8a7f6e", marginTop: 2,
     lineHeight: 1.45, whiteSpace: "pre-line",
   },
-  bkAdGo: {
-    flex: "0 0 auto", fontSize: 12, fontWeight: 700, color: "#fff",
-    background: "linear-gradient(180deg,#2c2723," + INK + ")",
-    padding: "9px 14px", borderRadius: 11,
-  },
-  homeRowHead: {
-    display: "flex", justifyContent: "space-between", alignItems: "baseline",
-    marginBottom: 10, padding: "0 2px",
-  },
-  homeRowTitle: {
-    fontSize: 16.5, fontWeight: 700, color: INK,
-    fontFamily: "'Quicksand', sans-serif",
-    display: "flex", alignItems: "baseline", gap: 7,
-  },
-  homeRowCount: {
-    fontSize: 12, opacity: 0.45, fontWeight: 600,
-  },
-  homeRowMore: {
-    background: ACCENT + "1a", border: "none", color: ACCENT,
-    fontSize: 12.5, fontWeight: 700, cursor: "pointer",
-    fontFamily: "'Quicksand', sans-serif",
-    borderRadius: 999, padding: "7px 13px",
-    display: "inline-flex", alignItems: "center", gap: 3,
-  },
+  bkAdGo: { flex: "0 0 auto", fontSize: 13, fontWeight: 600, color: "#fff", background: INK, padding: "8px 12px", borderRadius: 999 },
+  homeRowHead: { display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10, padding: "4px 0 0" },
+  homeRowTitle: { fontSize: 20, fontWeight: 700, color: INK, letterSpacing: "-0.02em", fontFamily: FONT, display: "flex", alignItems: "baseline", gap: 7 },
+  homeRowCount: { fontSize: 12.5, color: INK3, fontWeight: 600 },
+  homeRowMore: { background: "transparent", border: "none", color: ACCENT, fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: FONT, padding: "4px 0" },
   homeRail: {
-    display: "flex", gap: 8, overflowX: "auto",
+    display: "flex", gap: 10, overflowX: "auto",
     scrollSnapType: "x mandatory",
-    paddingBottom: 8,
-    margin: "0 -20px", paddingLeft: 20, paddingRight: 20,
-    // ⚠️ scroll-padding 이 없으면 스냅이 "첫 카드를 스크롤포트 왼쪽 끝"에 맞추려고
-    //    paddingLeft(20) 만큼 저절로 스크롤돼서, 첫 카드가 화면 왼쪽에 딱 붙어 잘린 것처럼 보인다.
-    scrollPaddingLeft: 20, scrollPaddingRight: 20,
+    paddingBottom: 4, paddingTop: 2,
+    margin: "0 -16px", paddingLeft: 16, paddingRight: 16,
+    scrollPaddingLeft: 16, scrollPaddingRight: 16,
   },
   homeRailFeatured: {
-    display: "flex", gap: 12, overflowX: "auto",
+    display: "flex", gap: 10, overflowX: "auto",
     scrollSnapType: "x mandatory",
-    paddingBottom: 8,
-    margin: "0 -20px", paddingLeft: 20, paddingRight: 20,
-
-    scrollPaddingLeft: 20, scrollPaddingRight: 20,
+    paddingBottom: 4, paddingTop: 2,
+    margin: "0 -16px", paddingLeft: 16, paddingRight: 16,
+    scrollPaddingLeft: 16, scrollPaddingRight: 16,
   },
   railCard: {
     // featuredCard 와 같은 이유 — 고정 110px 이면 기기 폭에 따라 2.91~3.46 장으로
@@ -5670,14 +5265,8 @@ const S = {
     background: "transparent", border: "none", padding: 0, cursor: "pointer",
     display: "flex", flexDirection: "column", gap: 6, scrollSnapAlign: "start",
   },
-  fsRailThumb: {
-    width: "100%", aspectRatio: "3/4", borderRadius: 14, overflow: "hidden",
-    background: "#f0ece4", boxShadow: "0 8px 20px -12px rgba(35,31,32,0.18)",
-  },
-  fsRailName: {
-    fontSize: 11.5, fontWeight: 700, color: INK, textAlign: "center",
-    whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-  },
+  fsRailThumb: { width: "100%", aspectRatio: "3/4", borderRadius: 12, overflow: "hidden", background: FILL },
+  fsRailName: { fontSize: 12, fontWeight: 600, color: INK, textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
   featuredCard: {
     // ⚠️ 예전엔 width:200 고정이었다. 컨텐츠 폭이 ~390 이라 두 장(200+12+200=412)이
     //    거의 꽉 차서 세 번째가 5% 만 보였고, 사용자는 옆으로 넘어가는 줄을 몰랐다
@@ -5700,16 +5289,12 @@ const S = {
   },
   featuredTitle: {
     color: "#fff", fontSize: 12.5, fontWeight: 700,
-    fontFamily: "'Quicksand', sans-serif", letterSpacing: "-0.01em",
+    fontFamily: FONT, letterSpacing: "-0.01em",
     textShadow: "0 1px 2px rgba(0,0,0,0.3)",
     overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
   },
   inviteCodeWrap: { marginTop: 10, display: "flex", flexDirection: "column", gap: 8 },
-  myCodeBtn: {
-    display: "flex", alignItems: "center", gap: 10, width: "100%",
-    background: "#fff", border: "1px solid rgba(35,31,32,0.09)", borderRadius: 14,
-    padding: "12px 14px", fontFamily: "'Quicksand', sans-serif", cursor: "pointer",
-  },
+  myCodeBtn: { display: "flex", alignItems: "center", gap: 10, width: "100%", background: BG, border: "1px solid " + SEP, borderRadius: R_BTN, padding: "12px 14px", fontFamily: FONT, cursor: "pointer" },
   myCodeLb: { fontSize: 12, fontWeight: 600, color: "#8a7f6e" },
   myCodeVal: {
     fontSize: 19, fontWeight: 800, letterSpacing: "0.14em", color: INK,
@@ -5717,17 +5302,8 @@ const S = {
   },
   myCodeHint: { fontSize: 11, color: "#b3a894" },
   codeRow: { display: "flex", gap: 8 },
-  codeInput: {
-    flex: 1, minWidth: 0, borderRadius: 12, border: "1px solid rgba(35,31,32,0.12)",
-    padding: "12px 14px", fontSize: 15, fontWeight: 700, letterSpacing: "0.12em",
-    fontFamily: "'Quicksand', sans-serif", color: INK, background: "#fff", outline: "none",
-  },
-  codeGo: {
-    flex: "0 0 auto", border: "none", borderRadius: 12, padding: "12px 18px",
-    fontSize: 14, fontWeight: 800, color: "#fff",
-    background: "linear-gradient(180deg,#2c2723," + INK + ")",
-    fontFamily: "'Quicksand', sans-serif", cursor: "pointer",
-  },
+  codeInput: { flex: 1, minWidth: 0, borderRadius: R_BTN, border: "1px solid " + SEP, padding: "12px 14px", fontSize: 15, fontWeight: 600, letterSpacing: "0.12em", fontFamily: FONT, color: INK, background: BG, outline: "none" },
+  codeGo: { flex: "0 0 auto", border: "none", borderRadius: R_BTN, padding: "12px 18px", fontSize: 14, fontWeight: 600, color: "#fff", background: INK, fontFamily: FONT, cursor: "pointer" },
   inviteBanner: {
     width: "100%", display: "flex", alignItems: "center",
     justifyContent: "space-between", gap: 12,
@@ -5739,7 +5315,7 @@ const S = {
   inviteBannerLeft: { flex: 1, minWidth: 0 },
   inviteBannerTitle: {
     fontSize: 13.5, fontWeight: 700, color: INK,
-    fontFamily: "'Quicksand', sans-serif", marginBottom: 3,
+    fontFamily: FONT, marginBottom: 3,
   },
   inviteBannerDesc: {
     fontSize: 11, opacity: 0.7, fontWeight: 500, lineHeight: 1.5,
@@ -5747,19 +5323,15 @@ const S = {
   inviteBannerBtn: {
     flexShrink: 0, background: ACCENT, color: "#fff",
     borderRadius: 999, padding: "8px 14px", fontSize: 12,
-    fontWeight: 700, fontFamily: "'Quicksand', sans-serif",
+    fontWeight: 700, fontFamily: FONT,
   },
-  inviteToast: {
-    background: INK, color: "#fff", borderRadius: 12,
-    padding: "11px 14px", fontSize: 12, fontWeight: 600,
-    marginBottom: 16, textAlign: "center", lineHeight: 1.5,
-  },
+  inviteToast: { background: INK, color: "#fff", borderRadius: R_BTN, padding: "11px 14px", fontSize: 13, fontWeight: 500, marginBottom: 14, textAlign: "center", lineHeight: 1.5 },
   payToast: {
-    position: "fixed", top: 70, left: "50%",
+    position: "fixed", top: "calc(env(safe-area-inset-top, 0px) + 14px)", left: "50%",
     transform: "translateX(-50%)",
     animation: "toastIn var(--d-swap) var(--ease-out)",
     background: INK, color: "#fff", borderRadius: 999,
-    padding: "11px 22px", fontSize: 13, fontWeight: 700,
+    padding: "11px 20px", fontSize: 14, fontWeight: 500, fontFamily: FONT,
     boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
     cursor: "pointer", zIndex: 999, maxWidth: "90vw",
     textAlign: "center",
@@ -5772,40 +5344,27 @@ const S = {
     // ⚠️ 전체화면 딤에 fadeIn(translateY 포함)을 쓰면 안 된다 — 화면 전체가 8px 밀려 올라온다.
     padding: 24, animation: "dimIn var(--d-swap) var(--ease-out)",
   },
-  bkCard: {
-    width: "100%", maxWidth: 340, background: "#fff",
-    borderRadius: 24, padding: "30px 24px 20px", textAlign: "center",
-    boxShadow: "0 24px 60px -12px rgba(20,16,16,0.5)",
-    animation: "bkPop var(--d-swap) var(--ease-out) backwards",
-  },
+  bkCard: { width: "100%", maxWidth: 340, background: CARD, borderRadius: R_SHEET, padding: "28px 22px 18px", textAlign: "center", boxShadow: "0 24px 60px -12px rgba(20,16,16,0.4)", animation: "bkPop var(--d-swap) var(--ease-out) backwards" },
   bkBadge: { fontSize: 40, marginBottom: 12, lineHeight: 1 },
-  bkTitle: { fontFamily: "'Jua', sans-serif", fontSize: 21, color: INK, marginBottom: 10 },
+  bkTitle: { fontSize: 20, fontWeight: 700, color: INK, marginBottom: 8 },
   bkDesc: { fontSize: 13.5, lineHeight: 1.6, color: "#6f665e", marginBottom: 22 },
-  bkPrimary: {
-    width: "100%", border: "none", borderRadius: 15, padding: "15px",
-    fontSize: 15, fontWeight: 700, color: "#fff",
-    background: "linear-gradient(180deg,#2c2723," + INK + ")",
-    fontFamily: "'Quicksand', sans-serif", cursor: "pointer",
-    boxShadow: "0 10px 22px -8px rgba(35,31,32,0.5)",
-  },
+  bkPrimary: { width: "100%", border: "none", borderRadius: R_BTN, height: 50, fontSize: 16, fontWeight: 600, color: "#fff", background: ACCENT, fontFamily: FONT, cursor: "pointer" },
   bkClose: {
     marginTop: 10, background: "transparent", border: "none",
     color: "#9a938c", fontSize: 13.5, fontWeight: 600,
-    fontFamily: "'Quicksand', sans-serif", cursor: "pointer", padding: 8,
+    fontFamily: FONT, cursor: "pointer", padding: 8,
   },
   // 로그인 시트 — "다음"(사진 입력 → 옵션 화면) 전환 때 뜨는 바텀시트.
   loginSheetBackdrop: {
     position: "fixed", inset: 0, zIndex: 1000,
-    background: "rgba(20,16,16,0.44)",
-    backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)",
+    background: "rgba(35,31,32,0.35)",
     display: "flex", alignItems: "flex-end", justifyContent: "center",
-    // 딤은 시트가 올라오는 시간에 맞춰 같이 들어온다 (따로 놀면 두 동작으로 보인다)
     animation: "dimIn var(--d-sheet) var(--ease-drawer)",
   },
   loginSheetCard: {
-    width: "100%", maxWidth: 440, background: "#fffdf9",
-    borderRadius: "24px 24px 0 0", padding: "22px 24px calc(env(safe-area-inset-bottom, 0px) + 22px)",
-    boxShadow: "0 -24px 60px -12px rgba(20,16,16,0.35)",
+    width: "100%", maxWidth: 440, background: CARD,
+    borderRadius: R_SHEET + "px " + R_SHEET + "px 0 0", padding: "10px 20px calc(env(safe-area-inset-bottom, 0px) + 24px)",
+    boxShadow: "0 -10px 40px rgba(35,31,32,0.18)",
     animation: "sheetUp var(--d-sheet) var(--ease-drawer) backwards",
     maxHeight: "88vh", overflowY: "auto", overscrollBehavior: "contain",
     WebkitOverflowScrolling: "touch",
@@ -5829,7 +5388,7 @@ const S = {
     fontSize: 10.5, fontWeight: 700, letterSpacing: "0.2em", color: ACCENT,
   },
   screenTitle: {
-    fontFamily: "'Jua', sans-serif", fontSize: 25, fontWeight: 400,
+    fontFamily: FONT, fontSize: 25, fontWeight: 700,
     lineHeight: 1.2,
   },
   galleryControls: {
@@ -5849,7 +5408,7 @@ const S = {
   searchIcon: { fontSize: 17, opacity: 0.4 },
   searchInput: {
     flex: 1, border: "none", background: "transparent", padding: "13px 0",
-    fontSize: 14, fontFamily: "'Quicksand', sans-serif", fontWeight: 500,
+    fontSize: 14, fontFamily: FONT, fontWeight: 500,
     outline: "none", color: INK, minWidth: 0,
   },
   searchClear: {
@@ -5866,59 +5425,35 @@ const S = {
   },
   stickyBar: {
     position: "sticky", top: 0, zIndex: 50,
-    background: BG, marginBottom: 10,
-    paddingTop: 6,
-    margin: "0 -20px 10px",
-    paddingLeft: 20, paddingRight: 20,
-    borderBottom: "1px solid " + INK + "10",
-    boxShadow: "0 2px 8px rgba(35,31,32,0.04)",
+    background: BG,
+    margin: "0 -16px 8px", paddingLeft: 16, paddingRight: 16,
   },
   catRowSticky: {
     display: "flex", gap: 8, overflowX: "auto",
-    paddingTop: 8, paddingBottom: 8,
-    margin: "0 -20px", paddingLeft: 20, paddingRight: 20,
+    paddingTop: 8, paddingBottom: 12,
+    margin: "0 -16px", paddingLeft: 16, paddingRight: 16,
     WebkitOverflowScrolling: "touch",
   },
   catChip: {
     flexShrink: 0,
-    background: "rgba(255,255,255,0.55)",
-    backdropFilter: "blur(12px) saturate(170%)",
-    WebkitBackdropFilter: "blur(12px) saturate(170%)",
-    border: "1px solid rgba(255,255,255,0.75)", borderRadius: 999,
-    padding: "10px 16px", fontSize: 13.5, fontWeight: 700,
-    fontFamily: "'Quicksand', sans-serif", cursor: "pointer",
+    background: CARD, border: "1px solid " + SEP, borderRadius: 999,
+    padding: "9px 14px", fontSize: 15, fontWeight: 600,
+    fontFamily: FONT, cursor: "pointer",
     color: INK, whiteSpace: "nowrap",
-    display: "inline-flex", alignItems: "center", gap: 6,
-    boxShadow: "0 4px 12px -4px rgba(40,30,30,0.18), inset 0 1px 0 rgba(255,255,255,0.8)",
+    display: "inline-flex", alignItems: "baseline", gap: 5,
   },
   catChipActive: { color: "#fff", borderColor: "transparent" },
-  catChipCount: {
-    fontSize: 10.5, opacity: 0.6, fontWeight: 700,
-  },
-  filterMetaRow: {
-    display: "flex", justifyContent: "space-between", alignItems: "center",
-    marginBottom: 14, gap: 8,
-  },
-  resultCount: {
-    fontSize: 11.5, opacity: 0.55, fontWeight: 600,
-    fontFamily: "'Quicksand', sans-serif", letterSpacing: "0.02em",
-  },
+  catChipCount: { fontSize: 12, fontWeight: 500, opacity: 0.55 },
+  filterMetaRow: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, gap: 8 },
+  resultCount: { fontSize: 13, color: INK2, fontWeight: 500 },
   grid: { display: "grid" },
   card: {
-    background: "#fff", border: "1px solid " + INK + "10",
-    borderRadius: 18, overflow: "hidden", padding: 0, cursor: "pointer",
-    textAlign: "left", boxShadow: "0 8px 20px -12px rgba(35,31,32,0.18)",
+    background: CARD, border: "none",
+    borderRadius: R_CARD, overflow: "hidden", padding: 0, cursor: "pointer",
+    textAlign: "left", boxShadow: "0 1px 2px rgba(35,31,32,.06), 0 8px 24px -16px rgba(35,31,32,.25)",
   },
-  thumb: {
-    aspectRatio: "3/4", position: "relative", overflow: "hidden",
-    background: "#f0ece4",
-  },
-  cardTitle: {
-    padding: "7px 9px 8px",
-    fontWeight: 700, color: INK, lineHeight: 1.3,
-    // 제목이 길어도 카드 높이가 들쭉날쭉해지지 않게 한 줄로 자른다
-    whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-  },
+  thumb: { aspectRatio: "3/4", position: "relative", overflow: "hidden", background: FILL },
+  cardTitle: { padding: "9px 12px 11px", fontWeight: 600, color: INK, lineHeight: 1.3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
   thumbImg: {
     width: "100%", height: "100%", objectFit: "cover", display: "block",
   },
@@ -5932,10 +5467,7 @@ const S = {
     letterSpacing: "0.02em", background: INK, color: "#fff",
     borderRadius: 999,
   },
-  emptyState: {
-    fontSize: 13, textAlign: "center", opacity: 0.45,
-    padding: "50px 0", fontWeight: 500,
-  },
+  emptyState: { fontSize: 14, textAlign: "center", color: INK2, padding: "50px 0", fontWeight: 500 },
   confirmPreview: {
     display: "flex", alignItems: "center", justifyContent: "center",
     gap: 14, marginBottom: 20,
@@ -5976,12 +5508,8 @@ const S = {
   idSuitChipOn: { border: "1.5px solid " + ACCENT, background: ACCENT + "12" },
   idSuitDot: { width: 16, height: 16, borderRadius: "50%", display: "inline-block", border: "1px solid rgba(0,0,0,0.12)" },
   idBgRow: { display: "grid", gridTemplateColumns: "repeat(8, 1fr)", gap: 8 },
-  idBgSwatch: {
-    aspectRatio: "1 / 1", borderRadius: 10, cursor: "pointer",
-    border: "1.5px solid " + INK + "1a", display: "flex",
-    alignItems: "center", justifyContent: "center", padding: 0,
-  },
-  idBgSwatchOn: { border: "2.5px solid " + ACCENT, boxShadow: "0 0 0 2px " + ACCENT + "30" },
+  idBgSwatch: { aspectRatio: "1 / 1", borderRadius: 10, cursor: "pointer", border: "1px solid " + SEP, padding: 0 },
+  idBgSwatchOn: { boxShadow: "0 0 0 2.5px " + ACCENT },
   idBgCheck: { fontSize: 13, fontWeight: 900 },
   idCustomRow: {
     position: "relative", display: "flex", alignItems: "center", gap: 9,
@@ -6000,7 +5528,7 @@ const S = {
     borderRadius: 12, padding: "9px 11px",
   },
   confirmTitle: {
-    fontFamily: "'Jua', sans-serif", fontSize: 20, fontWeight: 400,
+    fontFamily: FONT, fontSize: 20, fontWeight: 700,
     lineHeight: 1.2,
   },
   confirmCat: {
@@ -6020,31 +5548,16 @@ const S = {
   },
   costLabel: { fontSize: 12.5, fontWeight: 600, opacity: 0.55 },
   costValue: { fontSize: 13, fontWeight: 700 },
-  genWrap: {
-    display: "flex", flexDirection: "column", alignItems: "center",
-    justifyContent: "center", padding: "76px 0", gap: 22,
-  },
-  genHearts: { display: "flex", gap: 10 },
-  genTitle: {
-    fontFamily: "'Jua', sans-serif", fontSize: 21, fontWeight: 400,
-  },
-  genSub: { fontSize: 11.5, fontWeight: 600, opacity: 0.5 },
-  genHint: { fontSize: 10.5, fontWeight: 500, opacity: 0.4, marginTop: -8 },
-  genSafe: {
-    fontSize: 11.5, fontWeight: 600, opacity: 0.55, marginTop: 16,
-    textAlign: "center", lineHeight: 1.6, whiteSpace: "pre-line",
-  },
-  reportLink: {
-    display: "block", textAlign: "center", marginTop: 14,
-    fontSize: 12, color: "#9aa0a6", textDecoration: "none",
-  },
-  resultImage: { margin: "18px 0" },
-  resultImg: {
-    width: "100%", aspectRatio: "3/4", objectFit: "cover",
-    borderRadius: 24, display: "block",
-    boxShadow: "0 22px 46px -18px rgba(35,31,32,0.4)",
-  },
-  resultActions: { display: "flex", gap: 10 },
+  genWrap: { display: "flex", flexDirection: "column", alignItems: "stretch", justifyContent: "flex-start", padding: "0 0 40px", gap: 14, textAlign: "center" },
+  genHearts: { display: "flex", gap: 10, justifyContent: "center", marginTop: 30 },
+  genTitle: { fontSize: 20, fontWeight: 700, marginTop: 30 },
+  genSub: { fontSize: 13, color: INK2 },
+  genHint: { fontSize: 13, color: INK3 },
+  genSafe: { fontSize: 13, color: INK2, marginTop: 8, lineHeight: 1.6, whiteSpace: "pre-line" },
+  reportLink: { display: "block", textAlign: "center", marginTop: 16, fontSize: 12.5, color: INK3, textDecoration: "none" },
+  resultImage: { margin: "4px 0 12px" },
+  resultImg: { width: "100%", aspectRatio: "3/4", objectFit: "cover", borderRadius: 16, display: "block", background: FILL },
+  resultActions: { display: "flex", gap: 8, marginTop: 12 },
 
   // ── 기본 vs Pro 비교 ──
   proWrap: {
@@ -6057,7 +5570,7 @@ const S = {
     display: "block", width: "100%", boxSizing: "border-box", marginTop: 12,
     border: "none", borderRadius: 14, padding: "13px", fontSize: 14.5, fontWeight: 800,
     color: "#fff", background: "linear-gradient(180deg,#2c2723," + INK + ")",
-    fontFamily: "'Quicksand', sans-serif", cursor: "pointer",
+    fontFamily: FONT, cursor: "pointer",
   },
   proTeaser: {
     margin: "18px 0 6px", padding: "16px", borderRadius: 20, textAlign: "center",
@@ -6070,7 +5583,7 @@ const S = {
     marginTop: 12, width: "100%", boxSizing: "border-box",
     border: "none", borderRadius: 14, padding: "14px", fontSize: 15, fontWeight: 800,
     color: "#fff", background: "linear-gradient(90deg,#ff8a3d,#e6403c)",
-    fontFamily: "'Quicksand', sans-serif", cursor: "pointer",
+    fontFamily: FONT, cursor: "pointer",
     boxShadow: "0 10px 22px -10px rgba(230,64,60,0.6)",
   },
   csBox: {
@@ -6106,7 +5619,7 @@ const S = {
     display: "block", width: "100%", boxSizing: "border-box",
     background: "#fff", color: INK, border: "2px solid " + INK + "22",
     borderRadius: 18, padding: "16px", fontSize: 16, fontWeight: 700,
-    fontFamily: "'Quicksand', sans-serif", cursor: "pointer",
+    fontFamily: FONT, cursor: "pointer",
     textAlign: "center", textDecoration: "none", marginBottom: 10,
   },
   // [공유] 버튼 — 저장(downloadBtn)과 별개 경로 (viral-loop-and-funnel-standard.md §A)
@@ -6114,81 +5627,45 @@ const S = {
     display: "block", width: "100%", boxSizing: "border-box",
     background: "transparent", color: ACCENT, border: "2px solid " + ACCENT + "33",
     borderRadius: 18, padding: "14px", fontSize: 15, fontWeight: 700,
-    fontFamily: "'Quicksand', sans-serif", cursor: "pointer",
+    fontFamily: FONT, cursor: "pointer",
     textAlign: "center", marginBottom: 14,
   },
   saveNotice: {
     background: "#f9c83c22", color: "#8a6a16",
     border: "1.5px solid #f9c83c66", borderRadius: 14,
     padding: "13px 15px", fontSize: 12.5, lineHeight: 1.7,
-    fontWeight: 600, fontFamily: "'Quicksand', sans-serif",
+    fontWeight: 600, fontFamily: FONT,
     margin: "14px 0", textAlign: "center",
     wordBreak: "keep-all",
   },
-  errorCard: {
-    background: ACCENT + "10", color: ACCENT, borderRadius: 14,
-    padding: "16px 16px", fontSize: 12.5, lineHeight: 1.65,
-    fontWeight: 600, margin: "16px 0 18px",
-    whiteSpace: "pre-wrap", wordBreak: "break-word",
-  },
-  storeIntro: {
-    fontSize: 12.5, lineHeight: 1.7, opacity: 0.7,
-    marginBottom: 20, fontWeight: 500,
-  },
-  packList: { display: "flex", flexDirection: "column", gap: 13 },
-  pack: {
-    background: "#fff", border: "1px solid " + INK + "12",
-    borderRadius: 18, padding: "18px", position: "relative",
-    display: "grid", gridTemplateColumns: "1fr 1fr auto",
-    alignItems: "center", gap: 10,
-    boxShadow: "0 3px 12px rgba(35,31,32,0.05)",
-  },
-  packFeatured: {
-    border: "2px solid #f9c83c",
-    boxShadow: "0 8px 24px rgba(249,200,60,0.28)",
-  },
-  packBadge: {
-    position: "absolute", top: -10, left: 18, background: "#f9c83c",
-    color: INK, fontSize: 10, fontWeight: 700, letterSpacing: "0.06em",
-    padding: "4px 12px", borderRadius: 999,
-  },
-  packCount: {
-    fontFamily: "'Jua', sans-serif", fontSize: 23, fontWeight: 400,
-    lineHeight: 1,
-  },
+  errorCard: { background: ACCENT_SOFT, color: ACCENT, borderRadius: R_CARD, padding: "14px 16px", fontSize: 14, lineHeight: 1.6, fontWeight: 500, margin: "8px 0 16px", whiteSpace: "pre-wrap", wordBreak: "break-word" },
+  storeIntro: { fontSize: 14, lineHeight: 1.6, color: INK2, marginBottom: 16 },
+  packList: { display: "flex", flexDirection: "column", gap: 10 },
+  pack: { background: CARD, border: "none", borderRadius: R_CARD, padding: "16px", position: "relative", display: "grid", gridTemplateColumns: "1fr 1fr auto", alignItems: "center", gap: 10, boxShadow: "0 1px 2px rgba(35,31,32,.06)" },
+  packFeatured: { boxShadow: "0 0 0 1.5px " + ACCENT + " inset" },
+  packBadge: { position: "absolute", top: -9, left: 14, background: ACCENT, color: "#fff", fontSize: 10.5, fontWeight: 700, letterSpacing: "0.04em", padding: "3px 9px", borderRadius: 999 },
+  packCount: { fontSize: 20, fontWeight: 700, lineHeight: 1 },
   packPrice: { fontSize: 17, fontWeight: 700 },
   packPer: {
     fontSize: 10.5, fontWeight: 600, opacity: 0.55,
     gridColumn: "1 / 3", marginTop: -4,
   },
   packSave: { color: ACCENT, fontWeight: 700, marginLeft: 5 },
-  packBtn: {
-    gridRow: "1 / 3", gridColumn: 3, background: INK, color: "#fff",
-    border: "none", borderRadius: 13, padding: "13px 22px",
-    fontSize: 13.5, fontWeight: 700, fontFamily: "'Quicksand', sans-serif",
-    cursor: "pointer",
-  },
+  packBtn: { gridRow: "1 / 3", gridColumn: 3, background: INK, color: "#fff", border: "none", borderRadius: R_BTN, padding: "12px 18px", fontSize: 14, fontWeight: 600, fontFamily: FONT, cursor: "pointer" },
   restoreBtn: {
     background: "none", border: "1.5px solid rgba(35,31,32,0.22)",
     borderRadius: 10, padding: "8px 18px",
-    fontSize: 12.5, fontWeight: 600, fontFamily: "'Quicksand', sans-serif",
+    fontSize: 12.5, fontWeight: 600, fontFamily: FONT,
     color: INK, opacity: 0.65, cursor: "pointer",
   },
   storeNote: {
     fontSize: 10, lineHeight: 1.65, opacity: 0.45,
     marginTop: 18, textAlign: "center", fontWeight: 500,
   },
-  subSection: {
-    marginTop: 26, padding: "18px 16px", borderRadius: 20,
-    background: "rgba(255,255,255,0.6)", border: "1px solid rgba(35,31,32,0.07)",
-  },
-  subTitle: { fontFamily: "'Jua', sans-serif", fontSize: 17, color: INK, marginBottom: 3 },
+  subSection: { marginTop: 22, padding: "16px 14px", borderRadius: R_CARD, background: CARD, boxShadow: "0 1px 2px rgba(35,31,32,.06)" },
+  subTitle: { fontSize: 17, fontWeight: 600, color: INK, marginBottom: 3 },
   subDesc: { fontSize: 12, color: "#8a7f6e", marginBottom: 14 },
-  subCard: {
-    display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
-    padding: "12px 14px", borderRadius: 14, background: "#fff",
-    border: "1px solid rgba(35,31,32,0.08)", marginBottom: 10,
-  },
+  subCard: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "12px 14px", borderRadius: R_BTN, background: BG, border: "1px solid " + SEP, marginBottom: 10 },
   subCardHi: { border: "1.5px solid " + ACCENT },
   subCardInfo: { flex: 1, minWidth: 0 },
   subCardName: { fontSize: 14, fontWeight: 700, color: INK, display: "flex", alignItems: "center", gap: 6 },
@@ -6198,11 +5675,153 @@ const S = {
   subLegalLinks: { display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 8 },
   subLegalLink: { fontSize: 11.5, fontWeight: 600, color: INK, opacity: 0.75, textDecoration: "underline" },
   subLegalDot: { color: "#c8bda9", fontSize: 11 },
-  subCardBtn: {
-    flex: "0 0 auto", border: "none", borderRadius: 11, padding: "11px 16px",
-    fontSize: 14, fontWeight: 700, color: "#fff",
-    background: "linear-gradient(180deg,#2c2723," + INK + ")", fontFamily: "'Quicksand', sans-serif",
+  subCardBtn: { flex: "0 0 auto", border: "none", borderRadius: 999, padding: "9px 14px", fontSize: 14, fontWeight: 600, color: "#fff", background: INK, fontFamily: FONT },
+  creditChipSmall: {
+    display: "inline-flex", alignItems: "center", gap: 6,
+    background: CARD, color: INK, border: "1px solid " + SEP, borderRadius: 999,
+    padding: "6px 10px", fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap",
   },
+  topBar: {
+    height: 44, display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center",
+    margin: "calc(env(safe-area-inset-top, 0px) + 4px) 0 8px",
+  },
+  topBarSide: { display: "flex", alignItems: "center", minWidth: 0 },
+  topBack: {
+    display: "inline-flex", alignItems: "center", gap: 3, padding: "6px 4px 6px 0",
+    background: "transparent", border: "none", color: ACCENT, fontSize: 17, fontWeight: 400,
+    fontFamily: FONT, cursor: "pointer", whiteSpace: "nowrap",
+  },
+  topTitle: {
+    fontSize: 17, fontWeight: 600, letterSpacing: "-0.01em", textAlign: "center", color: INK,
+    maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+  },
+  progCard: {
+    width: "100%", margin: "4px 0 12px", background: CARD, borderRadius: R_CARD, padding: 14,
+    display: "flex", gap: 12, alignItems: "center", border: "none",
+    boxShadow: "0 1px 2px rgba(35,31,32,.06)", fontFamily: FONT, color: INK,
+  },
+  progSp: { width: 44, height: 44, borderRadius: 12, background: FILL, position: "relative", overflow: "hidden", flex: "none" },
+  progBar: { position: "absolute", left: 0, top: 0, bottom: 0, width: "60%", background: ACCENT, opacity: 0.85, display: "block" },
+  progTitle: { fontSize: 15, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
+  progDesc: { fontSize: 13, color: INK2, marginTop: 2 },
+  progAction: { fontSize: 13, fontWeight: 600, color: ACCENT, flex: "none" },
+  sheetBackdrop: {
+    position: "fixed", inset: 0, zIndex: 1000,
+    background: "rgba(35,31,32,0.35)",
+    display: "flex", alignItems: "flex-end", justifyContent: "center",
+    animation: "dimIn var(--d-sheet) var(--ease-drawer)",
+  },
+  sheetCard: {
+    width: "100%", maxWidth: 440, background: CARD,
+    borderRadius: R_SHEET + "px " + R_SHEET + "px 0 0", padding: "10px 20px calc(env(safe-area-inset-bottom, 0px) + 24px)",
+    boxShadow: "0 -10px 40px rgba(35,31,32,0.18)",
+    animation: "sheetUp var(--d-sheet) var(--ease-drawer) backwards",
+    maxHeight: "88vh", overflowY: "auto", overscrollBehavior: "contain",
+    WebkitOverflowScrolling: "touch", fontFamily: FONT, color: INK,
+  },
+  sheetGrab: { width: 36, height: 5, borderRadius: 3, background: FILL_PRESSED, margin: "0 auto 16px" },
+  sheetTitle: { fontSize: 20, fontWeight: 700, letterSpacing: "-0.02em", margin: "0 0 4px" },
+  sheetDesc: { fontSize: 14, color: INK2, margin: "0 0 16px", lineHeight: 1.5 },
+  sheetLabel: { fontSize: 13, fontWeight: 600, color: INK2, margin: "14px 0 6px", letterSpacing: "0.02em" },
+  sheetList: { display: "flex", flexDirection: "column", gap: 8 },
+  sheetRow: {
+    width: "100%", display: "flex", alignItems: "center", gap: 10, textAlign: "left",
+    background: BG, border: "1px solid " + SEP, borderRadius: R_BTN, padding: "12px 12px",
+    fontFamily: FONT, color: INK, cursor: "pointer",
+  },
+  sheetRowDot: { width: 10, height: 10, borderRadius: "50%", flex: "none" },
+  sheetRowTitle: { flex: 1, minWidth: 0, fontSize: 15, fontWeight: 600, display: "flex", flexDirection: "column", gap: 2 },
+  sheetRowSub: { fontSize: 12.5, fontWeight: 500, color: INK2 },
+  sheetRowBadge: { fontSize: 10.5, fontWeight: 700, color: "#fff", background: ACCENT, borderRadius: 5, padding: "2px 6px", flex: "none" },
+  sheetRowPrice: { fontSize: 14, fontWeight: 600, flex: "none" },
+  sheetRowBtn: {
+    flex: "none", fontSize: 13, fontWeight: 600, background: INK, color: "#fff",
+    borderRadius: 999, padding: "7px 12px", whiteSpace: "nowrap",
+  },
+  sheetRowBtnOff: { background: FILL, color: INK2 },
+  sheetInvite: { marginTop: 14, background: ACCENT_SOFT, borderColor: "transparent" },
+  sheetNote: { fontSize: 12, color: INK3, textAlign: "center", marginTop: 12 },
+  bigCard: {
+    flex: "0 0 160px", background: CARD, borderRadius: R_CARD, overflow: "hidden",
+    border: "none", padding: 0, cursor: "pointer", textAlign: "left", scrollSnapAlign: "start",
+    boxShadow: "0 1px 2px rgba(35,31,32,.06), 0 8px 24px -16px rgba(35,31,32,.25)",
+    fontFamily: FONT, color: INK,
+  },
+  bigCardSmall: { flex: "0 0 118px" },
+  bigCardThumb: { position: "relative", aspectRatio: "3/4", background: FILL, overflow: "hidden" },
+  bigCardTitle: { padding: "9px 12px 11px", fontSize: 14, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
+  heroImg: { width: "100%", height: "100%", objectFit: "cover", display: "block" },
+  heroCat: {
+    position: "absolute", left: 12, top: 12, background: "rgba(35,31,32,.55)", color: "#fff",
+    fontSize: 12, fontWeight: 600, borderRadius: 999, padding: "5px 10px",
+    backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
+  },
+  optCard: {
+    width: "100%", background: CARD, borderRadius: R_CARD, padding: 12, display: "flex", gap: 12, alignItems: "center",
+    boxShadow: "0 1px 2px rgba(35,31,32,.06)", border: "none", cursor: "pointer", fontFamily: FONT, color: INK,
+  },
+  optThumb: { width: 64, height: 64, borderRadius: 12, objectFit: "cover", objectPosition: "50% 15%", flex: "none", display: "block" },
+  optThumbEmpty: { background: FILL, border: "1.5px dashed #C9BCA9", display: "flex", alignItems: "center", justifyContent: "center", color: "#948B81", fontSize: 24, fontWeight: 300 },
+  optTitle: { display: "block", fontSize: 15, fontWeight: 600 },
+  optDesc: { display: "block", fontSize: 13, color: INK2, marginTop: 2 },
+  optChange: { marginLeft: "auto", fontSize: 14, fontWeight: 600, color: ACCENT, flex: "none" },
+  lbl: { fontSize: 13, fontWeight: 600, letterSpacing: "0.04em", color: INK2, margin: "20px 0 8px" },
+  lblSub: { fontWeight: 500, letterSpacing: 0 },
+  seg: { display: "flex", background: FILL, borderRadius: 10, padding: 3 },
+  segItem: {
+    flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 1,
+    padding: "8px 0", fontSize: 15, fontWeight: 600, borderRadius: 8, color: INK2,
+    background: "transparent", border: "none", cursor: "pointer", fontFamily: FONT, minHeight: 40,
+  },
+  segItemOn: { background: CARD, color: INK, boxShadow: "0 1px 3px rgba(35,31,32,.14)" },
+  segSub: { fontSize: 10.5, fontWeight: 500, opacity: 0.7 },
+  chipWrap: { display: "flex", flexWrap: "wrap", gap: 8 },
+  chip: {
+    display: "inline-flex", alignItems: "center", gap: 6, padding: "9px 14px", borderRadius: 999,
+    background: CARD, border: "1px solid " + SEP, fontSize: 14, fontWeight: 600, color: INK,
+    cursor: "pointer", fontFamily: FONT,
+  },
+  chipOn: { background: INK, color: "#fff", borderColor: INK },
+  pick: { display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8 },
+  pickCell: {
+    position: "relative", aspectRatio: "3/4", borderRadius: 12, background: FILL, border: "1.5px dashed #C9BCA9",
+    display: "flex", alignItems: "center", justifyContent: "center", color: "#948B81", fontSize: 22, fontWeight: 300,
+    cursor: "pointer", padding: 0, overflow: "hidden",
+  },
+  pickCellFilled: { border: "none" },
+  note: { margin: "10px 0 0", fontSize: 14, lineHeight: 1.5, color: INK2 },
+  consentNote: { margin: "12px 0 0", fontSize: 12, lineHeight: 1.5, color: INK3 },
+  cta: {
+    position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 90,
+    padding: "10px 16px calc(env(safe-area-inset-bottom, 0px) + 16px)",
+    display: "flex", justifyContent: "center", pointerEvents: "none",
+    background: "linear-gradient(to top, rgba(251,248,243,.96) 60%, rgba(251,248,243,0))",
+  },
+  grayBtn: {
+    flex: 1, height: 46, borderRadius: R_BTN, background: FILL, color: INK, border: "none",
+    fontSize: 15, fontWeight: 600, fontFamily: FONT, cursor: "pointer",
+    display: "flex", alignItems: "center", justifyContent: "center",
+  },
+  acts: { display: "flex", gap: 8, marginTop: 8 },
+  textBtn: { background: "transparent", border: "none", padding: "6px 0", color: ACCENT, fontSize: 14, fontWeight: 600, fontFamily: FONT, cursor: "pointer" },
+  savedNote: { fontSize: 14, color: INK2, textAlign: "center", margin: "0 0 12px", lineHeight: 1.5 },
+  rowGroup: { background: CARD, borderRadius: R_CARD, marginBottom: 14, overflow: "hidden", boxShadow: "0 1px 2px rgba(35,31,32,.06)" },
+  groupLabel: { fontSize: 13, fontWeight: 600, letterSpacing: "0.04em", color: INK2, padding: "12px 14px 4px" },
+  row: {
+    width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+    padding: "13px 14px", minHeight: 50, background: "transparent", border: "none",
+    borderBottom: "1px solid " + SEP, textAlign: "left", cursor: "pointer", fontFamily: FONT, color: INK,
+    textDecoration: "none",
+  },
+  rowTitle: { fontSize: 16, fontWeight: 500, display: "flex", flexDirection: "column", gap: 2, minWidth: 0, flex: 1 },
+  rowDesc: { fontSize: 13, color: INK2, fontWeight: 400, lineHeight: 1.4 },
+  rowValue: { fontSize: 16, fontWeight: 600, color: INK, flex: "none" },
+  rowValueSub: { fontSize: 13, fontWeight: 400, color: INK2 },
+  rowChevron: { fontSize: 20, color: INK3, flex: "none" },
+  toggle: { width: 51, height: 31, borderRadius: 16, background: FILL_PRESSED, position: "relative", flex: "none", display: "inline-block", transition: "background var(--d-swap)" },
+  toggleOn: { background: "#34C759" },
+  toggleKnob: { position: "absolute", top: 2, left: 2, width: 27, height: 27, borderRadius: "50%", background: "#fff", boxShadow: "0 3px 8px rgba(0,0,0,.15)", transition: "transform var(--d-swap) var(--ease-out)", display: "block" },
+  toggleKnobOn: { transform: "translateX(20px)" },
 };
 
 const CSS = `
@@ -6224,9 +5843,10 @@ body { margin: 0; background: ${BG}; }
   --d-press: 110ms;     /* 눌림(누를 때) */
   --d-press-out: 140ms; /* 눌림 복귀(뗄 때) — 복귀가 더 길어야 반응이 붙어 있다 */
   --d-swap: 180ms;    /* 짧은 교체·페이드 */
-  --d-enter: 300ms;   /* 카드·콘텐츠 진입 */
+  --d-enter: 260ms;   /* 진입 (스펙 260) */
+  --d-exit: 160ms;    /* 종료 (스펙 160) — 진입보다 빠르게 */
   --d-reveal: 340ms;  /* 결과 등장 */
-  --d-sheet: 420ms;   /* 시트 올라옴 — iOS 시트는 생각보다 길다 */
+  --d-sheet: 320ms;   /* 시트 열림 320 / 닫힘 220 (스펙) */
 }
 
 /* ⚠️ fill-mode 는 backwards 다. both 를 쓰면 안 된다.
@@ -6237,7 +5857,11 @@ body { margin: 0; background: ${BG}; }
    그려져 안 보였다(실측: top = -1070px).
    여기 애니메이션들은 마지막 키프레임이 곧 기본 상태라 forwards 가 필요 없다.
    backwards 는 지연/시작 전 상태만 담당하고 끝나면 잔여 스타일을 남기지 않는다. */
-.fade { animation: fadeIn var(--d-enter) var(--ease-out) backwards; padding-top: 18px; }
+.fade { animation: fadeIn var(--d-enter) var(--ease-out) backwards; padding-top: 10px; }
+/* 진행 카드 — 얇은 막대가 좌우로 흐른다(transform 만) */
+.progBar { animation: progSlide 1.2s cubic-bezier(.4,0,.2,1) infinite; }
+@keyframes progSlide { from { transform: translateX(-100%); } to { transform: translateX(170%); } }
+a { color: inherit; }
 /* 탭 전환은 세션당 수십 번 — 빈도 원칙상 "떠오름"을 걷어내고 150ms 불투명도만 남긴다(모션 리뷰).
    탭 버튼([data-tabbtn])만 예외로 두고 콘텐츠는 300ms 떠오르던 불일치를 맞춘다. */
 main[data-navdir="tab"] .fade { animation: dimIn 150ms var(--ease-out) backwards; }
@@ -6313,7 +5937,7 @@ button {
   transition: transform var(--d-press-out) var(--ease-out);
 }
 button:active { transition-duration: var(--d-press); transform: scale(0.985); }
-.cardIn:active { transition-duration: var(--d-press); transform: scale(0.97); }
+.cardIn:active, [data-hscroll] button:active, [data-tile]:active { transition-duration: var(--d-press); transform: scale(0.97); }
 /* 자주 쓰는 것은 애니메이션하지 않는다 (빈도 테스트).
    탭 전환은 한 세션에 수십 번 일어난다 — 여기에 전환이 걸리면 앱이 느리게 느껴진다. */
 [data-tabbtn] { transition: none !important; }
@@ -6327,6 +5951,6 @@ button:active { transition-duration: var(--d-press); transform: scale(0.985); }
   *, *::before, *::after { transition-duration: .001ms !important; }
   .pe-toast { transition-duration: 150ms !important; transform: translate(-50%, 0) !important; }
   button:active { transform: none; }
-  .splashDot, .genHeart { animation: none !important; opacity: .8; }
+  .splashDot, .genHeart, .progBar { animation: none !important; opacity: .8; }
 }
 `;

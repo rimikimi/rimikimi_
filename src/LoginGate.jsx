@@ -27,7 +27,7 @@ const NATIVE_REDIRECT = "com.rimikimi.app://login-callback";
 //            패딩·고정 높이를 빼고 카드 안에 맞는 여백으로 렌더링한다.
 // message  = 태그라인 대신 보여줄 문구(왜 지금 로그인해야 하는지 맥락 설명용).
 // onClose  = 있으면 우상단에 닫기(✕) 버튼 표시 — 로그인 없이 시트만 닫고 계속 둘러볼 수 있게.
-export default function LoginGate({ Logo, embedded = false, message, onClose }) {
+export default function LoginGate({ Logo, embedded = false, title, message, onClose }) {
   useLang(); // 언어 바뀌면 리렌더
   const [busy, setBusy] = useState(null); // 'apple' | 'kakao' | 'naver' | 'google' | 'email' | null
   const [error, setError] = useState(null);
@@ -238,11 +238,19 @@ export default function LoginGate({ Logo, embedded = false, message, onClose }) 
         </button>
       )}
 
-      <div style={embedded ? S.embeddedLogoBox : S.logoBox}>
-        {Logo ? <Logo height={embedded ? 52 : 70} /> : <span style={S.fallback}>rimikimi</span>}
-      </div>
-
-      <p style={embedded ? S.embeddedTagline : S.tagline}>{message || t("login.tagline")}</p>
+      {embedded ? (
+        <>
+          <h5 style={S.sheetTitle}>{title || t("login.sheet.title")}</h5>
+          <p style={S.sheetDesc}>{message || t("login.sheet.desc")}</p>
+        </>
+      ) : (
+        <>
+          <div style={S.logoBox}>
+            {Logo ? <Logo height={70} /> : <span style={S.fallback}>rimikimi</span>}
+          </div>
+          <p style={S.tagline}>{message || t("login.tagline")}</p>
+        </>
+      )}
 
       <div style={S.buttons}>
         <button
@@ -438,9 +446,10 @@ function GoogleIcon() {
 }
 
 // ---------- 스타일 ----------
-const ACCENT = "#e6403c";
-const INK = "#231f20";
-const BG = "#fffdf9";
+const ACCENT = "#E6403C";
+const INK = "#231F20";
+const BG = "#FBF8F3";
+const FONT = '-apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", system-ui, sans-serif';
 
 const S = {
   wrap: {
@@ -450,81 +459,83 @@ const S = {
     // 노치/홈바 안전영역 반영 (기종 자동 대응)
     padding: "calc(env(safe-area-inset-top, 0px) + 48px) 24px calc(env(safe-area-inset-bottom, 0px) + 40px)",
     display: "flex", flexDirection: "column", alignItems: "center",
-    fontFamily: "'Quicksand', sans-serif",
+    fontFamily: FONT,
     // 내용(이메일 폼 펼침 등)이 길어지면 화면 안에서만 스크롤, 문서 바운스 없음
     overflowY: "auto", overflowX: "hidden", overscrollBehavior: "contain",
     WebkitOverflowScrolling: "touch",
   },
   // 시트(embedded) 안에 끼워 넣을 때 — 카드 안 여백만 쓰고, 배경/높이는 카드가 담당.
   embeddedWrap: {
-    width: "100%", maxWidth: 400, margin: "0 auto",
+    width: "100%", margin: "0 auto",
     boxSizing: "border-box", color: INK,
-    padding: "4px 4px 2px",
-    display: "flex", flexDirection: "column", alignItems: "center",
-    fontFamily: "'Quicksand', sans-serif", position: "relative",
+    padding: 0,
+    display: "flex", flexDirection: "column", alignItems: "stretch",
+    fontFamily: FONT, position: "relative",
   },
+  sheetTitle: { fontSize: 20, fontWeight: 700, letterSpacing: "-0.02em", margin: "0 0 4px", color: INK },
+  sheetDesc: { fontSize: 14, color: "rgba(35,31,32,.6)", margin: "0 0 16px", lineHeight: 1.5 },
   embeddedClose: {
-    position: "absolute", top: -4, right: -4, width: 32, height: 32,
+    position: "absolute", top: -2, right: -4, width: 32, height: 32,
     borderRadius: "50%", border: "none", background: "rgba(35,31,32,0.06)",
     color: INK, fontSize: 14, fontWeight: 700, cursor: "pointer",
     display: "flex", alignItems: "center", justifyContent: "center",
   },
   embeddedLogoBox: { marginTop: 4, marginBottom: 10 },
   embeddedTagline: {
-    fontFamily: "'Jua', sans-serif",
+    fontFamily: FONT,
     fontSize: 15, color: INK, opacity: 0.75,
     margin: "0 0 22px", letterSpacing: "-0.005em", textAlign: "center",
   },
   logoBox: { marginTop: 48, marginBottom: 18 },
   fallback: {
-    fontFamily: "'Jua', sans-serif", fontSize: 36, color: INK,
+    fontFamily: FONT, fontSize: 36, color: INK,
   },
   tagline: {
-    fontFamily: "'Jua', sans-serif",
+    fontFamily: FONT,
     fontSize: 17, color: INK, opacity: 0.7,
     margin: "0 0 56px", letterSpacing: "-0.005em",
   },
   buttons: {
-    width: "100%", display: "flex", flexDirection: "column", gap: 12,
+    width: "100%", display: "flex", flexDirection: "column", gap: 10,
   },
   btnBase: {
-    width: "100%", border: "none", borderRadius: 14,
-    padding: "15px 18px", fontSize: 15, fontWeight: 700,
-    fontFamily: "'Quicksand', sans-serif",
+    width: "100%", border: "none", borderRadius: 12,
+    height: 50, padding: "0 18px", fontSize: 16, fontWeight: 600,
+    fontFamily: FONT,
     cursor: "pointer", display: "flex", alignItems: "center",
-    justifyContent: "center", gap: 10,
+    justifyContent: "center", gap: 8,
     transition: "transform .1s ease-out, opacity .12s ease-out",
   },
   btnApple: {
-    width: "100%", border: "none", borderRadius: 14,
-    padding: "15px 18px", fontSize: 15, fontWeight: 700,
-    fontFamily: "'Quicksand', sans-serif",
+    width: "100%", border: "none", borderRadius: 12,
+    height: 50, padding: "0 18px", fontSize: 16, fontWeight: 600,
+    fontFamily: FONT,
     cursor: "pointer", display: "flex", alignItems: "center",
-    justifyContent: "center", gap: 10,
+    justifyContent: "center", gap: 8,
     background: "#000", color: "#fff",
   },
   btnKakao: {
-    width: "100%", border: "none", borderRadius: 14,
-    padding: "15px 18px", fontSize: 15, fontWeight: 700,
-    fontFamily: "'Quicksand', sans-serif",
+    width: "100%", border: "none", borderRadius: 12,
+    height: 50, padding: "0 18px", fontSize: 16, fontWeight: 600,
+    fontFamily: FONT,
     cursor: "pointer", display: "flex", alignItems: "center",
-    justifyContent: "center", gap: 10,
+    justifyContent: "center", gap: 8,
     background: "#FEE500", color: "#191919",
   },
   btnNaver: {
-    width: "100%", border: "none", borderRadius: 14,
-    padding: "15px 18px", fontSize: 15, fontWeight: 700,
-    fontFamily: "'Quicksand', sans-serif",
+    width: "100%", border: "none", borderRadius: 12,
+    height: 50, padding: "0 18px", fontSize: 16, fontWeight: 600,
+    fontFamily: FONT,
     cursor: "pointer", display: "flex", alignItems: "center",
-    justifyContent: "center", gap: 10,
+    justifyContent: "center", gap: 8,
     background: "#03C75A", color: "#fff",
   },
   btnGoogle: {
-    width: "100%", border: "1.5px solid rgba(35,31,32,0.18)",
-    borderRadius: 14, padding: "14px 18px", fontSize: 15, fontWeight: 700,
-    fontFamily: "'Quicksand', sans-serif",
+    width: "100%", border: "1px solid rgba(35,31,32,0.2)",
+    borderRadius: 12, height: 50, padding: "0 18px", fontSize: 16, fontWeight: 600,
+    fontFamily: FONT,
     cursor: "pointer", display: "flex", alignItems: "center",
-    justifyContent: "center", gap: 10,
+    justifyContent: "center", gap: 8,
     background: "#fff", color: INK,
   },
   error: {
@@ -537,7 +548,7 @@ const S = {
     marginTop: 20, padding: "16px 18px",
     background: "#fef9c3", color: "#713f12",
     border: "1.5px solid #facc15", borderRadius: 14,
-    fontFamily: "'Quicksand', sans-serif",
+    fontFamily: FONT,
   },
   noticeTitle: {
     fontSize: 13.5, fontWeight: 700, lineHeight: 1.45, marginBottom: 8,
@@ -551,23 +562,23 @@ const S = {
     width: "100%", background: "#713f12", color: "#fff",
     border: "none", borderRadius: 10, padding: "11px 14px",
     fontSize: 13, fontWeight: 700, cursor: "pointer", marginBottom: 8,
-    fontFamily: "'Quicksand', sans-serif",
+    fontFamily: FONT,
   },
   noticeClose: {
     width: "100%", background: "transparent", color: "#713f12",
     border: "none", padding: "8px", fontSize: 12, fontWeight: 600,
-    cursor: "pointer", fontFamily: "'Quicksand', sans-serif",
+    cursor: "pointer", fontFamily: FONT,
     opacity: 0.7,
   },
   legal: {
-    marginTop: 26, fontSize: 11, lineHeight: 1.65, opacity: 0.55,
-    textAlign: "center", fontWeight: 500,
+    marginTop: 14, fontSize: 12, lineHeight: 1.6, color: "rgba(35,31,32,.5)",
+    textAlign: "center", fontWeight: 400,
   },
   emailToggle: {
     marginTop: 18, background: "transparent", border: "none",
     color: INK, opacity: 0.6, fontSize: 13, fontWeight: 600,
     cursor: "pointer", textDecoration: "underline",
-    fontFamily: "'Quicksand', sans-serif",
+    fontFamily: FONT,
   },
   emailForm: {
     width: "100%", display: "flex", flexDirection: "column", gap: 10,
@@ -586,19 +597,19 @@ const S = {
     width: "100%", boxSizing: "border-box",
     border: "1.5px solid rgba(35,31,32,0.18)", borderRadius: 12,
     padding: "13px 15px", fontSize: 15,
-    fontFamily: "'Quicksand', sans-serif", background: "#fff", color: INK,
+    fontFamily: FONT, background: "#fff", color: INK,
     outline: "none",
   },
   emailSubmit: {
     width: "100%", border: "none", borderRadius: 14,
     padding: "15px 18px", fontSize: 15, fontWeight: 700,
-    fontFamily: "'Quicksand', sans-serif", cursor: "pointer",
+    fontFamily: FONT, cursor: "pointer",
     background: ACCENT, color: "#fff", marginTop: 2,
   },
   emailSwitch: {
     background: "transparent", border: "none", color: INK, opacity: 0.6,
     fontSize: 12.5, fontWeight: 600, cursor: "pointer", padding: "6px",
-    fontFamily: "'Quicksand', sans-serif",
+    fontFamily: FONT,
   },
   successNotice: {
     marginTop: 16, fontSize: 12.5, color: "#166534",

@@ -28,9 +28,9 @@ export function markGuideSeen() {
 }
 
 export default function Guide({ mode = "intro", onClose }) {
-  // photo 모드는 사진 장(1번 인덱스)만 보여준다
-  const single = mode === "photo";
-  const [i, setI] = useState(single ? 1 : 0);
+  // 2.0: 첫 실행(intro)은 **1장만**(§3 첫 실행 팝업 0개 — 가이드 1장). photo 모드는 사진 장(1번 인덱스)만.
+  const single = true;
+  const [i, setI] = useState(mode === "photo" ? 1 : 0);
   const last = 2;
 
   function finish() {
@@ -45,9 +45,10 @@ export default function Guide({ mode = "intro", onClose }) {
       <h2 style={S.title}>{t("guide.how.title")}</h2>
       <ol style={S.steps}>
         <li style={S.step}><b>{t("guide.how.s1t")}</b><span style={S.stepSub}>{t("guide.how.s1d")}</span></li>
-        <li style={S.step}><b>{t("guide.how.s2t")}</b><span style={S.stepSub}>{t("guide.how.s2d")}</span></li>
+        <li style={S.step}><b>{t("guide.how.s2t")}</b><span style={S.stepSub}>{t("guide.how.s2d")} {t("guide.photo.lead")}</span></li>
         <li style={S.step}><b>{t("guide.how.s3t")}</b><span style={S.stepSub}>{t("guide.how.s3d")}</span></li>
       </ol>
+      <p style={S.note}>{t("guide.photo.note")}</p>
     </div>,
 
     // 1 — 어떤 사진을 넣어야 하나 (핵심)
@@ -118,8 +119,8 @@ const S = {
   },
   card: {
     width: "100%", maxWidth: 440,
-    background: "#fffdf9",
-    borderRadius: "22px 22px 0 0",
+    background: "#FFFFFF",
+    borderRadius: "20px 20px 0 0",
     padding: "22px 22px calc(env(safe-area-inset-bottom, 0px) + 18px)",
     maxHeight: "88vh", overflowY: "auto",
     position: "relative",
@@ -179,8 +180,8 @@ const S = {
     fontSize: 14.5, fontWeight: 600, color: "#3d3735", cursor: "pointer",
   },
   primaryBtn: {
-    flex: 1, padding: "13px 18px", borderRadius: 14, border: "none",
-    background: "#231f20", color: "#fff",
-    fontSize: 15, fontWeight: 700, cursor: "pointer",
+    flex: 1, height: 50, padding: "0 18px", borderRadius: 12, border: "none",
+    background: "#E6403C", color: "#fff",
+    fontSize: 16, fontWeight: 600, cursor: "pointer",
   },
 };

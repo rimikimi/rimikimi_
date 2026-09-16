@@ -17,8 +17,10 @@ import { createPortal } from "react-dom";
 import { FILM_PRESETS, groupedPresets, presetByKey, applyLook } from "./filters";
 import { t, getLang } from "./i18n";
 import { isNative } from "./nativeBridge";
+import { shareImage } from "./share";
 import * as hap from "./haptics";
 
+const FONT = '-apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", system-ui, sans-serif';
 const GRAIN_SEED = 7;          // PhotoEditor 와 같은 시드 — 미리보기/결과의 그레인이 같다
 const PREVIEW_STEPS = [640, 480, 360]; // 미리보기 긴 변 후보 (느리면 아래로)
 const SLOW_MS = 42;            // 프레임 처리 시간이 이걸 넘으면 한 단계 낮춘다
@@ -32,7 +34,8 @@ function chipList() {
   return out;
 }
 
-export default function CameraStudio({ initialPresetKey = "none", onShot, onClose }) {
+// 2.0(§3 카메라): 셔터 → **즉시 앨범 저장**(onSave) → "다듬기 · 공유" 버튼. 편집기는 원할 때만(onEdit).
+export default function CameraStudio({ initialPresetKey = "none", onSave, onEdit, onClose }) {
   const videoRef = useRef(null);
   const workRef = useRef(null);   // 처리용 오프스크린
   const viewRef = useRef(null);   // 화면에 보이는 캔버스
@@ -48,6 +51,10 @@ export default function CameraStudio({ initialPresetKey = "none", onShot, onClos
   const [ready, setReady] = useState(false);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  // 찍은 사진 리뷰 { url, presetKey, saved } | null
+  const [shot, setShot] = useState(null);
+  const [sharing, setSharing] = useState(false);
+  const [toast, setToast] = useState("");
 
   const chips = chipList();
   const ko = getLang() === "ko";
@@ -179,7 +186,13 @@ export default function CameraStudio({ initialPresetKey = "none", onShot, onClos
         ctx.putImageData(img, 0, 0);
       }
       const url = c.toDataURL("image/jpeg", 0.92);
-      onShot && onShot(url, presetRef.current);
+      const presetKey = presetRef.current;
+      setShot({ url, presetKey, saved: null });
+      // 즉시 저장 — 결과가 손에 남는 게 먼저다. 실패해도 리뷰 화면은 뜬다.
+      let saved = false;
+      try { saved = onSave ? !!(await onSave(url, "rimikimi_camera_" + Date.now())) : false; } catch (_) { saved = false; }
+      setShot((cur) => (cur && cur.url === url ? { ...cur, saved } : cur));
+      if (saved) { hap.done(); setToast(t("camera.saved")); setTimeout(() => setToast(""), 1800); }
     } catch (_) {
       setErr(t("camera.err.generic"));
     } finally {
@@ -221,6 +234,42 @@ export default function CameraStudio({ initialPresetKey = "none", onShot, onClos
       const el = document.querySelector(`[data-cschip="${key}"]`);
       el?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
     });
+  }
+
+  async function shareShot() {
+    if (!shot || sharing) return;
+    setSharing(true);
+    try {
+      await shareImage({ src: shot.url, filename: "rimikimi_camera.jpg", title: "rimikimi", text: t("share.caption") });
+    } finally { setSharing(false); }
+  }
+
+  if (shot) {
+    return createPortal(
+      <div style={CS.root}>
+        <style>{CS_CSS}</style>
+        {toast && <div style={CS.toast}>{toast}</div>}
+        <div style={CS.top}>
+          <button style={CS.iconBtn} onClick={() => { hap.tap(); onClose && onClose(); }} aria-label={t("common.close")}>✕</button>
+          <div style={CS.topTitle}>{label(presetByKey(shot.presetKey))}</div>
+          <span style={{ width: 44 }} />
+        </div>
+        <div style={CS.stage}>
+          <div style={CS.frame}>
+            <img src={shot.url} alt="" style={CS.shotImg} />
+          </div>
+        </div>
+        <div style={CS.review}>
+          <div style={CS.reviewNote}>{shot.saved === false ? t("save.toast.fail") : t("camera.saved")}</div>
+          <div style={CS.reviewRow}>
+            <button style={CS.reviewBtn} onClick={() => { hap.tap(); setShot(null); }}>{t("camera.retake")}</button>
+            <button style={CS.reviewBtn} onClick={() => { hap.tap(); onEdit && onEdit(shot.url, shot.presetKey); }}>{t("result.edit")}</button>
+            <button style={{ ...CS.reviewBtn, ...CS.reviewBtnHi }} disabled={sharing} onClick={shareShot}>{t("common.share")}</button>
+          </div>
+        </div>
+      </div>,
+      document.body
+    );
   }
 
   return createPortal(
@@ -304,7 +353,7 @@ const CS = {
     display: "flex", flexDirection: "column",
     paddingTop: "env(safe-area-inset-top, 0px)",
     paddingBottom: "env(safe-area-inset-bottom, 0px)",
-    color: "#fff", fontFamily: "'Quicksand', 'Jua', sans-serif",
+    color: "#fff", fontFamily: FONT,
   },
   top: {
     flex: "none", height: 52, display: "flex", alignItems: "center",
@@ -360,6 +409,20 @@ const CS = {
   },
   shutterOff: { opacity: 0.4, cursor: "default" },
   shutterInner: { width: 58, height: 58, borderRadius: "50%", background: "#fff", display: "block" },
+  shotImg: { width: "100%", height: "100%", objectFit: "cover", display: "block" },
+  review: { flex: "none", padding: "14px 16px calc(env(safe-area-inset-bottom, 0px) + 18px)", display: "flex", flexDirection: "column", gap: 12 },
+  reviewNote: { textAlign: "center", fontSize: 13, color: "rgba(255,255,255,0.6)" },
+  reviewRow: { display: "flex", gap: 8 },
+  reviewBtn: {
+    flex: 1, height: 50, borderRadius: 12, border: "none", background: "rgba(255,255,255,0.12)", color: "#fff",
+    fontSize: 16, fontWeight: 600, fontFamily: FONT, cursor: "pointer",
+  },
+  reviewBtnHi: { background: "#fff", color: "#231F20" },
+  toast: {
+    position: "absolute", top: "calc(env(safe-area-inset-top, 0px) + 60px)", left: "50%", transform: "translateX(-50%)",
+    background: "rgba(255,255,255,0.92)", color: "#231F20", borderRadius: 999, padding: "9px 16px",
+    fontSize: 13.5, fontWeight: 600, zIndex: 2, fontFamily: FONT,
+  },
 };
 
 const CS_CSS = `

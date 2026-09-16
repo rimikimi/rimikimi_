@@ -475,8 +475,8 @@ const S = {
   },
   row: { display: "flex", gap: 8, marginTop: 12 },
   primary: {
-    width: "100%", padding: "13px 18px", borderRadius: 14, border: "none",
-    background: INK, color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer",
+    width: "100%", height: 46, padding: "0 18px", borderRadius: 12, border: "none",
+    background: "#F1ECE4", color: INK, fontSize: 15, fontWeight: 600, cursor: "pointer",
   },
   ghost: {
     flex: "0 0 auto", padding: "13px 18px", borderRadius: 14,
@@ -489,9 +489,9 @@ const S = {
     fontSize: 14.5, fontWeight: 700, color: "#c0392b", cursor: "pointer",
   },
   card: {
-    background: "#fff", border: "1px solid " + INK + "10", borderRadius: 18,
-    padding: 16, marginBottom: 12, boxShadow: "0 8px 20px -12px rgba(35,31,32,0.18)",
+    background: "#fff", border: "none", borderRadius: 14,
+    padding: 14, marginBottom: 14, boxShadow: "0 1px 2px rgba(35,31,32,.06)",
   },
-  cardHead: { fontSize: 15, fontWeight: 800, color: INK, marginBottom: 8 },
-  cardNote: { fontSize: 12.5, lineHeight: 1.6, color: "#6b6360", marginBottom: 10 },
+  cardHead: { fontSize: 16, fontWeight: 600, color: INK, marginBottom: 6 },
+  cardNote: { fontSize: 13, lineHeight: 1.5, color: "rgba(35,31,32,.6)", marginBottom: 10 },
 };
