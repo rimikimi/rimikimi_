@@ -68,6 +68,8 @@ struct GenerateRequest {
     /// 인생네컷: 분할 수 + 스타일.
     var cutCount: Int? = nil
     var fourcutStyle: String? = nil
+    /// 페이스 프로필 참조(등록 사진). 매직부스는 안 보낸다.
+    var faceRef: UIImage? = nil
 
     var prompt: String { concept.isFourcut ? "인생네컷" : concept.text }
     var skipFacePrecheck: Bool { concept.isArtTransform }
@@ -170,7 +172,14 @@ final class RimikimiAPI {
             }
             body["dressStyle"] = r.dressStyle
         }
+        // 이 기기의 푸시 토큰 — 서버가 생성을 마치면 여기로 "완성됐어요"를 쏜다(1.x 와 동일).
         if let pushToken { body["pushToken"] = pushToken }
+        // 페이스 프로필(1.x `loadProfileRefs`): 등록 사진을 참조로 같이 보낸다. 서버는 참조로만 쓰고 저장하지 않는다.
+        // 매직부스(얼굴 미유지)는 1.x 와 같이 보내지 않는다.
+        if !r.skipFacePrecheck, let anchor = r.faceRef {
+            let p = ImageUtil.jpegPayload(anchor, maxSide: 1024, quality: 0.85)
+            body["faceRefs"] = [["mimeType": p.mimeType, "base64": p.base64, "angle": "anchor"]]
+        }
 
         var req = authed("api/generate", token: token)
         req.httpMethod = "POST"
@@ -210,6 +219,49 @@ final class RimikimiAPI {
                               quotaLimit: json["quotaLimit"] as? Int,
                               unlimited: json["unlimited"] as? Bool,
                               busyFallback: json["busyFallback"] as? Bool ?? false)
+    }
+
+    // MARK: 결제 · 초대 · 계정
+
+    /// `POST /api/iap/grant {productId, transactionId}` → 지급 크레딧. 202(pending) 는 잠시 뒤 재시도.
+    func iapGrant(productId: String, transactionId: String?, token: String) async throws -> Int? {
+        var req = authed("api/iap/grant", token: token)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        var body: [String: Any] = ["productId": productId]
+        if let transactionId { body["transactionId"] = transactionId }
+        req.httpBody = try JSONSerialization.data(withJSONObject: body)
+        for attempt in 0..<3 {
+            let (data, resp) = try await session.data(for: req)
+            let status = (resp as? HTTPURLResponse)?.statusCode ?? 0
+            let json = (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
+            if status == 202 { try? await Task.sleep(nanoseconds: 2_000_000_000 * UInt64(attempt + 1)); continue }
+            guard (200...299).contains(status) else {
+                throw APIError(message: json["error"] as? String ?? "결제 처리 실패 (오류 \(status))", status: status)
+            }
+            return json["credits"] as? Int
+        }
+        throw APIError(message: "구매 확인 중이에요. 잠시 후 크레딧을 확인해 주세요.", status: 202)
+    }
+
+    struct ReferralResult: Decodable { let ok: Bool; let reason: String? }
+    /// `POST /api/referral/claim {ref}` — 친구 초대 코드 등록.
+    func referralClaim(code: String, token: String) async throws -> ReferralResult {
+        var req = authed("api/referral/claim", token: token)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try JSONSerialization.data(withJSONObject: ["ref": code])
+        let (data, resp) = try await session.data(for: req)
+        try Self.check(resp, data)
+        return try JSONDecoder().decode(ReferralResult.self, from: data)
+    }
+
+    /// `POST /api/account/delete` — 계정·데이터 영구 삭제.
+    func deleteAccount(token: String) async throws {
+        var req = authed("api/account/delete", token: token)
+        req.httpMethod = "POST"
+        let (data, resp) = try await session.data(for: req)
+        try Self.check(resp, data)
     }
 
     // MARK: -

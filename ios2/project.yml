@@ -7,6 +7,14 @@ options:
   createIntermediateGroups: true
   groupSortPosition: top
 
+packages:
+  RevenueCat:
+    url: https://github.com/RevenueCat/purchases-ios-spm.git
+    from: 5.0.0
+  Firebase:
+    url: https://github.com/firebase/firebase-ios-sdk.git
+    from: 11.0.0
+
 settings:
   base:
     # Friday 와 동일 — Swift 5 언어 모드 + 최소 strict-concurrency.
@@ -35,6 +43,11 @@ targets:
         aps-environment: $(APS_ENVIRONMENT)
     sources:
       - path: rimikimi
+    dependencies:
+      - package: RevenueCat
+        product: RevenueCat
+      - package: Firebase
+        product: FirebaseMessaging
     info:
       path: rimikimi/Info.plist
       properties:
@@ -57,6 +70,10 @@ targets:
         NSCameraUsageDescription: "필터를 보면서 사진을 찍기 위해 카메라를 사용합니다."
         # ATT — 실행 시가 아니라 첫 생성 완료 후 1회(TrackingPrompt). 문구는 1.x 와 동일.
         NSUserTrackingUsageDescription: "맞춤형 광고를 제공하기 위해 사용돼요."
+        # 원격 푸시(FCM). APNs 토큰은 AppDelegate 가 Messaging 에 직접 넘긴다(스위즐링 끔).
+        UIBackgroundModes:
+          - remote-notification
+        FirebaseAppDelegateProxyEnabled: false
         LSApplicationQueriesSchemes:
           - kakaokompassauth
           - kakaolink

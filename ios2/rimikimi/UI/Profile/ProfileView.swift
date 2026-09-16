@@ -1,8 +1,10 @@
 import SwiftUI
 
-/// 프로필 — 크레딧 · 스토어 · 초대 · 알림 설정 · 계정 · 법적 고지. 1주차는 크레딧만 실데이터, 나머지는 자리.
+/// 프로필 — 크레딧 · 스토어 · 초대 · 알림 설정 · 계정 · 법적 고지.
 struct ProfileView: View {
     @Environment(AppState.self) private var app
+    @State private var confirmDelete = false
+    @State private var deleting = false
 
     var body: some View {
         ScrollView {
@@ -11,16 +13,16 @@ struct ProfileView: View {
                 if app.auth.isSignedIn {
                     CardGroup {
                         SettingsRow(title: "크레딧", value: app.quota?.chipLabel ?? "–", systemImage: "ticket", chevron: false) {}
-                        SettingsRow(title: "스토어", value: "곧 열려요", systemImage: "bag") { app.creditsSheet = true }
-                        SettingsRow(title: "친구 초대", value: app.quota?.referralCode, systemImage: "gift") { app.showToast("초대 화면은 다음 주에 붙어요") }
+                        SettingsRow(title: "스토어", value: "충전 · 구독", systemImage: "bag") { app.profilePath.append(.store) }
+                        SettingsRow(title: "친구 초대", value: app.quota?.referralCode, systemImage: "gift") { app.profilePath.append(.invite) }
                     }
                     CardGroup {
-                        SettingsRow(title: "새 컨셉 알림", value: "끄기", systemImage: "bell") { app.showToast("알림 설정은 다음 주에 붙어요") }
+                        NotificationToggleRow()
                     }
                     CardGroup {
                         SettingsRow(title: "계정", value: providerLabel, systemImage: "person.crop.circle", chevron: false) {}
                         SettingsRow(title: "로그아웃", systemImage: "rectangle.portrait.and.arrow.right", chevron: false) { app.signOut() }
-                        SettingsRow(title: "계정 삭제", systemImage: "trash", chevron: false, destructive: true) { app.showToast("계정 삭제는 다음 주에 붙어요") }
+                        SettingsRow(title: deleting ? "삭제 중…" : "계정 삭제", systemImage: "trash", chevron: false, destructive: true) { confirmDelete = true }
                     }
                 } else {
                     VStack(spacing: Spacing.s3) {
@@ -36,9 +38,9 @@ struct ProfileView: View {
                     .padding(.horizontal, Spacing.page)
                 }
                 CardGroup {
-                    SettingsRow(title: "이용약관", systemImage: "doc.text") { open("terms.html") }
-                    SettingsRow(title: "개인정보처리방침", systemImage: "hand.raised") { open("privacy.html") }
-                    SettingsRow(title: "환불정책", systemImage: "arrow.uturn.backward") { open("refund.html") }
+                    SettingsRow(title: "이용약관", systemImage: "doc.text") { open(Config.termsURL, "이용약관") }
+                    SettingsRow(title: "개인정보처리방침", systemImage: "hand.raised") { open(Config.privacyURL, "개인정보처리방침") }
+                    SettingsRow(title: "환불정책", systemImage: "arrow.uturn.backward") { open(Config.refundURL, "환불정책") }
                 }
                 VStack(spacing: 2) {
                     Text("상호: 리미키미 · 사업자등록번호: 247-01-03603")
@@ -55,6 +57,12 @@ struct ProfileView: View {
         .background(Color.bg)
         .inlineTitle("프로필")
         .task(id: app.auth.session?.userID) { await app.refreshQuota() }
+        .confirmationDialog("정말 계정을 삭제할까요?", isPresented: $confirmDelete, titleVisibility: .visible) {
+            Button("계정 삭제", role: .destructive) { deleteAccount() }
+            Button("취소", role: .cancel) {}
+        } message: {
+            Text("생성한 이미지·크레딧·모든 데이터가 영구 삭제되며 되돌릴 수 없어요.")
+        }
     }
 
     private var header: some View {
@@ -81,41 +89,49 @@ struct ProfileView: View {
         }
     }
 
-    private func open(_ page: String) {
-        app.webTool = .init(url: Config.apiBase.appendingPathComponent(page), title: "법적 고지")
+    private func open(_ url: URL, _ title: String) { app.webTool = .init(url: url, title: title) }
+
+    private func deleteAccount() {
+        guard !deleting else { return }
+        deleting = true
+        Task {
+            defer { deleting = false }
+            guard let token = await app.auth.validAccessToken() else { return }
+            do {
+                try await RimikimiAPI.shared.deleteAccount(token: token)
+                app.signOut()
+                app.userPhoto.clear()
+                app.showToast("계정이 삭제됐어요. 그동안 이용해 주셔서 감사합니다.")
+            } catch {
+                app.showToast(error.localizedDescription)
+            }
+        }
     }
 }
 
-/// 크레딧 부족 시트 — 팩 3개 · 구독 1개 · "친구 초대로 무료 3장". 결제(RevenueCat)는 다음 주.
-struct CreditsShortSheet: View {
-    @Environment(\.dismiss) private var dismiss
+/// "새 컨셉 알림" 토글 — 알림 권한은 여기서만 묻는다(SPEC §3).
+struct NotificationToggleRow: View {
+    @Environment(AppState.self) private var app
+    @State private var busy = false
+
     var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.s4) {
-            HStack {
-                Text("크레딧이 부족해요").font(AppFont.title2).tracking(Tracking.title2)
-                Spacer()
-                Button { dismiss() } label: {
-                    Image(systemName: "xmark").font(.system(size: 13, weight: .bold)).foregroundStyle(Color.ink)
-                        .frame(width: 30, height: 30).background(Color.fill, in: Circle())
-                }
-                .buttonStyle(.plain).accessibilityLabel("닫기")
+        HStack(spacing: Spacing.s3) {
+            Image(systemName: "bell").font(.system(size: 16, weight: .medium)).foregroundStyle(Color.ink2).frame(width: 24)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("새 컨셉 알림").font(AppFont.body)
+                Text(app.push.authorization == .denied ? "설정에서 알림이 꺼져 있어요" : "매일 저녁 8시 새 컨셉이 오면 알려드려요")
+                    .font(AppFont.footnote).foregroundStyle(Color.ink2)
             }
-            CardGroup {
-                SettingsRow(title: "인트로 팩", value: "6 크레딧") {}
-                SettingsRow(title: "스탠다드 팩", value: "24 크레딧") {}
-                SettingsRow(title: "프로 팩", value: "45 크레딧") {}
-            }
-            .padding(.horizontal, -Spacing.page)
-            CardGroup {
-                SettingsRow(title: "rimikimi 플러스 구독", value: "매월") {}
-            }
-            .padding(.horizontal, -Spacing.page)
-            Button("친구 초대로 무료 3장") {}
-                .buttonStyle(SecondaryButtonStyle())
-            Text("결제는 곧 열려요. 구매 즉시 하던 생성이 이어져요.").font(AppFont.footnote).foregroundStyle(Color.ink2)
-            Spacer(minLength: 0)
+            Spacer()
+            Toggle("", isOn: Binding(get: { app.push.newConceptAlerts }, set: { on in
+                guard !busy else { return }
+                busy = true
+                Task { await app.push.setNewConceptAlerts(on); busy = false }
+            }))
+            .labelsHidden()
+            .tint(Color.accent)
         }
-        .padding(Spacing.page)
-        .background(Color.bg)
+        .padding(.horizontal, Spacing.s4)
+        .frame(minHeight: ControlHeight.row)
     }
 }

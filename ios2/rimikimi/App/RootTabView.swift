@@ -61,8 +61,12 @@ struct RootTabView: View {
             guard ids != nil, let items = app.generation.pendingPresentation else { return }
             app.generation.pendingPresentation = nil
             app.present(items, job: app.generation.job)
-            // ATT 는 첫 생성 완료 후에만 — 결과 화면이 뜬 뒤 1초, 1회(SPEC §3).
-            TrackingPrompt.requestOnceAfterFirstResult()
+            // ATT 는 첫 생성 완료 후에만 — 결과 화면이 뜬 뒤 1초, 1회 → 그 다음 초대 카드(SPEC §3).
+            app.afterFirstResult()
+        }
+        // 429(크레딧 부족) 실패 → 시트. 구매 뒤 같은 요청을 이어간다.
+        .onChange(of: app.generation.state) { _, s in
+            if case .failed = s { app.handleGenerationFailure() }
         }
         .sheet(isPresented: $app.loginSheet) {
             LoginSheet(message: app.loginMessage)
@@ -70,8 +74,8 @@ struct RootTabView: View {
                 .presentationCornerRadius(Radius.sheet)
         }
         .sheet(isPresented: $app.creditsSheet) {
-            CreditsShortSheet()
-                .presentationDetents([.medium])
+            CreditsSheet()
+                .presentationDetents([.large])
                 .presentationCornerRadius(Radius.sheet)
         }
         .fullScreenCover(item: $app.webTool) { tool in
@@ -123,6 +127,8 @@ struct RouteDestination: View {
         case .concept(let c): ConceptOptionsView(concept: c)
         case .category(let name): CategoryListView(name: name)
         case .result(let payload): ResultView(payload: payload)
+        case .store: StoreView()
+        case .invite: InviteView()
         }
     }
 }

@@ -71,14 +71,22 @@ xcrun simctl launch <UDID> com.rimikimi.app -rimikimi-url "com.rimikimi.app://de
 - 테스트 계정 `ios2-e2e@rimikimi.test`(일반 사용자, 하루 1장). `App/DevRoutes.swift` 는 `#if DEBUG` 로만 컴파일된다. 샘플 인물 사진 `Resources/e2e_sample_person.jpg`.
 - ATT 는 첫 결과 화면 뒤 1회 뜬다. 시뮬레이터에선 누를 수 없어 **답하지 않은 ATT 알림이 앱을 다시 켜도 남는다** — 재부팅으로 지운다.
 
+## 2주차 (2026-09-16)
+
+- **스토어·구독** (`Backend/StoreManager.swift`, `UI/Store/StoreView.swift`): RevenueCat SPM(`purchases-ios-spm`). 흐름은 1.x `src/iap.js` 그대로 — configure → 로그인 뒤 `logIn(user.id)` → `products(ids)` → `purchase` → `POST /api/iap/grant {productId, transactionId}`(202 pending 은 3회 재시도). 상품 ID `rimikimi.pack.intro/mini/standard/pro`, `rimikimi.sub.plus.weekly/monthly/annual`. 공개 SDK 키는 `Config.revenueCatIOSKey`(`.env.local` VITE_RC_IOS_KEY). **크레딧 부족 시트**(`CreditsSheet`): 팩 3 · 구독(먼슬리) · "친구 초대로 무료 3장". 만들기 전에 잔액이 모자라거나 서버가 429 를 주면 뜨고, 구매 성공 시 `AppState.continueAfterPurchase()` 가 하던 생성을 이어간다.
+- **푸시** (`Backend/PushManager.swift`): Firebase Messaging SPM + `Resources/GoogleService-Info.plist`(1.x 것). 1.x 와 같이 **등록 API 없음** — 생성 요청의 `pushToken` 으로 완료 알림, 토픽 `drop_p540` 으로 새 컨셉 알림. 권한은 **프로필 "새 컨셉 알림" 토글에서만**. 앱 활성화 시 배지 0. APNs 토큰은 `AppDelegate` 가 `Messaging.apnsToken` 에 직접 넣는다(`FirebaseAppDelegateProxyEnabled=false`).
+- **첫 실행 가이드 1장** (`UI/Onboarding/GuideView.swift`): 1.x `guide.how.*` 문구. `guide.done.v2` 플래그. 실행 시 다른 팝업 없음. 순서: 첫 결과 → ATT(1초 뒤, 1회) → **초대 카드**(홈 상단 1회, `AppState.afterFirstResult`).
+- **프로필**: 초대(`UI/Profile/InviteView.swift` — 내 코드 복사·공유링크 `/i/CODE`, 친구 코드 → `POST /api/referral/claim {ref}`), 계정 삭제(확인 → `POST /api/account/delete` → 로그아웃), 법적 고지(`/terms`, `/privacy`, `/refund` 웹뷰), 알림 토글.
+- **정방향 맞춤(클라)** (`UI/Fit/`): 결과 사진이 3:4 에서 3% 넘게 벗어나면 제안 배너 → 시트. ① 잘라 맞춤 = EXIF 바로 세우기 + Vision `VNDetectFaceRectangles` 얼굴 기준 3:4 크롭(로컬, 무료) ② 채워 맞춤 = 버튼만(서버 `fit=outpaint` 준비 중 안내).
+- **faceRefs / pushToken**: `/api/generate` 에 1.x 와 같이 `faceRefs:[{mimeType,base64,angle:"anchor"}]`(등록 사진, 매직부스 제외) 와 `pushToken` 을 실어 보낸다.
+- 개발 라우트 추가: `dev/store`, `dev/credits?concept=`, `dev/invite`, `dev/profile`, `dev/guide`, `dev/invitecard`, `dev/fit`.
+
 ## 자리만 잡은 것(스텁)
 
 - 필터 편집기·카메라: `WKWebView` 로 `https://rimikimi-app.vercel.app/?tool=filter|camera` 를 연다(SPEC §5 1단계). 저장·공유·앨범 브리지 없음. 필터 프리셋 카드는 회색 자리(썸네일 없음).
-- 크레딧 부족 시트: 팩 3·구독 1·초대 버튼 문구만. RevenueCat 미연동.
-- 프로필의 스토어·초대·알림 설정·계정 삭제: 토스트로 "다음 주" 안내.
+- 결제 실구매는 시뮬레이터에서 불가 — UI·에러 경로만 확인. StoreKit 설정 파일(.storekit) 없음.
+- 채워 맞춤(서버 outpaint): 버튼만.
 - 다듬기 버튼: 편집기 웹뷰를 열 뿐 결과 사진을 넘기지 않는다.
-- 푸시 토큰(`pushToken`)은 요청에 실리지 않는다(등록 코드 없음). 페이스 프로필 `faceRefs` 도 보내지 않는다.
-- 첫 실행 가이드 1장, ATT, 알림 권한 시점: 없음.
 
 ## 명세상 애매한 점 / 확인 필요
 

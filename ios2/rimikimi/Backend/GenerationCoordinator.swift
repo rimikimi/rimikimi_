@@ -66,19 +66,19 @@ final class GenerationCoordinator {
 
     // MARK: 시작
 
-    func start(_ request: GenerateRequest, token: String) {
+    func start(_ request: GenerateRequest, token: String, pushToken: String? = nil) {
         guard !isRunning else { return }
         let job = Job(conceptId: request.concept.id, conceptTitle: request.concept.title,
                       startedAt: Date(), count: request.displayCount)
         writeMarker(job)
         state = .running(job, waiting: false)
         quotaExceeded = false
-        Task { await run(request, job: job, token: token) }
+        Task { await run(request, job: job, token: token, pushToken: pushToken) }
     }
 
-    private func run(_ request: GenerateRequest, job: Job, token: String) async {
+    private func run(_ request: GenerateRequest, job: Job, token: String, pushToken: String?) async {
         do {
-            let r = try await RimikimiAPI.shared.generate(request, token: token)
+            let r = try await RimikimiAPI.shared.generate(request, token: token, pushToken: pushToken)
             lastCredits = r.credits
             let items = r.items.map { ResultItem(id: $0.id, image: $0.image, url: nil, expiresAt: $0.galleryExpiresAt) }
             clearMarker()

@@ -20,6 +20,14 @@ enum Config {
     static let filterToolURL = URL(string: "https://rimikimi-app.vercel.app/?tool=filter")!
     static let cameraToolURL = URL(string: "https://rimikimi-app.vercel.app/?tool=camera")!
 
+    /// RevenueCat Apple 공개 SDK 키(`VITE_RC_IOS_KEY`, 클라이언트 노출용). 비어 있으면 스토어는 자리만 보여 준다.
+    static let revenueCatIOSKey = "appl_apQGEEGcMgFjBaHTxGCvrSTgbux"
+    /// 친구 초대 스마트링크(`/i/CODE`) — 누르면 쓰는 기기의 스토어로 간다.
+    static func inviteURL(code: String) -> URL { apiBase.appendingPathComponent("i/\(code)") }
+    static let termsURL = apiBase.appendingPathComponent("terms")
+    static let privacyURL = apiBase.appendingPathComponent("privacy")
+    static let refundURL = apiBase.appendingPathComponent("refund")
+
     static func thumbURL(_ id: String) -> URL { apiBase.appendingPathComponent("thumbs/\(id).webp") }
     static let bundleID = "com.rimikimi.app"
 }

@@ -10,6 +10,7 @@ struct GalleryHomeView: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
                 GalleryHeader()
+                if app.showInviteCard { InviteCard() }
                 CategoryChipsRow(categories: app.concepts.categories, active: $activeCategory)
                 if app.concepts.isLoading && app.concepts.concepts.isEmpty {
                     loadingRails

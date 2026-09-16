@@ -39,6 +39,28 @@ enum DevRoutes {
                 app.present([.init(id: item.id, image: nil, url: item.url, expiresAt: item.expiresAt)],
                             job: .init(conceptId: item.conceptId ?? "", conceptTitle: item.conceptTitle ?? "", startedAt: item.createdAt ?? Date(), count: 1))
             }
+        case "/store": app.tab = .profile; app.profilePath = [.store]
+        case "/invite": app.tab = .profile; app.profilePath = [.invite]
+        case "/profile": app.tab = .profile; app.profilePath = []
+        case "/credits":
+            app.tab = .gallery; app.galleryPath = []
+            if let id = q["concept"], let c = app.concepts.concept(id: id), let photo = app.userPhoto.image {
+                app.pendingAfterPurchase = GenerateRequest(concept: c, photo: photo)
+            }
+            app.creditsSheet = true
+        case "/guide": app.showGuide = true
+        case "/guidedone": app.finishGuide()
+        case "/invitecard": app.tab = .gallery; app.galleryPath = []; app.showInviteCard = true
+        case "/fit", "/fitsheet":
+            if url.path == "/fitsheet" { app.devAutoOpenFit = true }
+            // 샘플 사진을 4:3 로 잘라 "3:4 아님" 상황을 만든 뒤 결과 화면으로 연다(정방향 맞춤 제안 캡처용).
+            installSamplePhoto(app)
+            if let img = app.userPhoto.image, let cg = img.cgImage {
+                let w = CGFloat(cg.width), h = (w * 3 / 4).rounded()
+                let wide = cg.cropping(to: CGRect(x: 0, y: max(0, CGFloat(cg.height) / 2 - h / 2), width: w, height: h)).map { UIImage(cgImage: $0) } ?? img
+                app.present([.init(id: "dev-fit", image: wide, url: nil, expiresAt: nil)],
+                            job: .init(conceptId: "766", conceptTitle: "정방향 맞춤 데모", startedAt: Date(), count: 1))
+            }
         case "/tab":
             switch q["name"] {
             case "gallery": app.tab = .gallery
