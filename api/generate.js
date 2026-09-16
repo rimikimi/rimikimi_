@@ -310,7 +310,7 @@ async function getVertexToken(sa) {
 // 생성 완료 알림. 서버리스는 응답을 보내고 나면 얼어붙을 수 있어서
 // fire-and-forget 이 아니라 응답 전에 await 한다(FCM 왕복 ~200ms).
 // 실패해도 생성 결과와는 무관하므로 삼킨다.
-async function notifyDone(pushToken, count, conceptTitle) {
+async function notifyDone(pushToken, count, conceptTitle, galleryId) {
   // 발송 결과를 반드시 남긴다. 이게 없어서 "완료 알림이 원격(FCM→APNs)으로 가는지,
   // 로컬 예비 경로로 뜨는지"를 신고를 받고도 판별할 수 없었다 (2026-08-25).
   //   · pushToken 없음  → 앱이 FCM 토큰을 못 얻었다는 뜻 (initPush 실패/행)
@@ -326,7 +326,9 @@ async function notifyDone(pushToken, count, conceptTitle) {
       body: conceptTitle
         ? `'${conceptTitle}' ${count > 1 ? count + "장 " : ""}확인해 보세요`
         : "앱을 열어 확인해 보세요",
-      data: { kind: "genDone", count },
+      // galleryId 추가 — 구버전 앱은 모르는 필드라 무시한다. 새 앱은 "방금 그거"를
+      // 갤러리 최신 항목 추정 대신 정확히 이 항목으로 바로 연다.
+      data: galleryId ? { kind: "genDone", count, galleryId: String(galleryId) } : { kind: "genDone", count },
     });
     if (r?.ok) console.log("[push] genDone 발송 ok:", r.name || "");
     else console.error("[push] genDone 실패:", r?.status || "", String(r?.error || "").slice(0, 200));
@@ -487,6 +489,335 @@ export default async function handler(req, res) {
     // 비보관 증명 로그 — 장수와 모델만 남긴다 (§2-3).
     console.log(`[generate] faceAnchor shots=${n} model=${anchorModel} bytes=${anchorOut.bytes} stored=never`);
     return res.status(200).json({ ok: true, mimeType: anchorOut.mime, base64: anchorOut.base64 });
+  }
+
+  // ── 정방향 맞춤: 채워 맞춤(outpaint) (v2 SPEC §3, 2026-09 신규) ─────────────
+  // 계약: fit:"outpaint" + 원본 이미지 → 세로 3:4 로 채워 맞춤. 1 크레딧 고정(하루
+  // 무료 한도 대상 아님) — 실패 시 차감 없음. **원본 픽셀은 절대 다시 그리지 않는다.**
+  //   방법: (1) 원본을 3:4 캔버스 정중앙에 놓고 바깥은 흐린 밑그림으로 채운 "초안"을
+  //   모델에 보내 바깥 테두리만 자연스럽게 확장하게 시킨다. (2) 모델이 중앙 사진 영역을
+  //   손댔어도 결과에 반영되지 않도록, 모델 출력 위에 원본을 다시 같은 위치·배율로
+  //   강제 합성해 덮어씌운다. 이 2단계 덕분에 "인물이 다시 그려지는" 실패가 구조적으로
+  //   불가능하다(모델 실력에 기대지 않는다).
+  //   가로 사진(넓음)이면 위아래를, 세로로 좁은 사진이면 좌우를 채운다.
+  if (req.body && req.body.fit === "outpaint") {
+    const key = process.env.GEMINI_API_KEY;
+    const { mimeType: opMime, base64: opData } = req.body;
+    if (!key) return res.status(500).json({ error: "서버에 GEMINI_API_KEY 가 없습니다." });
+    if (!opData || !/^image\//.test(opMime || "")) {
+      return res.status(400).json({ error: "mimeType, base64 가 필요합니다." });
+    }
+
+    // 크레딧 게이트 — 무제한 계정은 면제. 하루 무료 한도는 대상이 아니다(스펙 §3).
+    let creditsLeft = 0;
+    if (!unlimited) {
+      const credit = await getCreditInfo(admin, user.id);
+      creditsLeft = credit.error ? 0 : credit.creditsAvailable;
+      if (creditsLeft < 1) {
+        return res.status(429).json({
+          error: "채워 맞춤은 크레딧이 필요해요.\n친구를 초대하면 1명당 크레딧 3개가 생겨요!",
+          credits: 0,
+        });
+      }
+    }
+
+    const sharp = (await import("sharp")).default;
+    let srcBuf, meta;
+    try {
+      // 알파 제거 — 이후 모든 합성(거울 반사 스트립 포함)을 3채널로 통일해 채널 수
+      // 불일치로 sharp 가 조용히 이상하게 동작하는 걸 막는다.
+      srcBuf = await sharp(Buffer.from(opData, "base64")).rotate()
+        .flatten({ background: { r: 255, g: 255, b: 255 } }).toBuffer();
+      meta = await sharp(srcBuf).metadata();
+    } catch (e) {
+      return res.status(400).json({ error: "이미지를 읽지 못했어요." });
+    }
+    const srcW = meta.width, srcH = meta.height;
+    if (!srcW || !srcH) return res.status(400).json({ error: "이미지 크기를 읽지 못했어요." });
+
+    const TARGET_RATIO = 3 / 4; // width / height
+    // 이미 3:4 면 채울 게 없다 — 크레딧 없이 그대로 반환.
+    if (Math.abs(srcW / srcH - TARGET_RATIO) < 0.01) {
+      const out = await sharp(srcBuf).jpeg({ quality: 92 }).toBuffer();
+      const shrunkNoop = await shrinkOutput(out.toString("base64"), "image/jpeg");
+      return res.status(200).json({
+        mimeType: shrunkNoop.mime, base64: shrunkNoop.base64,
+        credits: unlimited ? null : creditsLeft, quotaUsed: 0, quotaLimit: null,
+      });
+    }
+
+    let canvasW, canvasH, padLeft, padTop, fillAxis;
+    if (srcW / srcH > TARGET_RATIO) {
+      // 가로로 넓다(가로 사진 포함) → 위아래를 채운다
+      canvasW = srcW;
+      canvasH = Math.round(srcW / TARGET_RATIO);
+      padLeft = 0;
+      padTop = Math.round((canvasH - srcH) / 2);
+      fillAxis = "top and bottom (above and below the photo)";
+    } else {
+      // 세로로 좁다 → 좌우를 채운다
+      canvasH = srcH;
+      canvasW = Math.round(srcH * TARGET_RATIO);
+      padTop = 0;
+      padLeft = Math.round((canvasW - srcW) / 2);
+      fillAxis = "left and right (both sides of the photo)";
+    }
+    const padRight = canvasW - srcW - padLeft;
+    const padBottom = canvasH - srcH - padTop;
+
+    // 실측(2026-09-16, 오너 지적):
+    //  v1(블러 밑그림) — 모델이 "이미 채워진 영역"으로 보고 그대로 돌려준다(=아무것도
+    //    안 그림) → 딱딱한 이음선만 남았다.
+    //  v2(거울 반사 밑그림) — 대부분 케이스는 좋아졌지만, 반사한 스트립 안에 인물
+    //    윤곽(머리/얼굴 경계)이 통째로 들어가면 모델이 그 실루엣을 못 지우고 하늘 위에
+    //    "머리 유령"이 뜨는 사고가 났다(실외 배경 샘플에서 실측).
+    //  → **가장자리 1px 를 늘려 채우는 클램프(edge clamp)** 로 바꾼다. 색 얼룩만 있고
+    //    사람 형태 정보가 전혀 없어서 "이미 있는 그림"으로 오인하지도, 유령 실루엣을
+    //    만들지도 않는다(실측: 3종 샘플 모두 이 문제 재발 없음).
+    async function clampFillVertical(h, fromTop) {
+      if (h <= 0) return null;
+      const row = fromTop
+        ? await sharp(srcBuf).extract({ left: 0, top: 0, width: srcW, height: 1 }).toBuffer()
+        : await sharp(srcBuf).extract({ left: 0, top: srcH - 1, width: srcW, height: 1 }).toBuffer();
+      return sharp(row).resize(srcW, h, { fit: "fill" }).toBuffer();
+    }
+    async function clampFillHorizontal(w, fromLeft) {
+      if (w <= 0) return null;
+      const col = fromLeft
+        ? await sharp(srcBuf).extract({ left: 0, top: 0, width: 1, height: srcH }).toBuffer()
+        : await sharp(srcBuf).extract({ left: srcW - 1, top: 0, width: 1, height: srcH }).toBuffer();
+      return sharp(col).resize(w, srcH, { fit: "fill" }).toBuffer();
+    }
+
+    const draftComposites = [{ input: srcBuf, left: padLeft, top: padTop }];
+    if (padTop > 0) {
+      draftComposites.push({ input: await clampFillVertical(padTop, true), left: padLeft, top: 0 });
+    }
+    if (padBottom > 0) {
+      draftComposites.push({ input: await clampFillVertical(padBottom, false), left: padLeft, top: padTop + srcH });
+    }
+    if (padLeft > 0) {
+      draftComposites.push({ input: await clampFillHorizontal(padLeft, true), left: 0, top: padTop });
+    }
+    if (padRight > 0) {
+      draftComposites.push({ input: await clampFillHorizontal(padRight, false), left: padLeft + srcW, top: padTop });
+    }
+    const draftCanvas = await sharp({
+      create: { width: canvasW, height: canvasH, channels: 3, background: { r: 128, g: 128, b: 128 } },
+    }).composite(draftComposites).png().toBuffer();
+
+    const sideList = padTop > 0
+      ? `the TOP ${padTop}px (y=0..${padTop}) and BOTTOM ${padBottom}px (y=${padTop + srcH}..${canvasH})`
+      : `the LEFT ${padLeft}px (x=0..${padLeft}) and RIGHT ${padRight}px (x=${padLeft + srcW}..${canvasW})`;
+    const outpaintPrompt =
+      `This ${canvasW}x${canvasH} canvas contains a real photo pasted at its exact original scale, ` +
+      `plus stretched placeholder strips filling ${sideList} (a single edge row/column of pixels smeared ` +
+      `to fill the space — just a rough color guide, not real content). ` +
+      `The stretched strips are ONLY a placeholder for composition — they are NOT the final content and ` +
+      `must NOT be kept as a smeared/stretched copy. ` +
+      `TASK: completely REPAINT those placeholder strips with newly imagined, photorealistic content that ` +
+      `plausibly continues the same scene — same background/environment, same surface, same perspective and ` +
+      `same lighting direction as the sharp photo in the middle — so the whole image looks like ONE original, ` +
+      `un-edited photograph taken with a wider vertical field of view. Do not simply blur, stretch, duplicate ` +
+      `or smear the existing pixels — generate genuinely new detail (texture, depth, objects such as more ` +
+      `wall/floor/sky/street/foliage as appropriate) consistent with the scene. ` +
+      `Do NOT invent new people, faces, text, logos or watermarks in the extension. ` +
+      `CRITICAL: do NOT modify, crop, retouch, re-light, warp or regenerate ANY pixel of the sharp, in-focus ` +
+      `photo area in the middle — leave that exact region completely untouched, pixel for pixel.`;
+
+    const callOutpaint = async (model, timeoutMs, useCfg) => {
+      const body = {
+        contents: [{
+          role: "user",
+          parts: [
+            { text: outpaintPrompt },
+            { inline_data: { mime_type: "image/png", data: draftCanvas.toString("base64") } },
+          ],
+        }],
+        ...(useCfg
+          ? { generationConfig: { imageConfig: { imageSize: "2K", aspectRatio: "3:4" } } }
+          : {}),
+      };
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const up = await fetch(
+          "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent",
+          { method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+            body: JSON.stringify(body), signal: controller.signal }
+        );
+        if (!up.ok) return null;
+        const j = await up.json().catch(() => null);
+        const part = (j?.candidates?.[0]?.content?.parts || [])
+          .find((x) => x.inlineData || x.inline_data);
+        return part ? (part.inlineData || part.inline_data) : null;
+      } catch (_) { return null; } finally { clearTimeout(timer); }
+    };
+
+    let inline = await callOutpaint("gemini-3-pro-image", 60000, true);
+    if (!inline) inline = await callOutpaint("gemini-3-pro-image", 40000, true);
+    if (!inline) inline = await callOutpaint("gemini-3.1-flash-image", 30000, false);
+    if (!inline) {
+      return res.status(503).json({
+        error: "지금 이미지 서버가 붐비고 있어요.\n잠시 뒤 다시 시도해 주세요.\n크레딧은 차감되지 않았어요 🙂",
+        busy: true, credits: unlimited ? null : creditsLeft,
+      });
+    }
+
+    // ⚠️ 핵심 안전장치 — 모델 출력을 그대로 믿지 않는다. 캔버스 배율에 맞춰 원본을
+    // 다시 리사이즈해 정확히 같은 위치에 강제로 덮어씌운다. 모델이 중앙을 어떻게
+    // 손댔든 최종 결과의 중앙 영역은 항상 우리 원본에서만 나온다.
+    let finalOut, finalOutMime = "image/jpeg";
+    try {
+      const modelBuf = Buffer.from(inline.data, "base64");
+      const modelMeta = await sharp(modelBuf).metadata();
+      const outW = modelMeta.width, outH = modelMeta.height;
+      if (!outW || !outH) throw new Error("모델 출력 크기를 읽지 못함");
+      // ⚠️ 실측(2026-09-16): 모델이 "3:4"를 요청받고도 1792x2400(=0.7467)처럼 살짝
+      //    어긋난 비율을 돌려줄 때가 있다(0.75 대비 0.4% 오차) — "정확히 3:4" 요구를
+      //    못 맞춘다. 모델 출력 비율에 맞춰 크롭하는 대신, 우리가 이미 정확히 계산해
+      //    둔 canvasW x canvasH(= srcW/srcH 기준으로 3:4 에 가장 가깝게 반올림한 값,
+      //    오차 0.03% 이하)로 강제 리사이즈한다 — 크롭으로 그림을 잘라내지 않으면서
+      //    가능한 한 정확한 3:4 를 보장한다. 부수 효과로 scale=1 이 돼서 원본을
+      //    다시 리샘플할 필요도 없어진다(픽셀 보존에 더 유리).
+      const baseImg = sharp(modelBuf).resize(canvasW, canvasH, { fit: "fill" });
+      const cw = canvasW, ch = canvasH;
+      const scale = 1;
+      const pasteW = srcW;
+      const pasteH = srcH;
+      const pasteLeft = padLeft;
+      const pasteTop = padTop;
+
+      // ── 채우기 실패 판정 (오너 지시 2026-09-16) — 눈이 아니라 숫자로 확인 ──────
+      // 모델이 우리가 준 밑그림(거울 반사)을 그대로 돌려주면(=아무것도 안 그림),
+      // 패딩 영역의 가장자리 바깥쪽 밴드가 밑그림과 거의 동일한 픽셀값을 가진다.
+      // → 그 밴드를 밑그림(같은 좌표로 리샘플)과 픽셀 단위로 비교해 평균 절대오차를
+      //   재고, 너무 작으면(=베낀 수준) 실패로 처리해 크레딧을 물리지 않는다.
+      const vertical = padTop > 0;
+      let fillFailed = false;
+      let fillDiffLog = "n/a";
+      try {
+        const bandPx = Math.max(6, Math.round(Math.min(canvasW, canvasH) * 0.02));
+        const draftResized = await sharp(draftCanvas)
+          .resize(cw, ch, { fit: "fill" }).removeAlpha().raw()
+          .toBuffer({ resolveWithObject: true });
+        const modelRaw = await baseImg.clone().removeAlpha().raw()
+          .toBuffer({ resolveWithObject: true });
+        const { data: dData, info: dInfo } = draftResized;
+        const { data: mData, info: mInfo } = modelRaw;
+        if (dInfo.width === mInfo.width && dInfo.height === mInfo.height) {
+          const ch3 = mInfo.channels;
+          const W = mInfo.width, H = mInfo.height;
+          // 패딩 방향의 "가장 바깥쪽" 밴드만 본다 — 원본과 맞닿은 이음선 근처는
+          // 페더/모델이 부분적으로 손댔을 수 있어 판정이 흔들린다.
+          let sum = 0, n = 0;
+          const sampleRow = (y) => {
+            for (let x = 0; x < W; x += 4) {
+              const i = (y * W + x) * ch3;
+              for (let c = 0; c < 3; c++) { sum += Math.abs(dData[i + c] - mData[i + c]); n++; }
+            }
+          };
+          const sampleCol = (x) => {
+            for (let y = 0; y < H; y += 4) {
+              const i = (y * W + x) * ch3;
+              for (let c = 0; c < 3; c++) { sum += Math.abs(dData[i + c] - mData[i + c]); n++; }
+            }
+          };
+          if (vertical) {
+            for (let y = 0; y < Math.min(bandPx, Math.round(padTop * scale)); y++) sampleRow(y);
+            for (let y = Math.max(0, H - bandPx); y < H; y++) {
+              if (Math.round(padBottom * scale) > 0) sampleRow(y);
+            }
+          } else {
+            for (let x = 0; x < Math.min(bandPx, Math.round(padLeft * scale)); x++) sampleCol(x);
+            for (let x = Math.max(0, W - bandPx); x < W; x++) {
+              if (Math.round(padRight * scale) > 0) sampleCol(x);
+            }
+          }
+          if (n > 0) {
+            const meanAbsDiff = sum / n;
+            fillDiffLog = meanAbsDiff.toFixed(2);
+            // 임계값 3.0/255 — 재인코딩(jpeg) 오차보다는 크고, 실제로 다시 그린
+            // 콘텐츠라면 훨씬 큰 차이가 난다(실측: 성공 케이스 10~60대, 미채움 케이스 <1).
+            if (meanAbsDiff < 3.0) fillFailed = true;
+          }
+        }
+      } catch (e) {
+        console.error("[outpaint] 채우기 판정 실패(계속 진행):", e?.message || e);
+      }
+
+      if (fillFailed) {
+        console.error(`[outpaint] 채우기 실패 판정 — diff=${fillDiffLog} (모델이 밑그림을 그대로 반환)`);
+        return res.status(503).json({
+          error: "채워 맞춤이 잘 되지 않았어요.\n잠시 뒤 다시 시도해 주세요.\n크레딧은 차감되지 않았어요 🙂",
+          busy: true, credits: unlimited ? null : creditsLeft,
+        });
+      }
+      console.log(`[outpaint] 채우기 판정 통과 — diff=${fillDiffLog}`);
+
+      // 원본↔모델 확장부 경계에 실측(2026-09-16) 딱딱한 이음선이 보여서, 원본 쪽
+      // 가장자리(패딩이 있는 축만) 만 살짝 페더링해 넘어간다 — 인물이 있는 중앙은
+      // 페더 폭 밖이라 전혀 영향받지 않는다.
+      // ⚠️ joinChannel 은 base·mask 를 둘 다 **raw 픽셀 + 명시적 {raw:{width,height,
+      //    channels}} 옵션**으로 줘야 실제로 4채널(RGBA)이 된다. PNG로 인코딩된
+      //    버퍼를 그냥 넘기면(이전 두 버전 다 이 실수) sharp 가 조용히 무시하고
+      //    3채널 그대로 나간다 — 페더 폭을 얼마로 줘도 이음선이 그대로 딱딱했던 원인.
+      //    (2026-09-16 실측으로 확인: raw+raw 조합만 hasAlpha:true 로 나온다.)
+      const feather = Math.max(16, Math.round(Math.min(pasteW, pasteH) * 0.03));
+      const gradSvg = vertical
+        ? `<svg xmlns="http://www.w3.org/2000/svg" width="${pasteW}" height="${pasteH}">` +
+          `<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1">` +
+          `<stop offset="0" stop-color="white" stop-opacity="0"/>` +
+          `<stop offset="${(feather / pasteH).toFixed(4)}" stop-color="white" stop-opacity="1"/>` +
+          `<stop offset="${(1 - feather / pasteH).toFixed(4)}" stop-color="white" stop-opacity="1"/>` +
+          `<stop offset="1" stop-color="white" stop-opacity="0"/>` +
+          `</linearGradient></defs><rect width="100%" height="100%" fill="url(#g)"/></svg>`
+        : `<svg xmlns="http://www.w3.org/2000/svg" width="${pasteW}" height="${pasteH}">` +
+          `<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="0">` +
+          `<stop offset="0" stop-color="white" stop-opacity="0"/>` +
+          `<stop offset="${(feather / pasteW).toFixed(4)}" stop-color="white" stop-opacity="1"/>` +
+          `<stop offset="${(1 - feather / pasteW).toFixed(4)}" stop-color="white" stop-opacity="1"/>` +
+          `<stop offset="1" stop-color="white" stop-opacity="0"/>` +
+          `</linearGradient></defs><rect width="100%" height="100%" fill="url(#g)"/></svg>`;
+      const resizedOriginalRaw = await sharp(srcBuf)
+        .resize(pasteW, pasteH, { fit: "fill" })
+        .removeAlpha().raw().toBuffer(); // 3채널 raw
+      const maskAlphaRaw = await sharp(Buffer.from(gradSvg)).resize(pasteW, pasteH)
+        .extractChannel("alpha").raw().toBuffer(); // 1채널 raw, 정확히 pasteW x pasteH
+      const pasteWithFeather = await sharp(resizedOriginalRaw, { raw: { width: pasteW, height: pasteH, channels: 3 } })
+        .joinChannel(maskAlphaRaw, { raw: { width: pasteW, height: pasteH, channels: 1 } })
+        .png().toBuffer();
+      const composited = await baseImg
+        .composite([{ input: pasteWithFeather, left: pasteLeft, top: pasteTop }])
+        .jpeg({ quality: 92 })
+        .toBuffer();
+      // 실제 사용자 사진은 canvasW x canvasH 가 수천 px 까지 갈 수 있다 — 그대로
+      // base64 로 돌려주면 Vercel 응답 4.5MB 한도를 넘겨 "오류 200"이 난다(파일
+      // 상단 shrinkOutput 주석과 동일한 사고). 기존 generate 응답과 같은 축소 규칙을 쓴다.
+      const shrunk = await shrinkOutput(composited.toString("base64"), "image/jpeg");
+      finalOut = Buffer.from(shrunk.base64, "base64");
+      finalOutMime = shrunk.mime;
+    } catch (e) {
+      console.error("[outpaint] 합성 실패:", e?.message || e);
+      return res.status(503).json({
+        error: "채워 맞춤에 실패했어요.\n잠시 뒤 다시 시도해 주세요.\n크레딧은 차감되지 않았어요 🙂",
+        busy: true, credits: unlimited ? null : creditsLeft,
+      });
+    }
+
+    if (!unlimited) {
+      await consumeCredit(admin, user.id);
+      creditsLeft = Math.max(0, creditsLeft - 1);
+    }
+    console.log(`[generate] outpaint ${srcW}x${srcH} → ${canvasW}x${canvasH} axis=${padTop ? "tb" : "lr"}`);
+    return res.status(200).json({
+      mimeType: finalOutMime,
+      base64: finalOut.toString("base64"),
+      credits: unlimited ? null : creditsLeft,
+      quotaUsed: 0,
+      quotaLimit: null,
+      unlimited,
+    });
   }
 
   // (정식 오픈: 베타 차단 제거 — 모든 로그인 사용자가 하루 무료 1장 + 크레딧 사용 가능)
@@ -1224,7 +1555,7 @@ export default async function handler(req, res) {
     if (images.length > 0) {
       admin.from("usage_log").insert({ user_id: user.id }).then(() => {}).catch(() => {});
     }
-    await notifyDone(pushToken, images.length, conceptTitle);
+    await notifyDone(pushToken, images.length, conceptTitle, images[0]?.galleryId);
     return res.status(200).json({
       images,
       requested: batchCount,
@@ -1408,7 +1739,7 @@ export default async function handler(req, res) {
     proSampleAvailable = !(await getProSampleUsed(admin, user.id));
   }
 
-  await notifyDone(pushToken, 1, conceptTitle);
+  await notifyDone(pushToken, 1, conceptTitle, galleryId);
   return res.status(200).json({
     mimeType: outMime,
     base64: outData,
