@@ -60,7 +60,7 @@ targets:
         CFBundleDisplayName: rimikimi
         CFBundleIconName: AppIcon
         CFBundleShortVersionString: "2.0.0"
-        CFBundleVersion: "1"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         # 빈 런치스크린 = 시스템 배경색으로 즉시 그림 (플래시 없음).
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
@@ -92,7 +92,7 @@ targets:
         GENERATE_INFOPLIST_FILE: NO
         TARGETED_DEVICE_FAMILY: "1"
         MARKETING_VERSION: "2.0.0"
-        CURRENT_PROJECT_VERSION: "1"
+        CURRENT_PROJECT_VERSION: "90"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
       configs:
