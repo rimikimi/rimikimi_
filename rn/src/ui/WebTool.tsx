@@ -52,7 +52,11 @@ export function WebTool({ title, tool, query }: { title: string; tool: "filter" 
   const { refresh: refreshQuota } = useQuota();
   const [loading, setLoading] = useState(true);
   const webRef = useRef<WebView>(null);
-  const params = new URLSearchParams({ tool, native: "1", ...(query ?? {}) });
+  // 웹뷰의 localStorage 는 앱과 별개 저장소이고 웹은 navigator.language 로 언어를 정한다.
+  // 안 넘기면 **껍데기는 한국어인데 안쪽 편집기·카메라만 기기 언어(영어)** 로 뜬다.
+  // 지금 이 앱의 문구(copy.ts)는 한국어 전용이라 웹뷰도 한국어로 고정한다.
+  // ⚠️ 앱에 영어 문구를 붙이는 날 여기도 같이 바꿀 것.
+  const params = new URLSearchParams({ tool, native: "1", lang: "ko", ...(query ?? {}) });
   const hash = session ? `#access_token=${encodeURIComponent(session.access_token)}&refresh_token=${encodeURIComponent(session.refresh_token)}` : "";
   const uri = `${getEnv().apiBase}/?${params.toString()}${hash}`;
 

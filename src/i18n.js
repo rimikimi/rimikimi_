@@ -42,7 +42,19 @@ function readSaved() {
   return null;
 }
 
-let currentLang = readSaved() || detectSystemLang();
+// 2.0 네이티브 웹뷰(`?tool=`)는 자기 언어를 `?lang=` 으로 넘긴다. 웹뷰의 localStorage 는
+// 네이티브 앱과 별개 저장소이고 navigator.language 는 기기 언어를 따라가기 때문에,
+// 이게 없으면 **네이티브 껍데기는 한국어인데 안쪽 편집기·카메라만 영어**로 뜬다
+// (실측: 영어 시뮬레이터에서 상단바 "다듬기" + 내용 "Edit/Share/Save").
+function readURLLang() {
+  try {
+    const v = new URLSearchParams(window.location.search).get("lang");
+    if (SUPPORTED.includes(v)) return v;
+  } catch (_) {}
+  return null;
+}
+
+let currentLang = readURLLang() || readSaved() || detectSystemLang();
 
 export function getLang() {
   return currentLang;
