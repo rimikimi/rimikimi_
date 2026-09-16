@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import ImageIO
 
 /// 원격 이미지 — `URLSession` 으로 받아 `UIImage(data:)` 로 직접 디코드(iOS 는 WebP 네이티브 지원)하고
 /// 메모리 캐시(NSCache) + 디스크 캐시(URLCache) 에 둔다. `AsyncImage` 는 시뮬레이터에서 `/thumbs/*.webp`
@@ -49,13 +50,28 @@ final class ImageLoader {
 
     func cached(_ url: URL) -> UIImage? { cache.object(forKey: url as NSURL) }
 
+    /// 갤러리 원본은 2K PNG(≈10MB)라 그대로 디코드하면 느리고 메모리도 크다 — ImageIO 로 긴 변 `maxPixel` 까지만 푼다.
+    /// (앨범 저장은 원본이 필요하므로 별도 경로 — 2주차.)
+    nonisolated static func downsample(_ data: Data, maxPixel: CGFloat) -> UIImage? {
+        let opts: [CFString: Any] = [kCGImageSourceShouldCache: false]
+        guard let src = CGImageSourceCreateWithData(data as CFData, opts as CFDictionary) else { return nil }
+        let thumbOpts: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxPixel,
+        ]
+        guard let cg = CGImageSourceCreateThumbnailAtIndex(src, 0, thumbOpts as CFDictionary) else { return nil }
+        return UIImage(cgImage: cg)
+    }
+
     func load(_ url: URL) async -> UIImage? {
         if let hit = cached(url) { return hit }
         if let task = inflight[url] { return await task.value }
         let task = Task<UIImage?, Never> { [session] in
             guard let (data, resp) = try? await session.data(from: url),
                   (resp as? HTTPURLResponse).map({ (200...299).contains($0.statusCode) }) ?? true,
-                  let raw = UIImage(data: data) else {
+                  let raw = ImageLoader.downsample(data, maxPixel: 1600) ?? UIImage(data: data) else {
                 AppLog.api.notice("image.load.failed \(url.lastPathComponent, privacy: .public)")
                 return nil
             }

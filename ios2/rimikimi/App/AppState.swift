@@ -66,10 +66,11 @@ final class AppState {
     /// `AuthStore.signInTick` 이 오르면 호출 — 하던 동작을 이어간다.
     func resumePending() {
         loginSheet = false
+        // ⚠️ 크레딧 갱신은 pending 유무와 무관하다 — 예전엔 guard 뒤에 있어 그냥 로그인만 하면 칩이 "–" 로 남았다.
+        Task { await refreshQuota() }
         guard let action = pending else { return }
         pending = nil
         Task { await perform(action) }
-        Task { await refreshQuota() }
     }
 
     func perform(_ action: PendingAction) async {

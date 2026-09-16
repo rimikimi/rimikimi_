@@ -43,6 +43,10 @@ struct AuthSession: Codable, Equatable {
 }
 
 /// 키체인 — 서비스 `com.rimikimi.app`, 계정 `supabase_session`.
+///
+/// 서명 없는 시뮬레이터 빌드(`CODE_SIGNING_ALLOWED=NO`)에서는 `SecItemAdd` 가 -34018(entitlement 없음)로
+/// 실패해 재실행하면 로그아웃돼 있었다(2026-09-16 E2E 에서 발견). 키체인이 거부하면 앱 전용 보호 파일에
+/// 둔다 — 실기기·서명 빌드에서는 키체인이 정본이다.
 struct SessionKeychain {
     private let service = Config.bundleID
     private let key = "supabase_session"
@@ -56,8 +60,11 @@ struct SessionKeychain {
             kSecMatchLimit as String: kSecMatchLimitOne,
         ]
         var result: CFTypeRef?
-        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
-              let data = result as? Data else { return nil }
+        if SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess, let data = result as? Data,
+           let s = try? JSONDecoder().decode(AuthSession.self, from: data) {
+            return s
+        }
+        guard let data = try? Data(contentsOf: fallbackURL) else { return nil }
         return try? JSONDecoder().decode(AuthSession.self, from: data)
     }
 
@@ -71,7 +78,11 @@ struct SessionKeychain {
             kSecValueData as String: data,
             kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,
         ]
-        SecItemAdd(insert as CFDictionary, nil)
+        let status = SecItemAdd(insert as CFDictionary, nil)
+        if status != errSecSuccess {
+            AppLog.auth.error("keychain.write.failed status=\(status) → file fallback")
+            try? data.write(to: fallbackURL, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+        }
     }
 
     func clear() {
@@ -80,5 +91,13 @@ struct SessionKeychain {
             kSecAttrService as String: service,
             kSecAttrAccount as String: key,
         ] as CFDictionary)
+        try? FileManager.default.removeItem(at: fallbackURL)
+    }
+
+    private var fallbackURL: URL {
+        let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("rimikimi", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir.appendingPathComponent("session.json")
     }
 }

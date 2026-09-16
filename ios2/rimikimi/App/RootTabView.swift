@@ -40,7 +40,14 @@ struct RootTabView: View {
         }
         .tabBarMinimizeBehavior(.onScrollDown)
         .tint(Color.accent)
-        .overlay(alignment: .bottom) { CameraTabButton { openCamera() } }
+        // 안쪽 화면(푸시)에서는 탭바가 숨으므로 카메라 원도 함께 숨긴다 — 만들기 바 위에 겹치던 문제.
+        .overlay(alignment: .bottom) {
+            if app.galleryPath.isEmpty && app.myPhotosPath.isEmpty && app.profilePath.isEmpty {
+                CameraTabButton { openCamera() }
+                    .transition(.opacity.combined(with: .scale(scale: 0.9)))
+            }
+        }
+        .animation(Motion.exitCurve(), value: app.galleryPath.isEmpty && app.myPhotosPath.isEmpty && app.profilePath.isEmpty)
         .onChange(of: app.tab) { old, new in
             if new == .camera {
                 app.tab = old == .camera ? lastTab : old

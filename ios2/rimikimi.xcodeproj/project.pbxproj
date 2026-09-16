@@ -27,6 +27,7 @@
 		668C5033B01B75CA06438738 /* MyPhotosView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1421BF409A50AC56D62FE934 /* MyPhotosView.swift */; };
 		6F2399D44AB229460D3A7931 /* Motion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22011AE81D18E4DA58D0FC81 /* Motion.swift */; };
 		75ABB8FC02E395FFDCE9EC5E /* GenerationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 602EA387617A8E42DFAD3C9D /* GenerationCoordinator.swift */; };
+		78962CE8BACB19DEBB10C1D0 /* e2e_sample_person.jpg in Resources */ = {isa = PBXBuildFile; fileRef = E9E942DA3CA4C0AF9A0113D7 /* e2e_sample_person.jpg */; };
 		7B3FB9E2EEA88904B7FAD8E7 /* ConceptStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B5F41573F759B338E33F44C /* ConceptStore.swift */; };
 		835FB99CC4F14D1B4BE717EF /* FilterTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5857D4A423BFF51BC53D5FC5 /* FilterTabView.swift */; };
 		83681C6E4FE5B31C33FBA703 /* WebToolView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7187565C059C0F50D5993AE /* WebToolView.swift */; };
@@ -37,6 +38,7 @@
 		B95622A2A4AB1705BF60C974 /* GalleryHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BAF466244F7888654F1B6F3 /* GalleryHomeView.swift */; };
 		B9DCA305D9F06A53557C8FD6 /* AuthStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A1923FA18887976156964D8 /* AuthStore.swift */; };
 		BBDE02006DA8F3685914A9AC /* UserPhotoStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1574A83D978924D1C913B993 /* UserPhotoStore.swift */; };
+		D0D65C24A947A34D4E36E83F /* DevRoutes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3541E9E21830E875854A3D67 /* DevRoutes.swift */; };
 		D2411ABFA50209D92FD9D40E /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82D0C47706658134377A1FC8 /* ProfileView.swift */; };
 		D6EFDAD775F531D7F1BFF752 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3DA3258F5AAB1C9D0BA5DB98 /* Assets.xcassets */; };
 		D785A463CA74D8DE2EAA88C7 /* TypeTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8DBEB1A957E75B9F72FDA21 /* TypeTokens.swift */; };
@@ -64,6 +66,7 @@
 		2A2B5D4463A0B9F1318D9CF5 /* AppLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLog.swift; sourceTree = "<group>"; };
 		2D343267567AA1793CA75BDB /* BrandLogo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrandLogo.swift; sourceTree = "<group>"; };
 		2E258EB7EE8D8AB3C7FB79AB /* concepts.fallback.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = concepts.fallback.json; sourceTree = "<group>"; };
+		3541E9E21830E875854A3D67 /* DevRoutes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevRoutes.swift; sourceTree = "<group>"; };
 		3DA3258F5AAB1C9D0BA5DB98 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		4D8E6DAE2CC2F97BE9DDB763 /* rimikimi.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = rimikimi.entitlements; sourceTree = "<group>"; };
 		5857D4A423BFF51BC53D5FC5 /* FilterTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterTabView.swift; sourceTree = "<group>"; };
@@ -91,6 +94,7 @@
 		C8DBEB1A957E75B9F72FDA21 /* TypeTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TypeTokens.swift; sourceTree = "<group>"; };
 		CBC2D06E0F7E4978DF4481FB /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		E7187565C059C0F50D5993AE /* WebToolView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebToolView.swift; sourceTree = "<group>"; };
+		E9E942DA3CA4C0AF9A0113D7 /* e2e_sample_person.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = e2e_sample_person.jpg; sourceTree = "<group>"; };
 		F40ADC939FF4F14D1CED0C1C /* Rows.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Rows.swift; sourceTree = "<group>"; };
 		F54CE2F3200CA526ED869BFE /* RimikimiApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RimikimiApp.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -141,6 +145,7 @@
 			isa = PBXGroup;
 			children = (
 				2E258EB7EE8D8AB3C7FB79AB /* concepts.fallback.json */,
+				E9E942DA3CA4C0AF9A0113D7 /* e2e_sample_person.jpg */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -193,6 +198,7 @@
 			children = (
 				2A2B5D4463A0B9F1318D9CF5 /* AppLog.swift */,
 				CBC2D06E0F7E4978DF4481FB /* AppState.swift */,
+				3541E9E21830E875854A3D67 /* DevRoutes.swift */,
 				F54CE2F3200CA526ED869BFE /* RimikimiApp.swift */,
 				BF5B6B0822578D96D4227D32 /* RootTabView.swift */,
 				60680F477ACDAA854F12AC6A /* TrackingPrompt.swift */,
@@ -342,6 +348,7 @@
 			files = (
 				D6EFDAD775F531D7F1BFF752 /* Assets.xcassets in Resources */,
 				07E08D01231BA7191B9C0AAB /* concepts.fallback.json in Resources */,
+				78962CE8BACB19DEBB10C1D0 /* e2e_sample_person.jpg in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -366,6 +373,7 @@
 				EE366269CC2260FB1176333B /* ConceptOptionsView.swift in Sources */,
 				7B3FB9E2EEA88904B7FAD8E7 /* ConceptStore.swift in Sources */,
 				56C8581B4E154AC56E47CD07 /* Config.swift in Sources */,
+				D0D65C24A947A34D4E36E83F /* DevRoutes.swift in Sources */,
 				3F80252D1AC27E24F99EC75B /* Feedback.swift in Sources */,
 				835FB99CC4F14D1B4BE717EF /* FilterTabView.swift in Sources */,
 				B95622A2A4AB1705BF60C974 /* GalleryHomeView.swift in Sources */,

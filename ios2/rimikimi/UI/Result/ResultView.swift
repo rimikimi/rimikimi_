@@ -73,6 +73,7 @@ struct ResultView: View {
         .scrollIndicators(.hidden)
         .background(Color.bg)
         .inlineTitle(payload.conceptTitle.isEmpty ? "결과" : payload.conceptTitle)
+        .toolbar(.hidden, for: .tabBar)
     }
 
     private func oneMore(_ concept: Concept) {

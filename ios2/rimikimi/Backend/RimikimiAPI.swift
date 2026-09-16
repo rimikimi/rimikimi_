@@ -27,7 +27,8 @@ struct QuotaInfo: Decodable {
     /// 헤더 크레딧 칩 문구.
     var chipLabel: String {
         if unlimited == true { return "∞ 무제한" }
-        return "🎟 \(creditsAvailable)"
+        if creditsAvailable > 0 { return "🎟 \(creditsAvailable)" }
+        return "무료 \(freeLeft)장"
     }
 }
 

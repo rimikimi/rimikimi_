@@ -84,8 +84,10 @@ final class GenerationCoordinator {
             clearMarker()
             state = .done(job, items)
             pendingPresentation = items
+            AppLog.api.info("gen.done concept=\(job.conceptId, privacy: .public) items=\(items.count)")
             HapticPlayer.success()
         } catch let e as APIError {
+            AppLog.api.error("gen.failed status=\(e.status) networkFail=\(e.networkFail) msg=\(e.message, privacy: .public)")
             // 서버 판정을 못 받은 경우만 기다린다. 429/402 는 기다려도 달라지지 않는다.
             if await recover(poll: e.networkFail) { return }
             quotaExceeded = e.quotaExceeded

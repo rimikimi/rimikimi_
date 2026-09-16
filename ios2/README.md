@@ -53,6 +53,24 @@ rimikimi/
 - 홈 가로줄은 승인 목업(`mock.html #home`) 치수: 제목 20/700(이모지 없음), "새로 나왔어요" 에 NEW 배지(#E6403C 11/700 모서리 5), 카테고리 줄 오른쪽 "더보기"(15/600 강조색), 카드 폭 화면의 41%(160@390)·간격 10·흰 카드 모서리 14·제목 14/600 한 줄 말줄임.
 - 햅틱: 만들기 확정·완료·저장·옵션 확정에만. 누름 0.97(전체폭 0.985) 110/140ms. Reduce Motion 은 스켈레톤·토스트·스태거에서 존중.
 
+## E2E (시뮬레이터, 실제 서버) — 2026-09-16 통과
+
+로그인 → 컨셉 → 옵션 → 만들기 → 진행 카드 → 결과 → 내 사진 그리드까지 실서버로 확인했다.
+
+```sh
+# 1) 세션 발급 (서비스롤 키는 스크립트 안에서만 읽고 출력하지 않는다) — 저장소 루트에서
+LINK=$(node ios2/scripts/mint-session.mjs)
+# 2) 딥링크는 "Open in rimikimi?" 확인이 떠서 시뮬레이터에선 못 누른다 → 실행 인자로 넣는다(DEBUG 전용)
+xcrun simctl launch <UDID> com.rimikimi.app -rimikimi-url "$LINK"
+xcrun simctl launch <UDID> com.rimikimi.app -rimikimi-url "com.rimikimi.app://dev/open?concept=766"      # 옵션 화면
+xcrun simctl launch <UDID> com.rimikimi.app -rimikimi-url "com.rimikimi.app://dev/generate?concept=766"  # 만들기 실행
+xcrun simctl launch <UDID> com.rimikimi.app -rimikimi-url "com.rimikimi.app://dev/tab?name=myPhotos&pop=1"
+xcrun simctl launch <UDID> com.rimikimi.app -rimikimi-url "com.rimikimi.app://dev/result"                # 최신 결과 열기
+```
+
+- 테스트 계정 `ios2-e2e@rimikimi.test`(일반 사용자, 하루 1장). `App/DevRoutes.swift` 는 `#if DEBUG` 로만 컴파일된다. 샘플 인물 사진 `Resources/e2e_sample_person.jpg`.
+- ATT 는 첫 결과 화면 뒤 1회 뜬다. 시뮬레이터에선 누를 수 없어 **답하지 않은 ATT 알림이 앱을 다시 켜도 남는다** — 재부팅으로 지운다.
+
 ## 자리만 잡은 것(스텁)
 
 - 필터 편집기·카메라: `WKWebView` 로 `https://rimikimi-app.vercel.app/?tool=filter|camera` 를 연다(SPEC §5 1단계). 저장·공유·앨범 브리지 없음. 필터 프리셋 카드는 회색 자리(썸네일 없음).
