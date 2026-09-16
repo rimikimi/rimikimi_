@@ -1,0 +1,88 @@
+name: rimikimi
+options:
+  bundleIdPrefix: com.rimikimi
+  deploymentTarget:
+    # v2/SPEC.md §0: iOS 26+, Friday 방식. 네이티브 Liquid Glass 탭바·safeAreaBar 를 그대로 쓴다.
+    iOS: "26.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+
+settings:
+  base:
+    # Friday 와 동일 — Swift 5 언어 모드 + 최소 strict-concurrency.
+    SWIFT_VERSION: "5.0"
+    DEVELOPMENT_TEAM: K6U5MWKT85
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
+    SWIFT_STRICT_CONCURRENCY: minimal
+    TARGETED_DEVICE_FAMILY: "1"
+  configs:
+    Debug:
+      CODE_SIGN_STYLE: Automatic
+    Release:
+      CODE_SIGN_STYLE: Manual
+      CODE_SIGN_IDENTITY: "Apple Distribution"
+
+targets:
+  rimikimi:
+    type: application
+    platform: iOS
+    entitlements:
+      path: rimikimi/rimikimi.entitlements
+      # ⚠️ xcodegen 이 generate 때마다 이 파일을 properties 로 덮어쓴다. 필요한 키는 전부 여기에.
+      properties:
+        com.apple.developer.applesignin:
+          - Default
+        aps-environment: $(APS_ENVIRONMENT)
+    sources:
+      - path: rimikimi
+    info:
+      path: rimikimi/Info.plist
+      properties:
+        CFBundleDisplayName: rimikimi
+        CFBundleIconName: AppIcon
+        CFBundleShortVersionString: "2.0.0"
+        CFBundleVersion: "1"
+        # 빈 런치스크린 = 시스템 배경색으로 즉시 그림 (플래시 없음).
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        ITSAppUsesNonExemptEncryption: false
+        # OAuth 복귀 딥링크 — Supabase Redirect URL 에 등록된 com.rimikimi.app://login-callback
+        CFBundleURLTypes:
+          - CFBundleURLName: com.rimikimi.app
+            CFBundleURLSchemes:
+              - com.rimikimi.app
+        # 1.x 와 같은 문구 (사진 접근에 편집 용도 반영, 1.40).
+        NSPhotoLibraryAddUsageDescription: "만든 사진과 편집한 사진을 앨범에 저장하기 위해 사용합니다."
+        NSCameraUsageDescription: "필터를 보면서 사진을 찍기 위해 카메라를 사용합니다."
+        LSApplicationQueriesSchemes:
+          - kakaokompassauth
+          - kakaolink
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.rimikimi.app
+        GENERATE_INFOPLIST_FILE: NO
+        TARGETED_DEVICE_FAMILY: "1"
+        MARKETING_VERSION: "2.0.0"
+        CURRENT_PROJECT_VERSION: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+      configs:
+        Debug:
+          APS_ENVIRONMENT: development
+        Release:
+          APS_ENVIRONMENT: production
+          CODE_SIGN_IDENTITY: "Apple Distribution"
+          CODE_SIGN_STYLE: Manual
+          # ios_signing 메모: 프로파일 "rimikimi AppStore v4"(Push 포함) + 인증서 XZCYYJ2KAB
+          PROVISIONING_PROFILE_SPECIFIER: "rimikimi AppStore v4"
+
+schemes:
+  rimikimi:
+    build:
+      targets:
+        rimikimi: all
+    run:
+      config: Debug
+    archive:
+      config: Release
