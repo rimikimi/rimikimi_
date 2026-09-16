@@ -26,6 +26,18 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         return true
     }
 
+    // ── UIScene (iOS 27 SDK 필수 — SceneDelegate.swift 주석 참조) ──
+    func application(_ application: UIApplication, configurationForConnecting connectingSceneSession: UISceneSession, options: UIScene.ConnectionOptions) -> UISceneConfiguration {
+        // Info.plist 의 "Default Configuration"(SceneDelegate + Main.storyboard)을 쓴다
+        return UISceneConfiguration(name: "Default Configuration", sessionRole: connectingSceneSession.role)
+    }
+
+    // Scene 이 활성화될 때 SceneDelegate 가 부른다 (applicationDidBecomeActive 는 Scene 모드에서 안 불린다)
+    func handleDidBecomeActive() {
+        requestTrackingIfNeeded()
+        clearBadge()
+    }
+
     func applicationWillResignActive(_ application: UIApplication) {
         // Sent when the application is about to move from active to inactive state. This can occur for certain types of temporary interruptions (such as an incoming phone call or SMS message) or when the user quits the application and it begins the transition to the background state.
         // Use this method to pause ongoing tasks, disable timers, and invalidate graphics rendering callbacks. Games should use this method to pause the game.
@@ -41,9 +53,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func applicationDidBecomeActive(_ application: UIApplication) {
-        // Restart any tasks that were paused (or not yet started) while the application was inactive. If the application was previously in the background, optionally refresh the user interface.
-        requestTrackingIfNeeded()
-        clearBadge()
+        // Scene 모드에서는 불리지 않는다(SceneDelegate.sceneDidBecomeActive 가 대신). 혹시 모를 폴백.
+        handleDidBecomeActive()
     }
 
     // 앱 아이콘의 빨간 배지 지우기.
