@@ -45,6 +45,7 @@
 		B95622A2A4AB1705BF60C974 /* GalleryHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BAF466244F7888654F1B6F3 /* GalleryHomeView.swift */; };
 		B9DCA305D9F06A53557C8FD6 /* AuthStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A1923FA18887976156964D8 /* AuthStore.swift */; };
 		BBDE02006DA8F3685914A9AC /* UserPhotoStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1574A83D978924D1C913B993 /* UserPhotoStore.swift */; };
+		CCEA6EC7D2C4456F39156B08 /* Info 2.plist in Resources */ = {isa = PBXBuildFile; fileRef = A201EF0D112E88CB92D5CB6C /* Info 2.plist */; };
 		D0D65C24A947A34D4E36E83F /* DevRoutes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3541E9E21830E875854A3D67 /* DevRoutes.swift */; };
 		D0EE06C35181BD16854BA3D6 /* LegacySessionMigration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23346B5A133CCDDC3C90DAED /* LegacySessionMigration.swift */; };
 		D2411ABFA50209D92FD9D40E /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82D0C47706658134377A1FC8 /* ProfileView.swift */; };
@@ -102,6 +103,7 @@
 		994985E095D76ED128B3DA7A /* RemoteImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteImage.swift; sourceTree = "<group>"; };
 		99ABF96B6B0B061F6148D8FD /* ImageUtil.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageUtil.swift; sourceTree = "<group>"; };
 		9BAF466244F7888654F1B6F3 /* GalleryHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GalleryHomeView.swift; sourceTree = "<group>"; };
+		A201EF0D112E88CB92D5CB6C /* Info 2.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "Info 2.plist"; sourceTree = "<group>"; };
 		A29E03020A40301A2004D95D /* WebAuth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebAuth.swift; sourceTree = "<group>"; };
 		A81AB1D2A679E0FC5857C3C8 /* ConceptCards.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConceptCards.swift; sourceTree = "<group>"; };
 		A926DC441FC2160654C0583C /* LoginSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginSheet.swift; sourceTree = "<group>"; };
@@ -335,6 +337,7 @@
 				469CE486F972EBCE680B55AA /* Resources */,
 				D15F94AE94A3F734BC9B6F40 /* UI */,
 				3DA3258F5AAB1C9D0BA5DB98 /* Assets.xcassets */,
+				A201EF0D112E88CB92D5CB6C /* Info 2.plist */,
 				7F3709AB17F62286AD668705 /* Info.plist */,
 				4D8E6DAE2CC2F97BE9DDB763 /* rimikimi.entitlements */,
 			);
@@ -420,6 +423,7 @@
 			files = (
 				D6EFDAD775F531D7F1BFF752 /* Assets.xcassets in Resources */,
 				F48589FDA5347B94A901D955 /* GoogleService-Info.plist in Resources */,
+				CCEA6EC7D2C4456F39156B08 /* Info 2.plist in Resources */,
 				07E08D01231BA7191B9C0AAB /* concepts.fallback.json in Resources */,
 				78962CE8BACB19DEBB10C1D0 /* e2e_sample_person.jpg in Resources */,
 			);
@@ -558,7 +562,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = rimikimi/rimikimi.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 90;
+				CURRENT_PROJECT_VERSION = 91;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = rimikimi/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -643,7 +647,7 @@
 				CODE_SIGN_ENTITLEMENTS = rimikimi/rimikimi.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 90;
+				CURRENT_PROJECT_VERSION = 91;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = rimikimi/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
