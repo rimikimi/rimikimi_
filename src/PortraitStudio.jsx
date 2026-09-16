@@ -720,6 +720,14 @@ function TabIcon({ name, active }) {
       </svg>
     );
   }
+  if (name === "filter") {
+    return (
+      <svg {...svg}>
+        <rect x="3" y="4" width="18" height="16" rx="2.5" />
+        <path d="M7 4v16M17 4v16M3 9h4M3 15h4M17 9h4M17 15h4" />
+      </svg>
+    );
+  }
   return (
     <svg {...svg}>
       <path d="M12 12.4a4.2 4.2 0 1 0 0-8.4 4.2 4.2 0 0 0 0 8.4z" />
@@ -728,30 +736,51 @@ function TabIcon({ name, active }) {
   );
 }
 
-function BottomNav({ screen, go }) {
-  const tabs = [
+// 하단 탭바. 가운데 카메라 버튼(오너 지시 2026-09-16 "홈 화면 센터에 카메라 버튼").
+// 탭이 3개면 가운데가 안 맞아서(2|1) "필터" 탭을 하나 더 두어 2|2 로 정중앙을 잡았다.
+// 필터 탭은 별도 화면이 아니라 갤러리의 필터 카테고리로 간다(카메라 옆에 있는 게 자연스럽다).
+function BottomNav({ screen, go, onCamera, filterActive = false }) {
+  const left = [
     { key: "gallery", label: "갤러리", match: ["gallery", "home", "confirm", "result"] },
     { key: "mygallery", label: "내 사진", match: ["mygallery"] },
+  ];
+  const right = [
+    { key: "filter", label: "필터", match: [] },
     { key: "profile", label: "프로필", match: ["profile", "store"] },
   ];
+  const btn = (tb) => {
+    const on = tb.key === "filter" ? filterActive : (tb.match.includes(screen) && !filterActive);
+    return (
+      <button
+        key={tb.key}
+        style={{ ...S.tabBtn, ...(on ? S.tabBtnOn : {}) }}
+        data-tabbtn=""
+        onClick={() => go(tb.key)}
+        aria-current={on ? "page" : undefined}
+      >
+        <TabIcon name={tb.key} active={on} />
+        <span style={S.tabLabel}>{tb.label}</span>
+      </button>
+    );
+  };
   return (
     <nav style={S.tabbar}>
       <div style={S.tabbarInner}>
-        {tabs.map((tb) => {
-          const on = tb.match.includes(screen);
-          return (
-            <button
-              key={tb.key}
-              style={{ ...S.tabBtn, ...(on ? S.tabBtnOn : {}) }}
-              data-tabbtn=""
-              onClick={() => go(tb.key)}
-              aria-current={on ? "page" : undefined}
-            >
-              <TabIcon name={tb.key} active={on} />
-              <span style={S.tabLabel}>{tb.label}</span>
-            </button>
-          );
-        })}
+        {left.map(btn)}
+        <div style={S.tabCamSlot}>
+          <button
+            style={S.tabCam}
+            data-tabbtn=""
+            onClick={() => { hap.tap(); onCamera && onCamera(); }}
+            aria-label={t("camera.title")}
+          >
+            <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 8.5h2.6l1.3-2h8.2l1.3 2H20a1 1 0 0 1 1 1V18a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5a1 1 0 0 1 1-1Z" />
+              <circle cx="12" cy="13.5" r="3.4" />
+            </svg>
+          </button>
+        </div>
+        {right.map(btn)}
       </div>
     </nav>
   );
@@ -2670,7 +2699,16 @@ export default function PortraitStudio() {
         </footer>
       )}
 
-      <BottomNav screen={screen} go={goTab} />
+      <BottomNav
+        screen={screen}
+        go={(key) => {
+          if (key === "filter") { hap.tap(); setActiveCat(t("filter.cat")); goTab("gallery"); return; }
+          if (key === "gallery" && activeCat === t("filter.cat")) setActiveCat("전체");
+          goTab(key);
+        }}
+        onCamera={() => setCameraPreset("none")}
+        filterActive={screen === "gallery" && activeCat === t("filter.cat")}
+      />
 
       {showBrooklyn && (
         <div style={S.bkBackdrop} onClick={() => setShowBrooklyn(false)}>
@@ -5283,6 +5321,16 @@ const S = {
     transition: "none",
   },
   tabBtnOn: { color: ACCENT },
+  // 가운데 카메라 — 탭바 위로 살짝 떠 있는 원형 버튼
+  tabCamSlot: { flex: "0 0 74px", display: "flex", justifyContent: "center", alignItems: "center" },
+  tabCam: {
+    width: 58, height: 58, borderRadius: "50%", border: "none", cursor: "pointer",
+    background: "linear-gradient(150deg, #2b2627, " + INK + ")", color: "#fff",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    transform: "translateY(-14px)",
+    boxShadow: "0 10px 22px -8px rgba(35,31,32,0.55), 0 0 0 5px rgba(255,255,255,0.72)",
+    transition: "none",
+  },
   tabLabel: { fontSize: 10.5, fontWeight: 600, letterSpacing: "0.02em" },
   footer: {
     textAlign: "center",
