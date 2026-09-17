@@ -1,16 +1,17 @@
 // ============================================================
-// 카메라 — 찍기 전에 필터가 걸린 화면을 그대로 본다 (스노우식)
+// 카메라 — 찍기 전에 필터가 걸린 화면을 본다 (스노우식)
 //
-// 왜 이렇게 만들었나
-//   CSS filter 로 미리보기를 흉내 내면 빠르지만 **찍은 결과와 색이 다르다**.
-//   우리는 이미 filters.js 의 applyLook 으로 저장본을 만들고 있으니, 미리보기도
-//   같은 함수를 매 프레임 돌린다. 화면과 결과물이 100% 같은 코드를 탄다.
+// 미리보기 = 카메라 영상(`<video>`) 그대로 + 색감만 CSS 필터로 근사.
+// 저장본   = 셔터 순간 원본 해상도(최대 2048)에 `filters.js` 의 applyLook 을 정확히 적용.
 //
-//   대신 그 연산은 픽셀 수에 비례하므로 **미리보기 해상도를 낮춰서** 30fps 를 만든다
-//   (기본 긴 변 640px). 프레임 시간을 재서 느리면 480 → 360 으로 자동으로 내려간다.
-//   찍는 순간에는 카메라 원본 해상도로 같은 파이프라인을 한 번 더 돌린다.
+// ⚠️ 예전엔 미리보기도 매 프레임 캔버스에 applyLook 을 돌려 "화면=결과물" 을 맞췄다.
+//    그 연산이 너무 무거워 자동 해상도 강하가 계속 발동했고, **필터를 켜면 미리보기가
+//    뭉개졌다**(오너 지적 2026-09-17). 그래서 미리보기는 GPU 가 공짜로 해주는 CSS 필터로
+//    바꿨다 — 해상도·프레임 손실이 없다. 색이 100% 같지는 않지만(근사),
+//    **찍힌 사진은 예전과 똑같이 정확하다.**
+//    되돌리지 말 것: "화면과 결과가 같은 코드" 보다 "미리보기가 선명한 것" 이 우선이다.
 //
-//   촬영 후에는 PhotoEditor 로 넘긴다 — 세기 조절·효과·스티커·저장/공유가 거기 다 있다.
+//    촬영 후에는 PhotoEditor 로 넘긴다 — 세기 조절·효과·스티커·저장/공유가 거기 다 있다.
 // ============================================================
 import { useEffect, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
@@ -32,6 +33,30 @@ const PREVIEW_STEPS = (() => {
 })();
 const SLOW_MS = 42;            // 프레임 처리 시간이 이걸 넘으면 한 단계 낮춘다
 const ASPECT = 3 / 4;          // 앱 결과물과 같은 3:4
+
+// 프리셋 색감을 CSS 필터로 근사한다(미리보기 전용 — 저장본은 applyLook 그대로).
+// GPU 로 처리돼서 해상도·프레임 손실이 없다. 정확히 같진 않지만 "어떤 느낌인지"는 전달된다.
+function cssFilterFor(p) {
+  if (!p || p.key === "none") return "none";
+  const fx = p.fx || {};
+  const out = [];
+  const mono = (p.sat ?? 0) <= -0.9 || fx.mono;
+  if (mono) out.push("grayscale(1)");
+  const ex = p.ex ?? 0, con = p.con ?? 0;
+  const fade = (p.fade ?? 0) / 100;
+  out.push(`brightness(${(1 + ex + fade * 0.12).toFixed(3)})`);
+  out.push(`contrast(${(1 + con - fade * 0.25).toFixed(3)})`);
+  if (!mono) {
+    const sat = 1 + (p.sat ?? 0) + (p.vib ?? 0) * 0.4;
+    out.push(`saturate(${Math.max(0, sat).toFixed(3)})`);
+    const temp = p.temp ?? 0;
+    if (temp > 0) out.push(`sepia(${Math.min(0.5, temp / 140).toFixed(3)})`);
+    const tint = p.tint ?? 0;
+    if (tint) out.push(`hue-rotate(${(-tint * 0.5).toFixed(1)}deg)`);
+  }
+  if (fx.blur) out.push(`blur(${(fx.blur * 1.2).toFixed(1)}px)`);
+  return out.join(" ");
+}
 
 // 칩 목록: 원본 + 그룹 순서대로
 function chipList() {
@@ -124,49 +149,14 @@ export default function CameraStudio({ initialPresetKey = "none", onShot, onClos
     streamRef.current = null;
   }, []);
 
-  /* ── 미리보기 루프 ── */
-  useEffect(() => {
-    if (!ready) return;
-    let alive = true;
-
-    const loop = () => {
-      if (!alive) return;
-      rafRef.current = requestAnimationFrame(loop);
-      const v = videoRef.current, work = workRef.current, view = viewRef.current;
-      if (!v || !work || !view || !v.videoWidth) return;
-
-      // 3:4 중앙 크롭 — 카메라가 주는 비율이 무엇이든 결과물 비율에 맞춘다
-      const long = PREVIEW_STEPS[stepRef.current];
-      const pw = Math.round(long * ASPECT), ph = long;
-      if (work.width !== pw) { work.width = pw; work.height = ph; view.width = pw; view.height = ph; }
-
-      const t0 = performance.now();
-      const wctx = work.getContext("2d", { willReadFrequently: true });
-      const { sx, sy, sw, sh } = cover(v.videoWidth, v.videoHeight, pw, ph);
-      wctx.save();
-      if (facing === "user") { wctx.translate(pw, 0); wctx.scale(-1, 1); } // 셀카는 거울로
-      wctx.drawImage(v, sx, sy, sw, sh, 0, 0, pw, ph);
-      wctx.restore();
-
-      const p = presetByKey(presetRef.current);
-      if (p && p.key !== "none") {
-        const img = wctx.getImageData(0, 0, pw, ph);
-        applyLook(img.data, pw, ph, p, { ...(p.fx || {}), seed: GRAIN_SEED });
-        wctx.putImageData(img, 0, 0);
-      }
-      view.getContext("2d").drawImage(work, 0, 0);
-
-      // 느리면 미리보기 해상도를 한 단계 내린다
-      const ms = performance.now() - t0;
-      avgRef.current = avgRef.current ? avgRef.current * 0.85 + ms * 0.15 : ms;
-      if (avgRef.current > SLOW_MS && stepRef.current < PREVIEW_STEPS.length - 1) {
-        stepRef.current += 1;
-        avgRef.current = 0;
-      }
-    };
-    rafRef.current = requestAnimationFrame(loop);
-    return () => { alive = false; cancelAnimationFrame(rafRef.current); };
-  }, [ready, facing]);
+  /* ── 미리보기 ──
+     ⚠️ 예전엔 매 프레임을 캔버스에 다시 그리고 `applyLook` 을 픽셀 단위로 돌렸다.
+     그게 너무 무거워서 자동 해상도 강하(SLOW_MS)가 계속 발동 → **필터를 켜면 미리보기가
+     뭉개졌다**(오너 지적 2026-09-17: "필터 적용하면 왜 해상도가 깨지냐").
+     이제 카메라 영상(`<video>`)을 **그대로** 띄우고 색감만 CSS 필터로 근사한다 —
+     GPU 가 처리하니 해상도 손실도, 프레임 드랍도 없다.
+     **저장본은 그대로 정확하다**: 셔터를 누르면 `shoot()` 가 원본 해상도(최대 2048)에
+     `applyLook` 을 그대로 한 번 적용한다. 미리보기는 근사, 결과물은 정확. */
 
   /* ── 촬영: 카메라 원본 해상도로 같은 파이프라인 ── */
   async function shoot() {
@@ -277,9 +267,17 @@ export default function CameraStudio({ initialPresetKey = "none", onShot, onClos
         onTouchCancel={onTouchEnd}
       >
         <div style={CS.frame}>
-          <video ref={videoRef} style={CS.video} playsInline muted autoPlay />
+          <video
+            ref={videoRef}
+            style={{
+              ...CS.liveVideo,
+              filter: cssFilterFor(presetByKey(presetKey)),
+              transform: facing === "user" ? "scaleX(-1)" : "none",
+            }}
+            playsInline muted autoPlay
+          />
           <canvas ref={workRef} style={{ display: "none" }} />
-          <canvas ref={viewRef} style={CS.canvas} />
+          <canvas ref={viewRef} style={{ display: "none" }} />
           {!ready && !err && <div style={CS.hint}>{t("camera.opening")}</div>}
           {err && (
             <div style={CS.errBox}>
@@ -362,6 +360,8 @@ const CS = {
     overflow: "hidden", background: "#181616",
   },
   video: { position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none" },
+  // 카메라 영상을 그대로 보여준다(해상도 손실 없음). 색감은 CSS 필터로 근사.
+  liveVideo: { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" },
   canvas: { width: "100%", height: "100%", display: "block", objectFit: "cover" },
   hint: {
     position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
