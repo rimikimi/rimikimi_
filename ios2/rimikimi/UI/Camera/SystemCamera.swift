@@ -63,6 +63,21 @@ extension UIImage {
     }
 }
 
+extension UIImage {
+    /// 긴 변을 maxLong 이하로. 웹뷰에 base64 로 넘기는 값이라 과하게 크면 느려진다.
+    func downscaled(maxLong: CGFloat) -> UIImage {
+        let long = max(size.width, size.height)
+        guard long > maxLong else { return self }
+        let k = maxLong / long
+        let target = CGSize(width: size.width * k, height: size.height * k)
+        let f = UIGraphicsImageRendererFormat.default()
+        f.scale = 1
+        return UIGraphicsImageRenderer(size: target, format: f).image { _ in
+            draw(in: CGRect(origin: .zero, size: target))
+        }
+    }
+}
+
 /// 촬영 결과를 앨범에 저장한다 (SPEC §3 "셔터 → 즉시 앨범 저장").
 /// 권한이 없으면 조용히 실패한다 — 호출부가 결과로 안내한다.
 enum CameraAlbum {

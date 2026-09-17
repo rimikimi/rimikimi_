@@ -62,6 +62,10 @@ final class AppState {
     #endif
     /// 아이폰 기본 카메라 화면 표시 여부.
     var showSystemCamera = false
+    /// 시스템 사진 선택창 — 필터를 고른 뒤 여기서 사진을 먼저 고른다.
+    /// (웹에서 파일창을 자동으로 못 여는 제약 때문. `PhotoPicker` 주석 참고)
+    var photoPickPreset: String?     // nil 이면 닫힘
+    var showPhotoPicker = false
     /// 카메라 구현 스위치 — true = 아이폰 기본 카메라(현재), false = 옛 웹뷰 카메라(폴백).
     /// 웹뷰 쪽은 지우지 않고 남겨 둔다(문제가 생기면 한 줄로 되돌릴 수 있게).
     static let useSystemCamera = true
@@ -158,7 +162,9 @@ final class AppState {
             galleryPath.removeAll()
             tab = .myPhotos
         case .filterPick(let presetKey):
-            webTool = WebTool(url: Config.filterToolURL(mode: "pick", presetKey: presetKey), title: "필터")
+            // 사진을 **먼저** 고른다 — 웹의 "사진 선택" 빈 화면을 없애기 위해(오너 지적 2026-09-17).
+            photoPickPreset = presetKey ?? "none"
+            showPhotoPicker = true
         case .camera:
             // 아이폰 **기본 카메라 화면**을 띄운다(오너 지시 2026-09-17).
             // 웹뷰 카메라는 포커스·줌을 못 써서 폐기 — 폴백 경로로만 남긴다(useSystemCamera).
@@ -177,6 +183,24 @@ final class AppState {
             showToast(saved ? "앨범에 저장했어요" : "앨범 저장 권한이 없어요")
             openEditor(image: image)
         }
+    }
+
+    /// 사진 선택 완료 → 고른 사진들을 편집기에 실어 보낸다.
+    func handlePickedPhotos(_ images: [UIImage]) {
+        showPhotoPicker = false
+        let preset = photoPickPreset ?? "none"
+        photoPickPreset = nil
+        guard !images.isEmpty else { return }
+        // 편집기는 1080px 미리보기로 줄여 쓰므로 여기서 과하게 큰 원본을 보낼 이유가 없다.
+        // (base64 로 웹뷰에 넘기는 값이라 너무 크면 느려진다)
+        let srcs: [String] = images.prefix(10).compactMap { img in
+            let scaled = img.downscaled(maxLong: 2048)
+            guard let d = scaled.jpegData(compressionQuality: 0.92) else { return nil }
+            return "data:image/jpeg;base64,\(d.base64EncodedString())"
+        }
+        guard !srcs.isEmpty else { return }
+        webTool = WebTool(url: Config.filterToolURL(mode: "edit", presetKey: preset), title: "꾸미기",
+                          initialPayload: ["mode": "edit", "srcs": srcs])
     }
 
     /// 결과 화면 "다듬기" — 지금 보고 있는 사진을 편집기에 바로 실어 보낸다(사진 선택 화면 생략).

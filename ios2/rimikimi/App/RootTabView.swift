@@ -101,6 +101,14 @@ struct RootTabView: View {
             )
             .ignoresSafeArea()
         }
+        // 시스템 사진 선택창 — 필터를 고른 뒤 사진을 먼저 고른다.
+        .sheet(isPresented: $app.showPhotoPicker) {
+            PhotoPicker(
+                onPicked: { app.handlePickedPhotos($0) },
+                onCancel: { app.showPhotoPicker = false; app.photoPickPreset = nil }
+            )
+            .ignoresSafeArea()
+        }
         .fullScreenCover(item: $app.webTool) { tool in
             WebToolScreen(url: tool.url, title: tool.title, initialPayload: tool.initialPayload)
         }
