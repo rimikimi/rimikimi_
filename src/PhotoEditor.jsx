@@ -812,12 +812,13 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
       {/* 하단 패널 */}
       <div style={ES.panel}>
         <div style={ES.tabRow}>
-          {/* 스티커 탭은 오너 지시로 제외(2026-08-26 "development 가 좀 필요할듯").
-              구현(드래그·핀치·합성)은 아래에 그대로 있으니 배열에 다시 넣으면 복귀. */}
+          {/* 꾸미기(스티커) 탭 — 2026-08-26 에 "development 가 좀 필요할듯" 으로 뺐다가
+              2026-09-17 오너 지시로 복귀. 구현(드래그·핀치·회전·저장 합성)은 계속 있었다. */}
           {[
             ["filter", t("edit.tab.filter")],
             ["fx", t("edit.tab.fx")],
             ["fit", "정방향"],
+            ["sticker", "꾸미기"],
           ].map(([k, label]) => (
             <button
               key={k}
