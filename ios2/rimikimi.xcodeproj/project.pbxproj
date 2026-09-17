@@ -25,6 +25,7 @@
 		3898AA95ADD019D9451126D6 /* ImageUtil.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99ABF96B6B0B061F6148D8FD /* ImageUtil.swift */; };
 		3F80252D1AC27E24F99EC75B /* Feedback.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C0421A6B64F5A6B30BFB13A /* Feedback.swift */; };
 		48A33FC6218521911E5F7025 /* FaceCrop.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F791A073D7202ECE37FF768 /* FaceCrop.swift */; };
+		4AEF5A6DE7573F0250C52FB9 /* SystemCamera.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E80D37113DA80280724E361 /* SystemCamera.swift */; };
 		56C8581B4E154AC56E47CD07 /* Config.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D0C7847AA2242A68E84ED84 /* Config.swift */; };
 		5B40998AD1A335B23F123A57 /* InviteView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78F5BF2A69CD169D3F7CA3A3 /* InviteView.swift */; };
 		5C283CA156E2AAF1462813D7 /* AppleSignIn.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2B216927CC14B3E65171EE4 /* AppleSignIn.swift */; };
@@ -100,6 +101,7 @@
 		8658D32247F828A580AF2847 /* OptionBlocks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OptionBlocks.swift; sourceTree = "<group>"; };
 		8A00E26DC6A1237AB49B4A10 /* GuideView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuideView.swift; sourceTree = "<group>"; };
 		8B7250068E2825FC854BDBCC /* Concept.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Concept.swift; sourceTree = "<group>"; };
+		8E80D37113DA80280724E361 /* SystemCamera.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemCamera.swift; sourceTree = "<group>"; };
 		994985E095D76ED128B3DA7A /* RemoteImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteImage.swift; sourceTree = "<group>"; };
 		99ABF96B6B0B061F6148D8FD /* ImageUtil.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageUtil.swift; sourceTree = "<group>"; };
 		9BAF466244F7888654F1B6F3 /* GalleryHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GalleryHomeView.swift; sourceTree = "<group>"; };
@@ -204,6 +206,14 @@
 			path = Concept;
 			sourceTree = "<group>";
 		};
+		4B78B6662847AAC97752D1F9 /* Camera */ = {
+			isa = PBXGroup;
+			children = (
+				8E80D37113DA80280724E361 /* SystemCamera.swift */,
+			);
+			path = Camera;
+			sourceTree = "<group>";
+		};
 		50639B82BA5D889DBB84B6A1 /* Onboarding */ = {
 			isa = PBXGroup;
 			children = (
@@ -303,6 +313,7 @@
 		D15F94AE94A3F734BC9B6F40 /* UI */ = {
 			isa = PBXGroup;
 			children = (
+				4B78B6662847AAC97752D1F9 /* Camera */,
 				5D9B30C1CDC2AA2CA85DEADC /* Components */,
 				47FE1AE833A2038592FA5188 /* Concept */,
 				5C2A2D9FA6DAB50882645525 /* Filter */,
@@ -478,6 +489,7 @@
 				DB3E0F365192791237C1AF8B /* Rows.swift in Sources */,
 				1C01CBF7A36D7B7EBD9B5EBC /* StoreManager.swift in Sources */,
 				A49C605D45AA2557EBA1C0ED /* StoreView.swift in Sources */,
+				4AEF5A6DE7573F0250C52FB9 /* SystemCamera.swift in Sources */,
 				0C8FE0F9BC22DDEF7CB479FF /* TrackingPrompt.swift in Sources */,
 				D785A463CA74D8DE2EAA88C7 /* TypeTokens.swift in Sources */,
 				BBDE02006DA8F3685914A9AC /* UserPhotoStore.swift in Sources */,
@@ -562,7 +574,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = rimikimi/rimikimi.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 93;
+				CURRENT_PROJECT_VERSION = 94;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = rimikimi/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -647,7 +659,7 @@
 				CODE_SIGN_ENTITLEMENTS = rimikimi/rimikimi.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 93;
+				CURRENT_PROJECT_VERSION = 94;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = rimikimi/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (

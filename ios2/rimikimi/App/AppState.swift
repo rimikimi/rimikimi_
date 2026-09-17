@@ -60,6 +60,11 @@ final class AppState {
     /// 캡처용: 채워 맞춤 진행 화면을 잠깐 보이게 인위적 지연을 준다(실서버는 즉시 성공/실패한다).
     var outpaintDebugDelaySeconds: Double = 0
     #endif
+    /// 아이폰 기본 카메라 화면 표시 여부.
+    var showSystemCamera = false
+    /// 카메라 구현 스위치 — true = 아이폰 기본 카메라(현재), false = 옛 웹뷰 카메라(폴백).
+    /// 웹뷰 쪽은 지우지 않고 남겨 둔다(문제가 생기면 한 줄로 되돌릴 수 있게).
+    static let useSystemCamera = true
     /// 편집기·카메라 1단계 웹뷰(SPEC §5).
     var webTool: WebTool?
     /// 첫 실행 가이드 1장 — 실행 시 다른 팝업은 없다.
@@ -155,7 +160,22 @@ final class AppState {
         case .filterPick(let presetKey):
             webTool = WebTool(url: Config.filterToolURL(mode: "pick", presetKey: presetKey), title: "필터")
         case .camera:
-            webTool = WebTool(url: Config.cameraToolURL, title: "카메라", chromeless: true)
+            // 아이폰 **기본 카메라 화면**을 띄운다(오너 지시 2026-09-17).
+            // 웹뷰 카메라는 포커스·줌을 못 써서 폐기 — 폴백 경로로만 남긴다(useSystemCamera).
+            if Self.useSystemCamera { showSystemCamera = true }
+            else { webTool = WebTool(url: Config.cameraToolURL, title: "카메라", chromeless: true) }
+        }
+    }
+
+    /// 기본 카메라로 찍은 직후 — 앨범에 저장하고 편집기(필터)로 넘긴다.
+    /// SPEC §3: "셔터 → 즉시 앨범 저장 → 다듬기·공유". 기본 카메라는 라이브 필터를 못 얹으므로
+    /// **찍고 나서** 필터를 입히는 순서가 된다.
+    func handleCameraShot(_ image: UIImage) {
+        showSystemCamera = false
+        Task {
+            let saved = await CameraAlbum.save(image)
+            showToast(saved ? "앨범에 저장했어요" : "앨범 저장 권한이 없어요")
+            openEditor(image: image)
         }
     }
 

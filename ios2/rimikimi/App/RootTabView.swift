@@ -93,6 +93,14 @@ struct RootTabView: View {
                 .presentationDetents([.large])
                 .presentationCornerRadius(Radius.sheet)
         }
+        // 아이폰 기본 카메라 — 애플이 만든 촬영 화면 그대로(포커스·줌·플래시 전부 동작).
+        .fullScreenCover(isPresented: $app.showSystemCamera) {
+            SystemCameraPicker(
+                onPicked: { app.handleCameraShot($0) },
+                onCancel: { app.showSystemCamera = false }
+            )
+            .ignoresSafeArea()
+        }
         .fullScreenCover(item: $app.webTool) { tool in
             WebToolScreen(url: tool.url, title: tool.title, initialPayload: tool.initialPayload)
         }
