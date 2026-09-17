@@ -50,6 +50,231 @@ async function classifyOutfit(garmentList, apiKey, timeoutMs = 12000) {
   }
 }
 
+
+// ── 의상 실측 (2026-09-18 오너 반려: "옷을 바꾸지 좀 마") ──────────────────
+// 오너가 3장을 요청했는데 1장에서 **무릎 위 짧은 원피스가 발목까지 오는 롱으로** 바뀌고
+// 색도 짙은 브라운 → 검정이 됐다.
+//
+// 왜 프롬프트로 안 막혔나
+//   "미니는 미니로" 같은 문구는 이미 있었다. 문제는 그 문구가 지킬 **기준이 사진에 없다**는
+//   것이다. 업로드되는 의상 사진은 대부분 쇼핑몰 제품컷 — 몸 없이 옷만 평면으로 찍혀 있다.
+//   몸이 없으니 "몸 기준 밑단 위치"를 알 수 없고, 모델은 매번 **추측**한다. 그래서 같은
+//   옷으로 3장을 만들면 2장은 맞고 1장은 틀리는, 확률로 어긋나는 실패가 난다.
+//   게다가 거울셀카 모드에서는 분류조차 돌지 않아 아무 단서도 없었다.
+//
+// 그래서 그리기 전에 가벼운 비전 모델로 옷을 **먼저 재고**, 그 수치를 글로 박아 넣는다.
+// 추측할 여지를 없애는 게 목적이다. 실패하면(타임아웃 등) 그냥 예전처럼 진행한다.
+const HEM_POINTS = [
+  "upper-thigh", "mid-thigh", "above-knee", "knee", "below-knee",
+  "mid-calf", "ankle", "floor", "cropped-above-waist", "waist", "hip", "not-applicable",
+];
+const SLEEVES = ["sleeveless", "cap", "short", "elbow", "three-quarter", "long", "not-applicable"];
+
+async function measureGarments(garmentList, apiKey, timeoutMs = 14000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const r = await fetch(
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+        signal: controller.signal,
+        body: JSON.stringify({
+          contents: [{
+            role: "user",
+            parts: [
+              { text:
+                "You are measuring garments for a virtual try-on. The images are product photos — " +
+                "usually flat or on an invisible mannequin, with no body to compare against. " +
+                "For EACH image in order, report what the item is and, crucially, WHERE IT ENDS ON " +
+                "A STANDING BODY when worn. Judge this from the garment's own proportions " +
+                "(its length compared with its shoulder width, armhole and waist), not from a guess.\n" +
+                "hem = where the bottom edge of the item falls on the body when worn:\n" +
+                "  a short/mini dress or skirt -> upper-thigh, mid-thigh or above-knee\n" +
+                "  a midi -> below-knee or mid-calf ; a maxi -> ankle or floor\n" +
+                "  a t-shirt/blouse -> waist or hip ; a crop top -> cropped-above-waist\n" +
+                "  shoes, bags and accessories -> not-applicable\n" +
+                "colorHex = the single dominant colour of the item as #rrggbb, read off the photo. " +
+                "Be precise: very dark brown is NOT black.\n" +
+                "Also give the ONE place a real person would wear this whole outfit: casual, " +
+                "refined, business, active, evening, seasonal or home." },
+              ...garmentList.map((g) => ({ inline_data: { mime_type: g.mimeType, data: g.base64 } })),
+            ],
+          }],
+          generationConfig: {
+            thinkingConfig: { thinkingBudget: 0 },
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: "OBJECT",
+              properties: {
+                group: { type: "STRING", enum: ["casual","refined","business","active","evening","seasonal","home"] },
+                items: {
+                  type: "ARRAY",
+                  items: {
+                    type: "OBJECT",
+                    properties: {
+                      kind: { type: "STRING" },
+                      hem: { type: "STRING", enum: HEM_POINTS },
+                      sleeve: { type: "STRING", enum: SLEEVES },
+                      neckline: { type: "STRING" },
+                      fit: { type: "STRING" },
+                      fabric: { type: "STRING" },
+                      colorHex: { type: "STRING" },
+                    },
+                    required: ["kind", "hem", "colorHex"],
+                  },
+                },
+              },
+              required: ["group", "items"],
+            },
+          },
+        }),
+      }
+    );
+    if (!r.ok) return null;
+    const j = await r.json();
+    const txt = (j.candidates?.[0]?.content?.parts || []).map((p) => p.text || "").join("");
+    const out = JSON.parse(txt);
+    if (!out || !Array.isArray(out.items) || !out.items.length) return null;
+    return out;
+  } catch (_) {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** 실측 결과를 프롬프트 문장으로. 모델이 추측할 자리를 남기지 않는 게 목적이다. */
+function garmentFactsBlock(measured, ordinals) {
+  if (!measured?.items?.length) return "";
+  const HEM_TEXT = {
+    // 짧은 기장은 "무릎을 덮지 않는다"를 따로 못박는다 — 실측 3장 중 2장이 무릎까지
+    // 내려왔다(2026-09-18). 모델은 애매하면 길게 그리는 쪽으로 기운다.
+    "upper-thigh": "HIGH ON THE THIGH, well above the knee (a short/mini length). The whole " +
+      "knee and a good stretch of thigh stay uncovered",
+    "mid-thigh": "at MID-THIGH, about halfway between hip and knee (a short/mini length). " +
+      "The whole knee stays uncovered — the hem must NOT reach the knee",
+    "above-knee": "JUST ABOVE THE KNEE (a short length). The kneecap is completely uncovered " +
+      "and clearly visible below the hem — the hem must NOT touch or cover the knee",
+    "knee": "at the KNEE",
+    "below-knee": "just BELOW THE KNEE (midi)",
+    "mid-calf": "at MID-CALF (midi)",
+    "ankle": "at the ANKLE (maxi)",
+    "floor": "at the FLOOR (full length)",
+    "cropped-above-waist": "ABOVE THE WAIST (cropped)",
+    "waist": "at the WAIST",
+    "hip": "at the HIP",
+  };
+  const hex = (c) => (/^#[0-9a-fA-F]{6}$/.test(String(c || "")) ? c : null);
+  // ⚠️ 항목 수 ≠ 사진 수 일 수 있다. 실측에서 사진 1장(티셔츠 위에 겹쳐 입은 피나포어)을
+  //    항목 2개로 쪼개 돌려주는 경우가 실제로 나왔다 — 그때 서수를 그대로 붙이면 있지도 않은
+  //    "THIRD reference image" 를 가리키게 된다. 수가 맞을 때만 서수로 부른다.
+  const byOrdinal = measured.items.length === ordinals.length;
+  const lines = measured.items.slice(0, 8).map((it, i) => {
+    const bits = [];
+    if (it.fit) bits.push(it.fit);
+    if (it.fabric) bits.push(it.fabric);
+    bits.push(it.kind || "garment");
+    let line = byOrdinal
+      ? `  · The ${ordinals[i]} reference image: ${bits.join(" ")}`
+      : `  · ${bits.join(" ")}`;
+    const c = hex(it.colorHex);
+    if (c) line += `, colour exactly ${c}`;
+    if (it.sleeve && it.sleeve !== "not-applicable") {
+      line += it.sleeve === "sleeveless" ? ", sleeveless" : `, ${it.sleeve} sleeves`;
+    }
+    if (it.neckline) line += `, ${it.neckline} neckline`;
+    const h = HEM_TEXT[it.hem];
+    if (h) line += `. WORN, ITS BOTTOM EDGE ENDS ${h}`;
+    return line + ".";
+  });
+  return (
+    "GARMENT FACTS — these were MEASURED from the reference photos. They override every " +
+    "assumption you might make, because a flat product photo has no body to judge length " +
+    "against and guessing is how this goes wrong:\n" +
+    lines.join("\n") + "\n" +
+    "Render each item so its hem lands on EXACTLY the body landmark stated above, and its " +
+    "colour matches the stated hex. A short dress rendered long, or a dark brown rendered " +
+    "black, makes the picture WRONG and unusable — the customer is looking at their own " +
+    "clothes and will see immediately that you changed them. When a length is borderline, " +
+    "render it SHORTER rather than longer — drifting longer is the mistake that keeps " +
+    "happening, and a short dress drawn down to the knee or below is already wrong.\n"
+  );
+}
+
+
+// ── 결과 검사 (2026-09-18) ────────────────────────────────────────────────
+// 실측 수치를 프롬프트에 박아 넣어도 기장은 **확률로** 어긋난다(실사 3장 중 1장이
+// 무릎 위 → 미디로 늘어났다). 프롬프트로 확률을 0 으로 만들 수는 없으므로,
+// 만든 그림을 다시 보고 "밑단이 말한 자리에 왔나" 를 확인해 틀리면 한 번 다시 뽑는다.
+// 확인이 불가능하면(타임아웃·판단 불가) null 을 돌려주고 그대로 통과시킨다 —
+// 검사 때문에 생성이 막히는 일은 없어야 한다.
+const HEM_ORDER = ["upper-thigh","mid-thigh","above-knee","knee","below-knee","mid-calf","ankle","floor"];
+
+/** 기장이 있는 주 의상(원피스·치마·바지)의 기대 밑단. 없으면 null. */
+export function expectedHem(measured) {
+  if (!measured?.items?.length) return null;
+  for (const it of measured.items) {
+    const i = HEM_ORDER.indexOf(it.hem);
+    if (i >= 0) return it.hem;
+  }
+  return null;
+}
+
+/**
+ * 만들어진 사진에서 밑단이 실제로 어디 오는지 보고, 기대와 한 칸 넘게 다르면 false.
+ * @returns true=괜찮음 / false=다시 뽑아야 함 / null=판단 불가(통과)
+ */
+export async function checkHem(outBase64, outMime, expected, apiKey, timeoutMs = 12000) {
+  const want = HEM_ORDER.indexOf(expected);
+  if (want < 0 || !apiKey || !outBase64) return null;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const r = await fetch(
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+        signal: controller.signal,
+        body: JSON.stringify({
+          contents: [{
+            role: "user",
+            parts: [
+              { text:
+                "Look at the person in this photo. Find the LOWEST hem of the dress, skirt or " +
+                "trousers they are wearing (ignore any coat worn open over it). Where does that " +
+                "hem fall on their legs? Answer with one value only." },
+              { inline_data: { mime_type: outMime || "image/png", data: outBase64 } },
+            ],
+          }],
+          generationConfig: {
+            thinkingConfig: { thinkingBudget: 0 },
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: "OBJECT",
+              properties: { hem: { type: "STRING", enum: [...HEM_ORDER, "cannot-tell"] } },
+              required: ["hem"],
+            },
+          },
+        }),
+      }
+    );
+    if (!r.ok) return null;
+    const j = await r.json();
+    const txt = (j.candidates?.[0]?.content?.parts || []).map((p) => p.text || "").join("");
+    const got = HEM_ORDER.indexOf(JSON.parse(txt)?.hem);
+    if (got < 0) return null;
+    // 한 칸 차이는 봐준다(무릎 위 ↔ 무릎은 사진마다 애매하다). 두 칸부터 "옷이 바뀐 것".
+    return Math.abs(got - want) <= 1;
+  } catch (_) {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function buildDressroom({ garments, dressStyle, apiKey }) {
   // ── 드레스룸 (2026-08-25) ─────────────────────────────────────────────
   // 의상 사진(최대 5장)을 입은 내 모습을 만든다. Higgsfield 로 케이스별(상의만/
@@ -233,8 +458,15 @@ export async function buildDressroom({ garments, dressStyle, apiKey }) {
   //    한 번만 조립해 재사용하기 때문. 그래서 "그룹 전체를 섞은 목록"을 돌려주고,
   //    장면 자리는 토큰(__DRESS_SCENE__)으로 남겨 호출부가 장마다 다른 장면을 끼운다.
   let sceneGroup = null, sceneList = [], chosenScene = null;
-  if (!dressMirror && apiKey && garmentList.length) {
-    sceneGroup = await classifyOutfit(garmentList, apiKey);
+  // ⚠️ 실측은 **거울셀카에서도** 돌려야 한다. 예전엔 일상컷에서만 분류가 돌아서
+  //    거울셀카는 옷에 대한 단서가 하나도 없었고, 기장이 확률로 어긋났다(오너 반려 09-18).
+  let measured = null;
+  if (apiKey && garmentList.length) {
+    measured = await measureGarments(garmentList, apiKey);
+    if (!measured && !dressMirror) sceneGroup = await classifyOutfit(garmentList, apiKey);
+  }
+  if (!dressMirror) {
+    if (measured?.group) sceneGroup = measured.group;
     if (sceneGroup && SCENE_GROUPS[sceneGroup]) {
       sceneList = SCENE_GROUPS[sceneGroup].slice();
       for (let i = sceneList.length - 1; i > 0; i--) {
@@ -293,6 +525,7 @@ export async function buildDressroom({ garments, dressStyle, apiKey }) {
     "neckline shape and depth, the same waist seam position, and the same fabric surface " +
     "(boucle stays boucle, knit stays knit, satin stays satin). If you are unsure, err on the " +
     "side of copying the reference garment more literally.\n" +
+    garmentFactsBlock(measured, ORDINALS) +
     // 오너 지시(2026-08-30): 결과물에 가격표가 달려 나왔다. 피팅룸 장면이라 모델이
     // "안 산 옷" 으로 해석해 택을 붙이기도 하고, 의상 사진(쇼핑몰 캡처)에 택이 보이면
     // 그대로 옮겨 그린다. 양쪽 다 막는다.
@@ -357,7 +590,8 @@ export async function buildDressroom({ garments, dressStyle, apiKey }) {
     "Photorealistic skin and fabric texture, true-to-life garment colours. " +
     "One person only — no other people. No text, no logo, no watermark, no border or overlay.";
   return {
-    isDressroom, garmentList, dressMirror, sceneGroup, sceneList, scene: chosenScene,
+    isDressroom,
+    measured, garmentList, dressMirror, sceneGroup, sceneList, scene: chosenScene,
     // instruction = 토큰이 전부 치환된 완성본(단건·테스트·거울셀카용).
     // instructionTemplate = __DRESS_SCENE__ / __DRESS_CANDIDATES__ 토큰이 남은 원본 —
     //   배치 호출부(generate.js instructionAt)가 샷마다 다르게 치환한다.

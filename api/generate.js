@@ -12,7 +12,7 @@ import { getAuthedUser, countTodayUsage, FREE_DAILY, dailyLimitFor, isUnlimited,
 import { precheckHasFace } from "./_lib/precheck.js";
 import { getCreditInfo, consumeCredit, consumeCredits, refundCredits, getProSampleUsed, markProSampleUsed } from "./_lib/credits.js";
 import { saveToGallery } from "./_lib/gallery.js";
-import { buildDressroom } from "./_lib/dressroom.js";
+import { buildDressroom, expectedHem, checkHem } from "./_lib/dressroom.js";
 import { buildEditorialStrip } from "./_lib/fourcutEditorial.js";
 
 // Vertex 의 나노바나나 프로는 2K 요청이 ~42s 걸리고, 묶음 생성(3/6/12장)은 그보다
@@ -1091,8 +1091,10 @@ export default async function handler(req, res) {
   // 드레스룸 프롬프트는 api/_lib/dressroom.js 로 분리 — 테스트 스크립트가 같은 코드를 쓴다
   // instructionTemplate 에는 장면 자리가 __DRESS_SCENE__ 토큰으로 남아 있다 —
   // 배치(3/6/12장)에서 장마다 다른 배경을 끼우기 위해서다(아래 instructionAt).
-  const { isDressroom, garmentList, instruction: _dressResolved, instructionTemplate: dressroomInstruction, sceneList: dressSceneList = [], fallbackCandidates: dressCandidates = [] } =
+  const { isDressroom, garmentList, measured: dressMeasured = null, instruction: _dressResolved, instructionTemplate: dressroomInstruction, sceneList: dressSceneList = [], fallbackCandidates: dressCandidates = [] } =
     await buildDressroom({ garments, dressStyle, apiKey });
+  // 실측한 "밑단이 와야 할 자리" — 만든 뒤 이 값과 대조해 어긋나면 한 번 다시 뽑는다.
+  const dressWantHem = isDressroom ? expectedHem(dressMeasured) : null;
 
 
   // cutCount 가 오면 스트립 한 장, 아니면 구버전(컷별) — 구버전 앱 호환
@@ -1477,7 +1479,7 @@ export default async function handler(req, res) {
     }
 
     // 한 장 생성 = Vertex 우선, 실패 시 AI Studio. (단건 경로와 같은 순서)
-    async function oneShot(shotIdx = 0) {
+    async function attemptShot(shotIdx = 0) {
       if (vertexSA()) {
         const r = await callVertexBackoff(PRO_MODEL, true, budget(90000), shotIdx);
         if (!isBusyFailure(r)) return r;
@@ -1485,6 +1487,31 @@ export default async function handler(req, res) {
       const r2 = await callGemini(PRO_MODEL, true, budget(40000), shotIdx);
       if (!isBusyFailure(r2)) return r2;
       return await callGemini(BASE_MODEL, false, budget(30000), shotIdx);
+    }
+
+    // 드레스룸: 만든 그림의 밑단이 실측값과 두 칸 넘게 어긋나면 **한 번만** 다시 뽑는다.
+    // 오너 반려(2026-09-18) "옷을 바꾸지 좀 마" — 프롬프트에 수치를 박아도 3장 중 1장은
+    // 기장이 늘어났다. 확률을 프롬프트로 0 으로 만들 수 없으니 결과를 보고 되뽑는다.
+    // ⚠️ upstream 본문은 아래에서 한 번 더 읽는다 — 반드시 clone() 으로 검사할 것.
+    // ⚠️ 검사가 불가능하면(판단 불가·타임아웃) 그대로 통과시킨다. 검사가 생성을 막으면 안 된다.
+    async function oneShot(shotIdx = 0) {
+      const r = await attemptShot(shotIdx);
+      if (!dressWantHem || isBusyFailure(r) || !r?.upstream?.ok) return r;
+      if (left() < 45000) return r;                   // 다시 뽑을 시간이 없다
+      let ok = null;
+      try {
+        const j = await r.upstream.clone().json();
+        const part = (j?.candidates?.[0]?.content?.parts || [])
+          .find((x) => x.inlineData || x.inline_data);
+        const inline = part && (part.inlineData || part.inline_data);
+        if (inline) {
+          ok = await checkHem(inline.data, inline.mimeType || inline.mime_type, dressWantHem, apiKey);
+        }
+      } catch (_) { ok = null; }
+      if (ok !== false) return r;
+      console.log(`[generate] 드레스룸 기장 어긋남(기대 ${dressWantHem}) → 재생성 shot=${shotIdx}`);
+      const again = await attemptShot(shotIdx);
+      return (!isBusyFailure(again) && again?.upstream?.ok) ? again : r;
     }
 
     // ⚠️ 예전엔 batchCount 를 전부 동시에 던졌는데, 12장이면 Vertex 분당 한도에
