@@ -557,7 +557,7 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
       // 컴포저가 키보드를 피해 밀어 올렸으면 out.x/y 가 **보이던 자리**다 — 그게 우선이다.
       x: typeof out.x === "number" ? out.x : (typeof at.x === "number" ? at.x : 0.5),
       y: typeof out.y === "number" ? out.y : (typeof at.y === "number" ? at.y : 0.5),
-      rot: 0,
+      rot: typeof out.rot === "number" ? out.rot : 0,
     };
     setStickers((p) => [...p, st]);
     setSelId(st.id);
@@ -1253,7 +1253,8 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
               문구 추가
             </button>
             <div style={ES.stickerHint}>
-              사진을 가볍게 탭해도 그 자리에 문구가 생겨요. 얹은 문구를 탭하면 다시 고칠 수 있고,
+              사진을 가볍게 탭해도 그 자리에 문구가 생겨요. 쓰는 중에도 끌어서 옮기고
+              두 손가락으로 키우거나 돌릴 수 있어요. 얹은 문구를 탭하면 다시 고쳐지고,
               아래 휴지통으로 끌면 지워져요.
             </div>
             {/* ⚠️ 이모지 줄은 오너 지시(2026-09-17 "밑에 이모지 빼줘")로 숨긴다.

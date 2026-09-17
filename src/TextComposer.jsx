@@ -358,6 +358,11 @@ export default function TextComposer({ at, wrapRef, pickColorAt, onDone }) {
   const [rect, setRect] = useState(null);         // 사진 래퍼의 화면 좌표
   const boxRef = useRef(null);                    // 입력 중인 글자 상자
   const shiftRef = useRef(0);                     // 키보드에 가려 위로 밀어 올린 양(px)
+  // 제스처(끌기·크기·회전)를 **컴포저 안에서** 처리한다. 오너 지시 2026-09-17:
+  // "완료 누르면 다음 단계에서 되는 게 아니라 한 페이지에서 끝나야 함".
+  // ⚠️ 전부 ref 다 — 상태를 바꾸면 리렌더가 나고, 리렌더는 한글 조합을 끊는다.
+  const gestRef = useRef({ dx: 0, dy: 0, k: 1, rot: 0 });
+  const dragRef = useRef(null);
   const topBarRef = useRef(null);                 // 상단바 — 리렌더 없이 직접 옮긴다
   const bottomRef = useRef(null);                 // 색·글꼴 줄 — 리렌더 없이 직접 옮긴다
   const [, force] = useState(0);
@@ -621,7 +626,94 @@ export default function TextComposer({ at, wrapRef, pickColorAt, onDone }) {
     shift = Math.round(shift);
     if (shift === cur) return;
     shiftRef.current = shift;
-    box.style.transform = `translate(-50%,-50%) translateY(${shift}px)`;
+    applyBox();
+  }
+
+  /** 글자 상자의 최종 transform — 키보드 회피(shift) + 손가락 제스처를 합쳐 한 번에 쓴다. */
+  function applyBox() {
+    const box = boxRef.current;
+    if (!box) return;
+    const g = gestRef.current;
+    box.style.transform =
+      `translate(-50%,-50%) translate(${Math.round(g.dx)}px, ${Math.round(g.dy + shiftRef.current)}px)`
+      + ` rotate(${g.rot.toFixed(2)}deg) scale(${g.k.toFixed(4)})`;
+  }
+
+  /* ---------- 한 페이지 안에서 끌기 / 두 손가락 크기·회전 ----------
+     사진(stage) 위에서 받는다. 두 번째 손가락은 **사진 아무 데나** 짚어도 된다
+     (글자 상자는 작아서 두 손가락을 다 얹을 수 없다 — 편집기 쪽과 같은 규칙). */
+  function gestDown(ev) {
+    const inBox = boxRef.current && boxRef.current.contains(ev.target);
+    const d = dragRef.current || { pointers: new Map(), moved: 0, active: false };
+    d.pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    if (d.pointers.size === 1) {
+      // 한 손가락: 글자 위에서 시작했을 때만 "옮기기 후보". 8px 넘게 움직여야 실제로 옮긴다
+      // (그 전에는 캐럿 놓기 · 글자 고르기를 그대로 둔다).
+      d.candidate = !!inBox;
+      d.base = { ...gestRef.current };
+    } else if (d.pointers.size === 2) {
+      const [a1, b1] = [...d.pointers.values()];
+      d.baseDist = Math.hypot(a1.x - b1.x, a1.y - b1.y) || 1;
+      d.baseAng = (Math.atan2(b1.y - a1.y, b1.x - a1.x) * 180) / Math.PI;
+      d.base = { ...gestRef.current };
+      d.active = true;                       // 두 손가락은 곧바로 제스처
+      lockSelection(true);
+      try { ev.currentTarget.setPointerCapture?.(ev.pointerId); } catch (_) {}
+    }
+    dragRef.current = d;
+  }
+  /** 제스처 동안만 글자 선택을 막는다. 키보드는 그대로 둔다(인스타도 안 내린다). */
+  function lockSelection(on) {
+    const ta = taRef.current;
+    if (!ta) return;
+    ta.style.webkitUserSelect = on ? "none" : "";
+    ta.style.userSelect = on ? "none" : "";
+  }
+  function gestMove(ev) {
+    const d = dragRef.current;
+    if (!d || !d.pointers.has(ev.pointerId)) return;
+    const prev = d.pointers.get(ev.pointerId);
+    d.pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    d.moved += Math.abs(ev.clientX - prev.x) + Math.abs(ev.clientY - prev.y);
+    const g = gestRef.current;
+    if (d.pointers.size === 1) {
+      if (!d.candidate) return;
+      if (!d.active && d.moved < 8) return;           // 아직 탭/캐럿 구간
+      if (!d.active) {
+        d.active = true;
+        lockSelection(true);
+        try { ev.currentTarget.setPointerCapture?.(ev.pointerId); } catch (_) {}
+      }
+      ev.preventDefault();                            // iOS 글자 선택·스크롤 차단
+      g.dx += ev.clientX - prev.x;
+      g.dy += ev.clientY - prev.y;
+    } else if (d.pointers.size === 2 && d.baseDist) {
+      ev.preventDefault();
+      const [a1, b1] = [...d.pointers.values()];
+      const dist = Math.hypot(a1.x - b1.x, a1.y - b1.y);
+      const ang = (Math.atan2(b1.y - a1.y, b1.x - a1.x) * 180) / Math.PI;
+      g.k = Math.min(6, Math.max(0.35, d.base.k * (dist / d.baseDist)));
+      g.rot = d.base.rot + (ang - d.baseAng);
+    }
+    applyBox();
+  }
+  function gestUp(ev) {
+    const d = dragRef.current;
+    if (!d) return;
+    d.pointers.delete(ev.pointerId);
+    if (d.pointers.size === 1) {
+      // 손가락 하나가 남으면 남은 손가락 기준으로 이어서 옮긴다
+      d.base = { ...gestRef.current };
+      d.baseDist = 0;
+      d.candidate = true;
+      return;
+    }
+    if (d.pointers.size === 0) {
+      dragRef.current = null;
+      lockSelection(false);
+      // 제스처로 자리가 바뀌었으니 키보드에 가리지 않는지 다시 본다
+      queueMicrotask(fitText);
+    }
   }
 
   function done() {
@@ -629,12 +721,16 @@ export default function TextComposer({ at, wrapRef, pickColorAt, onDone }) {
     const raw = taRef.current ? taRef.current.value : value;
     const v = raw.trim();
     hap.tap();
-    // 키보드를 피해 밀어 올린 만큼을 위치에 더해, 보이던 자리 그대로 얹는다.
-    const sh = shiftRef.current;
-    const h = boxRef.current?.parentElement?.getBoundingClientRect().height || 0;
-    const y = h ? Math.min(1.05, Math.max(-0.05, ty + sh / h)) : ty;
+    // 키보드 회피로 밀어 올린 양 + 손가락으로 옮긴 양을 모두 위치에 반영한다.
+    // → **화면에서 보이던 그 자리·그 크기·그 각도 그대로** 얹힌다.
+    const sr = boxRef.current?.parentElement?.getBoundingClientRect();
+    const g = gestRef.current;
+    const cl = (n) => Math.min(1.05, Math.max(-0.05, n));
+    const x = sr?.width ? cl(tx + g.dx / sr.width) : tx;
+    const y = sr?.height ? cl(ty + (g.dy + shiftRef.current) / sr.height) : ty;
     onDone(v
-      ? { value: v.slice(0, MAX_TEXT_LEN), color, bgColor, bg, font, scale, align, effect, x: tx, y }
+      ? { value: v.slice(0, MAX_TEXT_LEN), color, bgColor, bg, font, align, effect,
+          scale: Math.min(0.9, Math.max(0.04, scale * g.k)), rot: g.rot, x, y }
       : null);
   }
 
@@ -654,7 +750,13 @@ export default function TextComposer({ at, wrapRef, pickColorAt, onDone }) {
       <div style={S.catcher} onPointerDown={done} />
 
       {/* 사진 위 입력 — 스크림은 사진 "바깥"에만 깔린다(box-shadow) */}
-      <div style={stage}>
+      <div
+        style={{ ...stage, touchAction: "none" }}
+        onPointerDown={gestDown}
+        onPointerMove={gestMove}
+        onPointerUp={gestUp}
+        onPointerCancel={gestUp}
+      >
         <div
           ref={boxRef}
           style={{
