@@ -356,8 +356,8 @@ export default function TextComposer({ at, wrapRef, pickColorAt, onDone }) {
   const [padSticky, setPadSticky] = useState(false);
   const [picking, setPicking] = useState(false);  // 스포이드 중
   const [rect, setRect] = useState(null);         // 사진 래퍼의 화면 좌표
-  const [kb, setKb] = useState(0);                // 키보드가 먹은 높이
-  const [vvTop, setVvTop] = useState(0);          // 보이는 화면이 레이아웃보다 얼마나 내려가 있나
+  const topBarRef = useRef(null);                 // 상단바 — 리렌더 없이 직접 옮긴다
+  const bottomRef = useRef(null);                 // 색·글꼴 줄 — 리렌더 없이 직접 옮긴다
   const [, force] = useState(0);
   const taRef = useRef(null);
   const mirrorRef = useRef(null);
@@ -390,21 +390,43 @@ export default function TextComposer({ at, wrapRef, pickColorAt, onDone }) {
   }, [wrapRef]);
 
   /* 키보드 위에 컨트롤을 붙인다(인스타는 색·글꼴 줄이 키보드 바로 위에 있다).
-     iOS Safari/WKWebView 는 키보드가 떠도 레이아웃 뷰포트가 안 줄어서 visualViewport 로만 알 수 있다. */
+     ⚠️ 두 가지를 지킨다. 둘 다 2026-09-17 실기에서 비싸게 배운 것이다.
+     ① **window.innerHeight 를 쓰지 않는다.** 네이티브 웹뷰(Capacitor)에서는 이 값이
+        화면도 웹뷰도 아닌 엉뚱한 크기라, 이걸로 키보드 높이를 빼면 색·글꼴 줄이
+        사진 한가운데에 떠 버린다. 보이는 영역은 visualViewport 가 직접 알려 준다 —
+        위 끝 = offsetTop, 아래 끝 = offsetTop + height. 그 두 값에만 붙인다.
+     ② **여기서 상태를 바꾸지 않는다.** 한글을 치는 동안 키보드 추천줄이 늘었다 줄었다
+        하며 이 이벤트가 계속 온다. 그때마다 리렌더하면 **조합 중인 한글이 끊겨**
+        "완" 이 "우ㅏㅏㄴ" 으로 깨진다. 그래서 DOM 스타일만 직접 쓴다. */
   useEffect(() => {
     const vv = window.visualViewport;
-    if (!vv) return;
-    const on = () => {
-      setKb(Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)));
-      // 키보드가 뜨면 iOS 는 "보이는 화면"만 아래로 밀어 놓는다. position:fixed 는 레이아웃
-      // 기준이라 그대로 있어서 상단바가 화면 위로 잘려 나간다 → 그만큼 내려 준다.
-      setVvTop(Math.max(0, Math.round(vv.offsetTop)));
+    let baseH = vv ? vv.height : 0;               // 키보드가 없을 때의 높이(가장 큰 값)
+    const apply = () => {
+      const top = vv ? vv.offsetTop : 0;
+      const h = vv ? vv.height : window.innerHeight;
+      if (h > baseH) baseH = h;
+      const kbUp = h < baseH - 60;
+      if (topBarRef.current) topBarRef.current.style.transform = `translateY(${Math.round(top)}px)`;
+      const el = bottomRef.current;
+      if (el) {
+        el.style.top = `${Math.round(top + h)}px`;   // 보이는 영역의 아래 끝 = 키보드 바로 위
+        el.style.transform = "translateY(-100%)";
+        // 키보드가 떠 있으면 홈 인디케이터 여백이 필요 없다(키보드가 이미 덮는다).
+        el.style.paddingBottom = kbUp ? "8px" : "calc(env(safe-area-inset-bottom, 0px) + 10px)";
+      }
     };
-    on();
-    vv.addEventListener("resize", on);
-    vv.addEventListener("scroll", on);
-    return () => { vv.removeEventListener("resize", on); vv.removeEventListener("scroll", on); };
+    apply();
+    if (!vv) return;
+    vv.addEventListener("resize", apply);
+    vv.addEventListener("scroll", apply);
+    return () => { vv.removeEventListener("resize", apply); vv.removeEventListener("scroll", apply); };
   }, []);
+
+  /* 리렌더가 나면 거울(span)의 글자가 React 가 아는 값으로 되돌아간다.
+     조합 중에는 그 값이 아직 낡았으므로, 렌더가 날 때마다 실제 입력값으로 다시 칠한다. */
+  useEffect(() => {
+    if (composingRef.current && taRef.current) paintMirror(taRef.current.value);
+  });
 
   /* ⚠️ 키보드가 뜨면 iOS(WKWebView)는 **문서를 위로 스크롤**해 입력칸을 드러낸다.
      우리 편집기는 position:fixed 로 짜여 있어서, 그렇게 스크롤되면 사진과 겹쳐 있던
@@ -435,8 +457,14 @@ export default function TextComposer({ at, wrapRef, pickColorAt, onDone }) {
   // (전에는 고른 글꼴만 받아서 칩이 전부 시스템 글꼴로 똑같이 보였다)
   useEffect(() => {
     let dead = false;
-    for (const f of TEXT_FONTS) loadFont(f.key).then(() => { if (!dead) force((n) => n + 1); });
-    const done = () => { if (!dead) force((n) => n + 1); };
+    // 조합 중 리렌더는 한글을 끊는다 → 조합이 끝난 뒤로 미룬다.
+    const bump = () => {
+      if (dead) return;
+      if (composingRef.current) { setTimeout(bump, 120); return; }
+      force((n) => n + 1);
+    };
+    for (const f of TEXT_FONTS) loadFont(f.key).then(bump);
+    const done = () => bump();
     try { document.fonts?.addEventListener?.("loadingdone", done); } catch (_) {}
     return () => {
       dead = true;
@@ -644,7 +672,7 @@ export default function TextComposer({ at, wrapRef, pickColorAt, onDone }) {
       </div>
 
       {/* 상단 — 정렬은 인스타처럼 왼쪽 끝. 그 옆에 배경(A)·효과. 오른쪽은 취소/완료. */}
-      <div style={{ ...S.top, transform: `translateY(${vvTop}px)` }}>
+      <div ref={topBarRef} style={S.top}>
         <div style={S.topGroup}>
           <button
             style={S.iconBtn}
@@ -683,7 +711,7 @@ export default function TextComposer({ at, wrapRef, pickColorAt, onDone }) {
       />
 
       {/* 아래 — 키보드 바로 위에 붙는다(색 줄 + 글꼴 캐러셀) */}
-      <div style={{ ...S.bottom, transform: `translateY(${-kb}px)` }}>
+      <div ref={bottomRef} style={S.bottom}>
         {/* 배경을 켜면 글자색/배경색을 따로 고른다 (흰 배경 + 분홍 글씨 같은 조합이 가능해진다) */}
         {bg !== "none" && (
           <div style={S.targetRow}>
@@ -812,11 +840,13 @@ const S = {
     position: "fixed", left: 34, width: 168, transform: "translate(-50%,-50%) rotate(-90deg)",
     accentColor: "#fff",
   },
+  // 위치는 visualViewport 로 **직접** 잡는다(위 useEffect). bottom 으로 붙이면
+  // 네이티브 웹뷰에서 키보드 높이를 잘못 계산해 사진 한가운데로 떠 버린다.
   bottom: {
-    position: "fixed", left: 0, right: 0,
-    bottom: "env(safe-area-inset-bottom, 0px)",
-    padding: "0 12px 10px", display: "flex", flexDirection: "column", gap: 9,
-    transition: "transform .18s cubic-bezier(0.32,0.72,0,1)",
+    position: "fixed", left: 0, right: 0, top: 0,
+    transform: "translateY(-100%)",
+    padding: "0 12px", paddingBottom: 10,
+    display: "flex", flexDirection: "column", gap: 9,
   },
   targetRow: { display: "flex", alignItems: "center", gap: 6 },
   targetBtn: {
