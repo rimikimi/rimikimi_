@@ -571,3 +571,48 @@ export function applyLook(data, w, h, preset, effects = {}) {
   }
   return data;
 }
+
+// ============================================================
+// 렌즈 왜곡 보정 (줌·광각 왜곡) — 2026-09-17 오너 요청
+//
+// 광각/근접 촬영은 가운데가 부풀어 보인다(배럴 왜곡). 반대로 망원·크롭은 가장자리가
+// 당겨 보인다(핀쿠션). 고전적인 반경 방향(radial) 모델로 되돌린다:
+//     r_src = r * (1 + k·r²)
+// k > 0 이면 배럴을 펴고(얼굴 가운데 부풂 완화), k < 0 이면 반대로 준다.
+//
+// 결과 픽셀마다 원본에서 가져올 위치를 계산해 **양선형 보간**으로 샘플링한다
+// (최근접으로 하면 계단이 보인다). 가장자리 밖은 가장자리 픽셀로 클램프한다.
+// amount: -1 … +1 (0 이면 아무것도 안 한다)
+export function correctLensDistortion(data, w, h, amount) {
+  const a = Math.max(-1, Math.min(1, amount || 0));
+  if (!a) return;
+  const k = a * 0.35;                    // 체감상 과하지 않은 범위
+  const src = new Uint8ClampedArray(data); // 원본 사본에서 샘플링
+  const cx = (w - 1) / 2, cy = (h - 1) / 2;
+  const norm = Math.hypot(cx, cy) || 1;
+  // 왜곡을 펴면 가장자리가 안쪽으로 들어와 빈 테두리가 생긴다 — 그만큼 확대해 덮는다.
+  const zoom = 1 + Math.max(0, k);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const dx = (x - cx) / norm, dy = (y - cy) / norm;
+      const r2 = dx * dx + dy * dy;
+      const f = (1 + k * r2) / zoom;
+      let sxf = cx + dx * f * norm;
+      let syf = cy + dy * f * norm;
+      if (sxf < 0) sxf = 0; else if (sxf > w - 1) sxf = w - 1;
+      if (syf < 0) syf = 0; else if (syf > h - 1) syf = h - 1;
+      const x0 = sxf | 0, y0 = syf | 0;
+      const x1 = x0 + 1 < w ? x0 + 1 : x0, y1 = y0 + 1 < h ? y0 + 1 : y0;
+      const fx = sxf - x0, fy = syf - y0;
+      const i00 = (y0 * w + x0) * 4, i10 = (y0 * w + x1) * 4;
+      const i01 = (y1 * w + x0) * 4, i11 = (y1 * w + x1) * 4;
+      const o = (y * w + x) * 4;
+      for (let c = 0; c < 3; c++) {
+        const top = src[i00 + c] + (src[i10 + c] - src[i00 + c]) * fx;
+        const bot = src[i01 + c] + (src[i11 + c] - src[i01 + c]) * fx;
+        data[o + c] = top + (bot - top) * fy;
+      }
+      data[o + 3] = 255;
+    }
+  }
+}
