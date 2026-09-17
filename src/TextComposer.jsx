@@ -357,8 +357,11 @@ export default function TextComposer({ at, wrapRef, pickColorAt, onDone }) {
   const [picking, setPicking] = useState(false);  // 스포이드 중
   const [rect, setRect] = useState(null);         // 사진 래퍼의 화면 좌표
   const [kb, setKb] = useState(0);                // 키보드가 먹은 높이
+  const [vvTop, setVvTop] = useState(0);          // 보이는 화면이 레이아웃보다 얼마나 내려가 있나
   const [, force] = useState(0);
   const taRef = useRef(null);
+  const mirrorRef = useRef(null);
+  const composingRef = useRef(false);              // 한글/일본어/중국어 조합 중인가
   const padRef = useRef(null);
   const loupeRef = useRef(null);
   const lpRef = useRef(null);                     // 스와치 롱프레스 상태
@@ -391,11 +394,37 @@ export default function TextComposer({ at, wrapRef, pickColorAt, onDone }) {
   useEffect(() => {
     const vv = window.visualViewport;
     if (!vv) return;
-    const on = () => setKb(Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)));
+    const on = () => {
+      setKb(Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)));
+      // 키보드가 뜨면 iOS 는 "보이는 화면"만 아래로 밀어 놓는다. position:fixed 는 레이아웃
+      // 기준이라 그대로 있어서 상단바가 화면 위로 잘려 나간다 → 그만큼 내려 준다.
+      setVvTop(Math.max(0, Math.round(vv.offsetTop)));
+    };
     on();
     vv.addEventListener("resize", on);
     vv.addEventListener("scroll", on);
     return () => { vv.removeEventListener("resize", on); vv.removeEventListener("scroll", on); };
+  }, []);
+
+  /* ⚠️ 키보드가 뜨면 iOS(WKWebView)는 **문서를 위로 스크롤**해 입력칸을 드러낸다.
+     우리 편집기는 position:fixed 로 짜여 있어서, 그렇게 스크롤되면 사진과 겹쳐 있던
+     컴포저가 화면 밖으로 밀려나고 아래 색·글꼴 줄이 사라진다(2026-09-17 실기 버그).
+     그래서 컴포저가 떠 있는 동안에는 문서 스크롤을 0 으로 묶어 둔다. */
+  useEffect(() => {
+    const se = document.scrollingElement || document.documentElement;
+    const prevY = window.scrollY || 0;
+    const pin = () => {
+      if ((window.scrollY || 0) !== 0) window.scrollTo(0, 0);
+      if (se && se.scrollTop !== 0) se.scrollTop = 0;
+    };
+    pin();
+    window.addEventListener("scroll", pin, { passive: true });
+    document.addEventListener("scroll", pin, { passive: true, capture: true });
+    return () => {
+      window.removeEventListener("scroll", pin);
+      document.removeEventListener("scroll", pin, { capture: true });
+      window.scrollTo(0, prevY);
+    };
   }, []);
 
   useEffect(() => { taRef.current?.focus(); }, []);
@@ -525,8 +554,24 @@ export default function TextComposer({ at, wrapRef, pickColorAt, onDone }) {
     setTimeout(() => taRef.current?.focus(), 0);
   }
 
+  const mirrorText = (v) => (v === "" ? "문구 입력" : v + (v.endsWith("\n") ? "\u200B" : ""));
+  /** 글자 수 상한을 DOM 에 직접 적용하고 그 값을 돌려준다(비제어 textarea 라 여기서 자른다). */
+  function clampLen(el) {
+    if (el.value.length > MAX_TEXT_LEN) el.value = el.value.slice(0, MAX_TEXT_LEN);
+    return el.value;
+  }
+  /** 조합 중에는 리렌더 없이 거울만 직접 갱신한다(리렌더하면 조합이 끊긴다). */
+  function paintMirror(v) {
+    const el = mirrorRef.current;
+    if (!el) return;
+    el.textContent = mirrorText(v);
+    el.style.opacity = v === "" ? "0.55" : "1";
+  }
+
   function done() {
-    const v = value.trim();
+    // 조합이 아직 안 끝난 채 완료를 누를 수 있다 → 상태가 아니라 **DOM 의 현재 값**을 읽는다.
+    const raw = taRef.current ? taRef.current.value : value;
+    const v = raw.trim();
     hap.tap();
     onDone(v
       ? { value: v.slice(0, MAX_TEXT_LEN), color, bgColor, bg, font, scale, align, effect }
@@ -534,7 +579,7 @@ export default function TextComposer({ at, wrapRef, pickColorAt, onDone }) {
   }
 
   // 거울(mirror)에 넣을 글자. 빈 값이면 안내 문구, 줄바꿈으로 끝나면 빈 줄이 접히지 않게 폭 0 문자.
-  const mirror = value === "" ? "문구 입력" : value + (value.endsWith("\n") ? "\u200B" : "");
+  const mirror = mirrorText(value);
 
   const stage = rect
     ? { position: "fixed", left: rect.left, top: rect.top, width: rect.width, height: rect.height,
@@ -559,14 +604,29 @@ export default function TextComposer({ at, wrapRef, pickColorAt, onDone }) {
             transform: "translate(-50%,-50%)",
           }}
         >
-          <span style={{ opacity: value === "" ? 0.55 : 1, pointerEvents: "none", userSelect: "none" }}>
+          <span ref={mirrorRef} style={{ opacity: value === "" ? 0.55 : 1, pointerEvents: "none", userSelect: "none" }}>
             {mirror}
           </span>
-          {/* 투명 textarea — 보이는 건 위 거울이고, 이건 캐럿과 한글 조합만 맡는다 */}
+          {/* 투명 textarea — 보이는 건 위 거울이고, 이건 캐럿과 한글 조합만 맡는다.
+              ⚠️ **value 로 묶지 말 것** (2026-09-17 실기 버그: "둥" 이 "ㄷㅜㅇㅇ" 로 깨졌다).
+              한글은 한 글자를 여러 번의 input 이벤트로 **조합**해 만든다. React 의 제어 컴포넌트는
+              input 마다 DOM 의 value 를 제 상태로 되돌려 쓰는데, 그러면 조합 중인 글자가 끊겨
+              자모가 낱개로 떨어진다. 그래서 여기서는 비제어(defaultValue)로 두고,
+              조합 중에는 거울만 직접 갱신하고 조합이 끝났을 때 상태에 넣는다. */}
           <textarea
             ref={taRef}
-            value={value}
-            onChange={(e) => setValue(e.target.value.slice(0, MAX_TEXT_LEN))}
+            defaultValue={init?.value || ""}
+            onCompositionStart={() => { composingRef.current = true; }}
+            onCompositionEnd={(e) => {
+              composingRef.current = false;
+              setValue(clampLen(e.target));
+            }}
+            onInput={(e) => {
+              const v = clampLen(e.target);
+              // 조합 중(한글·일본어·중국어)에는 상태를 건드리지 않는다 — 거울만 직접 갱신.
+              if (composingRef.current) paintMirror(v);
+              else setValue(v);
+            }}
             rows={1}
             spellCheck={false}
             style={{
@@ -584,7 +644,7 @@ export default function TextComposer({ at, wrapRef, pickColorAt, onDone }) {
       </div>
 
       {/* 상단 — 정렬은 인스타처럼 왼쪽 끝. 그 옆에 배경(A)·효과. 오른쪽은 취소/완료. */}
-      <div style={S.top}>
+      <div style={{ ...S.top, transform: `translateY(${vvTop}px)` }}>
         <div style={S.topGroup}>
           <button
             style={S.iconBtn}
