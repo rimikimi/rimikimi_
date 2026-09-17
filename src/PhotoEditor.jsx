@@ -554,8 +554,9 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
     }
     const st = {
       id: stickerSeq++, kind: "text", ...out,
-      x: typeof at.x === "number" ? at.x : 0.5,
-      y: typeof at.y === "number" ? at.y : 0.5,
+      // 컴포저가 키보드를 피해 밀어 올렸으면 out.x/y 가 **보이던 자리**다 — 그게 우선이다.
+      x: typeof out.x === "number" ? out.x : (typeof at.x === "number" ? at.x : 0.5),
+      y: typeof out.y === "number" ? out.y : (typeof at.y === "number" ? at.y : 0.5),
       rot: 0,
     };
     setStickers((p) => [...p, st]);
@@ -598,6 +599,24 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
     setStickers((p) => p.filter((s) => s.id !== id));
     setSelId((cur) => (cur === id ? null : cur));
   }
+
+  /* 편집기가 떠 있는 동안 문서 스크롤을 막는다.
+     ⚠️ iOS 는 손가락을 끌 때 페이지가 조금이라도 스크롤되면 **pointercancel** 을 던져
+        진행 중인 드래그를 끊어 버린다. 맥 브라우저에는 없는 동작이라 실기에서만
+        "글자가 안 옮겨진다" 로 나타난다(2026-09-17 지적). 아예 스크롤을 못 하게 한다. */
+  useEffect(() => {
+    const b = document.body, d = document.documentElement;
+    const prev = { bo: b.style.overflow, dof: d.style.overflow, ov: b.style.overscrollBehavior };
+    b.style.overflow = "hidden";
+    d.style.overflow = "hidden";
+    b.style.overscrollBehavior = "none";
+    const pin = () => { if (window.scrollY) window.scrollTo(0, 0); };
+    window.addEventListener("scroll", pin, { passive: true });
+    return () => {
+      b.style.overflow = prev.bo; d.style.overflow = prev.dof; b.style.overscrollBehavior = prev.ov;
+      window.removeEventListener("scroll", pin);
+    };
+  }, []);
 
   /* ---------- 드래그 중 보조 UI (휴지통 · 중앙 가이드 · 안전영역) ---------- */
   function showTrash(on) {
@@ -952,12 +971,18 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
               // 겹이 선택돼 있을 땐 탭이 먼저 '선택 해제'로 쓰인다.
               onPointerDown={(e) => {
                 e.preventDefault();
-                setPeeking(true);
-                canvasTapRef.current = { t: Date.now(), x: e.clientX, y: e.clientY, hadSel: selId != null };
+                // ⚠️ 여기서 바로 setPeeking(true) 하면 **겹이 전부 사라진다**(아래 목록이
+                //    !peeking 일 때만 그려진다). 글자 가장자리를 살짝 빗맞혀 눌러도 그 순간
+                //    끌려던 글자가 없어져서 "옮겨지지 않는다"가 된다(2026-09-17 실기 지적).
+                //    원본 비교는 원래 "길게 누르기" 기능이므로 320ms 뒤에만 켠다.
+                const tap = { t: Date.now(), x: e.clientX, y: e.clientY, hadSel: selId != null };
+                tap.timer = window.setTimeout(() => setPeeking(true), 320);
+                canvasTapRef.current = tap;
               }}
               onPointerUp={(e) => {
-                setPeeking(false);
                 const s = canvasTapRef.current;
+                if (s?.timer) window.clearTimeout(s.timer);
+                setPeeking(false);
                 canvasTapRef.current = null;
                 if (!s || composing) return;
                 if (Date.now() - s.t > 320) return;                       // 길게 누름 = 원본 비교
@@ -965,8 +990,8 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
                 if (s.hadSel) return;                                     // 선택 해제만
                 openTextAt(e.clientX, e.clientY);
               }}
-              onPointerCancel={() => { setPeeking(false); canvasTapRef.current = null; }}
-              onPointerLeave={() => { setPeeking(false); canvasTapRef.current = null; }}
+              onPointerCancel={() => { if (canvasTapRef.current?.timer) window.clearTimeout(canvasTapRef.current.timer); setPeeking(false); canvasTapRef.current = null; }}
+              onPointerLeave={() => { if (canvasTapRef.current?.timer) window.clearTimeout(canvasTapRef.current.timer); setPeeking(false); canvasTapRef.current = null; }}
             />
             {/* 드래그 중 보조선 — 가운데 정렬 가이드 + 안전영역 (인스타와 같은 안내) */}
             <div ref={safeRef} style={ES.safeBox} />

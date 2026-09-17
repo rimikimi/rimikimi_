@@ -356,6 +356,8 @@ export default function TextComposer({ at, wrapRef, pickColorAt, onDone }) {
   const [padSticky, setPadSticky] = useState(false);
   const [picking, setPicking] = useState(false);  // 스포이드 중
   const [rect, setRect] = useState(null);         // 사진 래퍼의 화면 좌표
+  const boxRef = useRef(null);                    // 입력 중인 글자 상자
+  const shiftRef = useRef(0);                     // 키보드에 가려 위로 밀어 올린 양(px)
   const topBarRef = useRef(null);                 // 상단바 — 리렌더 없이 직접 옮긴다
   const bottomRef = useRef(null);                 // 색·글꼴 줄 — 리렌더 없이 직접 옮긴다
   const [, force] = useState(0);
@@ -406,6 +408,7 @@ export default function TextComposer({ at, wrapRef, pickColorAt, onDone }) {
       const h = vv ? vv.height : window.innerHeight;
       if (h > baseH) baseH = h;
       const kbUp = h < baseH - 60;
+      queueMicrotask(fitText);
       if (topBarRef.current) topBarRef.current.style.transform = `translateY(${Math.round(top)}px)`;
       const el = bottomRef.current;
       if (el) {
@@ -426,6 +429,7 @@ export default function TextComposer({ at, wrapRef, pickColorAt, onDone }) {
      조합 중에는 그 값이 아직 낡았으므로, 렌더가 날 때마다 실제 입력값으로 다시 칠한다. */
   useEffect(() => {
     if (composingRef.current && taRef.current) paintMirror(taRef.current.value);
+    fitText();
   });
 
   /* ⚠️ 키보드가 뜨면 iOS(WKWebView)는 **문서를 위로 스크롤**해 입력칸을 드러낸다.
@@ -596,13 +600,41 @@ export default function TextComposer({ at, wrapRef, pickColorAt, onDone }) {
     el.style.opacity = v === "" ? "0.55" : "1";
   }
 
+  /** 키보드·컨트롤에 가려지지 않게 글자 상자를 위아래로 밀어 준다.
+   *  ⚠️ 상태를 쓰지 않는다 — 한글 조합 중에 리렌더가 나면 글자가 깨진다.
+   *  밀어 올린 만큼은 완료할 때 위치(y)에 반영하므로, **보이는 자리에 그대로 얹힌다**. */
+  function fitText() {
+    const box = boxRef.current, stageEl = box && box.parentElement;
+    if (!box || !stageEl) return;
+    const sr = stageEl.getBoundingClientRect();
+    if (!sr.height) return;
+    const cur = shiftRef.current;
+    // 지금 밀어 놓은 걸 뺀 "본래" 자리에서 계산한다
+    const br = box.getBoundingClientRect();
+    const top0 = br.top - cur, bot0 = br.bottom - cur;
+    const topLimit = (topBarRef.current?.getBoundingClientRect().bottom ?? 0) + 10;
+    const botLimit = (bottomRef.current?.getBoundingClientRect().top ?? window.innerHeight) - 10;
+    let shift = 0;
+    if (bot0 > botLimit) shift = botLimit - bot0;          // 아래에 가리면 위로
+    if (top0 + shift < topLimit) shift = topLimit - top0;  // 그래도 위가 잘리면 도로 내린다
+    if (bot0 - top0 > botLimit - topLimit) shift = topLimit - top0;  // 글이 길면 위 기준
+    shift = Math.round(shift);
+    if (shift === cur) return;
+    shiftRef.current = shift;
+    box.style.transform = `translate(-50%,-50%) translateY(${shift}px)`;
+  }
+
   function done() {
     // 조합이 아직 안 끝난 채 완료를 누를 수 있다 → 상태가 아니라 **DOM 의 현재 값**을 읽는다.
     const raw = taRef.current ? taRef.current.value : value;
     const v = raw.trim();
     hap.tap();
+    // 키보드를 피해 밀어 올린 만큼을 위치에 더해, 보이던 자리 그대로 얹는다.
+    const sh = shiftRef.current;
+    const h = boxRef.current?.parentElement?.getBoundingClientRect().height || 0;
+    const y = h ? Math.min(1.05, Math.max(-0.05, ty + sh / h)) : ty;
     onDone(v
-      ? { value: v.slice(0, MAX_TEXT_LEN), color, bgColor, bg, font, scale, align, effect }
+      ? { value: v.slice(0, MAX_TEXT_LEN), color, bgColor, bg, font, scale, align, effect, x: tx, y }
       : null);
   }
 
@@ -624,6 +656,7 @@ export default function TextComposer({ at, wrapRef, pickColorAt, onDone }) {
       {/* 사진 위 입력 — 스크림은 사진 "바깥"에만 깔린다(box-shadow) */}
       <div style={stage}>
         <div
+          ref={boxRef}
           style={{
             ...tStyle,
             position: "absolute",
@@ -654,6 +687,7 @@ export default function TextComposer({ at, wrapRef, pickColorAt, onDone }) {
               // 조합 중(한글·일본어·중국어)에는 상태를 건드리지 않는다 — 거울만 직접 갱신.
               if (composingRef.current) paintMirror(v);
               else setValue(v);
+              queueMicrotask(fitText);
             }}
             rows={1}
             spellCheck={false}
