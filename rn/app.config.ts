@@ -1,5 +1,10 @@
 import type { ExpoConfig } from "expo/config";
 
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const withFcmManifestFix = require("./plugins/withFcmManifestFix");
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const withReleaseSigning = require("./plugins/withReleaseSigning");
+
 // rimikimi 2.0 — Android (React Native / Expo) native config.
 //
 // · package = com.rimikimi.app (1.x Capacitor 앱과 같은 패키지 — 업데이트로 이어져야
@@ -77,6 +82,10 @@ const config: ExpoConfig = {
   },
 
   plugins: [
+    // Registered first so its mod wraps (and runs after) every other manifest
+    // mod below — expo-config-plugins' mod stack executes last-registered-first,
+    // so "runs after everything else" means "declared before everything else".
+    withFcmManifestFix,
     "expo-router",
     "expo-web-browser",
     "expo-secure-store",
@@ -105,6 +114,8 @@ const config: ExpoConfig = {
       },
     ],
     ["expo-build-properties", { android: { compileSdkVersion: 36, targetSdkVersion: 36 } }],
+    // 1.x 업로드 키로 release 서명 (app/build.gradle 수정, 매니페스트와 무관 — 순서 상관없음).
+    withReleaseSigning,
   ],
 
   experiments: { typedRoutes: true },

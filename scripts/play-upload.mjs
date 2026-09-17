@@ -14,7 +14,8 @@
 // ============================================================
 
 import { createSign } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 
 const PKG = "com.rimikimi.app";
@@ -80,16 +81,31 @@ async function api(method, url, { body, raw, contentType } = {}) {
   return text ? JSON.parse(text) : null;
 }
 
-const aab = readFileSync(AAB);
-console.log(`AAB: ${AAB} (${(aab.length / 1048576).toFixed(1)}MB)`);
+const aabSize = statSync(AAB).size;   // 본문은 curl 이 직접 읽는다(77MB 를 메모리에 올리지 않는다)
+console.log(`AAB: ${AAB} (${(aabSize / 1048576).toFixed(1)}MB)`);
 console.log(`트랙: ${TRACK}${DRY ? "  [dry]" : ""}`);
 
 const edit = await api("POST", `${BASE}/edits`);
 console.log(`edit: ${edit.id}`);
 
-const uploaded = await api("POST",
-  `https://androidpublisher.googleapis.com/upload/androidpublisher/v3/applications/${PKG}/edits/${edit.id}/bundles?uploadType=media`,
-  { raw: aab, contentType: "application/octet-stream" });
+// ⚠️ AAB 업로드만 curl 로 한다 (2026-09-18).
+//    fetch(node 내장 undici)는 응답 헤더를 5분 안에 못 받으면 UND_ERR_HEADERS_TIMEOUT 으로
+//    끊는다. 2.0 AAB 는 77MB 라 업로드에 그보다 오래 걸려 매번 여기서 죽었다.
+//    undici 의 Agent 는 node 에서 import 할 수 없으므로 curl 로 우회한다(타임아웃 없음).
+function uploadBundle(editId) {
+  const url = `https://androidpublisher.googleapis.com/upload/androidpublisher/v3/applications/${PKG}/edits/${editId}/bundles?uploadType=media`;
+  const r = spawnSync("curl", [
+    "-sS", "--fail-with-body", "--max-time", "3600", "--progress-bar",
+    "-X", "POST", url,
+    "-H", `Authorization: Bearer ${TOKEN}`,
+    "-H", "Content-Type: application/octet-stream",
+    "--data-binary", `@${AAB}`,
+  ], { encoding: "utf8", maxBuffer: 1 << 24, stdio: ["ignore", "pipe", "inherit"] });
+  if (r.status !== 0) throw new Error(`AAB 업로드 실패 (curl ${r.status})\n  ${(r.stdout || "").slice(0, 400)}`);
+  return JSON.parse(r.stdout);
+}
+
+const uploaded = uploadBundle(edit.id);
 console.log(`업로드됨: versionCode ${uploaded.versionCode}`);
 
 await api("PUT", `${BASE}/edits/${edit.id}/tracks/${TRACK}`, {
