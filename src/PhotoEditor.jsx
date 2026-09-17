@@ -21,6 +21,7 @@ import { shareImage } from "./share";
 import { t, getLang } from "./i18n";
 import { supabase } from "./supabaseClient";
 import { STICKER_SETS, stickerById } from "./stickerAssets";
+import TextComposer, { TEXT_FONTS, fontOf, fontFamilyOf, contrastInk, loadFont } from "./TextComposer";
 import * as hap from "./haptics";
 
 const PREVIEW_MAX = 1080; // 미리보기 긴 변
@@ -138,43 +139,6 @@ function drawDateStamp(ctx, w, h, style) {
 }
 
 
-/* ---------- 문구 꾸미기 (Justin `PosterEditor` 와 같은 모델) ----------
-   오너 지시 2026-09-17: "텍스트는 Justin 에 있는 거처럼 꾸미게 해줘야지".
-   프리셋 몇 색이 아니라 **연속 스펙트럼**(색상 띠 + 밝기 띠)으로 고르고,
-   글자 뒤에 배경(없음/단색/반투명)을 깔 수 있으며, 배경을 깔면 글자색은
-   대비에 따라 자동으로 검정/흰색이 된다. */
-function hsl(h, sat, l) {
-  const a = (sat / 100) * Math.min(l / 100, 1 - l / 100);
-  const f = (n) => {
-    const k = (n + h / 30) % 12;
-    const c = l / 100 - a * Math.max(-1, Math.min(k - 3, 9 - k, 1));
-    return Math.round(255 * c).toString(16).padStart(2, "0");
-  };
-  return `#${f(0)}${f(8)}${f(4)}`;
-}
-/** 밝기 0..1 → HSL 명도. 0=검정, 0.5=원색, 1=흰색. 양끝은 채도를 빼 회색이 되게. */
-const lightOf = (t) => (t <= 0.5 ? t * 100 : 50 + (t - 0.5) * 100);
-const colorOf = (hue, light) =>
-  hsl(hue, light >= 0.98 || light <= 0.02 ? 0 : 85, lightOf(light));
-
-/** 배경을 깔았을 때 글자색 — 밝은 배경엔 검정, 어두운 배경엔 흰색. */
-function contrastInk(hex) {
-  const n = hex.replace("#", "");
-  const lin = (c) => { const v = c / 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
-  const L = 0.2126 * lin(parseInt(n.slice(0, 2), 16))
-          + 0.7152 * lin(parseInt(n.slice(2, 4), 16))
-          + 0.0722 * lin(parseInt(n.slice(4, 6), 16));
-  return L > 0.45 ? "#111111" : "#FFFFFF";
-}
-
-/** 글꼴 — 이미 index.html 에서 받는 것만 쓴다(추가 로딩 없음). */
-const TEXT_FONTS = [
-  { key: "round", ko: "둥근", css: "'Jua', 'Apple SD Gothic Neo', sans-serif", weight: 400 },
-  { key: "bold", ko: "굵게", css: "'Apple SD Gothic Neo', -apple-system, sans-serif", weight: 800 },
-  { key: "soft", ko: "부드럽게", css: "'Quicksand', 'Apple SD Gothic Neo', sans-serif", weight: 700 },
-];
-const fontOf = (k) => TEXT_FONTS.find((f) => f.key === k) || TEXT_FONTS[0];
-
 /* ---------- 스티커 합성 (저장 시) ---------- */
 function drawSticker(ctx, st, w, h) {
   const px = st.scale * w; // scale = 이미지 폭 대비 크기
@@ -197,7 +161,7 @@ function drawSticker(ctx, st, w, h) {
   }
   if (st.kind === "text") {
     const f = fontOf(st.font);
-    ctx.font = `${f.weight} ${px}px ${f.css}`;
+    ctx.font = `${f.weight} ${px}px ${fontFamilyOf(st.font)}`;
     const bg = st.bg || "none";
     if (bg !== "none") {
       // 배경 박스 — 화면(LayerBody)과 같은 비율로 그린다.
@@ -310,13 +274,8 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
     }));
   const [selId, setSelId] = useState(null);
   const [textDraft, setTextDraft] = useState("");
-  // Justin 과 같은 연속 스펙트럼 — 색상(0..360) + 밝기(0..1). 기본 흰색.
-  const [textHue, setTextHue] = useState(0);
-  const [textLight, setTextLight] = useState(1);
-  const textColor = colorOf(textHue, textLight);
-  const [textBg, setTextBg] = useState("none");   // none | solid | soft
-  const [textFont, setTextFont] = useState("round");
-  const [textSize, setTextSize] = useState(0.09);
+  // 인스타 스토리식 문구 입력 — 사진 위에서 바로 친다. null 이면 닫힘.
+  const [composing, setComposing] = useState(null);   // null | {} | 기존 겹
   const [busy, setBusy] = useState(null); // "save" | "share" | null
   const [saveProg, setSaveProg] = useState(""); // 배치 저장 진행 "3/10"
   const [toast, setToast] = useState("");
@@ -592,19 +551,20 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
     setSelId(st.id);
   }
 
-  function addText() {
-    const v = textDraft.trim();
-    if (!v) return;
-    hap.tap();
-    const st = {
-      id: stickerSeq++, kind: "text", value: v.slice(0, 24),
-      color: textColor, bg: textBg, font: textFont,
-      x: 0.5, y: 0.78, scale: textSize, rot: 0,
-    };
+  /** 컴포저 완료 — 새로 만들거나, 고르던 겹을 갱신한다. */
+  function commitText(out) {
+    const editingId = composing && composing.id;
+    setComposing(null);
+    if (!out) return;
+    if (editingId != null) {
+      setStickers((p) => p.map((s0) => (s0.id === editingId ? { ...s0, ...out } : s0)));
+      return;
+    }
+    const st = { id: stickerSeq++, kind: "text", ...out, x: 0.5, y: 0.5, rot: 0 };
     setStickers((p) => [...p, st]);
     setSelId(st.id);
-    setTextDraft("");
   }
+
   function removeSticker(id) {
     hap.light();
     setStickers((p) => p.filter((s) => s.id !== id));
@@ -807,6 +767,9 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
   return createPortal(
     <div style={ES.overlay} className="pe-in" ref={overlayRef}>
       <style>{PE_CSS}</style>
+      {composing && (
+        <TextComposer initial={composing.value ? composing : null} onDone={commitText} />
+      )}
       {toast && <div style={ES.toast} className="pe-toast" onClick={() => setToast("")}>{toast}</div>}
 
       {/* 상단 바 */}
@@ -866,9 +829,10 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
                   fontSize: st.scale * wrapW || 24,
                   ...(st.kind === "text"
                     ? {
-                        fontFamily: fontOf(st.font).css,
+                        fontFamily: fontFamilyOf(st.font),
                         fontWeight: fontOf(st.font).weight,
-                        whiteSpace: "nowrap",
+                        whiteSpace: "pre-wrap",
+                        textAlign: st.align || "center",
                         lineHeight: 1.2,
                         ...(st.bg && st.bg !== "none"
                           ? {
@@ -1086,76 +1050,9 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
 
         {tab === "sticker" && (
           <div style={ES.stickerPanel}>
-            <div style={ES.textRow}>
-              <input
-                style={ES.textInput}
-                placeholder={t("edit.sticker.placeholder")}
-                value={textDraft}
-                maxLength={24}
-                onChange={(e) => setTextDraft(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") addText(); }}
-              />
-              <div style={{ ...ES.colorDot, background: textColor, border: "2px solid rgba(255,255,255,.7)" }} />
-              <button style={ES.textAdd} onClick={addText}>{t("edit.sticker.add")}</button>
-            </div>
-
-            {/* 색상 띠 — 문지르면 연속으로 바뀐다(프리셋 아님, Justin 과 같은 방식) */}
-            <input
-              className="pe-range pe-hue"
-              type="range" min="0" max="360"
-              value={textHue}
-              onChange={(e) => setTextHue(Number(e.target.value))}
-              style={{
-                ...ES.spectrum,
-                background:
-                  "linear-gradient(90deg,#ff0000 0%,#ffff00 16.6%,#00ff00 33.3%," +
-                  "#00ffff 50%,#0000ff 66.6%,#ff00ff 83.3%,#ff0000 100%)",
-              }}
-              aria-label="글자 색상"
-            />
-            {/* 밝기 띠 — 그 색의 검정~원색~흰색. 흰·검·회색도 여기서 나온다. */}
-            <input
-              className="pe-range"
-              type="range" min="0" max="100"
-              value={Math.round(textLight * 100)}
-              onChange={(e) => setTextLight(Number(e.target.value) / 100)}
-              style={{
-                ...ES.spectrum,
-                background: `linear-gradient(90deg, #000, ${colorOf(textHue, 0.5)}, #fff)`,
-              }}
-              aria-label="글자 밝기"
-            />
-
-            <div style={ES.textOptRow}>
-              {TEXT_FONTS.map((f) => (
-                <button
-                  key={f.key}
-                  style={{
-                    ...ES.textOptBtn, fontFamily: f.css, fontWeight: f.weight,
-                    ...(textFont === f.key ? ES.textOptOn : null),
-                  }}
-                  onClick={() => setTextFont(f.key)}
-                >{f.ko}</button>
-              ))}
-              {[["none", "배경 없음"], ["solid", "단색"], ["soft", "반투명"]].map(([k, ko]) => (
-                <button
-                  key={k}
-                  style={{ ...ES.textOptBtn, ...(textBg === k ? ES.textOptOn : null) }}
-                  onClick={() => setTextBg(k)}
-                >{ko}</button>
-              ))}
-            </div>
-
-            <div style={ES.textOptRow}>
-              <span style={ES.textOptLabel}>크기</span>
-              <input
-                className="pe-range"
-                type="range" min="4" max="30"
-                value={Math.round(textSize * 100)}
-                onChange={(e) => setTextSize(Number(e.target.value) / 100)}
-                style={{ flex: 1 }}
-              />
-            </div>
+            <button style={ES.addTextBtn} onClick={() => { hap.tap(); setComposing({}); }}>
+              문구 추가
+            </button>
             <div style={ES.emojiGrid}>
               {/* ⚠️ 그림 스티커는 **이번 제출에서 뺀다**(오너 지시 2026-09-17: "지금은 빼고 제출해").
                   자산(public/stickers/*.png)·합성 코드(kind:"img")·addImgSticker 는 그대로 두었으니
@@ -1346,6 +1243,10 @@ const ES = {
   },
   colorDot: { width: 24, height: 24, borderRadius: 12, border: "2px solid rgba(255,255,255,.25)", cursor: "pointer", flex: "0 0 auto", padding: 0 },
   colorDotOn: { borderColor: "#fff", transform: "scale(1.12)" },
+  addTextBtn: {
+    width: "100%", height: 46, borderRadius: 12, border: "none",
+    background: "#E6403C", color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer",
+  },
   spectrum: {
     width: "100%", height: 22, borderRadius: 11, appearance: "none", WebkitAppearance: "none",
     margin: "8px 0 0", cursor: "pointer", border: "1px solid rgba(255,255,255,.18)",
