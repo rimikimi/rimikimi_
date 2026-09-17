@@ -1457,7 +1457,17 @@ export default async function handler(req, res) {
   // picbox/claire 와 동일한 요금표. 많이 만들수록 장당 단가가 싸진다.
   // 무료 한도(하루 1장)로는 애초에 불가능하므로 크레딧/무제한만 허용한다.
   if (batchCount > 1) {
+    // ⚠️ 2026-09-18 실제 버그: 크레딧이 넉넉해도 **그날 무료 1장을 아직 안 썼으면**
+    //    묶음 생성이 402 로 거절됐다. useCredit 이 위쪽 `usage.count >= dailyLimit`
+    //    분기 안에서만 true 가 되기 때문 — "무료 한도를 다 썼는가" 를 "크레딧을 쓸 수
+    //    있는가" 의 대리 지표로 쓴 게 원인이다. 묶음은 애초에 크레딧 전용이므로
+    //    무료 한도와 무관하게 **잔액을 직접 보고** 판단한다.
     if (!unlimited && !useCredit) {
+      const credit = await getCreditInfo(admin, user.id);
+      creditsLeft = credit.error ? 0 : credit.creditsAvailable;
+      if (creditsLeft >= batchCost) useCredit = true;
+    }
+    if (!unlimited && (!useCredit || creditsLeft < batchCost)) {
       return res.status(402).json({
         error: `${batchCount}장 만들기는 크레딧이 필요해요.\n크레딧을 충전하면 한 번에 여러 장을 만들 수 있어요.`,
         credits: creditsLeft,
