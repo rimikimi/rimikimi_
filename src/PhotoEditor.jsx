@@ -20,6 +20,7 @@ import { isNative, nativeSaveToAlbum } from "./nativeBridge";
 import { shareImage } from "./share";
 import { t, getLang } from "./i18n";
 import { supabase } from "./supabaseClient";
+import { STICKER_SETS, stickerById } from "./stickerAssets";
 import * as hap from "./haptics";
 
 const PREVIEW_MAX = 1080; // 미리보기 긴 변
@@ -144,6 +145,18 @@ function drawSticker(ctx, st, w, h) {
   ctx.rotate((st.rot * Math.PI) / 180);
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
+  if (st.kind === "img") {
+    // 직접 그린 SVG 스티커. drawImage 는 동기라 미리 디코드된 것만 그린다
+    // (없으면 조용히 건너뛴다 — 저장이 실패하는 것보다 낫다).
+    const im = st._img;
+    if (im && im.complete && im.naturalWidth) {
+      const ratio = st.ratio || 1;
+      const dw = px, dh = px / ratio;
+      ctx.drawImage(im, -dw / 2, -dh / 2, dw, dh);
+    }
+    ctx.restore();
+    return;
+  }
   if (st.kind === "text") {
     ctx.font = `800 ${px}px -apple-system, "Apple SD Gothic Neo", sans-serif`;
     ctx.shadowColor = "rgba(0,0,0,0.35)";
@@ -505,6 +518,18 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
     setStickers((p) => [...p, st]);
     setSelId(st.id);
   }
+  function addImgSticker(item) {
+    hap.tap();
+    const im = new Image();
+    im.src = item.src;                    // data URI — 네트워크 요청 없음
+    const st = {
+      id: stickerSeq++, kind: "img", value: item.id, src: item.src, ratio: item.ratio || 1,
+      x: 0.5, y: 0.5, scale: 0.3, rot: 0, _img: im,
+    };
+    setStickers((p) => [...p, st]);
+    setSelId(st.id);
+  }
+
   function addText() {
     const v = textDraft.trim();
     if (!v) return;
@@ -779,7 +804,10 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
                   ...(selId === st.id ? ES.stickerSel : null),
                 }}
               >
-                {st.value}
+                {st.kind === "img"
+                  ? <img src={st.src} alt="" draggable={false}
+                         style={{ width: st.scale * wrapW || 60, height: "auto", display: "block", pointerEvents: "none" }} />
+                  : st.value}
                 {selId === st.id && (
                   <button
                     style={ES.stickerDel}
@@ -997,6 +1025,20 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
               <button style={ES.textAdd} onClick={addText}>{t("edit.sticker.add")}</button>
             </div>
             <div style={ES.emojiGrid}>
+              {/* 직접 그린 스티커 — 기기 글꼴을 안 타서 어디서나 같은 모양 */}
+              {STICKER_SETS.map((g) => (
+                <div key={g.key} style={{ width: "100%" }}>
+                  <div style={ES.stickerSetName}>{g.ko}</div>
+                  <div style={ES.stickerSetRow}>
+                    {g.items.map((it) => (
+                      <button key={it.id} style={ES.stickerImgBtn} onClick={() => addImgSticker(it)}>
+                        <img src={it.src} alt="" style={{ height: 34, display: "block" }} />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              <div style={ES.stickerSetName}>이모지</div>
               {EMOJIS.map((e) => (
                 <button key={e} style={ES.emojiBtn} onClick={() => addEmoji(e)}>{e}</button>
               ))}
@@ -1062,6 +1104,16 @@ const ES = {
     letterSpacing: ".03em", pointerEvents: "none",
   },
   loadState: { color: "rgba(255,255,255,.55)", fontSize: 14 },
+  stickerSetName: {
+    width: "100%", fontSize: 11.5, fontWeight: 700, letterSpacing: ".02em",
+    color: "rgba(255,255,255,0.5)", margin: "10px 0 6px",
+  },
+  stickerSetRow: { display: "flex", flexWrap: "wrap", gap: 8 },
+  stickerImgBtn: {
+    width: 48, height: 48, borderRadius: 12, border: "1px solid rgba(255,255,255,0.14)",
+    background: "rgba(255,255,255,0.06)", display: "flex", alignItems: "center",
+    justifyContent: "center", cursor: "pointer", padding: 0,
+  },
   sticker: {
     position: "absolute", lineHeight: 1, userSelect: "none", touchAction: "none",
     cursor: "grab", padding: 4,
