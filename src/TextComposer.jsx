@@ -17,16 +17,20 @@ import * as hap from "./haptics";
 
 /** 글꼴 목록. `g` 는 Google Fonts family 이름(없으면 시스템). */
 export const TEXT_FONTS = [
-  { key: "basic",  ko: "기본",   css: "-apple-system, 'Apple SD Gothic Neo', sans-serif", weight: 800 },
-  { key: "round",  ko: "둥근",   g: "Jua",               css: "'Jua'",               weight: 400 },
-  { key: "pen",    ko: "손글씨", g: "Nanum Pen Script",  css: "'Nanum Pen Script'",  weight: 400 },
-  { key: "cute",   ko: "귀여운", g: "Gaegu",             css: "'Gaegu'",             weight: 700 },
-  { key: "heavy",  ko: "굵게",   g: "Black Han Sans",    css: "'Black Han Sans'",    weight: 400 },
-  { key: "sharp",  ko: "각진",   g: "Do Hyeon",          css: "'Do Hyeon'",          weight: 400 },
-  { key: "serif",  ko: "명조",   g: "Song Myung",        css: "'Song Myung'",        weight: 400 },
-  { key: "brush",  ko: "붓글씨", g: "Nanum Brush Script",css: "'Nanum Brush Script'",weight: 400 },
-  { key: "plain",  ko: "담백",   g: "Gowun Dodum",       css: "'Gowun Dodum'",       weight: 400 },
-  { key: "pop",    ko: "발랄",   g: "Gamja Flower",      css: "'Gamja Flower'",      weight: 400 },
+  // 오너 지시(2026-09-17): "폰트는 좀 디자인 모던하고 이쁜걸로", "개밤티 폰트 가져오지 말고".
+  // 후보 20종을 실제로 렌더해 눈으로 고른 결과다(scratchpad/shots/fontsheet.png).
+  // **뺀 것**: 나눔손글씨·나눔붓글씨·개구·감자꽃·Poor Story·Song Myung·Dongle —
+  //   전부 촌스럽거나 옛 한글 웹폰트 느낌이라 사진 위에 얹으면 싸구려로 보인다.
+  // `g` = Google Fonts family, `url` = 그 밖의 CDN(구글에 없는 것).
+  { key: "pretendard", ko: "기본", weight: 700, css: "'Pretendard'",
+    url: "https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard-dynamic-subset.css" },
+  { key: "serif",   ko: "세리프", g: "Hahmlet",        css: "'Hahmlet'",        weight: 700 },
+  { key: "elegant", ko: "고운",   g: "Gowun Batang",   css: "'Gowun Batang'",   weight: 700 },
+  { key: "thin",    ko: "가는",   g: "Diphylleia",     css: "'Diphylleia'",     weight: 400 },
+  { key: "impact",  ko: "임팩트", g: "Black Han Sans", css: "'Black Han Sans'", weight: 400 },
+  { key: "bold",    ko: "볼드",   g: "Gasoek One",     css: "'Gasoek One'",     weight: 400 },
+  { key: "sharp",   ko: "각진",   g: "Do Hyeon",       css: "'Do Hyeon'",       weight: 400 },
+  { key: "hand",    ko: "손글씨", g: "Single Day",     css: "'Single Day'",     weight: 400 },
 ];
 export const fontOf = (k) => TEXT_FONTS.find((f) => f.key === k) || TEXT_FONTS[0];
 /** 실제로 쓸 font-family — 못 받았으면 시스템으로 떨어진다(편집을 막지 않는다). */
@@ -36,12 +40,13 @@ const loaded = new Set();
 /** 고른 순간에만 받아온다. 실패해도 던지지 않는다. */
 export function loadFont(key) {
   const f = fontOf(key);
-  if (!f.g || loaded.has(key)) return Promise.resolve(true);
+  const href = f.url || (f.g && `https://fonts.googleapis.com/css2?family=${f.g.replace(/ /g, "+")}&display=swap`);
+  if (!href || loaded.has(key)) return Promise.resolve(true);
   loaded.add(key);
   return new Promise((res) => {
     const l = document.createElement("link");
     l.rel = "stylesheet";
-    l.href = `https://fonts.googleapis.com/css2?family=${f.g.replace(/ /g, "+")}&display=swap`;
+    l.href = href;
     l.onload = () => res(true);
     l.onerror = () => res(false);
     document.head.appendChild(l);
@@ -86,7 +91,7 @@ const BG_ORDER = ["none", "solid", "soft"];
  */
 export default function TextComposer({ initial, onDone }) {
   const [value, setValue] = useState(initial?.value || "");
-  const [font, setFont] = useState(initial?.font || "basic");
+  const [font, setFont] = useState(initial?.font || "pretendard");
   const [color, setColor] = useState(initial?.color || "#FFFFFF");
   const [bg, setBg] = useState(initial?.bg || "none");
   const [align, setAlign] = useState(initial?.align || "center");

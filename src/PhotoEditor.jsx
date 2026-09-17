@@ -1053,14 +1053,9 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
             <button style={ES.addTextBtn} onClick={() => { hap.tap(); setComposing({}); }}>
               문구 추가
             </button>
-            <div style={ES.emojiGrid}>
-              {/* ⚠️ 그림 스티커는 **이번 제출에서 뺀다**(오너 지시 2026-09-17: "지금은 빼고 제출해").
-                  자산(public/stickers/*.png)·합성 코드(kind:"img")·addImgSticker 는 그대로 두었으니
-                  아래 블록의 주석만 풀면 되돌아온다. 지금은 이모지 + 문구만 제공한다. */}
-              {EMOJIS.map((e) => (
-                <button key={e} style={ES.emojiBtn} onClick={() => addEmoji(e)}>{e}</button>
-              ))}
-            </div>
+            {/* ⚠️ 이모지 줄은 오너 지시(2026-09-17 "밑에 이모지 빼줘")로 숨긴다.
+                addEmoji·EMOJIS·합성 코드(kind:"emoji")는 그대로라 되살릴 땐 이 블록만 풀면 된다.
+                그림 스티커도 같은 이유로 숨겨져 있다(위 주석 참고). */}
             {sel && <div style={ES.stickerHint}>{t("edit.sticker.hint")}</div>}
           </div>
         )}
