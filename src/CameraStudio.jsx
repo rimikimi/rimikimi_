@@ -44,7 +44,9 @@ export default function CameraStudio({ initialPresetKey = "none", onShot, onClos
   const swipeRef = useRef(null);
 
   const [presetKey, setPresetKey] = useState(initialPresetKey);
-  const [facing, setFacing] = useState("user");
+  // 기본은 **후면** 카메라(오너 지시 2026-09-17). 전환 버튼으로 전면으로 바꿀 수 있다.
+  // 전면일 때만 미리보기·저장본을 좌우 반전한다(아래 facing === "user" 분기).
+  const [facing, setFacing] = useState("environment");
   const [ready, setReady] = useState(false);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
