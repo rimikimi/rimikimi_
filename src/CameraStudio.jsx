@@ -20,7 +20,16 @@ import { isNative, isRimikimiWebView } from "./nativeBridge";
 import * as hap from "./haptics";
 
 const GRAIN_SEED = 7;          // PhotoEditor 와 같은 시드 — 미리보기/결과의 그레인이 같다
-const PREVIEW_STEPS = [640, 480, 360]; // 미리보기 긴 변 후보 (느리면 아래로)
+// 미리보기 긴 변 후보 (느리면 아래로).
+// ⚠️ 예전엔 [640,480,360] 이었다 — 요즘 폰 화면(가로 1200px+)에 640 캔버스를 늘려 그리니
+//    **미리보기가 뭉개져 보였다**(오너 지적 2026-09-17). 화면 실크기 × DPR 을 기준으로 잡고,
+//    느린 기기는 기존처럼 자동으로 한 단계씩 내려간다(SLOW_MS).
+const PREVIEW_STEPS = (() => {
+  const dpr = Math.min(typeof devicePixelRatio === "number" ? devicePixelRatio : 1, 3);
+  const cssLong = Math.min(Math.max(typeof innerHeight === "number" ? innerHeight : 800, 640), 1000);
+  const top = Math.round(Math.min(cssLong * dpr, 1440) / 20) * 20; // 20px 단위로 정리
+  return [top, Math.round(top * 0.75), Math.round(top * 0.56), 480, 360];
+})();
 const SLOW_MS = 42;            // 프레임 처리 시간이 이걸 넘으면 한 단계 낮춘다
 const ASPECT = 3 / 4;          // 앱 결과물과 같은 3:4
 
@@ -232,15 +241,26 @@ export default function CameraStudio({ initialPresetKey = "none", onShot, onClos
     <div style={CS.root}>
       <style>{CS_CSS}</style>
 
-      <div style={CS.top}>
-        <button style={CS.iconBtn} onClick={() => { hap.tap(); onClose && onClose(); }} aria-label={t("common.close")}>✕</button>
-        <div style={CS.topTitle}>{t("camera.title")}</div>
+      {/* 2.0 네이티브 웹뷰 안에서는 껍데기가 이미 "닫기 · 카메라" 상단바를 그린다 —
+          여기서 또 그리면 **헤더가 두 줄로 겹친다**(오너 지적 2026-09-17).
+          그때는 상단바를 접고, 꼭 필요한 전/후면 전환만 미리보기 위에 띄운다. */}
+      {isRimikimiWebView() ? (
         <button
-          style={CS.iconBtn}
+          style={CS.flipFloating}
           onClick={() => { hap.tap(); setFacing((f) => (f === "user" ? "environment" : "user")); }}
           aria-label={t("camera.flip")}
         >⟳</button>
-      </div>
+      ) : (
+        <div style={CS.top}>
+          <button style={CS.iconBtn} onClick={() => { hap.tap(); onClose && onClose(); }} aria-label={t("common.close")}>✕</button>
+          <div style={CS.topTitle}>{t("camera.title")}</div>
+          <button
+            style={CS.iconBtn}
+            onClick={() => { hap.tap(); setFacing((f) => (f === "user" ? "environment" : "user")); }}
+            aria-label={t("camera.flip")}
+          >⟳</button>
+        </div>
+      )}
 
       <div
         style={CS.stage}
@@ -319,6 +339,12 @@ const CS = {
   iconBtn: {
     width: 44, height: 44, borderRadius: 22, border: "none", background: "transparent",
     color: "#fff", fontSize: 20, cursor: "pointer", lineHeight: 1,
+  },
+  // 네이티브 웹뷰에선 상단바를 접으므로 전환 버튼만 미리보기 위에 띄운다.
+  flipFloating: {
+    position: "absolute", top: "calc(env(safe-area-inset-top, 0px) + 10px)", right: 12, zIndex: 5,
+    width: 40, height: 40, borderRadius: 20, border: "none",
+    background: "rgba(0,0,0,0.45)", color: "#fff", fontSize: 19, lineHeight: 1, cursor: "pointer",
   },
   stage: { flex: 1, minHeight: 0, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 12px" },
   frame: {
