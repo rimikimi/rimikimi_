@@ -19,6 +19,7 @@ import { FILM_PRESETS, presetByKey, applyLook, applyLookWithStrength } from "./f
 import { isNative, nativeSaveToAlbum } from "./nativeBridge";
 import { shareImage } from "./share";
 import { t, getLang } from "./i18n";
+import { supabase } from "./supabaseClient";
 import * as hap from "./haptics";
 
 const PREVIEW_MAX = 1080; // 미리보기 긴 변
@@ -179,7 +180,10 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
   const [idx, setIdx] = useState(0);
   const [ready, setReady] = useState(false);
   const [loadErr, setLoadErr] = useState(false);
-  const [tab, setTab] = useState("filter"); // filter | fx | sticker
+  const [tab, setTab] = useState("filter"); // filter | fx | fit | sticker
+  // 정방향 맞춤(SPEC §3) — 3:4 가 아니면 잘라 맞춤(무료) / 채워 맞춤(서버, 1크레딧).
+  const [fitBusy, setFitBusy] = useState("");   // "" | "crop" | "outpaint"
+  const [fitErr, setFitErr] = useState("");
   const [presetKey, setPresetKey] = useState(initialPresetKey);
   const [fx, setFx] = useState(() => fxOf(presetByKey(initialPresetKey)));
   const [chipGroup, setChipGroup] = useState(() => presetByKey(initialPresetKey).group || "film");
@@ -243,6 +247,12 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
   const revokeRef = useRef(null);
   const canvasRef = useRef(null);
   const baseRef = useRef(null);      // 활성 사진의 미리보기 ImageData
+  // 드래그 중에 쓸 **저해상도** base — 슬라이더를 움직일 때마다 1080px 전체에 applyLook 을
+  // 돌리면 한 번이 수십~수백 ms 라 rAF 로 합쳐도 버벅인다(오너 지적 2026-09-17).
+  // 드래그 중엔 이걸로 그리고(캔버스가 CSS 로 늘어나 살짝 무를 뿐), 손을 떼면 원본 품질로 다시 그린다.
+  const baseSmallRef = useRef(null);
+  const draggingRef = useRef(false);
+  const settleRef = useRef(0);
   const thumbRef = useRef(null);     // 칩 썸네일용 작은 ImageData
   // 사진 전환이 즉각이도록 최근 3장의 디코드 결과를 캐시 (10장 전부 들고 있으면
   // 2K 기준 200MB+ 라 iOS 웹뷰가 위험하다)
@@ -308,6 +318,7 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
         if (dead) return;
         fullImgRef.current = e.img;
         baseRef.current = e.base;
+        baseSmallRef.current = makeSmallBase(e.base);
         thumbRef.current = e.thumb;
         setReady(true);
       } catch (_) {
@@ -327,11 +338,33 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
   // 라이트룸/VSCO 의 press-to-compare 관례 그대로: 누르면 원본, 떼면 보정본.
   const [peeking, setPeeking] = useState(false);
 
+  /* ---------- 드래그용 저해상도 base ---------- */
+  // 긴 변 ~460px. 픽셀 수가 1/5 이하로 줄어 applyLook 이 그만큼 빨라진다.
+  function makeSmallBase(base) {
+    try {
+      const long = Math.max(base.width, base.height);
+      if (long <= 520) return base;
+      const k = 460 / long;
+      const sw = Math.max(1, Math.round(base.width * k));
+      const sh = Math.max(1, Math.round(base.height * k));
+      const a = document.createElement("canvas");
+      a.width = base.width; a.height = base.height;
+      a.getContext("2d").putImageData(base, 0, 0);
+      const b = document.createElement("canvas");
+      b.width = sw; b.height = sh;
+      const bc = b.getContext("2d", { willReadFrequently: true });
+      bc.drawImage(a, 0, 0, sw, sh);
+      return bc.getImageData(0, 0, sw, sh);
+    } catch (_) { return base; }
+  }
+
   /* ---------- 미리보기 렌더 (rAF 로 합침) ---------- */
   const renderPreview = useCallback(() => {
     cancelAnimationFrame(rafRef.current);
     rafRef.current = requestAnimationFrame(() => {
-      const base = baseRef.current, canvas = canvasRef.current;
+      const canvas = canvasRef.current;
+      // 드래그 중엔 저해상도로 — 손 떼면 아래 settle 타이머가 원본 품질로 다시 그린다.
+      const base = (draggingRef.current && baseSmallRef.current) || baseRef.current;
       if (!base || !canvas) return;
       const { width: w, height: h } = base;
       if (canvas.width !== w) { canvas.width = w; canvas.height = h; }
@@ -348,6 +381,101 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
   }, [presetKey, fx, dateStyle, peeking, strength]);
 
   useEffect(() => { if (ready) renderPreview(); }, [ready, renderPreview, idx]);
+
+  // 슬라이더 조작 중 표시 — 마지막 입력 후 140ms 지나면 원본 품질로 다시 그린다.
+  const beginDrag = useCallback(() => {
+    draggingRef.current = true;
+    clearTimeout(settleRef.current);
+  }, []);
+  const endDragSoon = useCallback(() => {
+    clearTimeout(settleRef.current);
+    settleRef.current = setTimeout(() => {
+      draggingRef.current = false;
+      renderPreview();
+    }, 140);
+  }, [renderPreview]);
+  useEffect(() => () => clearTimeout(settleRef.current), []);
+
+
+  /* ---------- 정방향 맞춤 (SPEC §3) ----------
+     잘라 맞춤 = 기기 안에서 3:4 중앙 크롭(무료). 얼굴 인식은 없다 — 가운데·위쪽 가중.
+     채워 맞춤 = 서버 `/api/generate {fit:"outpaint"}` (1크레딧). 원본 픽셀은 그대로 두고
+     바깥만 새로 그린다(서버가 결과 위에 원본을 다시 합성하므로 인물 재생성 불가). */
+  function isThreeFour() {
+    const b = baseRef.current;
+    if (!b) return true;
+    return Math.abs(b.width / b.height - 0.75) < 0.02;
+  }
+
+  // 편집기 상태를 새 이미지로 갈아끼운다(맞춤 결과 반영).
+  async function replaceWithDataUrl(dataUrl) {
+    const img = new Image();
+    await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = dataUrl; });
+    const long = Math.max(img.width, img.height);
+    const k = long > 1080 ? 1080 / long : 1;
+    const w = Math.round(img.width * k), h = Math.round(img.height * k);
+    const c = document.createElement("canvas");
+    c.width = w; c.height = h;
+    const ctx = c.getContext("2d", { willReadFrequently: true });
+    ctx.drawImage(img, 0, 0, w, h);
+    fullImgRef.current = img;
+    baseRef.current = ctx.getImageData(0, 0, w, h);
+    baseSmallRef.current = makeSmallBase(baseRef.current);
+    renderPreview();
+  }
+
+  async function doCropFit() {
+    const img = fullImgRef.current;
+    if (!img || fitBusy) return;
+    setFitErr(""); setFitBusy("crop"); hap.tap();
+    try {
+      const target = 0.75; // 3:4
+      let sw = img.width, sh = img.height, sx = 0, sy = 0;
+      if (img.width / img.height > target) {      // 가로로 넓다 → 좌우를 자른다
+        sw = Math.round(img.height * target);
+        sx = Math.round((img.width - sw) / 2);
+      } else {                                     // 세로로 길다 → 위아래를 자른다
+        sh = Math.round(img.width / target);
+        sy = Math.round((img.height - sh) * 0.35); // 얼굴은 보통 위쪽 — 위를 조금 더 남긴다
+      }
+      const c = document.createElement("canvas");
+      c.width = sw; c.height = sh;
+      c.getContext("2d").drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+      await replaceWithDataUrl(c.toDataURL("image/jpeg", 0.95));
+    } catch (_) {
+      setFitErr("잘라 맞춤에 실패했어요. 다시 시도해 주세요.");
+    } finally { setFitBusy(""); }
+  }
+
+  async function doOutpaintFit() {
+    const img = fullImgRef.current;
+    if (!img || fitBusy) return;
+    setFitErr(""); setFitBusy("outpaint"); hap.tap();
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data?.session?.access_token;
+      if (!token) { setFitErr("로그인이 필요해요."); return; }
+      const c = document.createElement("canvas");
+      const long = Math.min(1600, Math.max(img.width, img.height));
+      const k = long / Math.max(img.width, img.height);
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      const b64 = c.toDataURL("image/jpeg", 0.92).split(",")[1];
+      const r = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+        body: JSON.stringify({ fit: "outpaint", mimeType: "image/jpeg", base64: b64 }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j?.base64) {
+        setFitErr(j?.error || "채워 맞춤을 하지 못했어요. 크레딧은 차감되지 않았어요 🙂");
+        return;
+      }
+      await replaceWithDataUrl(`data:${j.mimeType || "image/jpeg"};base64,${j.base64}`);
+    } catch (_) {
+      setFitErr("채워 맞춤을 하지 못했어요. 크레딧은 차감되지 않았어요 🙂");
+    } finally { setFitBusy(""); }
+  }
 
   /* ---------- 필터 칩 썸네일 ---------- */
   // 각 칩의 <canvas> 가 마운트될 때 한 번 그린다 (프리셋당 64px — 순간).
@@ -681,6 +809,7 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
           {[
             ["filter", t("edit.tab.filter")],
             ["fx", t("edit.tab.fx")],
+            ["fit", "정방향"],
           ].map(([k, label]) => (
             <button
               key={k}
@@ -739,11 +868,35 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
                   type="range" min="0" max="100"
                   value={Math.round(strength * 100)}
                   onChange={(e) => updateLook({ strength: Number(e.target.value) / 100 })}
+                  onPointerDown={beginDrag}
+                  onPointerUp={endDragSoon}
+                  onPointerCancel={endDragSoon}
+                  onTouchStart={beginDrag}
+                  onTouchEnd={endDragSoon}
                   style={{ width: "100%" }}
                 />
               </div>
             )}
           </>
+        )}
+
+        {tab === "fit" && (
+          <div style={ES.fitCol}>
+            <div style={ES.fitHint}>
+              {isThreeFour() ? "이미 3:4 예요. 맞출 게 없어요." :
+               "이 사진은 3:4 가 아니에요. 잘라서 맞추거나, 바깥을 채워서 맞출 수 있어요."}
+            </div>
+            <button style={ES.fitBtn} disabled={isThreeFour() || !!fitBusy} onClick={doCropFit}>
+              {fitBusy === "crop" ? "맞추는 중…" : "잘라 맞춤 · 무료"}
+            </button>
+            <button style={ES.fitBtnGhost} disabled={isThreeFour() || !!fitBusy} onClick={doOutpaintFit}>
+              {fitBusy === "outpaint" ? "채우는 중…" : "채워 맞춤 · 1 크레딧"}
+            </button>
+            {fitErr && <div style={ES.fitErr}>{fitErr}</div>}
+            <div style={ES.fitNote}>
+              잘라 맞춤은 기기 안에서 처리돼요. 채워 맞춤은 원본은 그대로 두고 바깥만 새로 그려요.
+            </div>
+          </div>
         )}
 
         {tab === "fx" && (
@@ -763,6 +916,11 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
                   type="range" min="0" max="100"
                   value={Math.round(fx[k] * 100)}
                   onChange={(e) => updateLook({ fx: { ...fx, [k]: Number(e.target.value) / 100 } })}
+                  onPointerDown={beginDrag}
+                  onPointerUp={endDragSoon}
+                  onPointerCancel={endDragSoon}
+                  onTouchStart={beginDrag}
+                  onTouchEnd={endDragSoon}
                   style={ES.fxSlider}
                 />
                 <span style={ES.fxVal}>{Math.round(fx[k] * 100)}</span>
@@ -910,6 +1068,18 @@ const ES = {
     display: "inline-flex", gap: 2, margin: "0 16px 12px", padding: 3,
     background: "rgba(255,255,255,.07)", borderRadius: 13, alignSelf: "flex-start",
   },
+  fitCol: { padding: "12px 18px 4px", display: "flex", flexDirection: "column", gap: 10 },
+  fitHint: { fontSize: 13.5, lineHeight: 1.5, color: "rgba(255,255,255,0.8)" },
+  fitBtn: {
+    height: 46, borderRadius: 12, border: "none", background: "#E6403C", color: "#fff",
+    fontSize: 15, fontWeight: 700, cursor: "pointer",
+  },
+  fitBtnGhost: {
+    height: 46, borderRadius: 12, border: "1px solid rgba(255,255,255,0.28)",
+    background: "transparent", color: "#fff", fontSize: 15, fontWeight: 600, cursor: "pointer",
+  },
+  fitErr: { fontSize: 13, color: "#ff9b96", lineHeight: 1.5 },
+  fitNote: { fontSize: 11.5, color: "rgba(255,255,255,0.45)", lineHeight: 1.5 },
   tabBtn: {
     border: "none", borderRadius: 10, padding: "7px 16px", fontSize: 13, fontWeight: 800,
     background: "transparent", color: "rgba(255,255,255,.5)", cursor: "pointer",
