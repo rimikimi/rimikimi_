@@ -649,6 +649,26 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
     if (safeRef.current) safeRef.current.style.opacity = on ? "1" : "0";
   }
 
+  /** 사진 아무 데나 짚은 두 번째 손가락을 진행 중인 겹 제스처에 합류시킨다.
+   *  합류시켰으면 true — 그 경우 캔버스 본래 동작(원본 비교·탭해서 문구 만들기)은 건너뛴다.
+   *  (글자 상자가 작아 두 손가락을 다 얹을 수 없어서 크기·회전이 사실상 불가능했다) */
+  function joinPinch(ev) {
+    const d = dragRef.current;
+    if (!d || d.pointers.size !== 1 || d.pointers.has(ev.pointerId)) return false;
+    if (canvasTapRef.current?.timer) window.clearTimeout(canvasTapRef.current.timer);
+    canvasTapRef.current = null;
+    d.pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    const [a, b] = [...d.pointers.values()];
+    d.baseDist = Math.hypot(a.x - b.x, a.y - b.y);
+    d.baseAng = (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI;
+    // 지금까지 끌어 놓은 값을 기준으로 삼는다(안 그러면 두 번째 손가락을 대는 순간 튄다)
+    if (d.live) d.start = { ...d.start, scale: d.live.scale, rot: d.live.rot };
+    d.movedPx = 999;                       // 크기 조절은 "탭"이 아니다
+    // 캡처가 실패해도 제스처는 계속돼야 한다 — 여기서 예외가 나면 핸들러가 통째로 죽는다.
+    try { ev.currentTarget.setPointerCapture?.(ev.pointerId); } catch (_) {}
+    return true;
+  }
+
   // 드래그(1손가락) / 핀치 크기·회전(2손가락). 포인터 이벤트로 통일.
   function stickerPointerDown(ev, st) {
     ev.stopPropagation();
@@ -668,7 +688,7 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
       d.baseAng = (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI;
     }
     dragRef.current = d;
-    ev.currentTarget.setPointerCapture?.(ev.pointerId);
+    try { ev.currentTarget.setPointerCapture?.(ev.pointerId); } catch (_) {}
   }
   // 드래그 중엔 React state 를 건드리지 않는다(모션 리뷰). 매 pointermove 마다 setStickers 로
   // left/top(%) 을 바꾸면 레이아웃→페인트→합성이 프레임마다 돌고 stickers.map 재렌더까지
@@ -971,6 +991,9 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
               // 겹이 선택돼 있을 땐 탭이 먼저 '선택 해제'로 쓰인다.
               onPointerDown={(e) => {
                 e.preventDefault();
+                // 두 번째 손가락은 **사진 아무 데나** 짚어도 크기·회전에 합류시킨다.
+                // 글자 상자는 작아서 두 손가락을 다 얹을 수 없다 — 인스타도 캔버스 아무 데나 짚는다.
+                if (joinPinch(e)) return;
                 // ⚠️ 여기서 바로 setPeeking(true) 하면 **겹이 전부 사라진다**(아래 목록이
                 //    !peeking 일 때만 그려진다). 글자 가장자리를 살짝 빗맞혀 눌러도 그 순간
                 //    끌려던 글자가 없어져서 "옮겨지지 않는다"가 된다(2026-09-17 실기 지적).
@@ -979,7 +1002,11 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
                 tap.timer = window.setTimeout(() => setPeeking(true), 320);
                 canvasTapRef.current = tap;
               }}
+              onPointerMove={(e) => {
+                if (dragRef.current?.pointers.has(e.pointerId)) stickerPointerMove(e);
+              }}
               onPointerUp={(e) => {
+                if (dragRef.current?.pointers.has(e.pointerId)) { stickerPointerUp(e); return; }
                 const s = canvasTapRef.current;
                 if (s?.timer) window.clearTimeout(s.timer);
                 setPeeking(false);
@@ -990,8 +1017,16 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
                 if (s.hadSel) return;                                     // 선택 해제만
                 openTextAt(e.clientX, e.clientY);
               }}
-              onPointerCancel={() => { if (canvasTapRef.current?.timer) window.clearTimeout(canvasTapRef.current.timer); setPeeking(false); canvasTapRef.current = null; }}
-              onPointerLeave={() => { if (canvasTapRef.current?.timer) window.clearTimeout(canvasTapRef.current.timer); setPeeking(false); canvasTapRef.current = null; }}
+              onPointerCancel={(e) => {
+                if (dragRef.current?.pointers.has(e.pointerId)) { stickerPointerUp(e); return; }
+                if (canvasTapRef.current?.timer) window.clearTimeout(canvasTapRef.current.timer);
+                setPeeking(false); canvasTapRef.current = null;
+              }}
+              onPointerLeave={(e) => {
+                if (dragRef.current?.pointers.has(e.pointerId)) return;   // 제스처 중이면 건드리지 않는다
+                if (canvasTapRef.current?.timer) window.clearTimeout(canvasTapRef.current.timer);
+                setPeeking(false); canvasTapRef.current = null;
+              }}
             />
             {/* 드래그 중 보조선 — 가운데 정렬 가이드 + 안전영역 (인스타와 같은 안내) */}
             <div ref={safeRef} style={ES.safeBox} />
@@ -1301,8 +1336,15 @@ const ES = {
     justifyContent: "center", cursor: "pointer", padding: 0,
   },
   sticker: {
-    position: "absolute", lineHeight: 1, userSelect: "none", touchAction: "none",
+    position: "absolute", lineHeight: 1, touchAction: "none",
     cursor: "grab", padding: 4,
+    // ⚠️ iOS(WKWebView)에서 겹을 끌거나 두 손가락으로 키울 수 없던 원인 (2026-09-17 실기).
+    //    `user-select: none` 만으로는 사파리가 **글자 선택**을 막지 않는다. 텍스트 겹을
+    //    누르는 순간 선택·돋보기(callout)가 시작되면서 브라우저가 pointercancel 을 던져
+    //    제스처가 통째로 끊긴다. 캔버스에는 이 세 줄이 있었는데 겹에는 빠져 있었다.
+    //    (스티커가 그림이던 시절엔 안 났고, 겹이 글자가 되면서 드러났다.)
+    userSelect: "none", WebkitUserSelect: "none",
+    WebkitTouchCallout: "none", WebkitUserDrag: "none",
   },
   // 선택 표시는 outline 만 — borderRadius 를 여기서 덮으면 텍스트 배경 박스 모서리가 망가진다
   stickerSel: { outline: "1.5px dashed rgba(255,255,255,.85)", outlineOffset: 3 },
