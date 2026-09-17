@@ -21,7 +21,10 @@ import { shareImage } from "./share";
 import { t, getLang } from "./i18n";
 import { supabase } from "./supabaseClient";
 import { STICKER_SETS, stickerById } from "./stickerAssets";
-import TextComposer, { TEXT_FONTS, fontOf, fontFamilyOf, contrastInk, loadFont } from "./TextComposer";
+// 텍스트 겹의 "생김새"는 전부 TextComposer 가 소유한다 —
+// 화면 CSS(textLayerStyle)와 저장 합성(drawTextLayer)이 **같은 파일에 나란히** 있어야
+// 한쪽만 고쳐서 화면≠저장본이 되는 사고가 안 난다(오너가 두 번 지적한 그 문제).
+import TextComposer, { TEXT_MAXW, textLayerStyle, drawTextLayer, ensureTextFonts } from "./TextComposer";
 import * as hap from "./haptics";
 
 const PREVIEW_MAX = 1080; // 미리보기 긴 변
@@ -145,7 +148,6 @@ function drawSticker(ctx, st, w, h) {
   ctx.save();
   ctx.translate(st.x * w, st.y * h);
   ctx.rotate((st.rot * Math.PI) / 180);
-  ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   if (st.kind === "img") {
     // 직접 그린 SVG 스티커. drawImage 는 동기라 미리 디코드된 것만 그린다
@@ -160,33 +162,13 @@ function drawSticker(ctx, st, w, h) {
     return;
   }
   if (st.kind === "text") {
-    const f = fontOf(st.font);
-    ctx.font = `${f.weight} ${px}px ${fontFamilyOf(st.font)}`;
-    const bg = st.bg || "none";
-    if (bg !== "none") {
-      // 배경 박스 — 화면(LayerBody)과 같은 비율로 그린다.
-      const tw = ctx.measureText(st.value).width;
-      const padX = px * 0.28, padY = px * 0.12;
-      const bw = tw + padX * 2, bh = px * 1.2 + padY * 2;
-      ctx.save();
-      ctx.globalAlpha = bg === "soft" ? 0.55 : 1;
-      ctx.fillStyle = st.color;
-      const r = px * 0.22;
-      ctx.beginPath();
-      ctx.roundRect(-bw / 2, -bh / 2, bw, bh, r);
-      ctx.fill();
-      ctx.restore();
-      ctx.fillStyle = contrastInk(st.color);
-    } else {
-      ctx.shadowColor = "rgba(0,0,0,0.35)";
-      ctx.shadowBlur = px * 0.12;
-      ctx.fillStyle = st.color;
-    }
-    ctx.fillText(st.value, 0, 0);
-  } else {
-    ctx.font = `${px}px "Apple Color Emoji", "Noto Color Emoji", sans-serif`;
-    ctx.fillText(st.value, 0, 0);
+    drawTextLayer(ctx, st, px, w);
+    ctx.restore();
+    return;
   }
+  ctx.textAlign = "center";
+  ctx.font = `${px}px "Apple Color Emoji", "Noto Color Emoji", sans-serif`;
+  ctx.fillText(st.value, 0, 0);
   ctx.restore();
 }
 
@@ -301,6 +283,13 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
   const dragRef = useRef(null);      // 스티커 드래그/핀치 상태
   const stickerElRef = useRef(new Map()); // id → DOM (드래그 중 transform 직접 갱신용)
   const overlayRef = useRef(null);   // 닫을 때 150ms 페이드아웃(WAAPI)
+  // 아래 셋은 드래그 중에만 보이는 보조 UI. 전부 **ref 로 직접 style 을 만진다** —
+  // state 로 두면 매 pointermove 마다 리렌더가 돌아 2K 캔버스 위에서 끊긴다(기존 원칙).
+  const canvasTapRef = useRef(null); // 캔버스 탭 판정(짧게=문구 만들기 / 길게=원본 비교)
+  const trashRef = useRef(null);     // 인스타식 휴지통 (아래로 끌어서 삭제)
+  const guideVRef = useRef(null);    // 세로 중앙 가이드
+  const guideHRef = useRef(null);    // 가로 중앙 가이드
+  const safeRef = useRef(null);      // 안전영역 표시
   // 스티커 크기는 "이미지 폭 대비 비율"이라 화면상 픽셀 크기는 래퍼 실폭에서 계산한다.
   // (cqw 컨테이너 쿼리 단위는 iOS 16 미만 웹뷰가 몰라서 실측으로 간다)
   const [wrapW, setWrapW] = useState(0);
@@ -552,24 +541,93 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
     setSelId(st.id);
   }
 
-  /** 컴포저 완료 — 새로 만들거나, 고르던 겹을 갱신한다. */
+  /** 컴포저 완료 — 새로 만들거나, 고르던 겹을 갱신한다.
+   *  새 겹은 **탭한 자리**(composing.x/y)에 생긴다 — 인스타처럼. 없으면 한가운데. */
   function commitText(out) {
-    const editingId = composing && composing.id;
+    const at = composing || {};
+    const editingId = at.id;
     setComposing(null);
     if (!out) return;
     if (editingId != null) {
       setStickers((p) => p.map((s0) => (s0.id === editingId ? { ...s0, ...out } : s0)));
       return;
     }
-    const st = { id: stickerSeq++, kind: "text", ...out, x: 0.5, y: 0.5, rot: 0 };
+    const st = {
+      id: stickerSeq++, kind: "text", ...out,
+      x: typeof at.x === "number" ? at.x : 0.5,
+      y: typeof at.y === "number" ? at.y : 0.5,
+      rot: 0,
+    };
     setStickers((p) => [...p, st]);
     setSelId(st.id);
   }
+
+  /** 사진 위 한 점(화면 좌표)을 탭 → 그 자리에 문구를 만든다 (인스타 진입 방식). */
+  function openTextAt(clientX, clientY) {
+    const wrap = wrapRef.current;
+    if (!wrap) { setComposing({}); return; }
+    const r = wrap.getBoundingClientRect();
+    const cl = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+    hap.tap();
+    setComposing({
+      x: cl((clientX - r.left) / r.width, 0.08, 0.92),
+      // 아래쪽 끝은 키보드에 가려 안 보인다 — 만들 때만 살짝 위로 물린다(옮기는 건 자유)
+      y: cl((clientY - r.top) / r.height, 0.08, 0.85),
+    });
+  }
+
+  /** 스포이드용 — 화면 좌표의 **보이는 픽셀**(필터까지 먹은 색)을 뽑아준다.
+   *  캔버스가 same-origin(원격 이미지도 fetch→blob 으로 받는다)이라 getImageData 가 된다.
+   *  브라우저 EyeDropper API 는 iOS WKWebView 에 없어서 쓸 수 없다. */
+  const pickColorAt = useCallback((clientX, clientY) => {
+    const cv = canvasRef.current, wrap = wrapRef.current;
+    if (!cv || !wrap) return null;
+    const r = wrap.getBoundingClientRect();
+    const u = (clientX - r.left) / r.width, v = (clientY - r.top) / r.height;
+    if (u < 0 || u > 1 || v < 0 || v > 1) return null;
+    try {
+      const x = Math.min(cv.width - 1, Math.max(0, Math.round(u * cv.width)));
+      const y = Math.min(cv.height - 1, Math.max(0, Math.round(v * cv.height)));
+      const d = cv.getContext("2d").getImageData(x, y, 1, 1).data;
+      return "#" + [d[0], d[1], d[2]].map((n) => n.toString(16).padStart(2, "0")).join("");
+    } catch (_) { return null; }
+  }, []);
 
   function removeSticker(id) {
     hap.light();
     setStickers((p) => p.filter((s) => s.id !== id));
     setSelId((cur) => (cur === id ? null : cur));
+  }
+
+  /* ---------- 드래그 중 보조 UI (휴지통 · 중앙 가이드 · 안전영역) ---------- */
+  function showTrash(on) {
+    const el = trashRef.current;
+    if (!el) return;
+    el.style.opacity = on ? "1" : "0";
+    el.style.transform = on ? "translate(-50%,0) scale(1)" : "translate(-50%,14px) scale(.9)";
+    if (!on) el.style.background = "rgba(0,0,0,.55)";
+    // 끄는 동안엔 겹이 사진 밖으로 나가도 잘리지 않게 한다 — 안 그러면 휴지통까지 가기 전에
+    // 사진 아래 모서리에서 글자가 사라져 버린다(인스타는 손끝을 끝까지 따라온다).
+    if (wrapRef.current) wrapRef.current.style.overflow = on ? "visible" : "hidden";
+  }
+  function setTrashHot(hot) {
+    const el = trashRef.current;
+    if (!el) return;
+    el.style.background = hot ? "#E6403C" : "rgba(0,0,0,.55)";
+    el.style.transform = hot ? "translate(-50%,0) scale(1.2)" : "translate(-50%,0) scale(1)";
+  }
+  function overTrash(x, y) {
+    const el = trashRef.current;
+    if (!el) return false;
+    const r = el.getBoundingClientRect();
+    return Math.hypot(x - (r.left + r.width / 2), y - (r.top + r.height / 2)) < 64;
+  }
+  function showGuides(v, h) {
+    if (guideVRef.current) guideVRef.current.style.opacity = v ? "1" : "0";
+    if (guideHRef.current) guideHRef.current.style.opacity = h ? "1" : "0";
+  }
+  function showSafe(on) {
+    if (safeRef.current) safeRef.current.style.opacity = on ? "1" : "0";
   }
 
   // 드래그(1손가락) / 핀치 크기·회전(2손가락). 포인터 이벤트로 통일.
@@ -583,6 +641,8 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
     d.pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
     d.rect = rect;
     d.start = { x: st.x, y: st.y, scale: st.scale, rot: st.rot };
+    // "탭인가 드래그인가" 판정용 — 탭이면 다시 편집(인스타처럼 키보드가 올라온다)
+    if (d.downT == null) { d.downT = Date.now(); d.movedPx = 0; }
     if (d.pointers.size === 2) {
       const [a, b] = [...d.pointers.values()];
       d.baseDist = Math.hypot(a.x - b.x, a.y - b.y);
@@ -595,12 +655,20 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
   // left/top(%) 을 바꾸면 레이아웃→페인트→합성이 프레임마다 돌고 stickers.map 재렌더까지
   // 얹혀 2K 캔버스 위에서 끊겼다. 이제 이동·핀치는 엘리먼트의 transform 만 직접 바꾸고
   // (합성 전용), 손을 뗄 때 한 번만 state 에 커밋한다. 좌표 체계(0..1 비율)는 그대로.
+  // 겹의 "평상시" transform. 렌더와 **글자 하나까지 같은 문자열**이어야 한다.
+  // ⚠️ 드래그가 끝날 때 el.style.transform = "" 로 지우면 안 된다(실측으로 잡은 버그):
+  //    React 는 이전 렌더와 transform 값이 같으면 DOM 에 다시 쓰지 않는다. 우리가 지워버린
+  //    채로 남아서, 손을 뗀 겹이 제 크기의 절반만큼 오른쪽·아래로 어긋나 보인다
+  //    (저장본은 st.x/st.y 로 바르게 찍히므로 "화면과 저장본이 다른" 그 현상이 된다).
+  const layerTransform = (rot) => `translate(-50%,-50%) rotate(${rot}deg)`;
+
   function paintStickerLive(d) {
     const el = stickerElRef.current.get(d.id);
     if (!el || !d.live) return;
     const offX = (d.live.x - d.start.x) * d.rect.width;
     const offY = (d.live.y - d.start.y) * d.rect.height;
-    const k = d.live.scale / d.start.scale;
+    // 휴지통에 가까워질수록 겹이 줄어든다(인스타와 같은 신호). 사진 밖으로 잘려 나가는 것도 같이 줄어든다.
+    const k = (d.live.scale / d.start.scale) * (d.trashK ?? 1);
     el.style.transform =
       `translate(${offX}px, ${offY}px) translate(-50%,-50%) rotate(${d.live.rot}deg) scale(${k})`;
   }
@@ -610,13 +678,41 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
     ev.preventDefault();
     const prev = d.pointers.get(ev.pointerId);
     d.pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    d.movedPx = (d.movedPx || 0) + Math.abs(ev.clientX - prev.x) + Math.abs(ev.clientY - prev.y);
     if (!d.live) d.live = { ...d.start };
     if (d.pointers.size === 1) {
       const dx = (ev.clientX - prev.x) / d.rect.width;
       const dy = (ev.clientY - prev.y) / d.rect.height;
       d.live.x = Math.min(1.05, Math.max(-0.05, d.live.x + dx));
       d.live.y = Math.min(1.05, Math.max(-0.05, d.live.y + dy));
+      // 가운데 정렬 가이드 — 임계 안에 들면 붙여주고 선을 보여준다(인스타의 파란 선)
+      const snapV = Math.abs(d.live.x - 0.5) < 0.015;
+      const snapH = Math.abs(d.live.y - 0.5) < 0.015;
+      if (snapV) d.live.x = 0.5;
+      if (snapH) d.live.y = 0.5;
+      if (snapV !== d.snapV || snapH !== d.snapH) {
+        if (snapV || snapH) hap.light();   // 붙는 순간에만 아주 약하게
+        d.snapV = snapV; d.snapH = snapH;
+        showGuides(snapV, snapH);
+      }
+      showSafe(true);
+      // 아래로 끌어 휴지통에 버리기 (한 번만 띄운다 — 매 프레임 띄우면 hover 확대가 지워진다)
+      if ((d.movedPx || 0) > 8) {
+        if (!d.trashShown) { d.trashShown = true; showTrash(true); }
+        const hot = overTrash(ev.clientX, ev.clientY);
+        if (hot !== d.overTrash) { if (hot) hap.light(); d.overTrash = hot; setTrashHot(hot); }
+        // 휴지통까지 남은 거리로 겹을 줄인다 (160px 밖=1.0 → 휴지통 위=0.5)
+        const tr = trashRef.current?.getBoundingClientRect();
+        if (tr) {
+          const dist = Math.hypot(ev.clientX - (tr.left + tr.width / 2), ev.clientY - (tr.top + tr.height / 2));
+          d.trashK = Math.max(0.5, Math.min(1, 0.5 + ((dist - 56) / 160) * 0.5));
+        }
+      }
     } else if (d.pointers.size === 2 && d.baseDist) {
+      // 두 손가락(크기·회전) 중엔 삭제 제스처가 아니다 — 휴지통을 감춘다
+      if (d.overTrash) { d.overTrash = false; setTrashHot(false); }
+      if (d.trashShown) { d.trashShown = false; showTrash(false); }
+      d.trashK = 1;
       const [a, b] = [...d.pointers.values()];
       const dist = Math.hypot(a.x - b.x, a.y - b.y);
       const ang = (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI;
@@ -632,12 +728,23 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
     d.pointers.delete(ev.pointerId);
     if (d.pointers.size === 0) {
       dragRef.current = null;
-      if (d.live) {
+      showTrash(false); showGuides(false, false); showSafe(false);
+      const el = stickerElRef.current.get(d.id);
+      // 드래그용 임시 transform 을 "평상시" 값으로 되돌린다 (지우면 안 된다 — 위 주석 참고)
+      if (el) el.style.transform = layerTransform((d.live || d.start).rot);
+      // 휴지통 위에서 손을 떼면 삭제 (인스타의 텍스트·스티커 공통 삭제 제스처)
+      if (d.overTrash) { removeSticker(d.id); return; }
+      // 손가락 떨림(8px 미만·400ms 미만)은 이동이 아니라 **탭**이다 → 텍스트면 다시 편집.
+      // (인스타: 얹은 글자를 한 번 탭하면 키보드가 다시 올라온다)
+      const isTap = (d.movedPx || 0) < 8 && Date.now() - (d.downT || 0) < 400;
+      if (d.live && !isTap) {
         const live = d.live;
-        // 커밋: state 가 left/top/fontSize/rotate 를 다시 그리므로 임시 transform 은 지운다
-        const el = stickerElRef.current.get(d.id);
-        if (el) el.style.transform = "";
         setStickers((p) => p.map((s) => (s.id === d.id ? { ...s, ...live } : s)));
+        return;
+      }
+      if (isTap) {
+        const cur = (stickersByIdx[idx] || []).find((s) => s.id === d.id);
+        if (cur && cur.kind === "text") { hap.tap(); setComposing(cur); }
       }
     } else {
       // 손가락 하나가 남으면 남은 손가락 기준으로 이동을 이어간다 — 기준점을 현재 값으로 재설정
@@ -708,6 +815,8 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
     setBusy("save");
     try {
       await new Promise((r) => setTimeout(r, 30)); // busy 표시가 먼저 그려지게
+      // 합성 전에 글꼴 도착을 기다린다 — 안 그러면 저장본만 대체 글꼴로 찍힐 수 있다
+      await ensureTextFonts(Object.values(stickersByIdx).flat());
       let okAll = true;
       for (let i = 0; i < sources.length; i++) {
         if (multi) setSaveProg(`${i + 1}/${sources.length}`);
@@ -733,6 +842,7 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
     setBusy("share");
     try {
       await new Promise((r) => setTimeout(r, 30));
+      await ensureTextFonts(stickersByIdx[idx] || []);   // 저장과 같은 이유 (위 주석 참고)
       const data = await renderFullAt(idx, fullImgRef.current);
       const r = await shareImage({
         src: data,
@@ -769,18 +879,47 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
   return createPortal(
     <div style={ES.overlay} className="pe-in" ref={overlayRef}>
       <style>{PE_CSS}</style>
-      {composing && (
-        <TextComposer initial={composing.value ? composing : null} onDone={commitText} />
+      {/* 문구 입력은 **사진 위에서** 일어난다 — 컴포저가 wrapRef 의 화면 좌표에 맞춰 뜬다.
+          그래서 편집 중 크기·위치·줄바꿈이 확정 뒤와 완전히 같다(WYSIWYG). */}
+      {composing && ready && (
+        <TextComposer
+          at={composing}
+          wrapRef={wrapRef}
+          pickColorAt={pickColorAt}
+          onDone={commitText}
+        />
       )}
       {toast && <div style={ES.toast} className="pe-toast" onClick={() => setToast("")}>{toast}</div>}
 
-      {/* 상단 바 */}
-      <div style={ES.topBar}>
+      {/* 휴지통 — 겹을 끌면 나타나고, 그 위에서 손을 떼면 지워진다(인스타와 같은 삭제).
+          state 를 쓰지 않는다: 드래그 중 리렌더를 막으려고 ref 로 style 만 만진다. */}
+      {/* 아이콘은 이모지가 아니라 선화 SVG 다 — 이모지는 기기마다 그림이 달라지고 싸구려로 보인다. */}
+      <div ref={trashRef} style={ES.trash} aria-hidden="true">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+             stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M4 6.5h16" />
+          <path d="M9.5 6.5V5.2A1.2 1.2 0 0 1 10.7 4h2.6a1.2 1.2 0 0 1 1.2 1.2v1.3" />
+          <path d="M6.6 6.5l.8 12.1A1.5 1.5 0 0 0 8.9 20h6.2a1.5 1.5 0 0 0 1.5-1.4l.8-12.1" />
+          <path d="M10.4 10v6M13.6 10v6" />
+        </svg>
+      </div>
+
+      {/* 상단 바 — 문구를 치는 동안엔 감춘다(인스타처럼 화면 전체가 텍스트 편집이 된다).
+          ⚠️ display:none 이 아니라 visibility 다. 없애면 stage(flex:1)가 커지면서 사진 크기가
+             변하고, 글자 크기 기준(wrapW)이 바뀌어 "편집 중 크기 ≠ 얹힌 크기"로 되돌아간다. */}
+      <div style={{ ...ES.topBar, ...(composing ? ES.hidden : null) }}>
         <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
           <button style={ES.topBtn} onClick={closeEditor}>✕</button>
           <div style={ES.topTitle}>{t("edit.title")}</div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
+          {/* Aa — 인스타처럼 상단에서 바로 문구를 시작한다(탭 고르기·빨간 버튼을 거치지 않는다) */}
+          <button
+            style={{ ...ES.topAction, ...ES.topAa }}
+            disabled={!ready}
+            onClick={() => { hap.tap(); setSelId(null); setComposing({}); }}
+            aria-label="문구 추가"
+          >Aa</button>
           <button style={ES.topAction} disabled={!!busy} onClick={handleShare}>
             {busy === "share" ? "…" : t("common.share")}
           </button>
@@ -809,13 +948,33 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
             <canvas
               ref={canvasRef}
               style={ES.canvas}
-              onPointerDown={(e) => { e.preventDefault(); setPeeking(true); }}
-              onPointerUp={() => setPeeking(false)}
-              onPointerCancel={() => setPeeking(false)}
-              onPointerLeave={() => setPeeking(false)}
+              // 길게 누르면 원본 비교(peek, 기존 기능). **짧게 탭하면 그 자리에 문구**(인스타 진입).
+              // 겹이 선택돼 있을 땐 탭이 먼저 '선택 해제'로 쓰인다.
+              onPointerDown={(e) => {
+                e.preventDefault();
+                setPeeking(true);
+                canvasTapRef.current = { t: Date.now(), x: e.clientX, y: e.clientY, hadSel: selId != null };
+              }}
+              onPointerUp={(e) => {
+                setPeeking(false);
+                const s = canvasTapRef.current;
+                canvasTapRef.current = null;
+                if (!s || composing) return;
+                if (Date.now() - s.t > 320) return;                       // 길게 누름 = 원본 비교
+                if (Math.hypot(e.clientX - s.x, e.clientY - s.y) > 8) return;
+                if (s.hadSel) return;                                     // 선택 해제만
+                openTextAt(e.clientX, e.clientY);
+              }}
+              onPointerCancel={() => { setPeeking(false); canvasTapRef.current = null; }}
+              onPointerLeave={() => { setPeeking(false); canvasTapRef.current = null; }}
             />
+            {/* 드래그 중 보조선 — 가운데 정렬 가이드 + 안전영역 (인스타와 같은 안내) */}
+            <div ref={safeRef} style={ES.safeBox} />
+            <div ref={guideVRef} style={ES.guideV} />
+            <div ref={guideHRef} style={ES.guideH} />
             {peeking && <div style={ES.peekBadge}>{t("edit.peek")}</div>}
-            {!peeking && stickers.map((st) => (
+            {/* 지금 고쳐 쓰는 겹은 컴포저가 대신 그린다 — 두 번 겹쳐 보이지 않게 숨긴다 */}
+            {!peeking && stickers.filter((s) => !(composing && composing.id === s.id)).map((st) => (
               <span
                 key={st.id}
                 ref={(el) => { if (el) stickerElRef.current.set(st.id, el); else stickerElRef.current.delete(st.id); }}
@@ -827,26 +986,11 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
                   ...ES.sticker,
                   left: `${st.x * 100}%`,
                   top: `${st.y * 100}%`,
-                  transform: `translate(-50%,-50%) rotate(${st.rot}deg)`,
-                  fontSize: st.scale * wrapW || 24,
+                  transform: layerTransform(st.rot),   // 드래그 종료 때 되돌리는 문자열과 반드시 같아야 한다
+                  // 텍스트 겹의 CSS 는 컴포저와 **같은 함수**가 만든다 — 어긋날 수가 없다
                   ...(st.kind === "text"
-                    ? {
-                        fontFamily: fontFamilyOf(st.font),
-                        fontWeight: fontOf(st.font).weight,
-                        whiteSpace: "pre-wrap",
-                        textAlign: st.align || "center",
-                        lineHeight: 1.2,
-                        ...(st.bg && st.bg !== "none"
-                          ? {
-                              color: contrastInk(st.color),
-                              backgroundColor: st.color,
-                              opacity: st.bg === "soft" ? 0.55 : 1,
-                              padding: `${(st.scale * wrapW || 24) * 0.12}px ${(st.scale * wrapW || 24) * 0.28}px`,
-                              borderRadius: (st.scale * wrapW || 24) * 0.22,
-                            }
-                          : { color: st.color, textShadow: "0 1px 8px rgba(0,0,0,.35)" }),
-                      }
-                    : null),
+                    ? textLayerStyle(st, st.scale * wrapW || 24, TEXT_MAXW * (wrapW || 300))
+                    : { fontSize: st.scale * wrapW || 24 }),
                   ...(selId === st.id ? ES.stickerSel : null),
                 }}
               >
@@ -854,13 +998,6 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
                   ? <img src={st.src} alt="" draggable={false}
                          style={{ width: st.scale * wrapW || 60, height: "auto", display: "block", pointerEvents: "none" }} />
                   : st.value}
-                {selId === st.id && (
-                  <button
-                    style={ES.stickerDel}
-                    onPointerDown={(e) => { e.stopPropagation(); }}
-                    onClick={(e) => { e.stopPropagation(); removeSticker(st.id); }}
-                  >✕</button>
-                )}
               </span>
             ))}
           </div>
@@ -869,7 +1006,7 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
 
       {/* 사진 스트립 (여러 장일 때) — 탭해서 전환. 룩·스티커 모두 사진별 ("전체 적용"으로 일괄) */}
       {multi && (
-        <div style={ES.photoStrip}>
+        <div style={{ ...ES.photoStrip, ...(composing ? ES.hidden : null) }}>
           {sources.map((s, i) => (
             <button
               key={i}
@@ -883,8 +1020,8 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
         </div>
       )}
 
-      {/* 하단 패널 */}
-      <div style={ES.panel}>
+      {/* 하단 패널 — 문구 입력 중엔 감춘다(위 상단 바와 같은 이유로 visibility 만 끈다) */}
+      <div style={{ ...ES.panel, ...(composing ? ES.hidden : null) }}>
         <div style={ES.tabRow}>
           {/* 꾸미기(스티커) 탭 — 2026-08-26 에 "development 가 좀 필요할듯" 으로 뺐다가
               2026-09-17 오너 지시로 복귀. 구현(드래그·핀치·회전·저장 합성)은 계속 있었다. */}
@@ -1052,9 +1189,13 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
 
         {tab === "sticker" && (
           <div style={ES.stickerPanel}>
-            <button style={ES.addTextBtn} onClick={() => { hap.tap(); setComposing({}); }}>
+            <button style={ES.addTextBtn} onClick={() => { hap.tap(); setSelId(null); setComposing({}); }}>
               문구 추가
             </button>
+            <div style={ES.stickerHint}>
+              사진을 가볍게 탭해도 그 자리에 문구가 생겨요. 얹은 문구를 탭하면 다시 고칠 수 있고,
+              아래 휴지통으로 끌면 지워져요.
+            </div>
             {/* ⚠️ 이모지 줄은 오너 지시(2026-09-17 "밑에 이모지 빼줘")로 숨긴다.
                 addEmoji·EMOJIS·합성 코드(kind:"emoji")는 그대로라 되살릴 땐 이 블록만 풀면 된다.
                 그림 스티커도 같은 이유로 숨겨져 있다(위 주석 참고). */}
@@ -1100,6 +1241,10 @@ const ES = {
     background: "rgba(255,255,255,.09)", color: "rgba(255,255,255,.92)", cursor: "pointer",
   },
   topActionPrimary: { background: "#fff", color: "#191512" },
+  // 레이아웃은 그대로 두고 보이기만 끈다 (사진 크기가 변하면 글자 크기 기준이 흔들린다)
+  hidden: { visibility: "hidden", pointerEvents: "none" },
+  // Aa — 글자 도구라는 게 한눈에 보이게 라벨 자체를 세리프+큰 글씨로
+  topAa: { padding: "8px 13px", fontSize: 16, fontWeight: 800, fontFamily: "Georgia, serif", letterSpacing: "-.01em" },
   stage: {
     flex: 1, minHeight: 0, display: "flex", alignItems: "center", justifyContent: "center",
     padding: "8px 16px", overflow: "hidden",
@@ -1110,7 +1255,8 @@ const ES = {
     boxShadow: "0 24px 60px -20px rgba(0,0,0,.9), 0 0 0 1px rgba(255,255,255,.05)",
   },
   canvas: {
-    display: "block", width: "100%", height: "100%",
+    // 모서리 둥글기를 캔버스가 직접 가진다 — 드래그 중 wrap 의 overflow 를 풀어도 사진이 각지지 않게.
+    display: "block", width: "100%", height: "100%", borderRadius: 16,
     touchAction: "none", WebkitTouchCallout: "none", WebkitUserSelect: "none",
   },
   peekBadge: {
@@ -1133,11 +1279,31 @@ const ES = {
     position: "absolute", lineHeight: 1, userSelect: "none", touchAction: "none",
     cursor: "grab", padding: 4,
   },
-  stickerSel: { outline: "1.5px dashed rgba(255,255,255,.85)", borderRadius: 8 },
-  stickerDel: {
-    position: "absolute", top: -14, right: -14, width: 24, height: 24, borderRadius: 12,
-    border: "none", background: "#fff", color: "#231f20", fontSize: 11, fontWeight: 800,
-    boxShadow: "0 2px 8px rgba(0,0,0,.4)", cursor: "pointer",
+  // 선택 표시는 outline 만 — borderRadius 를 여기서 덮으면 텍스트 배경 박스 모서리가 망가진다
+  stickerSel: { outline: "1.5px dashed rgba(255,255,255,.85)", outlineOffset: 3 },
+  // 휴지통 — 겹을 끌 때만 아래 가운데에 뜬다. 위로 올리면 빨개지고, 떼면 삭제.
+  trash: {
+    position: "fixed", left: "50%", bottom: "calc(env(safe-area-inset-bottom, 0px) + 20px)",
+    width: 58, height: 58, borderRadius: 29, zIndex: 340,
+    display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24,
+    background: "rgba(0,0,0,.55)", border: "1px solid rgba(255,255,255,.4)",
+    boxShadow: "0 8px 24px -6px rgba(0,0,0,.7)",
+    pointerEvents: "none", opacity: 0, transform: "translate(-50%,14px) scale(.9)",
+    transition: "opacity .15s ease, transform .15s cubic-bezier(0.32,0.72,0,1), background .12s linear",
+  },
+  guideV: {
+    position: "absolute", left: "50%", top: 0, bottom: 0, width: 1, marginLeft: -0.5,
+    background: "rgba(86,170,255,.95)", boxShadow: "0 0 6px rgba(86,170,255,.85)",
+    opacity: 0, pointerEvents: "none", transition: "opacity .12s linear",
+  },
+  guideH: {
+    position: "absolute", top: "50%", left: 0, right: 0, height: 1, marginTop: -0.5,
+    background: "rgba(86,170,255,.95)", boxShadow: "0 0 6px rgba(86,170,255,.85)",
+    opacity: 0, pointerEvents: "none", transition: "opacity .12s linear",
+  },
+  safeBox: {
+    position: "absolute", inset: "5%", border: "1px dashed rgba(255,255,255,.34)",
+    borderRadius: 10, opacity: 0, pointerEvents: "none", transition: "opacity .12s linear",
   },
   photoStrip: {
     display: "flex", gap: 7, overflowX: "auto", padding: "10px 16px 2px",
