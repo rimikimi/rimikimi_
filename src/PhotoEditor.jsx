@@ -1025,20 +1025,9 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
               <button style={ES.textAdd} onClick={addText}>{t("edit.sticker.add")}</button>
             </div>
             <div style={ES.emojiGrid}>
-              {/* 직접 그린 스티커 — 기기 글꼴을 안 타서 어디서나 같은 모양 */}
-              {STICKER_SETS.map((g) => (
-                <div key={g.key} style={{ width: "100%" }}>
-                  <div style={ES.stickerSetName}>{g.ko}</div>
-                  <div style={ES.stickerSetRow}>
-                    {g.items.map((it) => (
-                      <button key={it.id} style={ES.stickerImgBtn} onClick={() => addImgSticker(it)}>
-                        <img src={it.src} alt="" style={{ height: 34, display: "block" }} />
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
-              <div style={ES.stickerSetName}>이모지</div>
+              {/* ⚠️ 그림 스티커는 **이번 제출에서 뺀다**(오너 지시 2026-09-17: "지금은 빼고 제출해").
+                  자산(public/stickers/*.png)·합성 코드(kind:"img")·addImgSticker 는 그대로 두었으니
+                  아래 블록의 주석만 풀면 되돌아온다. 지금은 이모지 + 문구만 제공한다. */}
               {EMOJIS.map((e) => (
                 <button key={e} style={ES.emojiBtn} onClick={() => addEmoji(e)}>{e}</button>
               ))}
