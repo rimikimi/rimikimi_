@@ -194,6 +194,7 @@ function drawSticker(ctx, st, w, h) {
 const fxOf = (p) => ({
   grain: p?.fx?.grain || 0, vignette: p?.fx?.vignette || 0, leak: p?.fx?.leak || 0,
   glow: p?.fx?.glow || 0, blur: p?.fx?.blur || 0, shake: p?.fx?.shake || 0,
+  twinkle: p?.fx?.twinkle || 0,
 });
 
 // src(1장) 또는 srcs(여러 장, 최대 10) 를 받는다. 여러 장이면 필터/효과는 전체
@@ -670,7 +671,8 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
       // 룩은 사진별 — i 번 사진의 장부를 쓴다 (지금 보는 사진도 장부에 최신값이 있다)
       const lk = lookOf(i);
       const hasLook = lk.presetKey !== "none"
-        || lk.fx.grain || lk.fx.vignette || lk.fx.leak || lk.fx.glow || lk.fx.blur || lk.fx.shake;
+        || lk.fx.grain || lk.fx.vignette || lk.fx.leak || lk.fx.glow || lk.fx.blur || lk.fx.shake
+        || lk.fx.twinkle;
       // ⚠️ 왜곡 보정은 룩이 없어도 저장본에 반영돼야 한다 — hasLook 에만 걸어두면
       //    "필터 없이 왜곡만 고친" 사진이 원본 그대로 저장된다.
       if (hasLook || lk.lens) {

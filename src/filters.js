@@ -112,6 +112,14 @@ export const FILM_PRESETS = [
     special: "vhs", fx: { grain: 0.35 } },
   { key: "pixelate", ko: "모자이크",  en: "Pixel", group: "fun",
     special: "pixelate" },
+  { key: "bloom",    ko: "빛번짐",    en: "Bloom", group: "fun",
+    temp: 8, tint: 2, ex: 0.06, con: -0.06, fade: 16, whitePull: 10, sat: -0.04, vib: 0.18,
+    sh: [6, 4, 0], hi: [14, 10, 2],
+    fx: { glow: 0.62, leak: 0.3 } },
+  { key: "twinkle",  ko: "트윙클",    en: "Twinkle", group: "fun",
+    temp: 4, tint: 0, ex: 0.03, con: 0.1, fade: 6, whitePull: 6, sat: 0.06, vib: 0.2,
+    sh: [0, 0, 4], hi: [8, 6, 0],
+    fx: { twinkle: 0.85, glow: 0.22 } },
   { key: "sketch",   ko: "스케치",    en: "Sketch", group: "fun",
     special: "sketch" },
 ];
@@ -569,7 +577,87 @@ export function applyLook(data, w, h, preset, effects = {}) {
       }
     }
   }
+
+  // 트윙클 — 밝은 점에 십자 별빛을 얹는다(렌즈 크로스 필터 흉내). 2026-09-17 오너 요청.
+  // 방법: 격자를 훑어 **주변보다 밝은 꼭짓점**만 고르고, 거기서 4방향(가로·세로·대각)
+  // 으로 밝기를 더해 가며 뻗는다. 더하기(additive)라 어두운 곳은 그대로 남는다.
+  if (effects.twinkle) twinkleRGBA(data, w, h, effects.twinkle, seed);
   return data;
+}
+
+/** 광원에서 별빛이 뻗는다 — **난시로 빛을 볼 때**의 느낌(오너 지시 2026-09-17).
+ *  **6갈래**(오너 지시) — 조리개 6날 렌즈의 스타버스트와 같다. 다만 깔끔한 선이 아니라
+ *  갈래마다 길이가 조금씩 다르고 **옆으로 번져 뿌옇다**(난시로 볼 때의 느낌).
+ *  광원마다 각도를 조금씩 틀어 기계적으로 보이지 않게 하고, 가운데엔 옅은 헤일로를 깐다.
+ *  amount 0..1 */
+function twinkleRGBA(data, w, h, amount, seed) {
+  const amt = Math.max(0, Math.min(1, amount));
+  if (!amt) return;
+  const lum = (i) => (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114);
+  const TH = 228;                                   // 이 밝기 위만 광원으로 본다
+  const step = Math.max(4, Math.round(Math.min(w, h) / 90));
+  const baseLen = Math.min(w, h) * 0.075 * (0.55 + amt);
+  let rs = (seed || 7) | 0;
+  const rnd = () => ((rs = (rs * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+
+  const peaks = [];
+  for (let y = step; y < h - step; y += step) {
+    for (let x = step; x < w - step; x += step) {
+      const i = (y * w + x) * 4;
+      const L = lum(i);
+      if (L < TH) continue;
+      if (L < lum(((y - step) * w + x) * 4) || L < lum(((y + step) * w + x) * 4)) continue;
+      if (L < lum((y * w + x - step) * 4) || L < lum((y * w + x + step) * 4)) continue;
+      peaks.push([x, y, L]);
+      if (peaks.length > 110) break;
+    }
+    if (peaks.length > 110) break;
+  }
+
+  const add = (xf, yf, v) => {
+    if (v <= 0) return;
+    const x = xf | 0, y = yf | 0;
+    if (x < 0 || y < 0 || x >= w || y >= h) return;
+    const i = (y * w + x) * 4;
+    data[i] = clamp8(data[i] + v);
+    data[i + 1] = clamp8(data[i + 1] + v);
+    data[i + 2] = clamp8(data[i + 2] + v);
+  };
+
+  for (const [px, py, L] of peaks) {
+    const bright = (L - TH) / (255 - TH) * 0.65 + 0.35;
+    // **6방향 고정**(오너 지시 2026-09-17 "starburst 6 방향으로").
+    // 조리개 6날 렌즈의 스타버스트가 6갈래다. 각도는 광원마다 조금씩 틀어
+    // 기계적으로 보이지 않게 하되, 갈래 수는 6으로 유지한다.
+    const rays = 6;
+    const phase = rnd() * Math.PI;
+    for (let r = 0; r < rays; r++) {
+      // 고르게 나누되 조금씩 흔들어 불규칙하게
+      const ang = phase + (r / rays) * Math.PI * 2 + (rnd() - 0.5) * 0.12;
+      // 6갈래는 마주 보는 쌍이 비슷한 길이여야 자연스럽다 — 길이 편차를 줄인다.
+      const len = baseLen * (0.85 + rnd() * 0.5);
+      const power = amt * 110 * bright * (0.75 + rnd() * 0.4);
+      const dx = Math.cos(ang), dy = Math.sin(ang);
+      const n = Math.max(2, Math.round(len));
+      for (let t = 1; t <= n; t++) {
+        const f = 1 - t / (n + 1);
+        const v = power * f * f;
+        add(px + dx * t, py + dy * t, v);
+        // 갈래를 한 픽셀 옆으로도 번지게 — 선이 아니라 **뿌연 빛**이 되게
+        add(px + dx * t - dy, py + dy * t + dx, v * 0.35);
+        add(px + dx * t + dy, py + dy * t - dx, v * 0.35);
+      }
+    }
+    // 가운데 헤일로 — 광원이 번져 보이는 느낌
+    const hr = Math.max(2, Math.round(baseLen * 0.22));
+    for (let yy = -hr; yy <= hr; yy++) {
+      for (let xx = -hr; xx <= hr; xx++) {
+        const d = Math.hypot(xx, yy) / hr;
+        if (d > 1) continue;
+        add(px + xx, py + yy, amt * 70 * bright * (1 - d) * (1 - d));
+      }
+    }
+  }
 }
 
 // ============================================================
