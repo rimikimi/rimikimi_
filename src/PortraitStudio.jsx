@@ -78,8 +78,10 @@ async function toDataUrl(url) {
   });
 }
 
-const PENDING_GEN_KEY = "rimikimi_pending_gen";
+const PENDING_GEN_KEY = "rimikimi_pending_gen";        // 구버전: 작업 '하나' 만 담던 키
+const PENDING_GEN_KEY_V2 = "rimikimi_pending_gen_v2";  // 현재: 작업 '목록'
 const PENDING_GEN_MAX_AGE = 10 * 60 * 1000; // 10분 지난 마커는 무효
+const PENDING_GEN_MAX = 8; // 마커가 무한정 쌓이지 않게 (동시에 8건 넘게 돌릴 일은 없다)
 
 // 요청이 끊긴 뒤 결과를 기다려 주는 창.
 // 서버(api/generate.js)는 DEADLINE = 200초 예산으로 돌고, 그 뒤 축소·갤러리 저장까지
@@ -89,19 +91,69 @@ const RECOVER_INTERVAL_MS = 5000;
 // 갤러리 조회'조차' 연속 실패하면 기기가 오프라인이라는 뜻 — 기다려도 소용없다.
 const RECOVER_OFFLINE_STRIKES = 3;
 
-function writePendingGen(p) {
-  try { localStorage.setItem(PENDING_GEN_KEY, JSON.stringify(p)); } catch (_) {}
+/* ── 복구 마커는 "작업(job)별" 이다 ───────────────────────────────────────
+   ⚠️ 예전엔 전역 키 하나에 요청마다 덮어썼다. 생성 중에 또 생성을 누르면 두 요청이
+      같은 자리를 나눠 쓰다가, 먼저 끝난 쪽이 clearPendingGen() 으로 **남의 마커까지**
+      지웠다. 그러면 남은 요청은 끊겼을 때 되찾을 근거가 없어 "생성 실패" 로 확정된다 —
+      실제로는 서버가 다 만들어 갤러리에 저장해 둔 상태인데도 영영 못 본다.
+      (오너 신고 2026-09-18 "이미지 생성 중일 때 다른거 이미지 생성 또 요청하면 생성 안하네??")
+   → 작업마다 고유 id 를 주고 목록으로 저장한다. clear 는 **자기 id 것만** 지운다.
+      iOS GenerationCoordinator 의 markerKey / legacyMarkerKey 와 같은 구조다. */
+
+function newGenJobId() {
+  return "g" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
-function readPendingGen() {
+
+function writePendingGens(list) {
   try {
-    const p = JSON.parse(localStorage.getItem(PENDING_GEN_KEY) || "null");
-    if (!p || !p.startedAt) return null;
-    if (Date.now() - p.startedAt > PENDING_GEN_MAX_AGE) { clearPendingGen(); return null; }
-    return p;
-  } catch (_) { return null; }
+    if (!list || !list.length) localStorage.removeItem(PENDING_GEN_KEY_V2);
+    else localStorage.setItem(PENDING_GEN_KEY_V2, JSON.stringify(list.slice(-PENDING_GEN_MAX)));
+  } catch (_) {}
 }
-function clearPendingGen() {
-  try { localStorage.removeItem(PENDING_GEN_KEY); } catch (_) {}
+
+function readPendingGens() {
+  let list = [];
+  let dirty = false;
+  try {
+    const raw = JSON.parse(localStorage.getItem(PENDING_GEN_KEY_V2) || "null");
+    if (Array.isArray(raw)) list = raw.filter(Boolean);
+  } catch (_) {}
+  // 구버전(단일) 마커 이관 — 업데이트 직후 진행 중이던 건을 잃지 않는다.
+  try {
+    const legacy = JSON.parse(localStorage.getItem(PENDING_GEN_KEY) || "null");
+    if (legacy) {
+      localStorage.removeItem(PENDING_GEN_KEY);
+      dirty = true;
+      if (legacy.startedAt) list = list.concat([{ ...legacy, id: legacy.id || newGenJobId() }]);
+    }
+  } catch (_) {}
+  const now = Date.now();
+  const alive = list.filter(
+    (p) => p && p.id && p.startedAt && now - p.startedAt <= PENDING_GEN_MAX_AGE
+  );
+  if (dirty || alive.length !== list.length) writePendingGens(alive);
+  return alive;
+}
+
+// 작업 하나를 마커에 얹는다 (예전 writePendingGen 자리).
+function addPendingGen(p) {
+  const list = readPendingGens().filter((x) => x.id !== p.id);
+  list.push(p);
+  writePendingGens(list);
+}
+
+// 작업 하나만 읽는다. id 를 안 주면 가장 오래된 것.
+function readPendingGen(jobId) {
+  const list = readPendingGens();
+  if (!jobId) return list[0] || null;
+  return list.find((p) => p.id === jobId) || null;
+}
+
+// ⚠️ **자기 작업만** 지운다. id 없이 부르면 아무것도 안 지운다 — 남의 마커를 통째로
+//    날리던 예전 사고를 코드 차원에서 막는다.
+function clearPendingGen(jobId) {
+  if (!jobId) return;
+  writePendingGens(readPendingGens().filter((p) => p.id !== jobId));
 }
 
 /* ── 로그인 게이트: "다음"(사진 입력 → 옵션 화면) 전환 복원 ──────────────
@@ -1496,15 +1548,31 @@ export default function PortraitStudio() {
   // 서버가 갤러리에 저장해 둔 방금 만든 결과를 찾아 결과화면에 자동으로 띄운다.
   // 리스너(한 번 등록)의 stale-closure 를 피하려고 최신 함수를 ref 로 들고 있는다.
   const recoverRef = useRef(() => {});
-  const recoveringRef = useRef(false);
+  // ⚠️ 복구 가드는 **작업별** 이다. 예전엔 전역 boolean 하나라, 한 요청이 복구 폴링 중이면
+  //    동시에 돌던 다른 요청은 복구를 시도조차 못 하고 그대로 "실패" 로 확정됐다.
+  const recoveringRef = useRef(new Set());
+  // 지금 서버에 나가 있는 작업 id 들. 완료 알림을 남의 것까지 지우지 않으려고 본다.
+  const inflightGenRef = useRef(new Set());
+  // 요청 순번. 화면 상태(generating / resultImage / genError …)는 **가장 최근 요청**만
+  // 건드린다. 오래된 응답은 갤러리 저장·크레딧 갱신 같은 부수효과만 하고 화면은 그대로 둔다
+  // (결과 자체는 서버가 이미 갤러리에 저장해 뒀으므로 잃지 않는다).
+  const genSeqRef = useRef(0);
 
-  // 갤러리를 '한 번' 조회해 방금 만든 결과를 찾는다.
-  //   true      → 찾아서 결과화면까지 띄웠다
+  // 완료 알림은 notify.js 가 고정 id 하나(GEN_DONE_ID)로 쓴다. 그 파일은 이번 범위 밖이라
+  // 작업별 알림 id 를 줄 수 없다 → 대신 **다른 생성이 아직 돌고 있으면 취소하지 않는다**.
+  // (내 작업이 실패했다고 남의 "사진이 완성됐어요" 알림까지 지워버리는 걸 막는다)
+  function cancelGenDoneNoticeExcept(jobId) {
+    for (const id of inflightGenRef.current) if (id !== jobId) return;
+    cancelGenDoneNotice();
+  }
+
+  // 갤러리를 '한 번' 조회해 그 작업의 결과를 찾는다.
+  //   true      → 찾았다 (화면을 가질 자격이 있으면 결과화면까지 띄운다)
   //   false     → 아직 없다 (서버가 계속 만들고 있을 수 있다)
   //   "offline" → 조회 자체가 실패했다 (기기가 네트워크에 못 붙는 상태)
   // 이 셋을 구분해야 "서버가 아직 만드는 중" 과 "기기가 오프라인" 을 가를 수 있다.
-  async function lookupPendingResult() {
-    const p = readPendingGen();
+  // ctx = { ownSeq, taken } — 화면을 가져도 되는 요청 순번과, 이미 가져갔는지.
+  async function lookupPendingResult(p, ctx) {
     if (!p) return false;
     const accessToken = session?.access_token;
     if (!accessToken) return false;
@@ -1530,30 +1598,35 @@ export default function PortraitStudio() {
       );
       const hit = mine[0];
       if (hit) {
-        setResultImage(hit.url);
-        setResultBatch(
-          mine.length > 1
-            ? mine.map((it) => ({
-                imageDataUrl: it.url, galleryId: it.id, galleryExpiresAt: it.expiresAt,
-              }))
-            : null
-        );
-        setGenError(null);
-        setGenerating(false);
-        // 결과화면은 selected 가 있어야 렌더된다(앱 재시작 후엔 null). 마커의 컨셉으로 복원.
-        setSelected((cur) => {
-          if (cur) return cur;
-          const found = concepts.find((c) => String(c.id) === String(p.conceptId));
-          return found || { id: p.conceptId, title: p.conceptTitle || "", text: "" };
-        });
-        setScreen("result");
+        // 화면은 가장 최근 요청의 것만 바꾼다. 자격이 없으면(그 사이 새 생성이 시작됐다면)
+        // 화면은 그대로 두고 마커 정리·만료 알림 예약 같은 부수효과만 한다.
+        if (genSeqRef.current === ctx.ownSeq && !ctx.taken) {
+          ctx.taken = true; // 여러 작업을 한꺼번에 복구할 때 화면은 먼저 찾은 하나만 가져간다
+          setResultImage(hit.url);
+          setResultBatch(
+            mine.length > 1
+              ? mine.map((it) => ({
+                  imageDataUrl: it.url, galleryId: it.id, galleryExpiresAt: it.expiresAt,
+                }))
+              : null
+          );
+          setGenError(null);
+          setGenerating(false);
+          // 결과화면은 selected 가 있어야 렌더된다(앱 재시작 후엔 null). 마커의 컨셉으로 복원.
+          setSelected((cur) => {
+            if (cur) return cur;
+            const found = concepts.find((c) => String(c.id) === String(p.conceptId));
+            return found || { id: p.conceptId, title: p.conceptTitle || "", text: "" };
+          });
+          setScreen("result");
+        }
         if (hit.id && hit.expiresAt) {
           syncExpiryNotifications(
             [{ id: hit.id, expiresAt: hit.expiresAt, conceptTitle: p.conceptTitle }],
             getSavedSet()
           );
         }
-        clearPendingGen();
+        clearPendingGen(p.id);
         return true;
       }
     } catch (_) {}
@@ -1567,28 +1640,41 @@ export default function PortraitStudio() {
   //    로그상 21:52 요청은 status 0(클라이언트 끊김), 21:54 요청은 200 성공이었다.)
   // → 서버가 아직 만들고 있을 수 있는 동안(RECOVER_WINDOW_MS)은 계속 물어본다.
   //   기기가 진짜 오프라인이면 갤러리 조회도 실패하므로 그때만 일찍 접는다.
-  async function tryRecoverGeneration({ poll = false } = {}) {
-    if (recoveringRef.current) return false; // 폴링 중복 방지(앱 복귀 리스너와 겹칠 수 있다)
-    recoveringRef.current = true;
+  // 작업 하나를 되살린다. 가드가 작업별이라 동시에 도는 다른 작업의 복구를 막지 않는다.
+  async function recoverOneJob(jobId, { poll, ctx }) {
+    if (recoveringRef.current.has(jobId)) return false; // 같은 작업의 폴링 중복만 막는다
+    recoveringRef.current.add(jobId);
     try {
       let strikes = 0;
       for (;;) {
-        const r = await lookupPendingResult();
+        const r = await lookupPendingResult(readPendingGen(jobId), ctx);
         if (r === true) return true;
         if (r === "offline") {
           if (++strikes >= RECOVER_OFFLINE_STRIKES) return false;
         } else {
           strikes = 0;
         }
-        const p = readPendingGen();
+        const p = readPendingGen(jobId);
         if (!poll || !p || Date.now() - p.startedAt > RECOVER_WINDOW_MS) return false;
-        setGenWaiting(true);
+        if (genSeqRef.current === ctx.ownSeq) setGenWaiting(true);
         await new Promise((res) => setTimeout(res, RECOVER_INTERVAL_MS));
       }
     } finally {
-      recoveringRef.current = false;
-      setGenWaiting(false);
+      recoveringRef.current.delete(jobId);
+      if (genSeqRef.current === ctx.ownSeq) setGenWaiting(false);
     }
+  }
+
+  // jobId 를 주면 그 작업만, 안 주면(앱 복귀 리스너) 마커에 남은 작업 **전부** 되살린다.
+  // seq = 이 복구를 부른 생성의 순번. 없으면 지금 화면 기준(= 새 요청이 없는 동안만 화면을 건드림).
+  async function tryRecoverGeneration({ poll = false, jobId = null, seq = null } = {}) {
+    const ctx = { ownSeq: seq == null ? genSeqRef.current : seq, taken: false };
+    if (jobId) return await recoverOneJob(jobId, { poll, ctx });
+    const ids = readPendingGens().map((p) => p.id);
+    if (!ids.length) return false;
+    // ⚠️ 순차로 돌리면 앞 작업이 5분까지 폴링하는 동안 뒤 작업이 묶인다 → 병렬로.
+    const rs = await Promise.all(ids.map((id) => recoverOneJob(id, { poll, ctx })));
+    return rs.some(Boolean);
   }
   // 앱 복귀 시에도 폴링으로 붙는다 — 완전히 종료했다 다시 켠 경우까지 커버된다.
   recoverRef.current = () => tryRecoverGeneration({ poll: true });
@@ -2120,6 +2206,11 @@ export default function PortraitStudio() {
         setTimeout(() => setPayToast(""), 3500);
         return;
       }
+      // 이 요청의 순번·작업 id. 생성 중에 또 눌러도 서로의 화면·마커·복구를 안 건드린다.
+      const seq = ++genSeqRef.current;
+      const jobId = newGenJobId();
+      const isLatest = () => genSeqRef.current === seq;
+      inflightGenRef.current.add(jobId);
       setGenError(null);
       setResultImage(null);
       setResultBatch(null);
@@ -2127,9 +2218,12 @@ export default function PortraitStudio() {
       setCanTryPro(false); // 인생네컷은 Pro 비교 미제공 (스트립이라)
       setResultGalleryId(null);
       setGenerating(true);
+      // 앞선 요청이 복구 폴링 중이었으면 genWaiting 이 켜져 있다. 그 요청은 이제 화면의
+      // 주인이 아니라 스스로 못 끈다 → 새 주인인 내가 끈다(안 그러면 "기다리는 중" 이 남는다).
+      setGenWaiting(false);
       setScreen("result");
       setFourcutProgress(String(fourcutCount));
-      writePendingGen({ startedAt: Date.now(), conceptId: selected.id, conceptTitle: selected.title });
+      addPendingGen({ id: jobId, startedAt: Date.now(), conceptId: selected.id, conceptTitle: selected.title });
       try {
         const accessToken = session?.access_token;
         const r = await generateImage(accessToken, photo, "인생네컷", {
@@ -2139,8 +2233,12 @@ export default function PortraitStudio() {
           cutCount: fourcutCount,   // ← 이게 있으면 서버가 스트립 한 장을 만든다
           keepRatio: false,
         });
-        setResultImage(r.imageDataUrl);
-        setResultGalleryId(r.galleryId || null);
+        // 화면은 가장 최근 요청의 것만 바꾼다 — 그 사이 새 생성이 시작됐으면 덮지 않는다.
+        if (isLatest()) {
+          setResultImage(r.imageDataUrl);
+          setResultGalleryId(r.galleryId || null);
+        }
+        // 아래는 화면이 아니라 부수효과 — 오래된 응답이어도 그대로 해야 한다.
         // 서버가 스트립을 그대로 갤러리에 저장했다 — 별도 업로드/컷 정리가 필요 없다.
         if (r.galleryId && r.galleryExpiresAt) {
           syncExpiryNotifications(
@@ -2151,7 +2249,7 @@ export default function PortraitStudio() {
         if (typeof r.unlimited === "boolean") setUnlimited(r.unlimited);
         if (typeof r.quotaUsed === "number") setFreeUsed(r.quotaUsed);
         setRefreshTick((n) => n + 1); // 크레딧/잔여 정확히 재조회
-        clearPendingGen();
+        clearPendingGen(jobId); // 내 마커만
         // ⚠️ await 금지 — 여기서 멈추면 finally 의 setGenerating(false) 를 못 탄다
         notifyGenDoneNow(1, localizedTitle(selected));
         track("generate", { engine: r.engine || null, concept: selected?.id ?? null });
@@ -2159,30 +2257,39 @@ export default function PortraitStudio() {
         // 결과가 나온 지금이 알림을 물어볼 자리다 — 다음 컨셉 알림도, 생성 완료
         // 알림도 여기서 처음 "필요하다"고 느낀다.
         setupNotifications(true);
-        if (r.busyFallback) {
+        if (r.busyFallback && isLatest()) {
           setPayToast(t("engine.busyFallback"));
           setTimeout(() => setPayToast(""), 4500);
         }
-        if (showAds) showInterstitial();
+        // 전면광고도 화면이다 — 뒤늦게 끝난 요청 때문에 지금 돌고 있는 생성 위를 덮지 않는다.
+        if (showAds && isLatest()) showInterstitial();
       } catch (err) {
         // 서버 판정을 못 받은 경우(networkFail)만 기다려 준다. 402/429 같은
         // 명시적 거절은 즉시 보여줘야 한다 — 기다린다고 달라지지 않는다.
-        const recovered = await tryRecoverGeneration({ poll: !!err?.networkFail });
+        const recovered = await tryRecoverGeneration({ poll: !!err?.networkFail, jobId, seq });
         if (!recovered) {
           if (typeof err.quotaUsed === "number") setFreeUsed(err.quotaUsed);
-          setGenError(err.message || "인생네컷 생성에 실패했어요.");
-          clearPendingGen();
+          if (isLatest()) setGenError(err.message || "인생네컷 생성에 실패했어요.");
+          clearPendingGen(jobId);
         }
-        cancelGenDoneNotice();
+        cancelGenDoneNoticeExcept(jobId);
       } finally {
-        setGenerating(false);
-        setGenWaiting(false);
-        setFourcutProgress("");
+        inflightGenRef.current.delete(jobId);
+        if (isLatest()) {
+          setGenerating(false);
+          setGenWaiting(false);
+          setFourcutProgress("");
+        }
       }
       return;
     }
 
     // 인증 + 횟수 체크는 서버(/api/generate)가 처리
+    // 이 요청의 순번·작업 id. 생성 중에 또 눌러도 서로의 화면·마커·복구를 안 건드린다.
+    const seq = ++genSeqRef.current;
+    const jobId = newGenJobId();
+    const isLatest = () => genSeqRef.current === seq;
+    inflightGenRef.current.add(jobId);
     setGenError(null);
     setResultImage(null);
     setResultBatch(null);
@@ -2190,9 +2297,15 @@ export default function PortraitStudio() {
     setCanTryPro(false);
     setResultGalleryId(null);
     setGenerating(true);
+    // 앞선 요청이 복구 폴링 중이었으면 genWaiting 이 켜져 있다. 그 요청은 이제 화면의
+    // 주인이 아니라 스스로 못 끈다 → 새 주인인 내가 끈다(안 그러면 "기다리는 중" 이 남는다).
+    setGenWaiting(false);
     setScreen("result");
-    // 백그라운드 복구용 마커 (생성 중 앱이 얼거나 요청이 끊겨도 결과를 되찾음)
-    writePendingGen({ startedAt: Date.now(), conceptId: selected.id, conceptTitle: selected.title });
+    // 인생네컷이 돌던 중에 일반 생성을 시작하면 "N컷 만드는 중" 문구가 남는다 —
+    // 이 화면의 주인은 이제 이 요청이므로 여기서 지운다(예전엔 동시 실행이 없어 안 겪던 자리).
+    setFourcutProgress("");
+    // 백그라운드 복구용 마커 (생성 중 앱이 얼거나 요청이 끊겨도 결과를 되찾음) — 작업별로 쌓는다
+    addPendingGen({ id: jobId, startedAt: Date.now(), conceptId: selected.id, conceptTitle: selected.title });
 
     try {
       const accessToken = session?.access_token;
@@ -2233,15 +2346,20 @@ export default function PortraitStudio() {
       // 무료 Pro 체험 재호출용 입력 보관 (인생네컷 제외 — 단일 컷만 비교)
       lastGenRef.current = { photo: photoToUse, promptText, meta: genMeta };
       const result = await generateImage(accessToken, photoToUse, promptText, genMeta);
-      setResultImage(result.imageDataUrl);
-      setResultBatch(result.batch || null);
-      setResultGalleryId(result.galleryId || null); // 저장 시 원본(2K) 받으려고 보관
+      // 화면은 가장 최근 요청의 것만 바꾼다. 그 사이 다른 생성이 시작됐다면 이 결과로
+      // 덮지 않는다 — 결과는 서버가 이미 갤러리에 저장해 뒀으므로 사라지지 않는다.
+      if (isLatest()) {
+        setResultImage(result.imageDataUrl);
+        setResultBatch(result.batch || null);
+        setResultGalleryId(result.galleryId || null); // 저장 시 원본(2K) 받으려고 보관
+        // 방금 생성이 무료(기본 엔진)이고 무료 Pro 체험이 남아있으면 비교 CTA 노출
+        setCanTryPro(result.engine === "base" && !!result.proSampleAvailable);
+      }
+      // 여기부터는 화면이 아니라 부수효과 — 오래된 응답이어도 그대로 해야 한다.
       track("generate", { engine: result.engine || null, concept: selected?.id ?? null });
       noteGeneration(); // 리뷰 요청 조건(생성 2장 이상) 카운트만 올림 — 여기선 묻지 않음
       setupNotifications(true); // 결과를 본 지금이 알림 권한을 물어볼 자리
 
-      // 방금 생성이 무료(기본 엔진)이고 무료 Pro 체험이 남아있으면 비교 CTA 노출
-      setCanTryPro(result.engine === "base" && !!result.proSampleAvailable);
       // 생성 직후 만료 10분 전 리마인드 푸시 예약 (갤러리를 안 열어도 동작)
       if (result.galleryId && result.galleryExpiresAt) {
         syncExpiryNotifications(
@@ -2249,10 +2367,11 @@ export default function PortraitStudio() {
           getSavedSet()
         );
       }
-      // 정상 완료 → 복구 마커 제거.
+      // 정상 완료 → 복구 마커 제거. **내 작업 것만** 지운다(동시에 도는 다른 생성의
+      // 마커까지 지우면 그쪽이 끊겼을 때 결과를 되찾을 근거가 없어진다).
       // 화면을 보고 있으면 결과가 이미 떴으니 예약 알림만 지우고,
       // 백그라운드였다면 "지금" 완료 알림을 띄운다(예상 시각이 아니라 실제 완료 시각).
-      clearPendingGen();
+      clearPendingGen(jobId);
       // ⚠️ 알림 호출은 절대 await 하지 않는다. 여기서 멈추면 finally 의
       //    setGenerating(false) 까지 못 가서 결과가 나왔는데도 로딩 화면에
       //    갇힌다(2026-08-17 실제 사고). 예약분 정리 순서는 함수 안에 있다.
@@ -2264,31 +2383,36 @@ export default function PortraitStudio() {
       if (typeof result.unlimited === "boolean") setUnlimited(result.unlimited);
       if (typeof result.quotaUsed === "number") setFreeUsed(result.quotaUsed);
       // Pro 혼잡으로 base 폴백됐으면 고지 (무과금)
-      if (result.busyFallback) {
+      if (result.busyFallback && isLatest()) {
         setPayToast(t("engine.busyFallback"));
         setTimeout(() => setPayToast(""), 4500);
       }
       // 무료 사용자 → 생성 후 전면광고 (네이티브에서만, 웹은 no-op)
-      if (showAds) showInterstitial();
+      // 전면광고도 화면이다 — 뒤늦게 끝난 요청 때문에 지금 돌고 있는 생성 위를 덮지 않는다.
+      if (showAds && isLatest()) showInterstitial();
     } catch (err) {
       // 요청이 끊겼어도 서버는 끝냈을 수 있음 → 갤러리에서 방금 결과를 되찾아 표시.
       // 서버 판정을 못 받은 경우(networkFail = fetch 자체가 죽음, 앱을 닫았을 때가
       // 대표적)만 폴링한다. 402/429/503 처럼 서버가 답을 준 실패는 즉시 보여준다.
-      const recovered = await tryRecoverGeneration({ poll: !!err?.networkFail });
+      // ⚠️ 내 작업 id·순번을 넘긴다 — 남의 마커를 보고 복구하거나, 남의 화면을 덮지 않게.
+      const recovered = await tryRecoverGeneration({ poll: !!err?.networkFail, jobId, seq });
       if (recovered) {
-        cancelGenDoneNotice(); // 결과가 화면에 떴으니 알림 불필요
+        cancelGenDoneNoticeExcept(jobId); // 결과가 화면에 떴으니 알림 불필요
       } else {
         // 서버가 한도 정보를 같이 줬으면 화면 카운터도 반영
         if (typeof err.quotaUsed === "number") setFreeUsed(err.quotaUsed);
-        setGenError(err.message || "이미지 생성에 실패했어요.");
+        if (isLatest()) setGenError(err.message || "이미지 생성에 실패했어요.");
         // 실패로 확정 — 마커를 남겨두면 이후 앱 복귀마다 갤러리를 헛되이 조회한다
-        clearPendingGen();
+        clearPendingGen(jobId);
         // ⚠️ 실패했는데 "완성됐어요" 알림이 뜨면 안 된다
-        cancelGenDoneNotice();
+        cancelGenDoneNoticeExcept(jobId);
       }
     } finally {
-      setGenerating(false);
-      setGenWaiting(false);
+      inflightGenRef.current.delete(jobId);
+      if (isLatest()) {
+        setGenerating(false);
+        setGenWaiting(false);
+      }
     }
   }
 

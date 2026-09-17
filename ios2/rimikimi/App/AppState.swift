@@ -224,7 +224,7 @@ final class AppState {
         creditsSheet = false
         if let req = pendingAfterPurchase {
             pendingAfterPurchase = nil
-            generation.dismiss()
+            generation.dismissFinished()
             await perform(.generate(req))
             return
         }

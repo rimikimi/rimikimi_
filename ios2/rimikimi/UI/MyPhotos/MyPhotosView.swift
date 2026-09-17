@@ -63,8 +63,8 @@ struct MyPhotosView: View {
         .background(Color.bg)
         .inlineTitle("내 사진")
         .task(id: app.auth.session?.userID) { await reload() }
-        .onChange(of: app.generation.state) { _, s in
-            if case .done = s { Task { await reload() } }
+        .onChange(of: app.generation.doneTick) { _, _ in
+            Task { await reload() }
         }
         .refreshable { await reload() }
         #if DEBUG
@@ -108,14 +108,26 @@ struct MyPhotosView: View {
 }
 
 /// 진행 카드 — 만드는 중 / 완성 / 실패. 완료되면 카드가 결과로 바뀌고 탭하면 결과 화면.
+///
+/// ⚠️ 카드가 **여러 개** 뜬다 (오너 지시 2026-09-18: 동시에 여러 장 만들기).
+///    예전엔 코디네이터가 작업을 하나만 들고 있어서 카드도 하나였고, 두 번째 생성을
+///    시작하면 카드에 **이전 작업의 제목**이 떠 있었다.
 struct ProgressCard: View {
     @Environment(AppState.self) private var app
 
     var body: some View {
-        switch app.generation.state {
-        case .idle:
-            EmptyView()
-        case .running(let job, let waiting):
+        VStack(spacing: Spacing.s3) {
+            ForEach(app.generation.entries) { entry in
+                row(entry)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func row(_ entry: GenerationCoordinator.Entry) -> some View {
+        let job = entry.job
+        switch entry.phase {
+        case .running(let waiting):
             card {
                 HStack(spacing: Spacing.s3) {
                     ProgressView().tint(Color.accent)
@@ -129,7 +141,7 @@ struct ProgressCard: View {
                     Spacer()
                 }
             }
-        case .done(let job, let items):
+        case .done(let items):
             Button { app.present(items, job: job) } label: {
                 card {
                     HStack(spacing: Spacing.s3) {
@@ -146,7 +158,7 @@ struct ProgressCard: View {
                 }
             }
             .buttonStyle(PressScaleButtonStyle(scale: 0.985))
-        case .failed(let job, let message):
+        case .failed(let message):
             card {
                 HStack(alignment: .top, spacing: Spacing.s3) {
                     Image(systemName: "exclamationmark.circle").foregroundStyle(Color.accent).font(.system(size: 20))
@@ -160,7 +172,7 @@ struct ProgressCard: View {
                         }
                     }
                     Spacer()
-                    Button { app.generation.dismiss() } label: {
+                    Button { app.generation.dismiss(entry.id) } label: {
                         Image(systemName: "xmark").font(.system(size: 12, weight: .bold)).foregroundStyle(Color.ink2)
                             .frame(width: 28, height: 28).background(Color.fill, in: Circle())
                     }

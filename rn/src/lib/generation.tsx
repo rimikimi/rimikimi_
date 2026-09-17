@@ -17,14 +17,27 @@ import { FIRST_GEN_DONE_KEY, INVITE_CARD_DUE_KEY, getFlag, setFlag } from "./pre
 // 생성 — SPEC §3: 만들기 → 홈으로 복귀 + 내 사진 진행 카드 → 완료 시 카드가 결과로 → 결과 화면.
 //
 // 웹 PortraitStudio.jsx 의 복구 로직을 그대로 옮겼다:
-//   · 생성 시작 시 마커(rimikimi_pending_gen)를 남긴다(앱 재시작에도 생존, 10분 유효)
+//   · 생성 시작 시 마커(rimikimi_pending_gen:<jobId>)를 남긴다(앱 재시작에도 생존, 10분 유효)
 //   · fetch 자체가 끊기면(networkFail) 서버는 계속 만들고 있으므로 /api/gallery 를 5초마다,
 //     최대 5분 폴링해 "시작 시각 이후 · 같은 컨셉" 결과를 찾는다. 갤러리 조회조차 3번 연속
 //     실패하면 오프라인 → 포기.
 //   · 402/429 같은 서버 거절은 즉시 실패로 보여준다.
+//
+// ⚠️ 마커·복구 가드는 **작업(job)별로 분리**돼 있다 (오너 보고 2026-09-18:
+//    "이미지 생성 중일 때 다른거 이미지 생성 또 요청하면 생성 안하네??").
+//    예전엔 마커가 전역 키 하나(rimikimi_pending_gen)라 두 요청이 같은 자리에 덮어썼고,
+//    먼저 끝난 요청의 clearPendingGen() 이 **남의 마커까지 지웠다** → 남은 요청이 끊기면
+//    복구할 근거가 사라져 "실패" 로 확정됐다(실제로는 서버가 만들어 갤러리에 넣어둔 상태).
+//    복구 가드도 전역 boolean 하나라, 한 요청이 폴링 중이면 다른 요청은 복구 시도조차 못 했다.
+//    그래서 마커는 작업당 키 1개, 복구 가드는 작업 id 집합(Set)으로 쪼갰다.
+//    (키를 나눈 이유: 배열 한 칸에 모으면 읽기→쓰기 사이에 다른 작업이 끼어들어
+//     서로의 항목을 날릴 수 있다. 작업마다 다른 키면 그 경합 자체가 없다.)
 // ============================================================================
 
-const PENDING_GEN_KEY = "rimikimi_pending_gen";
+/** 구버전(2.0 이전) 단일 마커 키 — 이관용으로만 읽는다. */
+const PENDING_GEN_LEGACY_KEY = "rimikimi_pending_gen";
+/** 신버전: 작업 하나당 키 하나. 전체 키는 `${PENDING_GEN_PREFIX}${jobId}`. */
+const PENDING_GEN_PREFIX = "rimikimi_pending_gen:";
 const PENDING_GEN_MAX_AGE = 10 * 60 * 1000;
 const RECOVER_WINDOW_MS = 5 * 60 * 1000;
 const RECOVER_INTERVAL_MS = 5000;
@@ -60,16 +73,63 @@ export interface JobInput {
 
 interface PendingMarker { jobId: string; startedAt: number; conceptId: string | number; conceptTitle: string; count: number }
 
-async function writePendingGen(p: PendingMarker) { try { await AsyncStorage.setItem(PENDING_GEN_KEY, JSON.stringify(p)); } catch { /* ignore */ } }
-async function readPendingGen(): Promise<PendingMarker | null> {
+const pendingKey = (jobId: string) => `${PENDING_GEN_PREFIX}${jobId}`;
+
+async function writePendingGen(p: PendingMarker) {
+  try { await AsyncStorage.setItem(pendingKey(p.jobId), JSON.stringify(p)); } catch { /* ignore */ }
+}
+
+/** **자기 작업 것만** 지운다. 예전엔 전역 키라 먼저 끝난 작업이 남의 마커까지 지웠다. */
+async function clearPendingGen(jobId: string) {
+  try { await AsyncStorage.removeItem(pendingKey(jobId)); } catch { /* ignore */ }
+}
+
+async function readPendingGen(jobId: string): Promise<PendingMarker | null> {
   try {
-    const p = JSON.parse((await AsyncStorage.getItem(PENDING_GEN_KEY)) || "null") as PendingMarker | null;
+    const p = JSON.parse((await AsyncStorage.getItem(pendingKey(jobId))) || "null") as PendingMarker | null;
     if (!p || !p.startedAt) return null;
-    if (Date.now() - p.startedAt > PENDING_GEN_MAX_AGE) { await clearPendingGen(); return null; }
+    if (Date.now() - p.startedAt > PENDING_GEN_MAX_AGE) { await clearPendingGen(jobId); return null; }
     return p;
   } catch { return null; }
 }
-async function clearPendingGen() { try { await AsyncStorage.removeItem(PENDING_GEN_KEY); } catch { /* ignore */ } }
+
+/**
+ * 구버전 단일 마커를 작업별 키로 옮긴다. 업데이트 직후(=구버전이 남긴 마커가 있는 채로 첫 실행)
+ * 진행 중이던 건을 잃지 않기 위한 이관. 한 번 옮기면 구버전 키는 지운다.
+ */
+async function migrateLegacyPendingGen() {
+  try {
+    const raw = await AsyncStorage.getItem(PENDING_GEN_LEGACY_KEY);
+    if (!raw) return;
+    await AsyncStorage.removeItem(PENDING_GEN_LEGACY_KEY);
+    const p = JSON.parse(raw) as PendingMarker | null;
+    if (!p || !p.startedAt) return;
+    if (Date.now() - p.startedAt > PENDING_GEN_MAX_AGE) return;  // 만료된 건 옮길 필요 없다
+    // 구버전도 jobId 를 넣어 저장했지만, 없더라도 복구가 돌아가도록 시작 시각으로 하나 만들어 준다.
+    const jobId = p.jobId || `job_legacy_${p.startedAt}`;
+    await writePendingGen({ ...p, jobId });
+  } catch { /* ignore */ }
+}
+
+/** 살아 있는 마커 **전부**. 만료·깨진 건 지우면서 읽는다(오래된 키가 쌓이지 않게). */
+async function readPendingGens(): Promise<PendingMarker[]> {
+  await migrateLegacyPendingGen();
+  let keys: readonly string[];
+  try { keys = await AsyncStorage.getAllKeys(); } catch { return []; }
+  const out: PendingMarker[] = [];
+  for (const k of keys) {
+    if (!k.startsWith(PENDING_GEN_PREFIX)) continue;
+    let p: PendingMarker | null = null;
+    try { p = JSON.parse((await AsyncStorage.getItem(k)) || "null") as PendingMarker | null; } catch { /* 깨진 값 */ }
+    if (!p || !p.startedAt || Date.now() - p.startedAt > PENDING_GEN_MAX_AGE) {
+      try { await AsyncStorage.removeItem(k); } catch { /* ignore */ }
+      continue;
+    }
+    // 키에서 jobId 를 복원해 둔다 — 값 쪽 jobId 가 비어 있어도 복구가 그 작업을 가리키게.
+    out.push({ ...p, jobId: p.jobId || k.slice(PENDING_GEN_PREFIX.length) });
+  }
+  return out.sort((a, b) => b.startedAt - a.startedAt);  // 최신 먼저
+}
 
 interface GenerationValue {
   jobs: Job[];
@@ -92,7 +152,9 @@ export function GenerationProvider({ children }: { children: React.ReactNode }) 
   const { session } = useAuth();
   const { refresh: refreshQuota } = useQuota();
   const [jobs, setJobs] = useState<Job[]>([]);
-  const recovering = useRef(false);
+  // 복구 중인 작업 id 집합. 예전엔 boolean 하나라 한 작업이 폴링 중이면 다른 작업은
+  // 복구 시도조차 못 했다. 이제 **같은 작업의 중복 폴링만** 막고 다른 작업은 통과시킨다.
+  const recovering = useRef<Set<string>>(new Set());
   const tokenRef = useRef<string | undefined>(undefined);
   tokenRef.current = session?.access_token;
 
@@ -134,7 +196,7 @@ export function GenerationProvider({ children }: { children: React.ReactNode }) 
         };
         return exists ? prev.map((j) => (j.id === p.jobId ? { ...j, status: "done", images, error: undefined } : j)) : [done, ...prev];
       });
-      await clearPendingGen();
+      await clearPendingGen(p.jobId);
       refreshQuota();
       void noteDone();
       void setLastDoneJob({ jobId: p.jobId, conceptId: String(p.conceptId), title: p.conceptTitle, url: images[0].uri });
@@ -143,13 +205,14 @@ export function GenerationProvider({ children }: { children: React.ReactNode }) 
     return false;
   }, [refreshQuota, noteDone]);
 
-  const tryRecover = useCallback(async ({ poll }: { poll: boolean }): Promise<boolean> => {
-    if (recovering.current) return false;
-    recovering.current = true;
+  /** 작업 하나를 갤러리에서 되찾는다. 가드·마커 모두 그 작업 id 로만 본다. */
+  const tryRecover = useCallback(async (jobId: string, { poll }: { poll: boolean }): Promise<boolean> => {
+    if (recovering.current.has(jobId)) return false;
+    recovering.current.add(jobId);
     try {
       let strikes = 0;
       for (;;) {
-        const p = await readPendingGen();
+        const p = await readPendingGen(jobId);
         if (!p) return false;
         const r = await lookupPendingResult(p);
         if (r === true) return true;
@@ -159,20 +222,28 @@ export function GenerationProvider({ children }: { children: React.ReactNode }) 
         await new Promise((res) => setTimeout(res, RECOVER_INTERVAL_MS));
       }
     } finally {
-      recovering.current = false;
+      recovering.current.delete(jobId);
     }
   }, [lookupPendingResult, patch]);
 
   // 앱 시작·복귀 시 살아 있는 마커가 있으면 갤러리에서 되찾는다.
+  // 마커가 여러 개면 **전부** 돌린다 — 예전엔 전역 키라 한 건밖에 없었고, 지금은
+  // 동시에 여러 건이 떠 있을 수 있어서 하나만 되살리면 나머지가 그대로 묻힌다.
   useEffect(() => {
     if (!session?.access_token) return;
-    const run = () => { void tryRecover({ poll: false }); };
+    const run = () => {
+      void (async () => {
+        for (const p of await readPendingGens()) await tryRecover(p.jobId, { poll: false });
+      })();
+    };
     run();
     const sub = AppState.addEventListener("change", (s) => { if (s === "active") run(); });
     return () => sub.remove();
   }, [session?.access_token, tryRecover]);
 
   const start = useCallback<GenerationValue["start"]>((input) => {
+    // ⚠️ 여기에 "이미 돌고 있으면 return" 같은 가드를 넣지 말 것 — 동시에 여러 건을 만들 수 있어야 한다.
+    //    아래 마커·복구는 전부 이 id 기준이라 작업끼리 서로의 상태를 건드리지 않는다.
     const id = `job_${Date.now()}_${++seq}`;
     const { concept } = input;
     const count = input.fourcutCount ?? (isArtOnly(concept) ? 1 : input.batchCount);
@@ -227,7 +298,7 @@ export function GenerationProvider({ children }: { children: React.ReactNode }) 
         const images: ResultImage[] = r.batch
           ? await Promise.all(r.batch.map(async (b) => ({ uri: await fitOne(b.imageDataUrl), galleryId: b.galleryId, galleryExpiresAt: b.galleryExpiresAt })))
           : [{ uri: await fitOne(r.imageDataUrl), galleryId: r.galleryId, galleryExpiresAt: r.galleryExpiresAt }];
-        await clearPendingGen();
+        await clearPendingGen(id);
         patch(id, { status: "done", images });
         refreshQuota();
         void noteDone();
@@ -235,9 +306,9 @@ export function GenerationProvider({ children }: { children: React.ReactNode }) 
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
       } catch (err) {
         const e = err as ApiError;
-        const recovered = await tryRecover({ poll: !!e?.networkFail });
+        const recovered = await tryRecover(id, { poll: !!e?.networkFail });
         if (!recovered) {
-          await clearPendingGen();
+          await clearPendingGen(id);
           patch(id, { status: "failed", error: e?.message || "이미지 생성에 실패했어요." });
           if (e?.quotaExceeded) refreshQuota();
         }

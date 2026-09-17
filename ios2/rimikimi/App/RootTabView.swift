@@ -67,14 +67,16 @@ struct RootTabView: View {
         // 생성 완료 → 결과 화면 1회 자동 표시.
         .onChange(of: app.generation.pendingPresentation?.map(\.id)) { _, ids in
             guard ids != nil, let items = app.generation.pendingPresentation else { return }
+            let job = app.generation.pendingPresentationJob
             app.generation.pendingPresentation = nil
-            app.present(items, job: app.generation.job)
+            app.generation.pendingPresentationJob = nil
+            app.present(items, job: job)
             // ATT 는 첫 생성 완료 후에만 — 결과 화면이 뜬 뒤 1초, 1회 → 그 다음 초대 카드(SPEC §3).
             app.afterFirstResult()
         }
         // 429(크레딧 부족) 실패 → 시트. 구매 뒤 같은 요청을 이어간다.
-        .onChange(of: app.generation.state) { _, s in
-            if case .failed = s { app.handleGenerationFailure() }
+        .onChange(of: app.generation.failedTick) { _, _ in
+            app.handleGenerationFailure()
         }
         // 완료 푸시 탭 → 결과 화면 직행(4주차).
         .onChange(of: app.push.pendingTapKind) { _, kind in
