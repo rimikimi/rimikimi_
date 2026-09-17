@@ -43,7 +43,10 @@ enum TabBarMetrics {
     /// 로만 쓴다 — 탭바 위 절대 여백이 아니다.
     static let cameraOverlap: CGFloat = 10
     /// 탭바 프레임을 아직 측정하지 못했을 때(첫 프레임)의 폴백 — 이전 고정값과 동일하게 둬서 깜빡임 최소화.
-    static let cameraFallbackBottom: CGFloat = 28   // 시뮬 스크린샷 실측으로 조정한다
+    // 오너 스크린샷 실측(2026-09-17): 원 중심이 탭바 알약 중심보다 36pt 위에 떠 있었다.
+    /// 알약 가운데 빈 슬롯에 들어앉도록 그만큼 내린다. 음수는 정상 — 이 오버레이의 기준은
+    /// **안전영역 아래**인데 떠 있는 탭바는 안전영역보다 더 아래까지 내려오기 때문이다.
+    static let cameraFallbackBottom: CGFloat = -8
     /// 탭바가 없는(푸시된) 화면의 하단 여백, 그리고 탭바 실측 전(첫 프레임) `AppState.contentBottomPad`
     /// 의 폴백값. **탭바가 실제로 떠 있는 탭 루트 화면**(갤러리·필터·내 사진·프로필)에서는 이 고정값 대신
     /// `AppState.contentBottomPad`(탭바 프레임 실측, 결함 #4 재작업 — 오너 지시)를 써야 한다. 고정 24pt로는

@@ -95,6 +95,10 @@ final class AppState {
         let id = UUID(); let url: URL; let title: String
         /// 편집기에 실어 보낼 초기 데이터(결과 화면 "다듬기" → 사진 1장). `WebBridgeCoordinator.initialPayload`.
         var initialPayload: [String: Any]? = nil
+        /// 상단바 없이 화면을 통째로 쓴다. 카메라는 **아이폰 기본 카메라처럼** 보여야 한다는
+        /// 오너 지시(2026-09-17) — 상단바가 있으면 웹 카메라 헤더와 겹쳐 두 줄이 되고,
+        /// 미리보기도 화면을 못 채운다. 닫기는 웹 쪽 버튼이 브리지로 처리한다.
+        var chromeless: Bool = false
     }
 
     let auth = AuthStore.shared
@@ -151,7 +155,7 @@ final class AppState {
         case .filterPick(let presetKey):
             webTool = WebTool(url: Config.filterToolURL(mode: "pick", presetKey: presetKey), title: "필터")
         case .camera:
-            webTool = WebTool(url: Config.cameraToolURL, title: "카메라")
+            webTool = WebTool(url: Config.cameraToolURL, title: "카메라", chromeless: true)
         }
     }
 

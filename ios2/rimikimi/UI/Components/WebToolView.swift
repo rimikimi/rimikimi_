@@ -169,25 +169,38 @@ struct WebToolScreen: View {
     var title: String
     /// 편집기에 미리 실어 보낼 사진("다듬기") — `src/ToolEntry.jsx` 의 `window.__rimikimiInit` 로 도착.
     var initialPayload: [String: Any]? = nil
+    /// 상단바 없이 전체 화면(카메라). 닫기는 웹 버튼 → `close` 브리지가 처리한다.
+    var chromeless: Bool = false
     @Environment(AppState.self) private var app
     @Environment(\.dismiss) private var dismiss
 
+    private var web: some View {
+        WebToolView(
+            url: url,
+            initialPayload: initialPayload,
+            onClose: { dismiss() },
+            onRefreshCredits: { Task { await app.refreshQuota() } },
+            onSaved: { HapticPlayer.success(); app.showToast("사진첩에 저장됐어요") }
+        )
+    }
+
     var body: some View {
-        NavigationStack {
-            WebToolView(
-                url: url,
-                initialPayload: initialPayload,
-                onClose: { dismiss() },
-                onRefreshCredits: { Task { await app.refreshQuota() } },
-                onSaved: { HapticPlayer.success(); app.showToast("사진첩에 저장됐어요") }
-            )
-            .ignoresSafeArea(edges: .bottom)
-            .background(Color.bg)
-            .inlineTitle(title)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("닫기") { dismiss() }
-                }
+        if chromeless {
+            // 아이폰 기본 카메라처럼 — 상단바 없이 화면을 통째로 쓴다(오너 지시).
+            web
+                .ignoresSafeArea()
+                .background(Color.black)
+        } else {
+            NavigationStack {
+                web
+                    .ignoresSafeArea(edges: .bottom)
+                    .background(Color.bg)
+                    .inlineTitle(title)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button("닫기") { dismiss() }
+                        }
+                    }
             }
         }
     }

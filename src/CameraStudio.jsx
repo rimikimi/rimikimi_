@@ -245,11 +245,18 @@ export default function CameraStudio({ initialPresetKey = "none", onShot, onClos
           여기서 또 그리면 **헤더가 두 줄로 겹친다**(오너 지적 2026-09-17).
           그때는 상단바를 접고, 꼭 필요한 전/후면 전환만 미리보기 위에 띄운다. */}
       {isRimikimiWebView() ? (
-        <button
-          style={CS.flipFloating}
-          onClick={() => { hap.tap(); setFacing((f) => (f === "user" ? "environment" : "user")); }}
-          aria-label={t("camera.flip")}
-        >⟳</button>
+        <>
+          <button
+            style={{ ...CS.floatBtn, left: 12 }}
+            onClick={() => { hap.tap(); onClose && onClose(); }}
+            aria-label={t("common.close")}
+          >✕</button>
+          <button
+            style={{ ...CS.floatBtn, right: 12 }}
+            onClick={() => { hap.tap(); setFacing((f) => (f === "user" ? "environment" : "user")); }}
+            aria-label={t("camera.flip")}
+          >⟳</button>
+        </>
       ) : (
         <div style={CS.top}>
           <button style={CS.iconBtn} onClick={() => { hap.tap(); onClose && onClose(); }} aria-label={t("common.close")}>✕</button>
@@ -340,17 +347,19 @@ const CS = {
     width: 44, height: 44, borderRadius: 22, border: "none", background: "transparent",
     color: "#fff", fontSize: 20, cursor: "pointer", lineHeight: 1,
   },
-  // 네이티브 웹뷰에선 상단바를 접으므로 전환 버튼만 미리보기 위에 띄운다.
-  flipFloating: {
-    position: "absolute", top: "calc(env(safe-area-inset-top, 0px) + 10px)", right: 12, zIndex: 5,
+  // 네이티브 웹뷰(카메라)는 상단바 없이 전체 화면이라, 닫기·전환을 미리보기 위에 띄운다
+  // — 아이폰 기본 카메라와 같은 배치(왼쪽 위 닫기, 오른쪽 위 전환).
+  floatBtn: {
+    position: "absolute", top: "calc(env(safe-area-inset-top, 0px) + 10px)", zIndex: 5,
     width: 40, height: 40, borderRadius: 20, border: "none",
     background: "rgba(0,0,0,0.45)", color: "#fff", fontSize: 19, lineHeight: 1, cursor: "pointer",
   },
-  stage: { flex: 1, minHeight: 0, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 12px" },
+  // 아이폰 기본 카메라처럼 **화면을 꽉 채운다**(오너 지시 2026-09-17).
+  // 예전엔 maxWidth 520 + 둥근 모서리 + 그림자라 검은 바탕에 상자가 떠 있는 모양이었다.
+  stage: { flex: 1, minHeight: 0, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: 0 },
   frame: {
-    position: "relative", width: "100%", maxWidth: 520, aspectRatio: "3 / 4",
-    borderRadius: 22, overflow: "hidden", background: "#181616",
-    boxShadow: "0 24px 60px -30px rgba(0,0,0,0.9)",
+    position: "relative", width: "100%", aspectRatio: "3 / 4",
+    overflow: "hidden", background: "#181616",
   },
   video: { position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none" },
   canvas: { width: "100%", height: "100%", display: "block", objectFit: "cover" },
