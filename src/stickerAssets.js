@@ -1,157 +1,41 @@
 // ============================================================
-// 꾸미기 스티커 — 직접 그린 것 (시스템 이모지와 별개)
+// 꾸미기 스티커 — 실제 스티커 아트(PNG, 배경 투명)
 //
-// 왜 SVG 인가
-//   이모지는 기기 글꼴에 따라 모양이 달라지고(안드로이드/아이폰이 다름) 브랜드 색과도
-//   안 맞는다. 스티커는 우리가 그려서 **어느 기기에서나 똑같이** 나와야 한다.
-//   SVG 를 data URI 로 들고 있으면 파일 요청이 없고 어떤 크기로 키워도 안 깨진다.
+// ⚠️ 처음엔 SVG 를 손으로 그렸다가 오너에게 두 번 반려당했다("개밤티", "디자인이 구리다").
+//    맞는 지적이었다 — 손으로 코딩한 도형은 클립아트로 보인다. 지금은 이미지 생성으로
+//    **실제 스티커 아트**를 만들어 쓴다(광택 있는 젤리 질감, 파스텔 그라데이션,
+//    흰 다이컷 테두리 — 스노우·소다 계열의 결).
 //
-// 색은 브랜드 팔레트(v2/SPEC.md §1)를 쓴다:
-//   빨강 #E6403C · 노랑 #F9C83C · 하늘 #60C9DE · 보라 #8A5DA7 · 잉크 #231F20 · 크림 #FBF8F3
+// 만드는 법 (다음에 추가할 때)
+//   1) 스티커 시트 1장을 생성한다: 흰 배경, 균등한 격자, "no text", 다이컷 흰 테두리 요구.
+//   2) 칸마다 잘라내고 **모서리에서 flood fill** 로 바깥 흰색만 투명화한다
+//      (단순 흰색 제거를 하면 스티커 자신의 흰 테두리까지 날아간다).
+//      옆 칸 조각이 묻지 않게 칸을 안쪽으로 5% 정도 좁혀 자른다.
+//   3) 420px 이하로 줄여 `public/stickers/<id>.png` 로 저장.
 // ============================================================
 
-const svg = (inner, vb = "0 0 100 100") =>
-  "data:image/svg+xml;utf8," +
-  encodeURIComponent(
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vb}">${inner}</svg>`
-  );
-
-// 손그림 느낌을 내려고 가장자리를 둥글게 하고 살짝 기울인다.
-const heart = (fill, tilt = 0) =>
-  svg(
-    `<g transform="rotate(${tilt} 50 50)">
-       <path d="M50 84C26 66 14 54 14 40a20 20 0 0135-13 20 20 0 0135 13c0 14-12 26-36 44z"
-             fill="${fill}" stroke="#231F20" stroke-width="4" stroke-linejoin="round"/>
-       <ellipse cx="36" cy="38" rx="6" ry="8" fill="#fff" opacity=".55" transform="rotate(-20 36 38)"/>
-     </g>`
-  );
-
-const spark = (fill) =>
-  svg(
-    `<path d="M50 8c4 24 14 34 38 38-24 4-34 14-38 38-4-24-14-34-38-38 24-4 34-14 38-38z"
-           fill="${fill}" stroke="#231F20" stroke-width="4" stroke-linejoin="round"/>`
-  );
-
-const star = (fill) =>
-  svg(
-    `<path d="M50 10l11 25 27 3-20 18 5 27-23-13-23 13 5-27L12 38l27-3z"
-           fill="${fill}" stroke="#231F20" stroke-width="4" stroke-linejoin="round"/>`
-  );
-
-// 말풍선 — 안에 글자를 넣는다. 한국어가 주다.
-const bubble = (text, bg, fg = "#231F20") => {
-  const w = Math.max(64, 22 + text.length * 19);
-  return svg(
-    `<g>
-       <rect x="4" y="6" width="${w - 8}" height="46" rx="23"
-             fill="${bg}" stroke="#231F20" stroke-width="4"/>
-       <path d="M24 50l-4 16 20-14z" fill="${bg}" stroke="#231F20" stroke-width="4" stroke-linejoin="round"/>
-       <text x="${w / 2}" y="36" text-anchor="middle"
-             font-family="'Apple SD Gothic Neo','Noto Sans KR',sans-serif"
-             font-size="22" font-weight="800" fill="${fg}">${text}</text>
-     </g>`,
-    `0 0 ${w} 70`
-  );
-};
-
-// 필름 한 컷 — 사진 위에 얹으면 "필름 프레임" 느낌
-const filmStrip = svg(
-  `<g>
-     <rect x="6" y="20" width="88" height="60" rx="5" fill="#231F20"/>
-     <rect x="16" y="30" width="68" height="40" rx="2" fill="#FBF8F3"/>
-     ${[0, 1, 2, 3, 4]
-       .map((i) => `<rect x="${10 + i * 17}" y="23" width="8" height="5" rx="1.5" fill="#FBF8F3"/>`)
-       .join("")}
-     ${[0, 1, 2, 3, 4]
-       .map((i) => `<rect x="${10 + i * 17}" y="72" width="8" height="5" rx="1.5" fill="#FBF8F3"/>`)
-       .join("")}
-   </g>`
-);
-
-const shutter = svg(
-  `<g>
-     <circle cx="50" cy="50" r="34" fill="#FBF8F3" stroke="#231F20" stroke-width="5"/>
-     <circle cx="50" cy="50" r="15" fill="#E6403C" stroke="#231F20" stroke-width="4"/>
-     <circle cx="62" cy="36" r="4" fill="#231F20"/>
-   </g>`
-);
-
-// 리본 — 인물 사진에 잘 어울리는 장식
-const ribbon = (fill) =>
-  svg(
-    `<g stroke="#231F20" stroke-width="4" stroke-linejoin="round">
-       <path d="M50 52L22 34c-6-4-12 1-11 8l3 18c1 6 8 9 13 5z" fill="${fill}"/>
-       <path d="M50 52l28-18c6-4 12 1 11 8l-3 18c-1 6-8 9-13 5z" fill="${fill}"/>
-       <circle cx="50" cy="54" r="9" fill="${fill}"/>
-     </g>`
-  );
-
-// 보름달 — 추석 시즌
-const moon = svg(
-  `<g>
-     <circle cx="50" cy="50" r="34" fill="#F9C83C" stroke="#231F20" stroke-width="4"/>
-     <circle cx="38" cy="42" r="6" fill="#231F20" opacity=".12"/>
-     <circle cx="58" cy="58" r="9" fill="#231F20" opacity=".1"/>
-     <circle cx="62" cy="36" r="4" fill="#231F20" opacity=".12"/>
-   </g>`
-);
-
-const songpyeon = svg(
-  `<g stroke="#231F20" stroke-width="4" stroke-linejoin="round">
-     <path d="M20 62c0-18 13-30 30-30s30 12 30 30c0 6-13 10-30 10s-30-4-30-10z" fill="#BFE3C6"/>
-     <path d="M32 58c6-4 12-4 18 0s12 4 18 0" fill="none"/>
-   </g>`
-);
-
-/** 그룹별 스티커. `src` 는 data URI, `ratio` 는 가로/세로 비(합성 시 씀). */
+/** `ratio` = 가로/세로. 저장 시 캔버스 합성에서 높이를 계산하는 데 쓴다. */
 export const STICKER_SETS = [
-  {
-    key: "heart",
-    ko: "하트 · 반짝",
-    items: [
-      { id: "h-red", src: heart("#E6403C", -8), ratio: 1 },
-      { id: "h-yel", src: heart("#F9C83C", 6), ratio: 1 },
-      { id: "h-sky", src: heart("#60C9DE", -4), ratio: 1 },
-      { id: "h-pur", src: heart("#8A5DA7", 10), ratio: 1 },
-      { id: "s-yel", src: spark("#F9C83C"), ratio: 1 },
-      { id: "s-sky", src: spark("#60C9DE"), ratio: 1 },
-      { id: "st-red", src: star("#E6403C"), ratio: 1 },
-      { id: "st-yel", src: star("#F9C83C"), ratio: 1 },
-      { id: "rb-red", src: ribbon("#E6403C"), ratio: 1 },
-      { id: "rb-sky", src: ribbon("#60C9DE"), ratio: 1 },
-    ],
-  },
-  {
-    key: "film",
-    ko: "필름 · 카메라",
-    items: [
-      { id: "film", src: filmStrip, ratio: 1 },
-      { id: "shutter", src: shutter, ratio: 1 },
-    ],
-  },
-  {
-    key: "word",
-    ko: "말풍선",
-    items: [
-      { id: "w1", src: bubble("최고", "#F9C83C"), ratio: 64 / 70 },
-      { id: "w2", src: bubble("찰칵", "#60C9DE"), ratio: 64 / 70 },
-      { id: "w3", src: bubble("오늘의 나", "#FBF8F3"), ratio: 213 / 70 },
-      { id: "w4", src: bubble("사랑해", "#E6403C", "#FFFFFF"), ratio: 79 / 70 },
-      { id: "w5", src: bubble("고마워", "#8A5DA7", "#FFFFFF"), ratio: 79 / 70 },
-    ],
-  },
-  {
-    key: "chuseok",
-    ko: "추석",
-    items: [
-      { id: "moon", src: moon, ratio: 1 },
-      { id: "songpyeon", src: songpyeon, ratio: 1 },
-      { id: "ch1", src: bubble("한가위", "#F9C83C"), ratio: 79 / 70 },
-    ],
-  },
+  { key: "heart", ko: "하트 · 반짝", items: [
+      { id: "heart", src: "/stickers/heart.png", ratio: 0.9413, ko: "하트" },
+      { id: "wingheart", src: "/stickers/wingheart.png", ratio: 1.1361, ko: "날개 하트" },
+      { id: "sparkle", src: "/stickers/sparkle.png", ratio: 1.1898, ko: "반짝이" },
+      { id: "shootingstar", src: "/stickers/shootingstar.png", ratio: 1.0489, ko: "별똥별" },
+      { id: "cherry", src: "/stickers/cherry.png", ratio: 0.9853, ko: "체리" },
+      { id: "clover", src: "/stickers/clover.png", ratio: 0.9595, ko: "네잎클로버" },
+  ] },
+  { key: "deco", ko: "장식", items: [
+      { id: "ribbon", src: "/stickers/ribbon.png", ratio: 1.1585, ko: "리본" },
+      { id: "crown", src: "/stickers/crown.png", ratio: 1.0452, ko: "왕관" },
+      { id: "bubble", src: "/stickers/bubble.png", ratio: 1.2613, ko: "말풍선" },
+  ] },
+  { key: "film", ko: "필름 · 밤하늘", items: [
+      { id: "camera", src: "/stickers/camera.png", ratio: 0.8425, ko: "카메라" },
+      { id: "film", src: "/stickers/film.png", ratio: 0.9286, ko: "필름" },
+      { id: "moon", src: "/stickers/moon.png", ratio: 0.8721, ko: "달" },
+  ] },
 ];
 
-/** id → 항목 */
 const BY_ID = new Map();
 for (const g of STICKER_SETS) for (const it of g.items) BY_ID.set(it.id, it);
 export const stickerById = (id) => BY_ID.get(id) || null;

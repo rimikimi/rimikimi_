@@ -10,7 +10,7 @@
 //   filter mode=edit  → { mode: "edit", src: "data:image/jpeg;base64,..." } (결과 화면 "다듬기")
 //   filter mode=pick  → { mode: "pick", presetKey } (필터 탭 프리셋 → 사진 선택)
 // ============================================================
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import CameraStudio from "./CameraStudio";
 import PhotoEditor from "./PhotoEditor";
 import { isRimikimiWebView, nativeSaveToAlbum, nativeShareImage, nativeClose } from "./nativeBridge";
@@ -141,11 +141,24 @@ function FilterPicker({ presetKey, onPicked }) {
     setBusy(false);
     onPicked(srcs);
   }
+  // 필터를 고른 직후라 "사진 선택" 한 단계가 더 있으면 빈 화면처럼 보인다(오너 지적).
+  // 열리자마자 사진 선택창을 띄운다. 브라우저가 사용자 제스처 없는 click() 을 막으면
+  // 아래 버튼이 그대로 보이므로 막히는 경우에도 흐름이 끊기지 않는다.
+  const fileRef = useRef(null);
+  useEffect(() => {
+    const t = setTimeout(() => { try { fileRef.current?.click(); } catch (_) {} }, 120);
+    return () => clearTimeout(t);
+  }, []);
+
   return (
-    <div style={{ ...ROOT, alignItems: "center", justifyContent: "center", background: "#FBF8F3" }}>
+    <div style={{ ...ROOT, alignItems: "center", justifyContent: "center", background: "#FBF8F3", gap: 14 }}>
+      <div style={{ fontSize: 15, color: "rgba(35,31,32,.6)" }}>
+        {busy ? "사진을 불러오고 있어요" : "꾸밀 사진을 골라 주세요"}
+      </div>
       <label style={{ ...btnPrimary, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 24px" }}>
         {busy ? "불러오는 중…" : "사진 선택 (최대 10장)"}
-        <input type="file" accept="image/*" multiple onChange={onChange} style={{ display: "none" }} disabled={busy} />
+        <input ref={fileRef} type="file" accept="image/*" multiple onChange={onChange}
+               style={{ display: "none" }} disabled={busy} />
       </label>
     </div>
   );
