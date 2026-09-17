@@ -34,6 +34,29 @@ const PREVIEW_STEPS = (() => {
 const SLOW_MS = 42;            // 프레임 처리 시간이 이걸 넘으면 한 단계 낮춘다
 const ASPECT = 3 / 4;          // 앱 결과물과 같은 3:4
 
+
+/* 아이폰 기본 카메라와 같은 결의 아이콘 — 문자(✕ ⟳) 대신 SVG. */
+function IconX({ size = 17 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+    </svg>
+  );
+}
+function IconFlipCamera({ size = 21 }) {
+  // 카메라 몸체 + 회전 화살표 (SF Symbols 의 arrow.triangle.2.circlepath.camera 결)
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M4.5 8.5h3l1.2-1.8h6.6L16.5 8.5h3a1.5 1.5 0 011.5 1.5v7a1.5 1.5 0 01-1.5 1.5h-15A1.5 1.5 0 013 17v-7a1.5 1.5 0 011.5-1.5z"
+            stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+      <path d="M9.6 13.4a2.4 2.4 0 014.2-1.5M14.4 13.4a2.4 2.4 0 01-4.2 1.5"
+            stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      <path d="M13.9 10.6l0.2 1.5 1.5-0.2M10.1 16.2l-0.2-1.5-1.5 0.2"
+            stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 // 프리셋 색감을 CSS 필터로 근사한다(미리보기 전용 — 저장본은 applyLook 그대로).
 // GPU 로 처리돼서 해상도·프레임 손실이 없다. 정확히 같진 않지만 "어떤 느낌인지"는 전달된다.
 function cssFilterFor(p) {
@@ -76,6 +99,17 @@ export default function CameraStudio({ initialPresetKey = "none", onShot, onClos
   const stepRef = useRef(0);
   const avgRef = useRef(0);
   const swipeRef = useRef(null);
+  // 터치 포커스 — 누른 자리에 사각형을 띄우고, **기기가 지원할 때만** 실제 포커스를 건다.
+  // iOS WebKit 이 focusMode/pointsOfInterest 를 노출하지 않으면 표시만 되고 초점은 안 바뀐다
+  // (그 경우 진짜 터치 포커스는 웹뷰가 아니라 네이티브 카메라로 가야 한다).
+  const [focusPt, setFocusPt] = useState(null);  // {x,y,ok} 화면 비율 0..1
+  // 디지털 줌 1..4 — 하드웨어 줌은 기기가 노출해야 쓸 수 있어서(웹뷰에선 대개 불가)
+  // 미리보기는 CSS 확대로 보여주고, **저장본은 원본 해상도에서 그만큼 잘라낸다**
+  // (업스케일이 아니라 실제 센서 픽셀을 쓰므로 화질 손실이 최소).
+  const [zoom, setZoom] = useState(1);
+  const zoomRef = useRef(1);
+  const pinchRef = useRef(null);
+  const focusTimer = useRef(0);
 
   const [presetKey, setPresetKey] = useState(initialPresetKey);
   // 기본은 **후면** 카메라(오너 지시 2026-09-17). 전환 버튼으로 전면으로 바꿀 수 있다.
@@ -90,6 +124,7 @@ export default function CameraStudio({ initialPresetKey = "none", onShot, onClos
   const label = (p) => (ko ? p.ko : p.en);
 
   useEffect(() => { presetRef.current = presetKey; }, [presetKey]);
+  useEffect(() => { zoomRef.current = zoom; }, [zoom]);
 
   // 모달이 떠 있는 동안 앱 루트의 스와이프 제스처를 끈다 (PhotoEditor 와 같은 방식)
   useEffect(() => {
@@ -158,6 +193,39 @@ export default function CameraStudio({ initialPresetKey = "none", onShot, onClos
      **저장본은 그대로 정확하다**: 셔터를 누르면 `shoot()` 가 원본 해상도(최대 2048)에
      `applyLook` 을 그대로 한 번 적용한다. 미리보기는 근사, 결과물은 정확. */
 
+  /* ── 터치 포커스 ── */
+  async function focusAt(e) {
+    const el = e.currentTarget;
+    const r = el.getBoundingClientRect();
+    const p = e.touches?.[0] || e.changedTouches?.[0] || e;
+    const x = (p.clientX - r.left) / r.width;
+    const y = (p.clientY - r.top) / r.height;
+    if (x < 0 || x > 1 || y < 0 || y > 1) return;
+
+    let ok = false;
+    try {
+      const track = streamRef.current?.getVideoTracks?.()[0];
+      const caps = track?.getCapabilities?.() || {};
+      // 지원 여부를 **실제로 물어보고** 있을 때만 적용한다. 없으면 표시만.
+      if (track && (caps.pointsOfInterest || caps.focusMode)) {
+        const c = {};
+        if (caps.pointsOfInterest) c.pointsOfInterest = [{ x, y }];
+        if (caps.focusMode) {
+          const modes = Array.isArray(caps.focusMode) ? caps.focusMode : [caps.focusMode];
+          if (modes.includes("single-shot")) c.focusMode = "single-shot";
+          else if (modes.includes("continuous")) c.focusMode = "continuous";
+        }
+        if (Object.keys(c).length) { await track.applyConstraints({ advanced: [c] }); ok = true; }
+      }
+    } catch (_) { ok = false; }
+
+    hap.tap();
+    setFocusPt({ x, y, ok });
+    clearTimeout(focusTimer.current);
+    focusTimer.current = setTimeout(() => setFocusPt(null), 900);
+  }
+  useEffect(() => () => clearTimeout(focusTimer.current), []);
+
   /* ── 촬영: 카메라 원본 해상도로 같은 파이프라인 ── */
   async function shoot() {
     const v = videoRef.current;
@@ -170,7 +238,13 @@ export default function CameraStudio({ initialPresetKey = "none", onShot, onClos
       const c = document.createElement("canvas");
       c.width = w; c.height = h;
       const ctx = c.getContext("2d", { willReadFrequently: true });
-      const { sx, sy, sw, sh } = cover(v.videoWidth, v.videoHeight, w, h);
+      let { sx, sy, sw, sh } = cover(v.videoWidth, v.videoHeight, w, h);
+      // 디지털 줌: 미리보기에서 확대한 만큼 원본에서 가운데를 잘라낸다(업스케일 아님).
+      const z = zoomRef.current || 1;
+      if (z > 1) {
+        const nw = sw / z, nh = sh / z;
+        sx += (sw - nw) / 2; sy += (sh - nh) / 2; sw = nw; sh = nh;
+      }
       ctx.save();
       if (facing === "user") { ctx.translate(w, 0); ctx.scale(-1, 1); }
       ctx.drawImage(v, sx, sy, sw, sh, 0, 0, w, h);
@@ -192,12 +266,27 @@ export default function CameraStudio({ initialPresetKey = "none", onShot, onClos
   }
 
   /* ── 미리보기 좌우 스와이프로 필터 넘기기 ── */
+  const dist2 = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+
   function onTouchStart(e) {
+    if (e.touches && e.touches.length === 2) {           // 핀치 줌 시작
+      swipeRef.current = null;
+      pinchRef.current = { d0: dist2(e.touches[0], e.touches[1]), z0: zoomRef.current };
+      return;
+    }
     const tt = e.touches && e.touches[0];
     if (!tt) return;
     swipeRef.current = { x0: tt.clientX, y0: tt.clientY, axis: null };
   }
   function onTouchMove(e) {
+    if (pinchRef.current && e.touches && e.touches.length === 2) {
+      const { d0, z0 } = pinchRef.current;
+      if (d0 > 0) {
+        const next = Math.min(4, Math.max(1, z0 * (dist2(e.touches[0], e.touches[1]) / d0)));
+        setZoom(next);
+      }
+      return;
+    }
     const s = swipeRef.current, tt = e.touches && e.touches[0];
     if (!s || !tt) return;
     const dx = tt.clientX - s.x0, dy = tt.clientY - s.y0;
@@ -210,7 +299,7 @@ export default function CameraStudio({ initialPresetKey = "none", onShot, onClos
       step(dx < 0 ? 1 : -1);
     }
   }
-  function onTouchEnd() { swipeRef.current = null; }
+  function onTouchEnd() { swipeRef.current = null; pinchRef.current = null; }
 
   function step(dir) {
     const i = chips.findIndex((p) => p.key === presetRef.current);
@@ -240,22 +329,22 @@ export default function CameraStudio({ initialPresetKey = "none", onShot, onClos
             style={{ ...CS.floatBtn, left: 12 }}
             onClick={() => { hap.tap(); onClose && onClose(); }}
             aria-label={t("common.close")}
-          >✕</button>
+          ><IconX /></button>
           <button
             style={{ ...CS.floatBtn, right: 12 }}
             onClick={() => { hap.tap(); setFacing((f) => (f === "user" ? "environment" : "user")); }}
             aria-label={t("camera.flip")}
-          >⟳</button>
+          ><IconFlipCamera /></button>
         </>
       ) : (
         <div style={CS.top}>
-          <button style={CS.iconBtn} onClick={() => { hap.tap(); onClose && onClose(); }} aria-label={t("common.close")}>✕</button>
+          <button style={CS.iconBtn} onClick={() => { hap.tap(); onClose && onClose(); }} aria-label={t("common.close")}><IconX /></button>
           <div style={CS.topTitle}>{t("camera.title")}</div>
           <button
             style={CS.iconBtn}
             onClick={() => { hap.tap(); setFacing((f) => (f === "user" ? "environment" : "user")); }}
             aria-label={t("camera.flip")}
-          >⟳</button>
+          ><IconFlipCamera /></button>
         </div>
       )}
 
@@ -266,13 +355,13 @@ export default function CameraStudio({ initialPresetKey = "none", onShot, onClos
         onTouchEnd={onTouchEnd}
         onTouchCancel={onTouchEnd}
       >
-        <div style={CS.frame}>
+        <div style={CS.frame} onClick={focusAt}>
           <video
             ref={videoRef}
             style={{
               ...CS.liveVideo,
               filter: cssFilterFor(presetByKey(presetKey)),
-              transform: facing === "user" ? "scaleX(-1)" : "none",
+              transform: `${facing === "user" ? "scaleX(-1) " : ""}scale(${zoom})`,
             }}
             playsInline muted autoPlay
           />
@@ -283,6 +372,26 @@ export default function CameraStudio({ initialPresetKey = "none", onShot, onClos
             <div style={CS.errBox}>
               <div style={CS.errText}>{err}</div>
               <button style={CS.retry} onClick={() => open(facing)}>{t("common.retry")}</button>
+            </div>
+          )}
+          {focusPt && (
+            <div
+              className="cs-focus"
+              style={{ ...CS.focusBox, left: `${focusPt.x * 100}%`, top: `${focusPt.y * 100}%` }}
+            />
+          )}
+          {ready && (
+            <div style={CS.zoomRow}>
+              {[1, 2].map((z) => (
+                <button
+                  key={z}
+                  style={{ ...CS.zoomBtn, ...(Math.abs(zoom - z) < 0.06 ? CS.zoomBtnOn : null) }}
+                  onClick={(e) => { e.stopPropagation(); hap.tap(); setZoom(z); }}
+                >{z}×</button>
+              ))}
+              {zoom > 1 && Math.abs(zoom - 1) > 0.06 && Math.abs(zoom - 2) > 0.06 && (
+                <span style={CS.zoomNow}>{zoom.toFixed(1)}×</span>
+              )}
             </div>
           )}
           {ready && <div className="cs-name" key={presetKey} style={CS.nameTag}>{label(presetByKey(presetKey))}</div>}
@@ -361,6 +470,24 @@ const CS = {
   },
   video: { position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none" },
   // 카메라 영상을 그대로 보여준다(해상도 손실 없음). 색감은 CSS 필터로 근사.
+  zoomRow: {
+    position: "absolute", left: 0, right: 0, bottom: 12, zIndex: 4,
+    display: "flex", justifyContent: "center", alignItems: "center", gap: 8,
+  },
+  zoomBtn: {
+    minWidth: 38, height: 30, padding: "0 10px", borderRadius: 15, border: "none",
+    background: "rgba(0,0,0,0.45)", color: "rgba(255,255,255,0.85)",
+    fontSize: 12.5, fontWeight: 700, cursor: "pointer",
+  },
+  zoomBtnOn: { background: "rgba(255,255,255,0.92)", color: "#111" },
+  zoomNow: {
+    height: 30, display: "flex", alignItems: "center", padding: "0 10px", borderRadius: 15,
+    background: "rgba(0,0,0,0.45)", color: "#FFD84D", fontSize: 12.5, fontWeight: 700,
+  },
+  focusBox: {
+    position: "absolute", width: 74, height: 74, marginLeft: -37, marginTop: -37,
+    border: "1.5px solid #FFD84D", borderRadius: 6, pointerEvents: "none", zIndex: 4,
+  },
   liveVideo: { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" },
   canvas: { width: "100%", height: "100%", display: "block", objectFit: "cover" },
   hint: {
