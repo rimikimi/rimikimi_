@@ -166,6 +166,48 @@ Apple Guideline 3.1.2 — 구독을 파는 앱은 앱 설명 안에 **표준 EUL
 
 ---
 
+## 3-3. 이번 업데이트 노트 (2.0 — "새로운 기능", App Store Connect 버전별 필드)
+
+### 한국어
+```
+🎉 완전히 새로워진 rimikimi 2.0
+
+· 더 빠르고 매끄러운 네이티브 앱으로 새로 만들었어요
+· 카메라가 아이폰 기본 카메라처럼 바로 찍혀요
+· 이미지를 여러 개 동시에 만들 수 있어요
+· 화면 전환과 애니메이션이 더 자연스러워졌어요
+· 다크 모드를 지원해요
+
+버그나 의견은 결과 화면의 "신고" 버튼이나 enquiry@rimikimi.com 으로 알려주세요.
+```
+
+### English
+```
+🎉 rimikimi 2.0 — Completely Rebuilt
+
+· Rebuilt from the ground up as a faster, smoother native app
+· The camera now opens exactly like your iPhone's built-in camera
+· Generate multiple images at once
+· Smoother screen transitions and animations
+· Dark mode support
+
+Found a bug or have feedback? Use the report button on the result screen, or email enquiry@rimikimi.com.
+```
+
+## 3-4. TestFlight "무엇을 테스트할지" (build 99, 내부 테스터용)
+
+```
+이번 빌드(99)에서 확인해 주세요 — 2.0 컴플라이언스 FIX 반영분:
+
+1. 로그인 4종(Apple/카카오/네이버/Google) 버튼이 다 정상 동작하는지
+2. 컨셉 선택 → 만들기 → 첫 생성 완료 직후 ATT(추적 허용) 팝업이 실제로 뜨는지
+3. 결과 화면 "🚩 부적절한 결과 신고" 버튼 → 메일 작성창이 뜨는지
+4. 첫 "만들기" 전 뜨는 동의 시트("사진은 이렇게 쓰여요")의 "개인정보처리방침" 링크가
+   사파리로 실제로 열리는지 (동의 시트·크레딧부족 시트 둘 다)
+5. 샌드박스 결제 1회 → 크레딧이 정확히 1번만 올라가는지
+6. (1.x 가 설치돼 있던 기기라면) 업데이트 후 로그인이 자동으로 유지되는지
+```
+
 ## 4. 키워드 (Keywords, 100자, 쉼표로 구분)
 
 ### 한국어
