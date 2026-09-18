@@ -21,6 +21,23 @@ async function toLocalFile(src: string, name: string) {
   return File.downloadFileAsync(src, f);
 }
 
+/**
+ * 이미 기기에 있는 파일(file://)을 앨범에 저장 — 네이티브 카메라로 찍은 **원본** 용.
+ * (아래 saveDataUrlToAlbum 은 data URL/원격 URL 을 캐시 파일로 받아쓰는 경로라, 이미 파일인
+ *  것을 굳이 다시 받아 쓸 이유가 없다. ios2 의 CameraAlbum.save 와 같은 자리.)
+ */
+export async function saveFileToAlbum(uri: string): Promise<{ ok: true } | { error: string }> {
+  try {
+    const MediaLibrary = await import("expo-media-library");
+    const perm = await MediaLibrary.requestPermissionsAsync(true); // writeOnly
+    if (!perm.granted) return { error: "permission denied" };
+    await MediaLibrary.saveToLibraryAsync(uri);
+    return { ok: true };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
 /** 앨범 저장(writeOnly) — 성공하면 {ok:true}, 실패하면 {error}. src/nativeBridge.js nativeSaveToAlbum 과 같은 반환 모양. */
 export async function saveDataUrlToAlbum(src: string, filename = "rimikimi"): Promise<{ ok: true } | { error: string }> {
   try {

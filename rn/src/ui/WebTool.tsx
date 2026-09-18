@@ -27,7 +27,8 @@ import { chrome, color, space, themedStyles } from "@/theme/tokens";
 // 것처럼 만든다. `window.__rimikimiResolve` 는 nativeBridge.js 자신이 이미 정의해 두므로
 // 여기서 또 만들 필요 없다 — 결과만 그 이름으로 불러주면 된다.
 //
-// 액션(type): saveToAlbum({dataUrl,filename}) → {ok:true}|{error}
+// 액션(type): ready({}) → 응답 대신 `window.__rimikimiInit(initialPayload)` 를 불러 초기 데이터를 준다
+//             saveToAlbum({dataUrl,filename}) → {ok:true}|{error}
 //             share({dataUrl,filename,title,text}) → {ok:true}|{ok:false,reason}
 //             close({}, id 없음) → 응답 없음, 네이티브가 화면을 닫는다
 //             refreshCredits({}) → {ok:true}
@@ -46,7 +47,19 @@ const BRIDGE_JS = `
 })();
 `;
 
-export function WebTool({ title, tool, query }: { title: string; tool: "filter" | "camera"; query?: Record<string, string> }) {
+export function WebTool({ title, tool, query, initialPayload }: {
+  title: string;
+  tool: "filter" | "camera";
+  query?: Record<string, string>;
+  /**
+   * 웹이 `ready` 를 보내면 그대로 `window.__rimikimiInit(payload)` 로 넘겨 주는 초기 데이터.
+   * ios2 WebToolView.swift 의 `initialPayload` 와 같은 규약이다 — 편집기에 사진을 미리 실어
+   * 보낼 때(카메라로 찍은 직후 "다듬기") 쓴다: `{ mode: "edit", src: "data:image/jpeg;base64,…" }`.
+   * ⚠️ ToolEntry.jsx 는 ready 후 1.5초 안에 응답이 없으면 빈 초기값으로 진행한다 —
+   *    여기서 ready 를 받자마자 바로 주입해야 사진이 실려 간다.
+   */
+  initialPayload?: Record<string, unknown>;
+}) {
   const insets = useSafeAreaInsets();
   const { session } = useAuth();
   const { refresh: refreshQuota } = useQuota();
@@ -73,6 +86,12 @@ export function WebTool({ title, tool, query }: { title: string; tool: "filter" 
     const { id, type, payload } = msg;
     (async () => {
       switch (type) {
+        case "ready": {
+          // 응답(__rimikimiResolve)이 아니라 __rimikimiInit 으로 준다 — ToolEntry.jsx 규약.
+          const payload = JSON.stringify(initialPayload ?? {});
+          webRef.current?.injectJavaScript(`window.__rimikimiInit && window.__rimikimiInit(${payload}); true;`);
+          break;
+        }
         case "saveToAlbum": {
           const r = await saveDataUrlToAlbum(String(payload?.dataUrl ?? ""), String(payload?.filename ?? "rimikimi"));
           resolve(id, r);

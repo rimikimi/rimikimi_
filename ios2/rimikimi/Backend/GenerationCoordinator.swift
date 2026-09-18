@@ -88,6 +88,9 @@ final class GenerationCoordinator {
     /// (entries 전체를 관찰하면 진행 중 waiting 토글에도 반응해 과하게 불린다)
     private(set) var doneTick = 0
     private(set) var failedTick = 0
+    /// 방금 끝난 완료가 "실제 생성" 인가, "복구(앱 재시작 뒤 갤러리에서 되찾음)" 인가.
+    /// 전면광고는 실제 생성에만 띄운다 — 1.x·안드로이드와 같게(2026-09-18 검증 지적).
+    private(set) var lastDoneWasLive = false
 
     private let defaults = UserDefaults.standard
     private let markerKey = "rimikimi.pendingGen.v2"    // [Job] 배열
@@ -123,6 +126,7 @@ final class GenerationCoordinator {
             setPhase(job.id, .done(items))
             pendingPresentation = items
             pendingPresentationJob = job
+            lastDoneWasLive = true
             doneTick &+= 1
             AppLog.api.info("gen.done concept=\(job.conceptId, privacy: .public) items=\(items.count)")
             HapticPlayer.success()
@@ -176,6 +180,7 @@ final class GenerationCoordinator {
                 setPhase(job.id, .done(items))
                 pendingPresentation = items
                 pendingPresentationJob = job
+                lastDoneWasLive = false      // 복구로 되찾은 결과 — 광고는 띄우지 않는다
                 doneTick &+= 1
                 HapticPlayer.success()
                 return true

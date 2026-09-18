@@ -11,6 +11,7 @@ import { StoreProvider } from "@/lib/store";
 import { GenerationProvider } from "@/lib/generation";
 import { CreditGateProvider } from "@/lib/creditGate";
 import { installPushHandlers, setupNotifications } from "@/lib/push";
+import { initAds } from "@/lib/ads";
 import { usePushResultRouting } from "@/lib/pushRouting";
 import { LoginSheet } from "@/ui/LoginSheet";
 import { CreditSheet } from "@/ui/CreditSheet";
@@ -60,6 +61,13 @@ export default function RootLayout() {
     const off = installPushHandlers();
     void setupNotifications(false);
     return off;
+  }, [problem]);
+
+  // AdMob SDK 초기화만 미리(광고를 받아 두진 않는다 — 이유는 lib/ads.ts initAds 주석).
+  // 전면광고를 띄우는 곳은 생성 성공 경로 한 곳뿐이다(lib/generation.tsx).
+  useEffect(() => {
+    if (problem) return;
+    initAds();
   }, [problem]);
 
   if (problem) {

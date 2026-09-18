@@ -9,6 +9,7 @@ import { encodeForUpload, type EncodedPhoto, type PhotoRef } from "./photo";
 import { RESULT_W, RESULT_H, fitResultToRatio, fitResultToSize, fileRatio } from "./fitToSize";
 import { type Concept, ID_BGS, buildIdPhotoPrompt, isArtOnly, isIdPhoto, isRestoreConcept } from "./concepts";
 import { getPushToken } from "./push";
+import { showInterstitial } from "./ads";
 import { loadProfileRefs } from "./faceProfile";
 import { setLastDoneJob } from "./lastJob";
 import { FIRST_GEN_DONE_KEY, INVITE_CARD_DUE_KEY, getFlag, setFlag } from "./prefs";
@@ -150,8 +151,16 @@ let seq = 0;
 
 export function GenerationProvider({ children }: { children: React.ReactNode }) {
   const { session } = useAuth();
-  const { refresh: refreshQuota } = useQuota();
+  const { quota, loaded: quotaLoaded, refresh: refreshQuota } = useQuota();
   const [jobs, setJobs] = useState<Job[]>([]);
+  // 전면광고 대상인가 — 1.x PortraitStudio.jsx 의 `showAds` 와 **같은 식**이다:
+  //   showAds = quotaLoaded && !unlimited && credits === 0
+  // (무제한 계정·유료 크레딧 보유자는 제외 = 무료 사용자만). 규칙을 새로 만들지 않았다.
+  // ref 로 두는 이유: start() 의 deps 에 크레딧을 넣으면 숫자가 바뀔 때마다 start 가
+  // 새로 만들어진다. 값은 **만들기를 누른 시점**에 한 번 읽는다 — 1.x 도 생성 시작 시점의
+  // 값을 클로저에 담고 있었다(생성으로 크레딧이 깎여도 그 판정은 안 바뀐다).
+  const showAdsRef = useRef(false);
+  showAdsRef.current = quotaLoaded && !!quota && !quota.unlimited && quota.credits === 0;
   // 복구 중인 작업 id 집합. 예전엔 boolean 하나라 한 작업이 폴링 중이면 다른 작업은
   // 복구 시도조차 못 했다. 이제 **같은 작업의 중복 폴링만** 막고 다른 작업은 통과시킨다.
   const recovering = useRef<Set<string>>(new Set());
@@ -249,6 +258,7 @@ export function GenerationProvider({ children }: { children: React.ReactNode }) 
     const count = input.fourcutCount ?? (isArtOnly(concept) ? 1 : input.batchCount);
     const startedAt = Date.now();
     const job: Job = { id, concept, count, startedAt, status: "running", images: [], input };
+    const showAds = showAdsRef.current; // 1.x 와 같이 "누른 시점" 판정
     setJobs((prev) => [job, ...prev]);
     // 햅틱은 확정 시점에만 — 만들기가 확정된 지금.
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
@@ -304,6 +314,9 @@ export function GenerationProvider({ children }: { children: React.ReactNode }) 
         void noteDone();
         if (images[0]) void setLastDoneJob({ jobId: id, conceptId: String(concept.id), title: concept.title, url: images[0].uri });
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
+        // 무료 사용자 → 생성이 끝난 뒤 전면광고 1회 (1.x src/PortraitStudio.jsx 와 같은 자리·같은 조건).
+        // ⚠️ await 금지 — 광고가 늦거나 실패해도 이 흐름이 여기서 멈추면 안 된다.
+        if (showAds) void showInterstitial();
       } catch (err) {
         const e = err as ApiError;
         const recovered = await tryRecover(id, { poll: !!e?.networkFail });

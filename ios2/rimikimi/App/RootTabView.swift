@@ -72,7 +72,18 @@ struct RootTabView: View {
             app.generation.pendingPresentationJob = nil
             app.present(items, job: job)
             // ATT 는 첫 생성 완료 후에만 — 결과 화면이 뜬 뒤 1초, 1회 → 그 다음 초대 카드(SPEC §3).
+            // ⚠️ 순서 주의: `afterFirstResult()` 는 부르는 즉시 "물어봤음" 으로 기록하므로
+            //    ATT 가 이번에 뜰 차례인지는 **부르기 전에** 봐 둬야 한다.
+            let attWillAsk = !TrackingPrompt.asked
             app.afterFirstResult()
+            // 무료 사용자 → 생성 후 전면광고 1회 (1.x `src/ads.js` 규칙 그대로).
+            // 단 ATT 팝업이 뜰 차례면(첫 결과) 이번 회는 건너뛴다 — 전면광고가 화면을 덮은 채
+            // ATT 를 요청하면 iOS 가 조용히 무시한다(1.x `ads.js` 가 기록해 둔 사고, SPEC §3
+            // "팝업 겹치기 금지"). 광고는 두 번째 생성부터 정상적으로 나간다.
+            // ⚠️ 이 자리는 **복구 경로**(앱 재시작·복귀 뒤 갤러리에서 결과를 되찾는 길)도
+            //    지나간다. 1.x 는 복구에는 광고를 띄우지 않았고 안드로이드도 안 띄운다 —
+            //    양쪽을 맞춘다. 방금 생성이 끝나 결과가 뜬 경우에만 광고를 낸다.
+            if !attWillAsk, app.generation.lastDoneWasLive { app.showInterstitialAfterGeneration() }
         }
         // 429(크레딧 부족) 실패 → 시트. 구매 뒤 같은 요청을 이어간다.
         .onChange(of: app.generation.failedTick) { _, _ in

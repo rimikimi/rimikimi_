@@ -48,7 +48,7 @@ const config: ExpoConfig = {
 
   android: {
     package: "com.rimikimi.app",
-    versionCode: 100,
+    versionCode: 101,
     // FCM (rimikimi-ad8aa) — 1.x android/app/google-services.json 사본. 완료 푸시 + 드롭 토픽(drop_p540).
     googleServicesFile: "./google-services.json",
     adaptiveIcon: {
@@ -114,6 +114,20 @@ const config: ExpoConfig = {
       },
     ],
     ["expo-build-properties", { android: { compileSdkVersion: 36, targetSdkVersion: 36 } }],
+    // AdMob 전면광고 (src/lib/ads.ts). 이 플러그인이 하는 일은 매니페스트에
+    //   <meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" .../>
+    // 를 넣는 것뿐이다 — **이게 없으면 광고 SDK 가 앱 시작 때 크래시한다**(구글 SDK 사양).
+    // 값은 1.x android/app/src/main/AndroidManifest.xml 과 같은 AdMob 앱 ID (앱 ID `~`,
+    // 광고단위 ID `/` — 헷갈리면 크래시한다. 광고단위는 src/lib/ads.ts 에 있다).
+    // iosAppId: 이 워크트리는 안드로이드 전용(prebuild --platform android)이라 Info.plist 는
+    // 만들어지지 않는다. 안 주면 플러그인이 매번 경고를 찍어서 1.x 의 iOS 앱 ID 를 같이 둔다.
+    [
+      "react-native-google-mobile-ads",
+      {
+        androidAppId: "ca-app-pub-9458625554324585~7815250725",
+        iosAppId: "ca-app-pub-9458625554324585~5856129775",
+      },
+    ],
     // 1.x 업로드 키로 release 서명 (app/build.gradle 수정, 매니페스트와 무관 — 순서 상관없음).
     withReleaseSigning,
   ],

@@ -316,10 +316,29 @@ final class AppState {
     /// 노출로 바뀌었다(결함 #5, `showInviteCard` 초기값 참고). 키 이름은 예전 그대로 재사용(ATT 1회
     /// 트리거 용도로만 씀, 마이그레이션 불필요).
     func afterFirstResult() {
-        let key = "invite.card.shown.v1"
-        guard !UserDefaults.standard.bool(forKey: key) else { return }
-        UserDefaults.standard.set(true, forKey: key)
+        // ⚠️ 예전에는 여기서 `invite.card.shown.v1` 로 먼저 걸렀다. 초대 카드가 홈 상시 노출로
+        //    바뀌면서 그 키는 쓸모가 없어졌는데 가드만 남았고, 그 바람에 **ATT 플래그가
+        //    기록되지 않는 기기**가 생겼다: 그 키가 이미 true 인 기기(예전 빌드로 한 번이라도
+        //    생성해 본 테스터 전부)는 여기서 곧바로 돌아가버려 `rimikimi.att.asked.v1` 이
+        //    영영 false 로 남는다. 그 플래그를 보고 전면광고를 건너뛰게 해 놨으므로
+        //    → **광고가 영영 안 뜬다**(2026-09-18 검증에서 잡음).
+        //    TrackingPrompt 는 자기 키로 이미 1회 보장을 한다. 여기서 또 막을 이유가 없다.
         TrackingPrompt.requestOnceAfterFirstResult()
+    }
+
+    /// 생성이 끝난 뒤 **무료 사용자에게만** 전면광고 1회.
+    ///
+    /// 규칙은 새로 만들지 않고 1.x 를 그대로 옮겼다 — `src/PortraitStudio.jsx:1542`
+    /// `showAds = quotaLoaded && !unlimited && credits === 0`:
+    ///   - `quota == nil` (아직 못 불러옴) → 안 띄운다. 모르면 안 띄우는 쪽이 맞다.
+    ///   - 무제한 계정 → 안 띄운다.
+    ///   - 크레딧이 남아 있으면 → 안 띄운다. (크레딧을 쓴 생성에는 광고를 붙이지 않는다는 뜻.
+    ///     하루 무료분으로 만든 사람만 광고를 본다.)
+    /// 여기서 판정하는 이유는 `GenerationCoordinator` 가 크레딧/무제한 상태를 모르기 때문이다
+    /// (`quota` 는 AppState 소유). 코디네이터에 역참조를 심으면 그 파일 구조를 건드리게 된다.
+    func showInterstitialAfterGeneration() {
+        guard let q = quota, q.unlimited != true, q.creditsAvailable == 0 else { return }
+        AdManager.shared.showInterstitial()
     }
 
     /// 홈 초대 카드를 닫는다 — 닫힌 상태를 영구 기억해 다음 실행에도 다시 뜨지 않게 한다(결함 #5).

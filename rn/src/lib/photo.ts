@@ -50,10 +50,15 @@ export async function pickPhotos(opts: { multiple?: boolean; limit?: number } = 
   return res.assets.map((a) => ({ uri: a.uri, width: a.width, height: a.height }));
 }
 
+/**
+ * OS 기본 카메라로 한 장. **후면이 기본**이다 — 오너 지시로 아이폰도 후면이고
+ * (ios2/rimikimi/UI/Camera/SystemCamera.swift `cameraDevice = .rear`), 앞뒤 전환은 기본
+ * 카메라 화면에서 사용자가 직접 한다. (2.0 초기엔 front 였는데 아이폰과 달라 맞췄다.)
+ */
 export async function takeSelfie(): Promise<PhotoRef | null> {
   const perm = await ImagePicker.requestCameraPermissionsAsync();
   if (!perm.granted) return null;
-  const res = await ImagePicker.launchCameraAsync({ mediaTypes: ["images"], cameraType: ImagePicker.CameraType.front, quality: 1 });
+  const res = await ImagePicker.launchCameraAsync({ mediaTypes: ["images"], cameraType: ImagePicker.CameraType.back, quality: 1 });
   if (res.canceled) return null;
   const a = res.assets[0];
   return { uri: a.uri, width: a.width, height: a.height };

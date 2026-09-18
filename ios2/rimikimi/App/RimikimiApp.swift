@@ -16,6 +16,9 @@ struct RimikimiApp: App {
                 .task {
                     // 실행 시 팝업 없음 — Firebase 설정만, 권한은 프로필 토글에서.
                     app.push.configureAtLaunch()
+                    // 전면광고 SDK 초기화 + 첫 광고 미리 로드. 팝업은 안 뜬다(ATT 는 TrackingPrompt 소유).
+                    // 여기서 미리 받아 둬야 생성이 끝난 순간 기다림 없이 띄울 수 있다.
+                    AdManager.shared.start()
                     // 5주차: 아직 로그인 안 된 상태면 1.x WKWebView localStorage 에서 세션을 건질 수
                     // 있는지 1회 시도한다(LegacySessionMigration). 실패해도 부작용 없음 — 평소처럼 로그인 시트.
                     await LegacySessionMigration.attemptOnce()

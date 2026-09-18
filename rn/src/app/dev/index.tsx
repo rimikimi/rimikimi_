@@ -24,7 +24,7 @@ const ROUTES: { href: string; title: string }[] = [
   { href: "/concept/793", title: "옵션: 드레스룸(793)" },
   { href: "/concept/418", title: "옵션: 인생네컷(418)" },
   { href: "/concept/743", title: "옵션: 커플(743)" },
-  { href: "/camera", title: "카메라(웹뷰)" },
+  { href: "/camera", title: "카메라(OS 기본 카메라)" },
   { href: "/editor", title: "편집기(웹뷰)" },
 ];
 
