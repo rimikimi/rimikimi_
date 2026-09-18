@@ -1,0 +1,41 @@
+# rimikimi (리미키미)
+
+> 셀카 한 장으로 AI 사진을 만드는 한국 앱. 증명사진·프로필 사진부터 인생네컷·커플 화보까지
+> 464가지 컨셉으로 만듭니다. 얼굴 특징은 그대로 두고 배경·의상·분위기만 바꿉니다.
+> iOS·Android 앱이 있고 웹에서도 바로 써볼 수 있습니다.
+
+One selfie becomes an AI portrait. rimikimi is a Korean AI photo app with 464 concepts —
+ID photos, resume headshots, couple shots, photo-booth strips and editorial looks —
+keeping the person's face recognizable while changing only styling and setting.
+
+## 핵심 사실 / Key facts
+
+- 만드는 방식: 셀카 1장 업로드 → 컨셉 선택 → 몇 분 내 생성. 여러 장 동시 생성 가능.
+- 컨셉 수: 464종. 매일 저녁 8시(KST)에 새 컨셉이 추가됩니다.
+- 무료: 가입하면 하루 1장 무료. 그 이상은 크레딧으로.
+- 주요 기능: AI 프로필 사진 / AI 증명사진 / 인생네컷(2~8분할) / 커플 사진(사진 2장) /
+  드레스룸(옷 사진을 입은 내 모습) / 사진 복원 / 필터·편집기
+- 개인정보: 생성한 사진은 1시간 뒤 자동 삭제. 얼굴인식 특징정보(임베딩)를 만들거나
+  보관하지 않습니다. 기준 사진은 기기 안에만 저장됩니다.
+- 운영: 리미키미 (사업자등록번호 247-01-03603, 통신판매업 2026-고양일산동-0326,
+  경기도 고양시 일산동구). 문의 enquiry@rimikimi.com
+
+## 주의 / Caveats
+
+- 증명사진은 AI 생성물입니다. 여권·비자 등 공식 제출용으로는 규격 불일치로 거절될 수
+  있어 참고용으로 안내합니다.
+- 결과물은 AI가 만든 이미지입니다. 실존 인물의 실제 사진이 아닙니다.
+
+## 문서 / Pages
+
+- [앱 사용하기 (웹)](https://rimikimi-app.vercel.app/): 컨셉 고르고 바로 생성
+- [앱 다운로드](https://rimikimi-app.vercel.app/download): iOS · Android
+- [개인정보처리방침](https://rimikimi-app.vercel.app/privacy): 사진 보관·삭제, 국외이전, 수탁사
+- [이용약관](https://rimikimi-app.vercel.app/terms)
+- [환불정책](https://rimikimi-app.vercel.app/refund): 7일 이내 미사용분 환불, 인앱결제 안내
+- [계정 삭제](https://rimikimi-app.vercel.app/delete-account)
+
+## 스토어 / Stores
+
+- App Store: https://apps.apple.com/kr/app/id6782776518
+- Google Play: https://play.google.com/store/apps/details?id=com.rimikimi.app

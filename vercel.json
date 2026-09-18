@@ -48,5 +48,27 @@
       "path": "/api/cron/refresh-apple-secret",
       "schedule": "0 4 1 * *"
     }
+  ],
+  "redirects": [
+    {
+      "source": "/privacy.html",
+      "destination": "/privacy",
+      "permanent": true
+    },
+    {
+      "source": "/terms.html",
+      "destination": "/terms",
+      "permanent": true
+    },
+    {
+      "source": "/refund.html",
+      "destination": "/refund",
+      "permanent": true
+    },
+    {
+      "source": "/download.html",
+      "destination": "/download",
+      "permanent": true
+    }
   ]
 }

@@ -55,6 +55,8 @@ function readURLLang() {
 }
 
 let currentLang = readURLLang() || readSaved() || detectSystemLang();
+// 첫 렌더 전에 한 번 맞춘다 — 크롤러가 보는 스냅샷이 모순되지 않게.
+try { if (typeof document !== "undefined") queueMicrotask(() => syncDocumentLang()); } catch (_) {}
 
 export function getLang() {
   return currentLang;
@@ -74,7 +76,57 @@ export function setLang(lang) {
       return;
     }
   } catch (_) {}
+  syncDocumentLang();
   listeners.forEach((fn) => { try { fn(currentLang); } catch (_) {} });
+}
+
+/* ── 문서 메타를 "지금 그려지는 언어"와 맞춘다 ───────────────────────────────
+   왜 필요한가 (2026-09-18 감사에서 잡힘):
+     정적 HTML 은 lang="ko" · 한국어 title/description · og:locale=ko_KR 인데,
+     언어는 navigator.languages 로 고른다. **구글봇은 en-US 로 크롤한다** — 그래서
+     구글이 저장한 스냅샷은 "한국어 메타 + 영어 본문 + lang=ko" 라는 모순 조합이었다.
+     한국어로도 영어로도 확신을 못 준다.
+   어떻게 푸나:
+     렌더 언어에 맞춰 html[lang]·title·description·og 를 갈아끼우고, canonical 을
+     그 언어판 주소(?lang=ko / ?lang=en)로 자기참조시킨다. index.html 의 hreflang 이
+     두 주소를 가리키므로, 구글봇이 ?lang=ko 를 크롤하면 readURLLang() 이 이겨
+     **한국어로 렌더된 한국어판**을 제대로 색인한다. */
+const DOC_META = {
+  ko: {
+    title: "rimikimi — 내 얼굴로 만드는 AI 인생 프로필",
+    desc: "셀카 한 장으로 만드는 AI 인생 프로필 앱 rimikimi. 증명사진, 이력서용 프로필 사진부터 카페·웨딩·스튜디오 컨셉의 화보풍 셀카 화보까지 내 얼굴로 몇 분 만에 완성해 원하는 배경과 스타일을 골라 바로 다운로드하세요.",
+    ogTitle: "rimikimi — 내 얼굴로 만드는 AI 인생 프로필",
+    ogDesc: "내 얼굴로 인생 프로필 만들기 ✨",
+    locale: "ko_KR",
+  },
+  en: {
+    title: "rimikimi — AI portraits from one selfie",
+    desc: "Turn one selfie into AI portraits: ID photos, resume headshots, couple shots, photo-booth strips and editorial concepts. Hundreds of concepts, ready in minutes, free to try once a day.",
+    ogTitle: "rimikimi — AI portraits from one selfie",
+    ogDesc: "One selfie. Hundreds of concepts. ✨",
+    locale: "en_US",
+  },
+};
+const BASE_URL = "https://rimikimi-app.vercel.app/";
+
+function setMeta(sel, attr, value) {
+  try {
+    const el = document.querySelector(sel);
+    if (el) el.setAttribute(attr, value);
+  } catch (_) {}
+}
+
+export function syncDocumentLang() {
+  if (typeof document === "undefined") return;
+  const m = DOC_META[currentLang] || DOC_META.ko;
+  try { document.documentElement.setAttribute("lang", currentLang); } catch (_) {}
+  try { document.title = m.title; } catch (_) {}
+  setMeta('meta[name="description"]', "content", m.desc);
+  setMeta('meta[property="og:title"]', "content", m.ogTitle);
+  setMeta('meta[property="og:description"]', "content", m.ogDesc);
+  setMeta('meta[property="og:locale"]', "content", m.locale);
+  // 각 언어판이 자기 자신을 canonical 로 — 안 그러면 hreflang 이 무시된다.
+  setMeta('link[rel="canonical"]', "href", `${BASE_URL}?lang=${currentLang}`);
 }
 
 // "auto" 인지 알고 싶을 때 (프로필 UI 가 라디오 표시할 때)

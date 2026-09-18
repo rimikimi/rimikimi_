@@ -9,6 +9,15 @@
     <title>rimikimi — 내 얼굴로 만드는 AI 인생 프로필</title>
     <meta name="description" content="셀카 한 장으로 만드는 AI 인생 프로필 앱 rimikimi. 증명사진, 이력서용 프로필 사진부터 카페·웨딩·스튜디오 컨셉의 화보풍 셀카 화보까지 내 얼굴로 몇 분 만에 완성해 원하는 배경과 스타일을 골라 바로 다운로드하세요." />
     <link rel="canonical" href="https://rimikimi-app.vercel.app/" />
+    <!-- 한/영 두 벌인데 hreflang 이 하나도 없었다 (2026-09-18 감사).
+         언어 전환이 ?lang= 쿼리로만 되고 서버 응답엔 흔적이 없어서,
+         ?lang=en 으로 들어온 영어권 사용자에게도 한국어 메타가 노출됐다.
+         ⚠️ 검색엔진이 각 언어판을 크롤하려면 **각 변형이 자기 자신을 canonical**로
+            가리켜야 한다 — src/i18n.js 가 렌더 언어에 맞춰 canonical·title·
+            description·og:locale·html[lang] 을 함께 갈아끼운다. -->
+    <link rel="alternate" hreflang="ko" href="https://rimikimi-app.vercel.app/?lang=ko" />
+    <link rel="alternate" hreflang="en" href="https://rimikimi-app.vercel.app/?lang=en" />
+    <link rel="alternate" hreflang="x-default" href="https://rimikimi-app.vercel.app/" />
     <meta name="robots" content="index, follow" />
 
     <!-- 폰트 — 예전엔 런타임 주입 <style> 맨 위의 @import 였다. @import 는 그 스타일시트
@@ -83,7 +92,67 @@
 
     <!-- JSON-LD -->
     <script type="application/ld+json">
-    {"@context":"https://schema.org","@type":"MobileApplication","name":"rimikimi","operatingSystem":"iOS, Android","applicationCategory":"MultimediaApplication","description":"셀카로 만드는 AI 인생 프로필 — 증명사진부터 화보까지.","url":"https://rimikimi-app.vercel.app/","downloadUrl":["https://apps.apple.com/kr/app/id6782776518","https://play.google.com/store/apps/details?id=com.rimikimi.app"],"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"publisher":{"@type":"Organization","name":"rimikimi studios","url":"https://rimikimi-apps.vercel.app/"}}
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://rimikimi.com/#org",
+      "name": "rimikimi studios",
+      "alternateName": "리미키미",
+      "url": "https://rimikimi.com/",
+      "email": "enquiry@rimikimi.com",
+      "sameAs": [
+        "https://apps.rimikimi.com/",
+        "https://apps.apple.com/kr/app/id6782776518",
+        "https://play.google.com/store/apps/details?id=com.rimikimi.app"
+      ]
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://rimikimi-app.vercel.app/#site",
+      "url": "https://rimikimi-app.vercel.app/",
+      "name": "rimikimi",
+      "inLanguage": ["ko-KR", "en"],
+      "publisher": { "@id": "https://rimikimi.com/#org" }
+    },
+    {
+      "@type": "MobileApplication",
+      "@id": "https://rimikimi-app.vercel.app/#app",
+      "name": "rimikimi",
+      "alternateName": "리미키미",
+      "operatingSystem": "iOS, Android",
+      "applicationCategory": "MultimediaApplication",
+      "applicationSubCategory": "Photo & Video",
+      "description": "셀카 한 장으로 만드는 AI 사진관. 증명사진·프로필 사진부터 인생네컷·커플 화보까지 464가지 컨셉으로 만듭니다.",
+      "inLanguage": ["ko-KR", "en"],
+      "url": "https://rimikimi-app.vercel.app/",
+      "downloadUrl": [
+        "https://apps.apple.com/kr/app/id6782776518",
+        "https://play.google.com/store/apps/details?id=com.rimikimi.app"
+      ],
+      "sameAs": [
+        "https://apps.apple.com/kr/app/id6782776518",
+        "https://play.google.com/store/apps/details?id=com.rimikimi.app",
+        "https://rimikimi.com/"
+      ],
+      "offers": [
+        { "@type": "Offer", "price": "0", "priceCurrency": "KRW", "description": "무료 · 하루 1장" },
+        { "@type": "Offer", "priceCurrency": "KRW", "category": "인앱결제", "description": "크레딧 팩 / rimikimi+ 구독" }
+      ],
+      "featureList": [
+        "셀카 1장으로 AI 프로필 사진 생성",
+        "AI 증명사진 (여권·이력서용 참고 이미지)",
+        "인생네컷 — 2~8분할 프레임",
+        "커플 사진 (사진 2장 합성)",
+        "드레스룸 — 옷 사진을 입은 내 모습",
+        "464가지 컨셉, 매일 저녁 8시 신규 공개"
+      ],
+      "publisher": { "@id": "https://rimikimi.com/#org" },
+      "isPartOf": { "@id": "https://rimikimi-app.vercel.app/#site" }
+    }
+  ]
+}
     </script>
   </head>
   <body>

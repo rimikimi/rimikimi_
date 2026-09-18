@@ -60,5 +60,13 @@ export function publishedConcepts(ALL, now) {
 
   // publishAt 은 지우지 않고 그대로 내려준다 — 구버전 앱이 자체 정렬할 때
   // 쓸 수 있고, 이미 지난 시각이라 숨길 이유도 없다.
-  return list;
+
+  // ⚠️ **프롬프트(text)는 내려보내지 않는다** (2026-09-18).
+  //    예전엔 컨셉마다 프롬프트 전문을 그대로 실어 보냈다. 그래서 `/concepts.json` 과
+  //    `public/concepts.fallback.json`(634KB)에 **오너가 직접 쓴 프롬프트 464개가
+  //    통째로 공개**돼 있었고, robots.txt 가 전면 허용이라 AI 학습 크롤러도 긁어갔다.
+  //    이제 생성할 때 서버가 conceptId 로 직접 찾는다(api/generate.js 의 resolvePrompt).
+  //    앱은 프롬프트를 알 필요가 없다.
+  //    ⚠️ 여기서 되살리지 말 것 — 되살리면 그날로 다시 공개된다.
+  return list.map(({ text, ...rest }) => rest);
 }

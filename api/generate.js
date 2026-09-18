@@ -14,6 +14,28 @@ import { getCreditInfo, consumeCredit, consumeCredits, refundCredits, getProSamp
 import { saveToGallery } from "./_lib/gallery.js";
 import { buildDressroom, expectedHem, checkHem } from "./_lib/dressroom.js";
 import { buildEditorialStrip } from "./_lib/fourcutEditorial.js";
+// 컨셉 원본(프롬프트 포함). **서버가 프롬프트의 출처**여야 한다 — 아래 resolvePrompt 참고.
+import ALL_CONCEPTS from "./_data/concepts.json" with { type: "json" };
+
+// ── 프롬프트는 서버가 정한다 (2026-09-18) ───────────────────────────────────
+// 예전엔 앱이 컨셉 목록에서 `text`(= 프롬프트 전문)를 받아 생성 요청에 실어 보냈다.
+// 그래서 **프롬프트 464개가 그대로 공개**돼 있었다 — `/concepts.json` 과
+// `public/concepts.fallback.json`(634KB)을 주소만 치면 누구나 받고, robots.txt 가
+// 전면 허용이라 AI 학습 크롤러도 그대로 가져갔다. 오너가 직접 쓴 이 앱의 핵심 자산이다.
+//
+// 이제 **conceptId 로 서버가 직접 찾는다.** 앱이 보낸 prompt 는 쓰지 않는다
+// (컨셉을 못 찾을 때만 폴백 — 캐시가 오래된 구버전 앱을 깨뜨리지 않기 위해서다).
+// 이렇게 해 두면 목록에서 `text` 를 빼도 생성이 그대로 돌아간다.
+const PROMPT_BY_ID = new Map(
+  (Array.isArray(ALL_CONCEPTS) ? ALL_CONCEPTS : [])
+    .filter((c) => c && c.id != null && typeof c.text === "string" && c.text)
+    .map((c) => [String(c.id), c.text])
+);
+/** conceptId 로 서버 프롬프트를 찾는다. 없으면 앱이 보낸 것(구버전 호환). */
+function resolvePrompt(conceptId, clientPrompt) {
+  const mine = conceptId != null ? PROMPT_BY_ID.get(String(conceptId)) : null;
+  return mine || clientPrompt || "";
+}
 
 // Vertex 의 나노바나나 프로는 2K 요청이 ~42s 걸리고, 묶음 생성(3/6/12장)은 그보다
 // 훨씬 오래 걸린다. 팀 플랜이 Pro 라 300s 까지 쓸 수 있다(picbox·claire 와 동일).
@@ -868,7 +890,7 @@ export default async function handler(req, res) {
 
   // 3) 요청 본문 확인
   const {
-    mimeType, base64, prompt, conceptId, conceptTitle,
+    mimeType, base64, prompt: clientPrompt, conceptId, conceptTitle,
     // 아트 변환처럼 풍경/물건 사진을 받는 컨셉은 얼굴 검사 우회
     skipFacePrecheck,
     // 증명사진: 사용자가 고른 정장색/배경색 (서버에서 프롬프트 조립)
@@ -909,6 +931,9 @@ export default async function handler(req, res) {
 
   const batchCount = BATCH_COST[Number(count)] ? Number(count) : 1;
   const batchCost = BATCH_COST[batchCount];
+  // ⚠️ prompt 는 **서버가 정한 값**을 쓴다. 앱이 보낸 건 컨셉을 못 찾을 때만 쓴다.
+  //    (아래 로직 전체가 `prompt` 변수를 보므로 여기서 한 번만 정한다)
+  const prompt = resolvePrompt(conceptId, clientPrompt);
   if (!mimeType || !base64 || !prompt) {
     return res
       .status(400)
