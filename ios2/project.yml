@@ -80,7 +80,10 @@ targets:
               - com.rimikimi.app
         # 1.x 와 같은 문구 (사진 접근에 편집 용도 반영, 1.40).
         NSPhotoLibraryAddUsageDescription: "만든 사진과 편집한 사진을 앨범에 저장하기 위해 사용합니다."
-        NSCameraUsageDescription: "필터를 보면서 사진을 찍기 위해 카메라를 사용합니다."
+        # 문구 정정(2026-09-19): 예전엔 "필터를 보면서"였는데, 아이폰 기본 카메라로 바뀌면서
+        # (build 94, SystemCamera.swift) 촬영 중 라이브 필터 미리보기가 없어졌다 — 촬영은 먼저,
+        # 필터는 찍은 뒤 편집기에서. 실제 동작과 다른 문구는 컴플라이언스 리뷰(2.3.1)에서 걸린다.
+        NSCameraUsageDescription: "사진을 찍어 컨셉 사진을 만들기 위해 카메라를 사용합니다."
         # WKWebView 의 getUserMedia 는 audio:false 로 요청해도 iOS 가 마이크 권한 문구를 확인한다
         # (1.x 가 이미 물린 함정 — ios/App/App/Info.plist 참고). 없으면 카메라 웹뷰가 크래시/거부된다.
         NSMicrophoneUsageDescription: "필터 카메라를 열 때 iOS가 확인하는 항목이에요. 리미키미는 소리를 녹음하지 않아요."
@@ -150,7 +153,10 @@ targets:
         # ⚠️ 이 값이 project.pbxproj 의 진짜 출처다. 빌드 번호를 pbxproj 쪽에서만 올리면
         #    다음 `xcodegen generate` 때 통째로 되돌아간다 — 실제로 어긋나 있었다(yml 96 / pbxproj 97).
         #    올릴 땐 여기를 올릴 것.
-        CURRENT_PROJECT_VERSION: "97"
+        # 2026-09-19: 97 → 98. ASC 확인 결과 97 은 한 번도 업로드된 적 없었지만(디스크의 유일한
+        # 아카이브는 광고 붙기 전인 90), 이번에 컴플라이언스 FIX 5건이 들어가는 김에 번호를 새로
+        # 올려 "이 빌드부터가 그 수정분"임을 명확히 한다.
+        CURRENT_PROJECT_VERSION: "98"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
       configs:

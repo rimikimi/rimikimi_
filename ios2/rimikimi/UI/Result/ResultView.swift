@@ -85,6 +85,18 @@ struct ResultView: View {
                 }
                 .padding(.horizontal, Spacing.page)
 
+                // 부적절 콘텐츠 신고 (App Store Guideline 1.2 — AI 인물 이미지 서비스는 인앱 신고
+                // 경로가 있어야 한다). 웹 `src/PortraitStudio.jsx` 의 신고 링크와 같은 수신함
+                // (enquiry@rimikimi.com)·같은 제목 규칙으로 맞췄다 — 1.x 에 있던 기능이 2.0 재작성
+                // 때 빠졌던 것(`public/terms.html` 제7조는 "앱 내 신고 기능"이 있다고 이미 약속하고
+                // 있어, 이게 없으면 약관과 실제 동작이 어긋난다).
+                Button(action: reportIssue) {
+                    Text("🚩 부적절한 결과 신고")
+                        .font(AppFont.footnote)
+                        .foregroundStyle(Color.ink3)
+                }
+                .buttonStyle(.plain)
+
                 if let concept {
                     ConceptRail(title: "비슷한 컨셉", concepts: app.concepts.similar(to: concept))
                 }
@@ -95,6 +107,11 @@ struct ResultView: View {
         .background(Color.bg)
         .inlineTitle(payload.conceptTitle.isEmpty ? "결과" : payload.conceptTitle)
         .toolbar(.hidden, for: .tabBar)
+        // ATT는 결과 화면이 실제로 보이는 이 시점에만 시도한다(`TrackingPrompt` 주석 참고) — 내비게이션
+        // 전환 중(`RootTabView`의 onChange)에 부르면 앱이 아직 `.active`가 아닐 수 있어 팝업 없이
+        // 플래그만 타 버릴 위험이 있었다(컴플라이언스 리뷰로 발견). 매번 호출해도 안전 —
+        // 이미 물었으면 내부에서 바로 completion만 부르고 끝난다.
+        .onAppear { app.afterFirstResult() }
         #if DEBUG
         .onAppear { if app.devAutoOpenFit { app.devAutoOpenFit = false; DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { fitImage = currentImage } } }
         #endif
@@ -112,6 +129,21 @@ struct ResultView: View {
         app.myPhotosPath.removeAll()
         app.tab = .gallery
         app.galleryPath = [.concept(concept)]
+    }
+
+    /// 웹 `src/PortraitStudio.jsx`의 `mailto:` 신고 링크와 같은 수신함·제목 규칙.
+    private func reportIssue() {
+        let conceptLabel = concept.map { "\($0.title) (#\($0.id))" } ?? payload.conceptTitle
+        let itemId = current?.id ?? "-"
+        var comps = URLComponents()
+        comps.scheme = "mailto"
+        comps.path = "enquiry@rimikimi.com"
+        comps.queryItems = [
+            URLQueryItem(name: "subject", value: "[신고] 부적절한 생성 결과 #\(itemId)"),
+            URLQueryItem(name: "body", value: "신고 사유를 적어주세요.\n\n컨셉: \(conceptLabel)\n결과 ID: \(itemId)\n"),
+        ]
+        guard let url = comps.url else { return }
+        UIApplication.shared.open(url)
     }
 
     private func saveToAlbum() {

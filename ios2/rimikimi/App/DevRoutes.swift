@@ -15,6 +15,8 @@ import UIKit
 ///   com.rimikimi.app://dev/devscrollbottom[?tab=gallery|myPhotos|profile]  탭 루트를 맨 아래로 스크롤된 채로 열기(결함 #4 캡처용)
 ///   com.rimikimi.app://dev/legacymigration[?write=1|?reset=1]  1.x→2.0 로그인 이전 매커니즘 검증(토스트로 결과).
 ///                                                             reset=1 은 attemptedFlag/ambiguousCount 초기화(재시도 유도).
+///   com.rimikimi.app://dev/consent[?reset=1]  AI 전송 고지 시트 강제 표시(캡처용). reset=1 은
+///                                             동의 플래그를 지워 "다시 1회 뜨는지" 재확인용.
 @MainActor
 enum DevRoutes {
     /// 처리했으면 true.
@@ -151,6 +153,11 @@ enum DevRoutes {
                     }
                 }
             }
+        case "/consent":
+            // 컴플라이언스 FIX ③ 캡처용 — 실제로는 `perform(.generate)` 가 `aiConsentGiven` 를 보고
+            // 여는데, 시뮬레이터엔 터치 자동화가 없어 "만들기"까지 갈 필요 없이 시트만 바로 연다.
+            if q["reset"] == "1" { UserDefaults.standard.removeObject(forKey: "ai.consent.v1") }
+            app.aiConsentSheet = true
         case "/tab":
             switch q["name"] {
             case "gallery": app.tab = .gallery

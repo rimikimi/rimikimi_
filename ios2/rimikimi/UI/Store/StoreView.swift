@@ -47,6 +47,8 @@ struct StoreView: View {
                 Text("구매는 App Store 계정으로 안전하게 결제돼요. 구독은 기간 종료 24시간 전까지 해지하지 않으면 자동 갱신돼요.")
                     .font(AppFont.caption).foregroundStyle(Color.ink3).multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity).padding(.horizontal, Spacing.page)
+                LegalLinksRow()
+                    .frame(maxWidth: .infinity).padding(.horizontal, Spacing.page)
             }
             .padding(.top, Spacing.s3)
             .padding(.bottom, TabBarMetrics.contentBottomPad)
@@ -152,8 +154,12 @@ struct CreditsSheet: View {
                 if let err = app.store.lastError {
                     Text(err).font(AppFont.footnote).foregroundStyle(Color.accent)
                 }
-                Text("구매는 App Store 계정으로 안전하게 결제돼요.")
+                // 3.1.2 — 구독도 파는 화면이라 자동갱신 고지가 필요하다(컴플라이언스 리뷰로 발견:
+                // 이 시트에만 없고 StoreView 에는 있던 문구). 두 화면 문구를 동일하게 맞췄다.
+                Text("구매는 App Store 계정으로 안전하게 결제돼요. 구독은 기간 종료 24시간 전까지 해지하지 않으면 자동 갱신돼요.")
                     .font(AppFont.caption).foregroundStyle(Color.ink3).frame(maxWidth: .infinity)
+                LegalLinksRow()
+                    .frame(maxWidth: .infinity)
             }
             .padding(Spacing.page)
         }
@@ -177,5 +183,23 @@ struct CreditsSheet: View {
                 app.showToast("결제 처리 실패: \(error.localizedDescription)")
             }
         }
+    }
+}
+
+/// 이용약관·개인정보처리방침 링크 — 두 구매 화면(StoreView·CreditsSheet) 공통.
+/// Apple 3.1.2 는 구독을 파는 화면에 약관·개인정보 링크가 있어야 한다고 요구한다
+/// (컴플라이언스 리뷰로 발견: 이전엔 프로필 화면에만 있었다).
+private struct LegalLinksRow: View {
+    @Environment(AppState.self) private var app
+    var body: some View {
+        HStack(spacing: Spacing.s3) {
+            Button("이용약관") { app.webTool = .init(url: Config.termsURL, title: "이용약관") }
+            Text("·").foregroundStyle(Color.ink3)
+            Button("개인정보처리방침") { app.webTool = .init(url: Config.privacyURL, title: "개인정보처리방침") }
+        }
+        .font(AppFont.caption)
+        .buttonStyle(.plain)
+        .foregroundStyle(Color.ink3)
+        .multilineTextAlignment(.center)
     }
 }

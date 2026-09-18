@@ -20,6 +20,7 @@
 		1C01CBF7A36D7B7EBD9B5EBC /* StoreManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F76B5128BA2628F7C1F210E /* StoreManager.swift */; };
 		1D9D50CB127C0C1471FE91BF /* RimikimiAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0978461A670B5C95B6CA0087 /* RimikimiAPI.swift */; };
 		22DEFE8C6B1211D5C5ECA851 /* BrandLogo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D343267567AA1793CA75BDB /* BrandLogo.swift */; };
+		23125BF04D9549EA5EAA9CE5 /* AIConsentSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA06DDA36A4CB1E6CA1E88C7 /* AIConsentSheet.swift */; };
 		24CABC9518A055F10C906064 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = 27C500D824848E5D798CFF2B /* FirebaseMessaging */; };
 		3323B9D4CD0F3F2B88CCB394 /* AppLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A2B5D4463A0B9F1318D9CF5 /* AppLog.swift */; };
 		3898AA95ADD019D9451126D6 /* ImageUtil.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99ABF96B6B0B061F6148D8FD /* ImageUtil.swift */; };
@@ -48,7 +49,6 @@
 		B9DCA305D9F06A53557C8FD6 /* AuthStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A1923FA18887976156964D8 /* AuthStore.swift */; };
 		BBDE02006DA8F3685914A9AC /* UserPhotoStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1574A83D978924D1C913B993 /* UserPhotoStore.swift */; };
 		BE5BF41B5A2D46F85AA7E50D /* AdManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6AD421125C4CB868836ACF9 /* AdManager.swift */; };
-		CCEA6EC7D2C4456F39156B08 /* Info 2.plist in Resources */ = {isa = PBXBuildFile; fileRef = A201EF0D112E88CB92D5CB6C /* Info 2.plist */; };
 		D0D65C24A947A34D4E36E83F /* DevRoutes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3541E9E21830E875854A3D67 /* DevRoutes.swift */; };
 		D0EE06C35181BD16854BA3D6 /* LegacySessionMigration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23346B5A133CCDDC3C90DAED /* LegacySessionMigration.swift */; };
 		D2411ABFA50209D92FD9D40E /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82D0C47706658134377A1FC8 /* ProfileView.swift */; };
@@ -109,10 +109,10 @@
 		99ABF96B6B0B061F6148D8FD /* ImageUtil.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageUtil.swift; sourceTree = "<group>"; };
 		9BAF466244F7888654F1B6F3 /* GalleryHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GalleryHomeView.swift; sourceTree = "<group>"; };
 		9C1D2B899128932E07E33229 /* PhotoPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoPicker.swift; sourceTree = "<group>"; };
-		A201EF0D112E88CB92D5CB6C /* Info 2.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "Info 2.plist"; sourceTree = "<group>"; };
 		A29E03020A40301A2004D95D /* WebAuth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebAuth.swift; sourceTree = "<group>"; };
 		A81AB1D2A679E0FC5857C3C8 /* ConceptCards.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConceptCards.swift; sourceTree = "<group>"; };
 		A926DC441FC2160654C0583C /* LoginSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginSheet.swift; sourceTree = "<group>"; };
+		AA06DDA36A4CB1E6CA1E88C7 /* AIConsentSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIConsentSheet.swift; sourceTree = "<group>"; };
 		B1CEF15DAECD9F61A723B9DF /* LayoutTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayoutTokens.swift; sourceTree = "<group>"; };
 		B2B216927CC14B3E65171EE4 /* AppleSignIn.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleSignIn.swift; sourceTree = "<group>"; };
 		B898AFB4830FC25134D5A6F3 /* AuthSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthSession.swift; sourceTree = "<group>"; };
@@ -252,6 +252,14 @@
 			path = Components;
 			sourceTree = "<group>";
 		};
+		6AE87F8D7542B4F9B6E7432D /* Consent */ = {
+			isa = PBXGroup;
+			children = (
+				AA06DDA36A4CB1E6CA1E88C7 /* AIConsentSheet.swift */,
+			);
+			path = Consent;
+			sourceTree = "<group>";
+		};
 		7408E62C48B359593E19310F /* Account */ = {
 			isa = PBXGroup;
 			children = (
@@ -324,6 +332,7 @@
 				4B78B6662847AAC97752D1F9 /* Camera */,
 				5D9B30C1CDC2AA2CA85DEADC /* Components */,
 				47FE1AE833A2038592FA5188 /* Concept */,
+				6AE87F8D7542B4F9B6E7432D /* Consent */,
 				5C2A2D9FA6DAB50882645525 /* Filter */,
 				3F738A0F3AF512D825F75E25 /* Fit */,
 				45CE74AE1D3A2ADE850AD730 /* Gallery */,
@@ -356,7 +365,6 @@
 				469CE486F972EBCE680B55AA /* Resources */,
 				D15F94AE94A3F734BC9B6F40 /* UI */,
 				3DA3258F5AAB1C9D0BA5DB98 /* Assets.xcassets */,
-				A201EF0D112E88CB92D5CB6C /* Info 2.plist */,
 				7F3709AB17F62286AD668705 /* Info.plist */,
 				4D8E6DAE2CC2F97BE9DDB763 /* rimikimi.entitlements */,
 			);
@@ -444,7 +452,6 @@
 			files = (
 				D6EFDAD775F531D7F1BFF752 /* Assets.xcassets in Resources */,
 				F48589FDA5347B94A901D955 /* GoogleService-Info.plist in Resources */,
-				CCEA6EC7D2C4456F39156B08 /* Info 2.plist in Resources */,
 				07E08D01231BA7191B9C0AAB /* concepts.fallback.json in Resources */,
 				78962CE8BACB19DEBB10C1D0 /* e2e_sample_person.jpg in Resources */,
 			);
@@ -457,6 +464,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				23125BF04D9549EA5EAA9CE5 /* AIConsentSheet.swift in Sources */,
 				BE5BF41B5A2D46F85AA7E50D /* AdManager.swift in Sources */,
 				3323B9D4CD0F3F2B88CCB394 /* AppLog.swift in Sources */,
 				14635BD2933C70E87895C66F /* AppState.swift in Sources */,
@@ -586,7 +594,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = rimikimi/rimikimi.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 97;
+				CURRENT_PROJECT_VERSION = 98;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = rimikimi/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -671,7 +679,7 @@
 				CODE_SIGN_ENTITLEMENTS = rimikimi/rimikimi.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 97;
+				CURRENT_PROJECT_VERSION = 98;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = rimikimi/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (

@@ -68,14 +68,14 @@ struct RootTabView: View {
         .onChange(of: app.generation.pendingPresentation?.map(\.id)) { _, ids in
             guard ids != nil, let items = app.generation.pendingPresentation else { return }
             let job = app.generation.pendingPresentationJob
-            app.generation.pendingPresentation = nil
             app.generation.pendingPresentationJob = nil
-            app.present(items, job: job)
-            // ATT 는 첫 생성 완료 후에만 — 결과 화면이 뜬 뒤 1초, 1회 → 그 다음 초대 카드(SPEC §3).
-            // ⚠️ 순서 주의: `afterFirstResult()` 는 부르는 즉시 "물어봤음" 으로 기록하므로
-            //    ATT 가 이번에 뜰 차례인지는 **부르기 전에** 봐 둬야 한다.
+            app.generation.pendingPresentation = nil
+            // ATT 트리거는 여기서 부르지 않는다 — 내비게이션이 아직 전환 중이라 앱이 `.active` 가
+            // 아닌 순간일 수 있다(컴플라이언스 리뷰로 발견, `TrackingPrompt` 주석 참고). 실제 트리거는
+            // `ResultView.onAppear`(화면이 진짜 보일 때)로 옮겼다 — 여기서는 광고 스킵 판단에만
+            // 쓰는 "물어볼 차례인가"를 미리 읽어 둔다(이 읽기 자체는 플래그를 바꾸지 않아 안전).
             let attWillAsk = !TrackingPrompt.asked
-            app.afterFirstResult()
+            app.present(items, job: job)
             // 무료 사용자 → 생성 후 전면광고 1회 (1.x `src/ads.js` 규칙 그대로).
             // 단 ATT 팝업이 뜰 차례면(첫 결과) 이번 회는 건너뛴다 — 전면광고가 화면을 덮은 채
             // ATT 를 요청하면 iOS 가 조용히 무시한다(1.x `ads.js` 가 기록해 둔 사고, SPEC §3
@@ -105,6 +105,13 @@ struct RootTabView: View {
             CreditsSheet()
                 .presentationDetents([.large])
                 .presentationCornerRadius(Radius.sheet)
+        }
+        // 제3자 AI 전송 고지 — 첫 "만들기" 때 1회만(계정/기기당). 동의하면 미뤄둔 생성이 바로 이어진다.
+        .sheet(isPresented: $app.aiConsentSheet) {
+            AIConsentSheet(onAgree: { app.continueAfterConsent() }, onCancel: { app.cancelConsent() })
+                .presentationDetents([.medium, .large])
+                .presentationCornerRadius(Radius.sheet)
+                .interactiveDismissDisabled()
         }
         // 아이폰 기본 카메라 — 애플이 만든 촬영 화면 그대로(포커스·줌·플래시 전부 동작).
         .fullScreenCover(isPresented: $app.showSystemCamera) {

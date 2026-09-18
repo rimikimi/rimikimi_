@@ -46,6 +46,14 @@ final class AppState {
     var loginMessage: String?
     var pending: PendingAction?
     var toast: String?
+    /// 제3자 AI(Google Gemini) 전송 고지 — 첫 "만들기" 전 1회만(Apple 5.1.1(i)/5.1.2(i) +
+    /// AI기본법 §31 사전고지, 컴플라이언스 리뷰로 발견). `AIConsentSheet` 가 지켜본다.
+    /// ⚠️ **매 생성마다 다시 묻지 않는다** — 다른 플래그들(`guide.done.v2` 등)과 같은 관례로
+    /// UserDefaults 에 1회만 기록, 동의 즉시 미뤄둔 요청을 이어간다(오너 지시 2026-09-19).
+    var aiConsentSheet = false
+    private var pendingAfterConsent: GenerateRequest?
+    private static let aiConsentKey = "ai.consent.v1"
+    static var aiConsentGiven: Bool { UserDefaults.standard.bool(forKey: aiConsentKey) }
     /// 크레딧 부족 시트(팩 3 · 구독 · 초대). 구매 성공 시 `pendingAfterPurchase` 를 이어간다.
     var creditsSheet = false
     var pendingAfterPurchase: GenerateRequest?
@@ -148,6 +156,12 @@ final class AppState {
         switch action {
         case .generate(var req):
             guard let token = await auth.validAccessToken() else { loginSheet = true; return }
+            // 제3자 AI 전송 고지 — 계정당(기기당) 1회만. 동의 전이면 요청을 미뤄두고 시트를 띄운다.
+            guard Self.aiConsentGiven else {
+                pendingAfterConsent = req
+                aiConsentSheet = true
+                return
+            }
             // 크레딧 부족이면 시트 먼저 — 서버에 보내 봐야 429 다(SPEC §3 "크레딧 부족이면 팩·구독·초대 시트").
             if let q = quota, q.unlimited != true, q.creditsAvailable + q.freeLeft < req.creditCost {
                 pendingAfterPurchase = req
@@ -216,6 +230,23 @@ final class AppState {
         guard generation.quotaExceeded, let req = lastRequest else { return }
         pendingAfterPurchase = req
         creditsSheet = true
+    }
+
+    /// 동의 시트 "동의하고 계속" — 플래그를 1회 기록하고 미뤄둔 생성을 그대로 이어간다.
+    /// 이 플래그는 여기서만 세운다 — 다음 생성부터는 `perform` 의 guard 를 그냥 통과한다.
+    func continueAfterConsent() {
+        UserDefaults.standard.set(true, forKey: Self.aiConsentKey)
+        aiConsentSheet = false
+        guard let req = pendingAfterConsent else { return }
+        pendingAfterConsent = nil
+        Task { await perform(.generate(req)) }
+    }
+
+    /// 동의 시트 "다음에" — 그냥 취소. 사진 생성이 핵심 기능이라 대체 경로는 없고,
+    /// 다시 "만들기"를 누르면 시트가 또 뜬다(부작용 없음).
+    func cancelConsent() {
+        aiConsentSheet = false
+        pendingAfterConsent = nil
     }
 
     /// 구매 성공 → 크레딧 갱신 → 하던 생성(또는 채워 맞춤) 이어가기.
@@ -312,17 +343,15 @@ final class AppState {
         }
     }
 
-    /// 첫 생성 완료 직후 1회: ATT 권한 요청. 초대 카드는 더 이상 여기서 켜지 않는다 — 홈에 상시
-    /// 노출로 바뀌었다(결함 #5, `showInviteCard` 초기값 참고). 키 이름은 예전 그대로 재사용(ATT 1회
-    /// 트리거 용도로만 씀, 마이그레이션 불필요).
+    /// 결과 화면이 뜬 동안(`ResultView.onAppear`)마다 호출 — ATT 권한 요청은 그 안에서 1회만
+    /// 실제로 시도한다. 초대 카드는 여기서 켜지 않는다 — 홈에 상시 노출로 바뀌었다(결함 #5,
+    /// `showInviteCard` 초기값 참고). 키 이름은 예전 그대로 재사용(ATT 1회 트리거 용도로만 씀).
+    /// ⚠️ 예전엔 이 함수가 `RootTabView`의 내비게이션 전환 onChange 에서 불렸는데, 그 타이밍엔 앱이
+    /// 아직 `.active` 가 아닐 수 있어 팝업 없이 플래그만 타는 결함이 있었다(컴플라이언스 리뷰로
+    /// 발견, rimikimi 1.0 을 2번 리젝시킨 것과 같은 패턴) — 이제 `ResultView.onAppear`(화면이 진짜
+    /// 보이는 시점)에서만 부르고, 플래그도 `TrackingPrompt` 내부에서 실제 결정된 답을 받은 뒤에만
+    /// 세운다. 매번 호출해도 안전(이미 물었으면 즉시 반환).
     func afterFirstResult() {
-        // ⚠️ 예전에는 여기서 `invite.card.shown.v1` 로 먼저 걸렀다. 초대 카드가 홈 상시 노출로
-        //    바뀌면서 그 키는 쓸모가 없어졌는데 가드만 남았고, 그 바람에 **ATT 플래그가
-        //    기록되지 않는 기기**가 생겼다: 그 키가 이미 true 인 기기(예전 빌드로 한 번이라도
-        //    생성해 본 테스터 전부)는 여기서 곧바로 돌아가버려 `rimikimi.att.asked.v1` 이
-        //    영영 false 로 남는다. 그 플래그를 보고 전면광고를 건너뛰게 해 놨으므로
-        //    → **광고가 영영 안 뜬다**(2026-09-18 검증에서 잡음).
-        //    TrackingPrompt 는 자기 키로 이미 1회 보장을 한다. 여기서 또 막을 이유가 없다.
         TrackingPrompt.requestOnceAfterFirstResult()
     }
 
