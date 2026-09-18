@@ -106,8 +106,10 @@ struct RootTabView: View {
                 .presentationDetents([.large])
                 .presentationCornerRadius(Radius.sheet)
         }
-        // 제3자 AI 전송 고지 — 첫 "만들기" 때 1회만(계정/기기당). 동의하면 미뤄둔 생성이 바로 이어진다.
-        .sheet(isPresented: $app.aiConsentSheet) {
+        // 제3자 AI 전송 고지 — 첫 "만들기" 때 1회만(계정/기기당). 미뤄둔 생성/채워맞춤은 시트가
+        // **완전히 닫힌 뒤**(onDismiss)에 이어간다 — 닫히는 도중에 새 시트(크레딧 시트 등)를 열면
+        // 경합해 조용히 무반응이 될 수 있었다(재검증으로 발견).
+        .sheet(isPresented: $app.aiConsentSheet, onDismiss: { app.resumeAfterConsentDismissed() }) {
             AIConsentSheet(onAgree: { app.continueAfterConsent() }, onCancel: { app.cancelConsent() })
                 .presentationDetents([.medium, .large])
                 .presentationCornerRadius(Radius.sheet)

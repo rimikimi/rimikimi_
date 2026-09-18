@@ -104,6 +104,10 @@
 · 개인정보는 안전하게 보호됩니다
 
 지금 rimikimi로 나만의 인생 프로필을 만들어보세요!
+
+이용약관: https://rimikimi-app.vercel.app/terms
+개인정보처리방침: https://rimikimi-app.vercel.app/privacy
+자동갱신 구독 이용약관(EULA): https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
 ```
 
 ### 영어 (English)
@@ -143,6 +147,10 @@ oil paintings, watercolors, charcoal drawings, and more.
 · Your personal data stays protected
 
 Create your dream profile with rimikimi today!
+
+Terms of Use: https://rimikimi-app.vercel.app/terms
+Privacy Policy: https://rimikimi-app.vercel.app/privacy
+Auto-Renewable Subscription Terms (EULA): https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
 ```
 
 ---
@@ -150,14 +158,11 @@ Create your dream profile with rimikimi today!
 ## 3-2. EULA 링크 (2026-09-19 컴플라이언스 리뷰로 발견 — 구독 판매 시 필수)
 
 Apple Guideline 3.1.2 — 구독을 파는 앱은 앱 설명 안에 **표준 EULA 링크**(또는 자체 EULA)를 둬야
-한다. rimikimi 는 별도 EULA 를 쓰지 않으므로 Apple 표준 링크를 설명문 맨 끝에 추가할 것:
+한다. rimikimi 는 별도 EULA 를 쓰지 않으므로 Apple 표준 링크를 쓴다.
 
-```
-이용약관: https://rimikimi-app.vercel.app/terms
-개인정보처리방침: https://rimikimi-app.vercel.app/privacy
-자동갱신 구독 이용약관(EULA): https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
-```
-(영문판 설명에도 같은 3줄, 링크는 동일)
+✅ **§3-1 한/영 설명문 본문 맨 끝에 이미 인라인으로 들어가 있음**(재검증에서 "지침만 있고 본문에
+안 들어가 있으면 그대로 복붙해 빠뜨리기 쉽다"는 지적을 받아 반영 — 키아라가 이 정확한 사유로
+리젝된 전례가 있다). §3-1 을 그대로 복붙하면 자동으로 포함된다 — 여기서 따로 추가할 것 없음.
 
 ---
 

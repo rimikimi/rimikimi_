@@ -11,6 +11,10 @@ import SwiftUI
 /// 취소되고, 다시 만들기를 누르면 같은 시트가 또 뜬다.
 struct AIConsentSheet: View {
     @Environment(AppState.self) private var app
+    // ⚠️ 재검증으로 발견(2026-09-19): `app.webTool`(fullScreenCover)은 `RootTabView`의 같은
+    // 프레젠터에 이미 떠 있는 **이 시트 위**로는 못 뜬다(UIKit 은 프레젠터당 모달 1개) — 조용히
+    // 무시된다. 시트 안에서는 항상 뜨는 시스템 브라우저(`openURL`)로 연다.
+    @Environment(\.openURL) private var openURL
     var onAgree: () -> Void
     var onCancel: () -> Void
 
@@ -27,7 +31,7 @@ struct AIConsentSheet: View {
                 }
 
                 Button {
-                    app.webTool = .init(url: Config.privacyURL, title: "개인정보처리방침")
+                    openURL(Config.privacyURL)
                 } label: {
                     Text("개인정보처리방침에서 자세히 보기")
                         .font(AppFont.footnote).foregroundStyle(Color.accent)

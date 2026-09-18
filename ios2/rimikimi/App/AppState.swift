@@ -52,6 +52,9 @@ final class AppState {
     /// UserDefaults 에 1회만 기록, 동의 즉시 미뤄둔 요청을 이어간다(오너 지시 2026-09-19).
     var aiConsentSheet = false
     private var pendingAfterConsent: GenerateRequest?
+    /// 채워 맞춤(outpaint)도 같은 Gemini 전송이라 같은 동의가 필요하다(재검증으로 발견 — 결과
+    /// 화면을 거치지 않고 도달하는 이론적 우회가 남아 있었다). 이미지+완료 콜백을 미뤄둔다.
+    private var pendingOutpaintAfterConsent: (image: UIImage, completion: (UIImage) -> Void)?
     private static let aiConsentKey = "ai.consent.v1"
     static var aiConsentGiven: Bool { UserDefaults.standard.bool(forKey: aiConsentKey) }
     /// 크레딧 부족 시트(팩 3 · 구독 · 초대). 구매 성공 시 `pendingAfterPurchase` 를 이어간다.
@@ -232,21 +235,36 @@ final class AppState {
         creditsSheet = true
     }
 
-    /// 동의 시트 "동의하고 계속" — 플래그를 1회 기록하고 미뤄둔 생성을 그대로 이어간다.
-    /// 이 플래그는 여기서만 세운다 — 다음 생성부터는 `perform` 의 guard 를 그냥 통과한다.
+    /// 동의 시트 "동의하고 계속" — 플래그를 1회 기록하고 시트를 닫는다. **미뤄둔 동작은 아직
+    /// 이어가지 않는다** — `resumeAfterConsentDismissed()`(시트의 `onDismiss`)가 이어간다.
+    /// ⚠️ 재검증으로 발견(2026-09-19): 여기서 곧바로 `perform` 을 부르면, 크레딧이 부족해
+    /// `creditsSheet = true` 가 되는 경우 "동의 시트가 닫히는 중에 크레딧 시트를 새로 띄우는"
+    /// 경합이 생겨 조용히 무반응이 될 수 있었다(같은 프레젠터, UIKit 모달 1개 제한).
     func continueAfterConsent() {
         UserDefaults.standard.set(true, forKey: Self.aiConsentKey)
         aiConsentSheet = false
-        guard let req = pendingAfterConsent else { return }
-        pendingAfterConsent = nil
-        Task { await perform(.generate(req)) }
     }
 
     /// 동의 시트 "다음에" — 그냥 취소. 사진 생성이 핵심 기능이라 대체 경로는 없고,
-    /// 다시 "만들기"를 누르면 시트가 또 뜬다(부작용 없음).
+    /// 다시 "만들기"를 누르면 시트가 또 뜬다(부작용 없음). 미뤄둔 동작도 전부 버린다 —
+    /// `onDismiss` 가 아무것도 이어가지 않게.
     func cancelConsent() {
         aiConsentSheet = false
         pendingAfterConsent = nil
+        pendingOutpaintAfterConsent = nil
+    }
+
+    /// `aiConsentSheet` 의 `onDismiss` — 시트가 **완전히 닫힌 뒤**(전환 애니메이션 끝) 호출된다.
+    /// 동의했을 때만 미뤄둔 생성/채워맞춤이 남아 있으므로, 취소면 위 두 슬롯이 이미 비어 있어
+    /// 아무 일도 안 한다. 새 시트(크레딧 시트 등)를 여기서 열어도 이전 시트와 경합하지 않는다.
+    func resumeAfterConsentDismissed() {
+        if let req = pendingAfterConsent {
+            pendingAfterConsent = nil
+            Task { await perform(.generate(req)) }
+        } else if let pending = pendingOutpaintAfterConsent {
+            pendingOutpaintAfterConsent = nil
+            requestOutpaint(pending.image, completion: pending.completion)
+        }
     }
 
     /// 구매 성공 → 크레딧 갱신 → 하던 생성(또는 채워 맞춤) 이어가기.
@@ -268,7 +286,14 @@ final class AppState {
     // MARK: 채워 맞춤 (outpaint)
 
     /// `FitSheet` "채워 맞춤" 버튼 — 크레딧 부족이면 시트를 띄우고, 완료되면 `completion` 으로 결과 이미지를 돌려준다.
+    /// 이 경로도 사진을 Gemini 로 보내므로(`RimikimiAPI.outpaint`) 제3자 AI 전송 동의가 먼저 필요하다
+    /// (재검증으로 발견 — 보통은 결과 화면을 거쳐야만 도달해 이미 동의된 상태지만, 이론적 우회를 막는다).
     func requestOutpaint(_ image: UIImage, completion: @escaping (UIImage) -> Void) {
+        guard Self.aiConsentGiven else {
+            pendingOutpaintAfterConsent = (image, completion)
+            aiConsentSheet = true
+            return
+        }
         outpaintCompletion = completion
         Task { await runOutpaint(image) }
     }

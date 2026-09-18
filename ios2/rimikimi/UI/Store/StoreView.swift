@@ -190,12 +190,15 @@ struct CreditsSheet: View {
 /// Apple 3.1.2 는 구독을 파는 화면에 약관·개인정보 링크가 있어야 한다고 요구한다
 /// (컴플라이언스 리뷰로 발견: 이전엔 프로필 화면에만 있었다).
 private struct LegalLinksRow: View {
-    @Environment(AppState.self) private var app
+    // ⚠️ 재검증으로 발견(2026-09-19): `CreditsSheet` 에서 쓰일 때 `app.webTool`(fullScreenCover)은
+    // 이미 떠 있는 시트 위로는 못 뜬다(같은 프레젠터, UIKit 은 모달 1개 제한) — 조용히 무시된다.
+    // 시스템 브라우저(`openURL`)는 시트든 푸시 화면이든 항상 동작해 양쪽 다 안전하다.
+    @Environment(\.openURL) private var openURL
     var body: some View {
         HStack(spacing: Spacing.s3) {
-            Button("이용약관") { app.webTool = .init(url: Config.termsURL, title: "이용약관") }
+            Button("이용약관") { openURL(Config.termsURL) }
             Text("·").foregroundStyle(Color.ink3)
-            Button("개인정보처리방침") { app.webTool = .init(url: Config.privacyURL, title: "개인정보처리방침") }
+            Button("개인정보처리방침") { openURL(Config.privacyURL) }
         }
         .font(AppFont.caption)
         .buttonStyle(.plain)
