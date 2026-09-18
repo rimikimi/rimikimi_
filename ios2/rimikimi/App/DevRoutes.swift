@@ -17,6 +17,8 @@ import UIKit
 ///                                                             reset=1 은 attemptedFlag/ambiguousCount 초기화(재시도 유도).
 ///   com.rimikimi.app://dev/consent[?reset=1]  AI 전송 고지 시트 강제 표시(캡처용). reset=1 은
 ///                                             동의 플래그를 지워 "다시 1회 뜨는지" 재확인용.
+///   com.rimikimi.app://dev/systemcamera  실제 카메라 플로우(SystemCameraPicker) 강제 표시(캡처용).
+///                                        시뮬레이터엔 카메라가 없어 사진 보관함으로 자동 대체됨.
 @MainActor
 enum DevRoutes {
     /// 처리했으면 true.
@@ -153,6 +155,11 @@ enum DevRoutes {
                     }
                 }
             }
+        case "/systemcamera":
+            // 캡처용 — 실제로는 `perform(.camera)`(로그인 게이트) 를 거치지만, 화면 자체를
+            // 보려는 목적이라 바로 켠다. 시뮬레이터엔 카메라가 없어 사진 보관함으로 대체된다
+            // (`SystemCameraPicker.makeUIViewController` 참고).
+            app.showSystemCamera = true
         case "/consent":
             // 컴플라이언스 FIX ③ 캡처용 — 실제로는 `perform(.generate)` 가 `aiConsentGiven` 를 보고
             // 여는데, 시뮬레이터엔 터치 자동화가 없어 "만들기"까지 갈 필요 없이 시트만 바로 연다.
