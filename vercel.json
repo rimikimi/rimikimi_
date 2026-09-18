@@ -3,6 +3,66 @@
   "framework": "vite",
   "rewrites": [
     {
+      "source": "/c/magic",
+      "destination": "/c/magic.html"
+    },
+    {
+      "source": "/c/party",
+      "destination": "/c/party.html"
+    },
+    {
+      "source": "/c/street",
+      "destination": "/c/street.html"
+    },
+    {
+      "source": "/c/beach",
+      "destination": "/c/beach.html"
+    },
+    {
+      "source": "/c/fantasy",
+      "destination": "/c/fantasy.html"
+    },
+    {
+      "source": "/c/art",
+      "destination": "/c/art.html"
+    },
+    {
+      "source": "/c/travel",
+      "destination": "/c/travel.html"
+    },
+    {
+      "source": "/c/fashion",
+      "destination": "/c/fashion.html"
+    },
+    {
+      "source": "/c/daily",
+      "destination": "/c/daily.html"
+    },
+    {
+      "source": "/c/men",
+      "destination": "/c/men.html"
+    },
+    {
+      "source": "/c/wedding",
+      "destination": "/c/wedding.html"
+    },
+    {
+      "source": "/c/couple",
+      "destination": "/c/couple.html"
+    },
+    {
+      "source": "/c/fourcut",
+      "destination": "/c/fourcut.html"
+    },
+    {
+      "source": "/c/id-photo",
+      "destination": "/c/id-photo.html"
+    },
+    {
+      "source": "/c/studio",
+      "destination": "/c/studio.html"
+    },
+    {
       "source": "/concepts.json",
       "destination": "/api/concepts"
     },
@@ -68,6 +128,81 @@
     {
       "source": "/download.html",
       "destination": "/download",
+      "permanent": true
+    },
+    {
+      "source": "/c/studio.html",
+      "destination": "/c/studio",
+      "permanent": true
+    },
+    {
+      "source": "/c/id-photo.html",
+      "destination": "/c/id-photo",
+      "permanent": true
+    },
+    {
+      "source": "/c/fourcut.html",
+      "destination": "/c/fourcut",
+      "permanent": true
+    },
+    {
+      "source": "/c/couple.html",
+      "destination": "/c/couple",
+      "permanent": true
+    },
+    {
+      "source": "/c/wedding.html",
+      "destination": "/c/wedding",
+      "permanent": true
+    },
+    {
+      "source": "/c/men.html",
+      "destination": "/c/men",
+      "permanent": true
+    },
+    {
+      "source": "/c/daily.html",
+      "destination": "/c/daily",
+      "permanent": true
+    },
+    {
+      "source": "/c/fashion.html",
+      "destination": "/c/fashion",
+      "permanent": true
+    },
+    {
+      "source": "/c/travel.html",
+      "destination": "/c/travel",
+      "permanent": true
+    },
+    {
+      "source": "/c/art.html",
+      "destination": "/c/art",
+      "permanent": true
+    },
+    {
+      "source": "/c/fantasy.html",
+      "destination": "/c/fantasy",
+      "permanent": true
+    },
+    {
+      "source": "/c/beach.html",
+      "destination": "/c/beach",
+      "permanent": true
+    },
+    {
+      "source": "/c/street.html",
+      "destination": "/c/street",
+      "permanent": true
+    },
+    {
+      "source": "/c/party.html",
+      "destination": "/c/party",
+      "permanent": true
+    },
+    {
+      "source": "/c/magic.html",
+      "destination": "/c/magic",
       "permanent": true
     }
   ]
