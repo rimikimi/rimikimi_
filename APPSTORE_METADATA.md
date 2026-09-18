@@ -3,6 +3,13 @@
 > **2026-07-18 현행화** — IAP 크레딧 팩 4종 + 구독 2종 반영, "인앱구입 없음" 문구 전부 제거.
 > Apple Developer 가입 + DUNS 발급 완료 후, App Store Connect 에 복붙용.
 > 작성일 기준 초안. 승인 전까지 자유롭게 수정.
+>
+> **2026-09-19 재현행화(2.0 컴플라이언스 리뷰로 발견) — 상품 ID·가격이 전부 낡아 있었다.**
+> 아래 §2 는 2026-08-14 부터 이미 `credits_10~120`·`rimikimi_plus_*`(2종) 에서 `rimikimi.pack.*`
+> (4종)·`rimikimi.sub.plus.*`(위클리 신설로 **3종**) 로 판매 상품이 바뀐 뒤 이 문서만 안 따라왔던
+> 것 — 코드는 처음부터 옳았다(`api/_lib/payments/packages.js` `PACKAGES`, `StoreManager.swift`
+> 와 1:1). 이 문서로 스토어 리스팅을 채우면 실제 판매 상품과 다른 값을 적게 되어 Guideline 2.3.1
+> (설명 정확성) 에 걸린다 — §2 표를 반드시 아래 새 값으로 쓸 것, 옛 표는 참고용으로만 남겨 둔다.
 
 ---
 
@@ -16,29 +23,33 @@
 | **주 카테고리** | 사진 및 비디오 (Photo & Video) |
 | **부 카테고리** | 엔터테인먼트 (Entertainment) — 선택 |
 | **연령 등급** | 4+ (또는 콘텐츠 검토 후 12+) |
-| **가격** | 무료 다운로드 (광고 포함, 무료 사용자만 노출) + 인앱구입 4종 + 자동갱신 구독 2종 |
+| **가격** | 무료 다운로드 (광고 포함, 무료 사용자만 노출) + 인앱구입 4종 + 자동갱신 구독 3종 |
 
 ---
 
 ## 2. 인앱 구입 / 구독 상품 (In-App Purchases & Subscriptions)
 
-> 소스: `api/_lib/payments/packages.js`. 상품 ID는 코드/스토어 공통 — **절대 변경 금지**.
+> 소스: `api/_lib/payments/packages.js` `PACKAGES`(현재 판매 목록, 2026-08-14~) — iOS
+> `ios2/rimikimi/Backend/StoreManager.swift`·Android `rn/` 도 이 ID/가격과 1:1. 상품 ID는
+> 코드/스토어 공통 — **절대 변경 금지**. (옛 `credits_10~120`·`rimikimi_plus_*`는 과거 구매자
+> 영수증 재검증용으로만 서버에 남아 있고 더는 판매하지 않는다 — 스토어 리스팅에 쓰지 말 것.)
 
 ### 소모성 크레딧 팩 (Consumable)
 
 | 상품 ID | 크레딧 | 가격(KRW) | 가격(USD 참고) | 배지 |
 |---|---|---|---|---|
-| `credits_10` | 10 | ₩7,900 | $5.99 | — |
-| `credits_30` | 30 | ₩19,800 | $14.99 | 인기 (Popular) |
-| `credits_70` | 70 | ₩39,800 | $29.99 | 이득 (Best Value) |
-| `credits_120` | 120 | ₩59,800 | $44.99 | 최고 가성비 (Best Deal) |
+| `rimikimi.pack.intro` | 6 | ₩3,900 | $2.99 | 첫 구매 (First purchase) |
+| `rimikimi.pack.mini` | 12 | ₩7,900 | $5.99 | — |
+| `rimikimi.pack.standard` | 24 | ₩14,900 | $10.99 | 베스트 가치 (Best value) |
+| `rimikimi.pack.pro` | 45 | ₩27,000 | $19.99 | 장당 최저 (Lowest per image) |
 
 ### 자동갱신 구독 (Auto-Renewable Subscription)
 
 | 상품 ID | 주기 | 지급 크레딧 | 가격(KRW) | 가격(USD 참고) | 혜택 |
 |---|---|---|---|---|---|
-| `rimikimi_plus_monthly` | 월간 | 20/월 | ₩9,900 | $7.99 | 광고 제거 + Pro 엔진(2K) |
-| `rimikimi_plus_annual` | 연간 | 240/년 | ₩99,000 | $74.99 | 광고 제거 + Pro 엔진(2K), 2개월 무료 |
+| `rimikimi.sub.plus.weekly` | 주간 | 8/주 | ₩6,900 | $4.99 | 매주 8장 |
+| `rimikimi.sub.plus.monthly` | 월간 | 30/월 | ₩12,900 | $9.99 | 광고 제거 + 매달 30장 |
+| `rimikimi.sub.plus.annual` | 연간 | 240/년 | ₩109,000 | $89.99 | 광고 제거, 3개 구독 중 가장 저렴 |
 
 ### 무료 제공 (참고 — 상품 아님)
 - 무료 1장/일 (한국시간 KST 자정 리셋), 기본 엔진(`gemini-2.5-flash-image`)
@@ -83,7 +94,7 @@
 💳 이용 방법
 · 매일 1장 무료로 생성할 수 있어요 (한국시간 자정 리셋)
 · 더 많이 만들고 싶다면 크레딧을 충전하거나(1회 구매)
-  rimikimi+ 구독(월간/연간)으로 매달 크레딧이 자동 충전돼요
+  rimikimi+ 구독(위클리/먼슬리/애뉴얼)으로 크레딧이 자동 충전돼요
 · rimikimi+ 구독은 광고 제거 + 더 선명한 2K 고화질 엔진 혜택 포함
 · 무료 이용 시 광고가 표시될 수 있어요
 
@@ -122,7 +133,7 @@ oil paintings, watercolors, charcoal drawings, and more.
 💳 How it works
 · Get 1 free generation every day (resets at midnight KST)
 · Want more? Buy a one-time credit pack, or subscribe to
-  rimikimi+ (monthly/annual) for credits that renew automatically
+  rimikimi+ (weekly/monthly/annual) for credits that renew automatically
 · rimikimi+ removes ads and unlocks our sharper 2K high-definition engine
 · Ads may appear while using the free tier
 
@@ -133,6 +144,20 @@ oil paintings, watercolors, charcoal drawings, and more.
 
 Create your dream profile with rimikimi today!
 ```
+
+---
+
+## 3-2. EULA 링크 (2026-09-19 컴플라이언스 리뷰로 발견 — 구독 판매 시 필수)
+
+Apple Guideline 3.1.2 — 구독을 파는 앱은 앱 설명 안에 **표준 EULA 링크**(또는 자체 EULA)를 둬야
+한다. rimikimi 는 별도 EULA 를 쓰지 않으므로 Apple 표준 링크를 설명문 맨 끝에 추가할 것:
+
+```
+이용약관: https://rimikimi-app.vercel.app/terms
+개인정보처리방침: https://rimikimi-app.vercel.app/privacy
+자동갱신 구독 이용약관(EULA): https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
+```
+(영문판 설명에도 같은 3줄, 링크는 동일)
 
 ---
 
