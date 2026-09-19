@@ -153,10 +153,9 @@ targets:
         # ⚠️ 이 값이 project.pbxproj 의 진짜 출처다. 빌드 번호를 pbxproj 쪽에서만 올리면
         #    다음 `xcodegen generate` 때 통째로 되돌아간다 — 실제로 어긋나 있었다(yml 96 / pbxproj 97).
         #    올릴 땐 여기를 올릴 것.
-        # 2026-09-19: 97 → 98 → 99. 98 은 ASC 에 업로드까지 했지만, 같은 리뷰어에게 diff
-        # 재검증을 맡겨 보니 링크 무반응(A)·시트 경합(B)·outpaint 동의 우회(C) 3건이 더
-        # 나와 같은 날 다시 올린다 — 98 은 그 3건이 없는 채로 남아 있으니 심사에 붙이지 말 것.
-        CURRENT_PROJECT_VERSION: "99"
+        # 2026-09-19: 97 → 98 → 99 → 100. 99 이후 카메라 dev route + 네이티브 사진 앱 스타일
+        # 탐색(앨범 그리드·핀치줌 그리드·필름스트립 브라우저, 커밋 dfea643)이 들어가 다시 올린다.
+        CURRENT_PROJECT_VERSION: "100"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
       configs:
