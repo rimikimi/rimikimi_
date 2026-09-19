@@ -85,19 +85,84 @@ struct ConceptCard: View {
     }
 }
 
-/// 두 열 그리드 — 카테고리 화면.
-struct ConceptGrid: View {
-    var concepts: [Concept]
+/// 홈의 "앨범" 타일 — 표지 1장(정방형) + 이름 + 장수. 탭 → 그 카테고리의 빽빽한 그리드(`DensePhotoGrid`).
+struct AlbumGridTile: View {
+    var tile: ConceptStore.AlbumTile
+
+    var body: some View {
+        NavigationLink(value: Route.category(tile.name)) {
+            VStack(alignment: .leading, spacing: Spacing.s1) {
+                RemoteImage(url: tile.coverURL, cornerRadius: Radius.card)
+                    .aspectRatio(1, contentMode: .fit)
+                Text(tile.name).font(AppFont.cardTitle).foregroundStyle(Color.ink).lineLimit(1)
+                Text("\(tile.count)장").font(AppFont.footnote).foregroundStyle(Color.ink3)
+            }
+        }
+        .buttonStyle(PressScaleButtonStyle())
+    }
+}
+
+/// 두 열 앨범 그리드 — 홈에서 "추천"·"새로 나왔어요"를 뺀 나머지 카테고리(네이티브 사진 앱
+/// "앨범" 탭 참고, 오너 지시 2026-09-19).
+struct AlbumsGrid: View {
+    var tiles: [ConceptStore.AlbumTile]
     private let columns = [GridItem(.flexible(), spacing: CardMetrics.railGap), GridItem(.flexible(), spacing: CardMetrics.railGap)]
+
+    var body: some View {
+        if !tiles.isEmpty {
+            VStack(alignment: .leading, spacing: 0) {
+                Text("카테고리").font(AppFont.sectionTitle).tracking(Tracking.sectionTitle)
+                    .padding(.horizontal, Spacing.page)
+                    .padding(.top, Spacing.s1)
+                    .padding(.bottom, Spacing.s3 - 2)
+                    .accessibilityAddTraits(.isHeader)
+                LazyVGrid(columns: columns, spacing: Spacing.s4) {
+                    ForEach(tiles) { AlbumGridTile(tile: $0) }
+                }
+                .padding(.horizontal, Spacing.page)
+            }
+        }
+    }
+}
+
+/// 빽빽한 정방형 그리드 — 카테고리 화면(네이티브 사진 앱 라이브러리 그리드 참고, 오너 지시
+/// 2026-09-19). 카드 크롬·캡션 없음, 간격 2pt. 핀치로 3열↔5열(두 단계만 — 오너 지시로 3단계
+/// 안 함). `MagnifyGesture`(iOS 17+, SwiftUI 정식 API — 네이티브 핀치 인식 자체는 이미 있고
+/// "그 값을 열 수 전환에 매핑"만 직접 구현한 것) 로 손을 뗄 때 방향만 본다: 오므렸으면(축소)
+/// 더 촘촘하게(5열), 벌렸으면 더 크게(3열). 탭 → 필름스트립 브라우저(`Route.browse`).
+struct DensePhotoGrid: View {
+    var concepts: [Concept]
+    var category: String
+    @State private var wideColumns = false  // false = 3열(큼), true = 5열(촘촘)
+
+    private var columnCount: Int { wideColumns ? 5 : 3 }
+    private var columns: [GridItem] {
+        Array(repeating: GridItem(.flexible(), spacing: 2), count: columnCount)
+    }
 
     var body: some View {
         if concepts.isEmpty {
             EmptyState(message: "검색 결과가 없어요")
         } else {
-            LazyVGrid(columns: columns, spacing: Spacing.s4) {
-                ForEach(concepts) { c in ConceptCard(concept: c) }
+            LazyVGrid(columns: columns, spacing: 2) {
+                ForEach(concepts) { c in
+                    NavigationLink(value: Route.browse(category: category, startID: c.id)) {
+                        RemoteImage(url: c.thumbURL, cornerRadius: 0)
+                            .aspectRatio(1, contentMode: .fit)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
-            .padding(.horizontal, Spacing.page)
+            .animation(.spring(response: 0.35, dampingFraction: 0.86), value: columnCount)
+            .gesture(
+                MagnifyGesture()
+                    .onEnded { value in
+                        let shouldNarrow = value.magnification < 1  // 오므림 = 축소 = 더 촘촘히(5열)
+                        guard shouldNarrow != wideColumns else { return }
+                        wideColumns = shouldNarrow
+                        HapticPlayer.selection()
+                    }
+            )
         }
     }
 }

@@ -9,6 +9,9 @@ enum TabID: Hashable { case gallery, filter, camera, myPhotos, profile }
 enum Route: Hashable {
     case concept(Concept)
     case category(String)
+    /// 카테고리 안의 사진들을 필름스트립으로 훑어보는 화면(네이티브 사진 앱 참고, 오너 지시
+    /// 2026-09-19) — `startID` 는 어떤 사진을 누르고 들어왔는지.
+    case browse(category: String, startID: String)
     case result(ResultPayload)
     case store
     case invite

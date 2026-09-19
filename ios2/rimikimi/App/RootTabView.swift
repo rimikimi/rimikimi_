@@ -190,6 +190,7 @@ struct RouteDestination: View {
         switch route {
         case .concept(let c): ConceptOptionsView(concept: c)
         case .category(let name): CategoryListView(name: name)
+        case .browse(let category, let startID): ConceptBrowserView(category: category, startID: startID)
         case .result(let payload): ResultView(payload: payload)
         case .store: StoreView()
         case .invite: InviteView()

@@ -11,6 +11,7 @@
 		04788E19FE0CB109D966D13C /* Chips.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E11BF60C2C8F9A9AA946888 /* Chips.swift */; };
 		07E08D01231BA7191B9C0AAB /* concepts.fallback.json in Resources */ = {isa = PBXBuildFile; fileRef = 2E258EB7EE8D8AB3C7FB79AB /* concepts.fallback.json */; };
 		08AABBCE194CCCB98ADC373B /* RemoteImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 994985E095D76ED128B3DA7A /* RemoteImage.swift */; };
+		0951FEA12E10140FF45BEDEA /* ConceptBrowserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D94DFC2C63AD914BC1C1C505 /* ConceptBrowserView.swift */; };
 		0C8FE0F9BC22DDEF7CB479FF /* TrackingPrompt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60680F477ACDAA854F12AC6A /* TrackingPrompt.swift */; };
 		11C4A6B2AD0D9030ED970465 /* ColorTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D7392A73B81DED2F69CD07B /* ColorTokens.swift */; };
 		14635BD2933C70E87895C66F /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBC2D06E0F7E4978DF4481FB /* AppState.swift */; };
@@ -121,6 +122,7 @@
 		C0D3B23531F2DC7A6AC57D6E /* ConceptOptionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConceptOptionsView.swift; sourceTree = "<group>"; };
 		C8DBEB1A957E75B9F72FDA21 /* TypeTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TypeTokens.swift; sourceTree = "<group>"; };
 		CBC2D06E0F7E4978DF4481FB /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		D94DFC2C63AD914BC1C1C505 /* ConceptBrowserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConceptBrowserView.swift; sourceTree = "<group>"; };
 		E6AD421125C4CB868836ACF9 /* AdManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdManager.swift; sourceTree = "<group>"; };
 		E7187565C059C0F50D5993AE /* WebToolView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebToolView.swift; sourceTree = "<group>"; };
 		E9E942DA3CA4C0AF9A0113D7 /* e2e_sample_person.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = e2e_sample_person.jpg; sourceTree = "<group>"; };
@@ -187,6 +189,7 @@
 		45CE74AE1D3A2ADE850AD730 /* Gallery */ = {
 			isa = PBXGroup;
 			children = (
+				D94DFC2C63AD914BC1C1C505 /* ConceptBrowserView.swift */,
 				A81AB1D2A679E0FC5857C3C8 /* ConceptCards.swift */,
 				9BAF466244F7888654F1B6F3 /* GalleryHomeView.swift */,
 			);
@@ -476,6 +479,7 @@
 				04788E19FE0CB109D966D13C /* Chips.swift in Sources */,
 				11C4A6B2AD0D9030ED970465 /* ColorTokens.swift in Sources */,
 				1769B09109E23A39A64D7E69 /* Concept.swift in Sources */,
+				0951FEA12E10140FF45BEDEA /* ConceptBrowserView.swift in Sources */,
 				FBA4B809C6957CA029E75249 /* ConceptCards.swift in Sources */,
 				EE366269CC2260FB1176333B /* ConceptOptionsView.swift in Sources */,
 				7B3FB9E2EEA88904B7FAD8E7 /* ConceptStore.swift in Sources */,

@@ -16,15 +16,16 @@ struct GalleryHomeView: View {
                     if app.concepts.isLoading && app.concepts.concepts.isEmpty {
                         loadingRails
                     } else if let cat = activeCategory {
-                        ConceptGrid(concepts: app.concepts.concepts(in: cat))
+                        DensePhotoGrid(concepts: app.concepts.concepts(in: cat), category: cat)
                             .padding(.top, Spacing.s3)
                     } else {
                         ConceptRail(title: "추천", concepts: app.concepts.featured)
                         ConceptRail(title: "새로 나왔어요", concepts: app.concepts.newest, isNew: true)
                         BrooklynBanner()
-                        ForEach(app.concepts.rows) { row in
-                            ConceptRail(title: row.name, concepts: row.items, more: Route.category(row.name))
-                        }
+                        // 그 외 카테고리는 가로 줄 대신 앨범 그리드(네이티브 사진 앱 참고,
+                        // 오너 지시 2026-09-19) — "추천"·"새로 나왔어요"는 위에서 이미 뺐다.
+                        AlbumsGrid(tiles: app.concepts.albumTiles)
+                            .padding(.top, Spacing.s2)
                     }
                     Color.clear.frame(height: 1).id("bottomAnchor")
                 }
@@ -203,8 +204,7 @@ struct CategoryListView: View {
     var name: String
     var body: some View {
         ScrollView {
-            ConceptGrid(concepts: app.concepts.concepts(in: name))
-                .padding(.top, Spacing.s3)
+            DensePhotoGrid(concepts: app.concepts.concepts(in: name), category: name)
                 .padding(.bottom, app.contentBottomPad)
         }
         .background(Color.bg)

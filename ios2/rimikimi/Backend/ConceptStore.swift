@@ -21,6 +21,13 @@ final class ConceptStore {
         let items: [Concept]
         var id: String { name }
     }
+    /// 홈의 "앨범" 타일 하나 — 표지 1장 + 이름 + 장수(네이티브 사진 앱 앨범 탭 참고).
+    struct AlbumTile: Identifiable {
+        let name: String
+        let count: Int
+        let coverURL: URL?
+        var id: String { name }
+    }
 
     /// 증명사진은 목록에서 뺀다(웹과 동일 — 별도 앱으로 안내하던 항목).
     var pool: [Concept] { concepts.filter { !$0.isIdPhoto } }
@@ -68,6 +75,15 @@ final class ConceptStore {
         }
         return groups.map { Row(name: $0.key, items: Array($0.value.items.sorted(by: Self.byNewest).prefix(10))) }
             .sorted { (groups[$0.name]?.latest ?? 0) > (groups[$1.name]?.latest ?? 0) }
+    }
+
+    /// 홈 카테고리 섹션 — "추천"·"새로 나왔어요"를 뺀 나머지를 네이티브 사진 앱 "앨범" 탭처럼
+    /// 표지 1장 + 이름 + 장수로 보여준다(오너 지시 2026-09-19). 정렬은 `rows`와 동일(최근에 새
+    /// 컨셉이 들어온 카테고리가 위) — 장수는 `rows.items`가 10개로 잘려 있어 `categories`의
+    /// 진짜 총합을 따로 조회한다.
+    var albumTiles: [AlbumTile] {
+        let counts = Dictionary(uniqueKeysWithValues: categories.map { ($0.name, $0.count) })
+        return rows.map { AlbumTile(name: $0.name, count: counts[$0.name] ?? $0.items.count, coverURL: $0.items.first?.thumbURL) }
     }
 
     func concepts(in category: String) -> [Concept] {
