@@ -540,7 +540,11 @@ final class AppState {
     /// (`quota` 는 AppState 소유). 코디네이터에 역참조를 심으면 그 파일 구조를 건드리게 된다.
     func showInterstitialAfterGeneration() {
         guard let q = quota, q.unlimited != true, q.creditsAvailable == 0 else { return }
-        AdManager.shared.showInterstitial()
+        Task {
+            // 구독자(광고 제거)에게는 띄우지 않는다.
+            if await store.hasActiveSubscription() { return }
+            AdManager.shared.showInterstitial()
+        }
     }
 
     /// 홈 초대 카드를 닫는다 — 닫힌 상태를 영구 기억해 다음 실행에도 다시 뜨지 않게 한다(결함 #5).

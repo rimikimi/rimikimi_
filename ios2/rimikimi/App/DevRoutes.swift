@@ -42,6 +42,12 @@ enum DevRoutes {
                 AppLog.ui.info("dev.generate concept=\(concept.id, privacy: .public)")
                 app.requireLogin(.generate(req))
             }
+        case "/seedcards":
+            // 내 사진 탭에 완성·진행·실패 카드를 심는다 — 레이아웃 캡처용(완성 카드 X 확인).
+            installSamplePhoto(app)
+            app.generation.debugSeedCards(image: app.userPhoto.image)
+            app.tab = .myPhotos
+            app.myPhotosPath.removeAll()
         case "/result":
             // 갤러리의 최신 항목을 결과 화면으로 연다(자동 표시는 1회뿐이라 캡처용).
             app.openLatestGalleryResult()

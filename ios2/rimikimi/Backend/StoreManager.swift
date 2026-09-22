@@ -109,6 +109,15 @@ final class StoreManager {
         return granted
     }
 
+    /// rimikimi+ 구독 중인가. 구독은 "광고 제거" 로 팔리는데 광고 판정이 크레딧 잔액만 봐서,
+    /// 크레딧을 다 쓴 구독자에게 광고가 나갔다(2026-09-18 스윕 #30). RevenueCat 의 캐시된
+    /// CustomerInfo 를 본다 — 못 받으면 false(광고 판정은 기존 규칙 그대로).
+    func hasActiveSubscription() async -> Bool {
+        guard available, configured else { return false }
+        guard let info = try? await Purchases.shared.customerInfo() else { return false }
+        return !info.activeSubscriptions.isEmpty
+    }
+
     func restore() async -> Bool {
         guard available, configured else { return false }
         do { _ = try await Purchases.shared.restorePurchases(); return true }

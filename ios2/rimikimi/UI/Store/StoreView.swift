@@ -68,11 +68,14 @@ struct StoreView: View {
             guard let token = await app.auth.validAccessToken() else { app.handleNoToken(); return }
             do {
                 if let n = try await app.store.purchase(pack, token: token) {
-                    app.showToast("🎉 +\(n) 크레딧 충전 완료!")
+                    // 0 = 테스트(샌드박스) 결제 — 서버가 실서비스 크레딧을 주지 않는다(efa4741).
+                    app.showToast(n > 0 ? "🎉 +\(n) 크레딧 충전 완료!" : "테스트 결제라 크레딧은 적립되지 않았어요.")
                     await app.refreshAfterStorePurchase() // 스토어 탭 — 예약 이어가지 않음
                 }
             } catch {
-                app.showToast("결제 처리 실패: \(error.localizedDescription)")
+                // 202 = 결제는 됐고 적립 확인만 늦는 중 — "실패" 라고 말하면 안 된다.
+                if (error as? APIError)?.status == 202 { app.showToast(error.localizedDescription) }
+                else { app.showToast("결제 처리 실패: \(error.localizedDescription)") }
             }
         }
     }
@@ -179,11 +182,14 @@ struct CreditsSheet: View {
             }
             do {
                 if let n = try await app.store.purchase(pack, token: token) {
-                    app.showToast("🎉 +\(n) 크레딧 충전 완료!")
+                    // 0 = 테스트(샌드박스) 결제 — 서버가 실서비스 크레딧을 주지 않는다(efa4741).
+                    app.showToast(n > 0 ? "🎉 +\(n) 크레딧 충전 완료!" : "테스트 결제라 크레딧은 적립되지 않았어요.")
                     await app.continueAfterPurchase()
                 }
             } catch {
-                app.showToast("결제 처리 실패: \(error.localizedDescription)")
+                // 202 = 결제는 됐고 적립 확인만 늦는 중 — "실패" 라고 말하면 안 된다.
+                if (error as? APIError)?.status == 202 { app.showToast(error.localizedDescription) }
+                else { app.showToast("결제 처리 실패: \(error.localizedDescription)") }
             }
         }
     }

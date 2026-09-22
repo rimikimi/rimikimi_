@@ -257,6 +257,21 @@ final class GenerationCoordinator {
     /// ⚠️ 없으면: A 가 생성 중 로그아웃 → B 로그인 → A 의 결과가 B 에게 결과 화면으로 뜬다.
     private func isLive(_ id: String) -> Bool { entries.contains { $0.id == id } }
 
+    #if DEBUG
+    /// 캡처용 — 진행/완성/실패 카드를 한 장씩 심는다(DevRoutes `/seedcards`). 네트워크 없음.
+    func debugSeedCards(image: UIImage?) {
+        let now = Date()
+        entries = [
+            Entry(job: Job(conceptId: "dbg1", conceptTitle: "폭풍 방파제 코트", startedAt: now, count: 1),
+                  phase: .done([ResultItem(id: "dbg-img", image: image, url: nil, expiresAt: nil)])),
+            Entry(job: Job(conceptId: "dbg2", conceptTitle: "오후 공방의 햇살", startedAt: now, count: 3),
+                  phase: .running(waiting: false)),
+            Entry(job: Job(conceptId: "dbg3", conceptTitle: "교복 인생네컷", startedAt: now, count: 1),
+                  phase: .failed("지금 이미지 서버가 많이 붐비고 있어요.")),
+        ]
+    }
+    #endif
+
     /// 끝난 카드 전부 닫기. 돌고 있는 건 남긴다.
     func dismissFinished() {
         entries.removeAll { if case .running = $0.phase { return false } else { return true } }
