@@ -207,8 +207,13 @@ struct DensePhotoGrid: View {
     /// 잠금 해제 예약. 새 핀치가 시작되면 이전 예약을 **취소**한다 — 안 그러면 앞 핀치가 걸어 둔
     /// 3초 안전장치가 다음 핀치 도중에 터져서 잠금이 풀린다.
     @State private var unlock: DispatchWorkItem?
-    /// 핀치가 도는 동안의 배율(1 = 안 움직임). 격자를 살짝 따라 움직이게 해서 끊겨 보이지 않게 한다.
-    @State private var pinchScale: CGFloat = 1
+    /// 격자 배율은 **두 겹**이다. 하나로 합쳐 두면 안 된다 — 문턱을 넘은 뒤에도 손가락은 계속
+    /// 움직이고 `onProgress` 가 매 프레임 값을 덮어써서, 아래 `step(to:)` 이 건 애니메이션이
+    /// 다음 프레임에 지워진다(핀치로는 한 번도 안 보이고 dev 토글로만 보였을 뻔했다).
+    /// 열이 바뀐 직후 1 로 돌아오며 칸이 스르르 줄거나 늘어나게 하는 몫.
+    @State private var stepScale: CGFloat = 1
+    /// 손가락을 그대로 따라가는 몫.
+    @State private var liveScale: CGFloat = 1
 
     private var columnCount: Int { wideColumns ? 5 : 3 }
     /// 타일 사이 간격과 화면 양옆 여백. 사진 앱은 끝까지 꽉 채우지만 우리 격자는 그러면 답답하다
@@ -216,6 +221,39 @@ struct DensePhotoGrid: View {
     private static let gap: CGFloat = 4
     private var columns: [GridItem] {
         Array(repeating: GridItem(.flexible(), spacing: Self.gap), count: columnCount)
+    }
+
+    /// 5열로 좁히면 화면에 칸이 세 배 가까이 늘어난다. 미리 받아 두지 않으면 그 칸들이 잠깐
+    /// 빈 회색으로 있다가 하나씩 뜬다(녹화해서 확인 — 약 0.1초). 썸네일은 장당 수십 KB라
+    /// 한 화면 분량을 미리 받아 두는 편이 낫다.
+    private func prefetch() {
+        for c in concepts.prefix(60) {
+            let url = c.thumbURL
+            guard ImageLoader.shared.cached(url) == nil else { continue }
+            Task { _ = await ImageLoader.shared.load(url) }
+        }
+    }
+
+    /// 열 수를 바꾼다 — **재배열은 한 프레임에, 움직임은 배율로.**
+    ///
+    /// `LazyVGrid` 의 열 수에 애니메이션을 걸면 칸들이 대각선으로 흩어졌다 겹치며 날아 들어온다
+    /// (녹화해서 프레임으로 확인했다. 오너 지적 3회의 정체가 이거다). 게으른 격자는 열 수가 바뀌는
+    /// 순간 칸을 새로 만들고 버려서, 중간 상태를 그릴 재료 자체가 없기 때문이다.
+    ///
+    /// 그래서 네이티브 사진 앱과 같은 방식을 쓴다 — **재배열하지 않고 확대/축소한다.** 3열에서
+    /// 5열로 갈 때 새 칸은 3/5 크기다. 바뀌는 순간 격자 전체를 5/3 배로 키워 두면 방금 전과 똑같은
+    /// 크기로 보이고, 이 배율이 1 로 돌아오는 동안 칸이 **스르르 줄어든다**. 반대도 같다.
+    /// 움직이는 건 격자 통째로 하나뿐이라 겹치거나 흩어질 수가 없다.
+    private func step(to next: Bool) {
+        let from = CGFloat(columnCount)
+        var t = Transaction(); t.disablesAnimations = true
+        withTransaction(t) {
+            wideColumns = next
+            stepScale = CGFloat(next ? 5 : 3) / from   // 바뀌기 전과 같은 크기로 보이게
+            liveScale = 1
+        }
+        withAnimation(.snappy(duration: 0.28, extraBounce: 0.02)) { stepScale = 1 }
+        HapticPlayer.selection()
     }
 
     private func scheduleUnlock(after seconds: Double) {
@@ -261,30 +299,34 @@ struct DensePhotoGrid: View {
             // 핀치는 **열 수만** 바꾼다 — 3열 ↔ 5열. 페이지를 같이 확대/축소하지 않는다
             // (2026-09-22 오너 지적: 화면 전체가 작아지는 건 시스템 확대전환의 "핀치로 닫기"였다.
             //  그래서 이 화면에서는 확대전환을 쓰지 않는다 — 아래 `zoomSource` 를 뗀 이유).
-            // 핀치하는 동안 격자가 **손가락을 따라 조금 커졌다 작아진다**. 이게 없으면 열 수가
-            // 바뀌는 순간에만 화면이 툭 바뀌어서 뚝뚝 끊겨 보인다(오너 지적 2026-09-22).
-            .scaleEffect(1 + (pinchScale - 1) * 0.12, anchor: .center)
-            // ⚠️ 열 수 변화에는 **짧은** 애니메이션만. 길게 주면 `LazyVGrid` 가 다시 배치하는 동안
-            //    옛 칸들이 잔상처럼 남아 겹친다(오너 지적 "미리 불러내기 된게 따라붙으면 안 된다고").
-            .animation(.easeInOut(duration: 0.18), value: columnCount)
+            // 재배열은 **한 프레임에** 끝내고, 자연스러움은 전부 이 배율이 만든다. 아래 주석 참고.
+            .scaleEffect(stepScale * liveScale, anchor: .center)
             .padding(.horizontal, Spacing.page)
             .padding(.top, Spacing.s2)
-            .onAppear { if startWide { wideColumns = true } }
+            .onAppear {
+                if startWide { wideColumns = true }
+                prefetch()
+            }
+            // 캡처·검증용 — 시뮬레이터엔 핀치가 없어서 열 전환을 눈으로 볼 방법이 이것뿐이다.
+            // 실제 핀치와 **같은 경로**(`step(to:)`)를 타야 녹화한 게 의미가 있다.
+            .onChange(of: app.devWideColumns) { _, w in if w != wideColumns { step(to: w) } }
             .gesture(PinchColumnsGesture(
                 onBegan: {
                     pinching = true
                     scheduleUnlock(after: 3)   // 종료 콜백을 놓쳐도 잠금이 영원히 남지 않게
                 },
-                onProgress: { s in pinchScale = s },
+                // 문턱을 넘기 전에도 손가락을 따라 조금 움직인다 — 핀치가 먹고 있다는 느낌.
+                onProgress: { s in liveScale = 1 + (s - 1) * 0.4 },
                 onStep: { zoomIn in
                     let next = !zoomIn  // 벌림 = 확대 = 3열(wideColumns false), 오므림 = 5열
-                    withAnimation(.snappy(duration: 0.2)) { pinchScale = 1 }
-                    guard next != wideColumns else { return }
-                    wideColumns = next
-                    HapticPlayer.selection()
+                    guard next != wideColumns else {
+                        withAnimation(.snappy(duration: 0.2)) { liveScale = 1 }
+                        return
+                    }
+                    step(to: next)
                 },
                 onEnd: {
-                    withAnimation(.snappy(duration: 0.2)) { pinchScale = 1 }
+                    withAnimation(.snappy(duration: 0.2)) { liveScale = 1 }
                     // 손을 뗀 직후 한 박자 뒤에 푼다 — 떼는 순간의 잔여 터치가 탭으로 새지 않게.
                     scheduleUnlock(after: 0.25)
                 }

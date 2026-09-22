@@ -59,6 +59,13 @@ enum DevRoutes {
             app.devWideColumns = q["cols"] == "5"
             app.tab = .gallery
             app.galleryPath = [.category(q["name"] ?? "세계여행")]
+            // `toggleAfter=<초>` — 그만큼 뒤에 열 수를 뒤집는다. 핀치 없이 전환 순간을 녹화해서
+            // 칸이 날아 들어오는지(오너 지적 "미리 로딩해놓은거 띄우지 마라") 확인하는 용도.
+            if let after = q["toggleAfter"].flatMap(Double.init) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + after) {
+                    app.devWideColumns.toggle()
+                }
+            }
         case "/browse":
             // 필름스트립 브라우저. `id` 없으면 그 카테고리 첫 장.
             //
