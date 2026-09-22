@@ -111,6 +111,32 @@ export const FILM_PRESETS: Preset[] = [
     hsl: [{ c: 120, w: 60, h: 10, s: -0.15, l: 0.03 }],
     fx: { grain: 0.2 } },
 
+  /* ── 폰카 (연도별 아이폰 카메라 색감, 오너 지시 2026-09-23) ──
+     이름은 모델 번호만 쓴다 — "iPhone" 은 붙이지 않는다(오너 지시). 오래된 기종일수록
+     다이내믹레인지가 좁고(하이라이트 날아감·대비↑) 노이즈·연화가 늘고 색이 한쪽으로 쏠린다.
+     최신 기종은 스마트 HDR 계열 — 그림자를 들어 올리고 하이라이트를 눌러 평평하게 편다. */
+  { key: "ph16pro", ko: "16 Pro", en: "16 Pro", group: "phone", // 2024 — 진한 대비·깊은 그림자
+    temp: 2,  tint: 0,  ex: -0.02, con: 0.3,  fade: 0,  whitePull: 8,  sat: 0.1,   vib: 0.12, sh: [-2, 0, 4],   hi: [4, 2, -2] },
+  { key: "ph15pro", ko: "15 Pro", en: "15 Pro", group: "phone", // 2023 — 자연스러운 웜, 부드러운 HDR
+    temp: 14, tint: 4,  ex: 0.03,  con: 0.08, fade: 4,  whitePull: 14, sat: 0.04,  vib: 0.14, sh: [4, 2, 0],    hi: [8, 4, -4] },
+  { key: "ph14pro", ko: "14 Pro", en: "14 Pro", group: "phone", // 2022 — 밝고 쨍한 HDR, 약간 차가움
+    temp: -10, tint: -1, ex: 0.1,  con: 0.04, fade: 6,  whitePull: 24, sat: 0.2,   vib: 0.25, sh: [-2, 2, 8],   hi: [0, 2, 6] },
+  { key: "phxs",    ko: "XS",     en: "XS",     group: "phone", // 2018 — 첫 스마트 HDR: 평평·주황빛 피부·뽀얀 질감
+    temp: 18, tint: 6,  ex: 0.05,  con: -0.1, fade: 16, whitePull: 22, sat: -0.02, vib: 0.1,  sh: [8, 4, 0],    hi: [10, 5, -6],
+    fx: { glow: 0.25 } },
+  { key: "ph7",     ko: "7",      en: "7",      group: "phone", // 2016 — 노란기 도는 뉴트럴, 중간 대비
+    temp: 16, tint: -6, ex: 0.03,  con: 0.18, fade: 4,  whitePull: 4,  sat: 0.1,   vib: 0.06, sh: [2, 4, -4],   hi: [10, 10, -12],
+    fx: { grain: 0.12 } },
+  { key: "ph6s",    ko: "6s",     en: "6s",     group: "phone", // 2015 — 살짝 푸르고 선명, 초록 기운
+    temp: -14, tint: -8, ex: 0.02, con: 0.2,  fade: 2,  whitePull: 2,  sat: 0.14,  vib: 0.04, sh: [-4, 4, 8],   hi: [0, 4, 6],
+    fx: { grain: 0.14 } },
+  { key: "ph4s",    ko: "4s",     en: "4s",     group: "phone", // 2011 — 누런 캐스트, 좁은 계조, 노이즈
+    temp: 26, tint: -6, ex: 0.12,  con: 0.32, fade: 8,  whitePull: 0,  sat: -0.08, vib: 0,    sh: [6, 6, -8],   hi: [14, 12, -14],
+    fx: { grain: 0.3, vignette: 0.35, blur: 0.04 } },
+  { key: "ph3gs",   ko: "3GS",    en: "3GS",    group: "phone", // 2009 — 물 빠진 색, 초록·마젠타 쏠림, 흐릿함·굵은 노이즈
+    temp: 14, tint: -14, ex: 0.14, con: 0.26, fade: 22, whitePull: 0,  sat: -0.35, vib: -0.05, sh: [-6, 10, 6], hi: [18, 16, -10],
+    fx: { grain: 0.55, vignette: 0.45, blur: 0.08 } },
+
   /* ── 재미 (SNOW류 — 특수 렌더 모드, special 필드가 전용 코드 경로를 탄다) ── */
   { key: "sepia",    ko: "세피아",    en: "Sepia", group: "fun",
     ex: 0.02, con: 0.12, fade: 8, whitePull: 6, bw: [0.3, 0.55, 0.15], sh: [18, 6, -14], hi: [24, 10, -18] },
@@ -136,6 +162,7 @@ export const FILM_PRESETS: Preset[] = [
 // 순서 = 화면에 뜨는 순서. 여기 없는 group 은 "재미" 뒤에 자동으로 붙는다.
 export interface FilterGroup { key: string; labelKey: string; emoji: string }
 export const FILTER_GROUPS: FilterGroup[] = [
+  { key: "phone",  labelKey: "filter.gPhone", emoji: "📱" },
   { key: "film",   labelKey: "filter.gFilm", emoji: "🎞️" },
   { key: "camera", labelKey: "filter.gCam",  emoji: "📷" },
   { key: "fun",    labelKey: "filter.gFun",  emoji: "✨" },

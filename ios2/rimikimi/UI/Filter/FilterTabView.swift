@@ -12,6 +12,12 @@ struct FilterTabView: View {
     struct Group: Identifiable { let key: String; let title: String; let emoji: String; let presets: [Preset]; var id: String { key } }
 
     static let groups: [Group] = [
+        // 폰카 — 연도별 아이폰 색감. 이름은 모델 번호만(오너 지시 2026-09-23, "iPhone" 은 안 붙인다).
+        .init(key: "phone", title: "폰카", emoji: "📱", presets: [
+            .init(key: "ph16pro", label: "16 Pro"), .init(key: "ph15pro", label: "15 Pro"), .init(key: "ph14pro", label: "14 Pro"),
+            .init(key: "phxs", label: "XS"), .init(key: "ph7", label: "7"), .init(key: "ph6s", label: "6s"),
+            .init(key: "ph4s", label: "4s"), .init(key: "ph3gs", label: "3GS"),
+        ]),
         .init(key: "film", title: "필름", emoji: "🎞️", presets: [
             .init(key: "golden", label: "골든"), .init(key: "peach", label: "피치"), .init(key: "slide", label: "슬라이드"),
             .init(key: "retro", label: "레트로"), .init(key: "vivid", label: "비비드"), .init(key: "green", label: "그린"),

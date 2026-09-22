@@ -1101,9 +1101,9 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
 
         {tab === "filter" && (
           <>
-            {/* 필름 / 카메라 그룹 토글 */}
+            {/* 폰카 / 필름 / 카메라 / 재미 그룹 토글 */}
             <div style={ES.groupRow}>
-              {[["film", t("filter.gFilm")], ["camera", t("filter.gCam")], ["fun", t("filter.gFun")]].map(([g, label]) => (
+              {[["phone", t("filter.gPhone")], ["film", t("filter.gFilm")], ["camera", t("filter.gCam")], ["fun", t("filter.gFun")]].map(([g, label]) => (
                 <button
                   key={g}
                   style={{ ...ES.groupBtn, ...(chipGroup === g ? ES.groupBtnOn : null) }}
@@ -1414,11 +1414,13 @@ const ES = {
     transition: "color .15s",
   },
   tabBtnOn: { background: "#fff", color: "#191512" },
-  groupRow: { display: "flex", gap: 6, padding: "0 16px 9px" },
+  // 그룹이 4개(폰카 추가)라 좁은 폰에서 "전체 적용"까지 한 줄에 안 들어갈 수 있다 → 가로 스크롤
+  groupRow: { display: "flex", gap: 6, padding: "0 16px 9px", overflowX: "auto", scrollbarWidth: "none" },
   groupBtn: {
     border: "1px solid rgba(255,255,255,.14)", borderRadius: 15, padding: "5px 13px",
     fontSize: 11.5, fontWeight: 800, background: "transparent",
     color: "rgba(255,255,255,.55)", cursor: "pointer",
+    whiteSpace: "nowrap", flexShrink: 0,
   },
   groupBtnOn: { background: "rgba(255,255,255,.14)", color: "#fff", borderColor: "transparent" },
   // 전체 적용 — 그룹 토글과 같은 급의 필이되 오른쪽 끝에서 살짝 강조
