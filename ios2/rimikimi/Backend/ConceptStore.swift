@@ -25,7 +25,10 @@ final class ConceptStore {
     struct AlbumTile: Identifiable {
         let name: String
         let count: Int
+        /// 표지는 2열 타일(≈185pt = 555px)이라 400px 썸네일로는 모자란다 — 1200px 을 먼저 쓰고
+        /// 없으면 썸네일로 되돌아간다(`RemoteImage(fallback:)`).
         let coverURL: URL?
+        let coverFallbackURL: URL?
         var id: String { name }
     }
 
@@ -83,7 +86,8 @@ final class ConceptStore {
     /// 진짜 총합을 따로 조회한다.
     var albumTiles: [AlbumTile] {
         let counts = Dictionary(uniqueKeysWithValues: categories.map { ($0.name, $0.count) })
-        return rows.map { AlbumTile(name: $0.name, count: counts[$0.name] ?? $0.items.count, coverURL: $0.items.first?.thumbURL) }
+        return rows.map { AlbumTile(name: $0.name, count: counts[$0.name] ?? $0.items.count,
+                                    coverURL: $0.items.first?.largeURL, coverFallbackURL: $0.items.first?.thumbURL) }
     }
 
     func concepts(in category: String) -> [Concept] {

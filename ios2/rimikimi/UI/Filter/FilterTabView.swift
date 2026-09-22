@@ -36,7 +36,10 @@ struct FilterTabView: View {
                             .foregroundStyle(Color.onInk).frame(width: 44, height: 44).background(Color.ink, in: Circle())
                         VStack(alignment: .leading, spacing: 2) {
                             Text("카메라로 찍기").font(AppFont.headline)
-                            Text("필터를 보면서 찍어요 · 전부 무료").font(AppFont.footnote).foregroundStyle(Color.ink2)
+                            // 문구 정정(2026-09-22): build 94 에서 아이폰 기본 카메라(`SystemCamera.swift`)로
+                            // 바뀌면서 촬영 중 라이브 필터 미리보기가 없어졌다 — "필터를 보면서 찍어요"는
+                            // 이제 거짓이고 심사(2.3.1)에서도 걸린다. Info.plist 는 이미 고쳤고 여기가 남아 있었다.
+                            Text("찍고 바로 필터 입혀요 · 전부 무료").font(AppFont.footnote).foregroundStyle(Color.ink2)
                         }
                         Spacer()
                         Image(systemName: "chevron.right").font(.system(size: 13, weight: .semibold)).foregroundStyle(Color.ink3)

@@ -8,6 +8,9 @@ import ImageIO
 struct RemoteImage: View {
     var url: URL?
     var cornerRadius: CGFloat = Radius.thumb
+    /// `url` 이 없을 때(404 등) 대신 쓸 주소. 고해상도(`large/`)를 먼저 시도하고 아직 없는 컨셉은
+    /// 썸네일로 되돌아가는 용도 — 새 컨셉이 올라왔는데 `large/` 만 빠져도 빈 회색으로 남지 않는다.
+    var fallback: URL? = nil
     @State private var image: UIImage?
 
     var body: some View {
@@ -23,7 +26,10 @@ struct RemoteImage: View {
         .task(id: url) {
             guard let url else { image = nil; return }
             if let cached = ImageLoader.shared.cached(url) { image = cached; return }
-            image = await ImageLoader.shared.load(url)
+            if let loaded = await ImageLoader.shared.load(url) { image = loaded; return }
+            guard let fallback, fallback != url else { return }
+            if let hit = ImageLoader.shared.cached(fallback) { image = hit }
+            else { image = await ImageLoader.shared.load(fallback) }
         }
     }
 }

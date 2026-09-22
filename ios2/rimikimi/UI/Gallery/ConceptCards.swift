@@ -92,7 +92,7 @@ struct AlbumGridTile: View {
     var body: some View {
         NavigationLink(value: Route.category(tile.name)) {
             VStack(alignment: .leading, spacing: Spacing.s1) {
-                RemoteImage(url: tile.coverURL, cornerRadius: Radius.card)
+                RemoteImage(url: tile.coverURL, cornerRadius: Radius.card, fallback: tile.coverFallbackURL)
                     .aspectRatio(1, contentMode: .fit)
                 Text(tile.name).font(AppFont.cardTitle).foregroundStyle(Color.ink).lineLimit(1)
                 Text("\(tile.count)장").font(AppFont.footnote).foregroundStyle(Color.ink3)
@@ -127,9 +127,9 @@ struct AlbumsGrid: View {
 
 /// 빽빽한 정방형 그리드 — 카테고리 화면(네이티브 사진 앱 라이브러리 그리드 참고, 오너 지시
 /// 2026-09-19). 카드 크롬·캡션 없음, 간격 2pt. 핀치로 3열↔5열(두 단계만 — 오너 지시로 3단계
-/// 안 함). `MagnifyGesture`(iOS 17+, SwiftUI 정식 API — 네이티브 핀치 인식 자체는 이미 있고
-/// "그 값을 열 수 전환에 매핑"만 직접 구현한 것) 로 손을 뗄 때 방향만 본다: 오므렸으면(축소)
-/// 더 촘촘하게(5열), 벌렸으면 더 크게(3열). 탭 → 필름스트립 브라우저(`Route.browse`).
+/// 안 함): 오므리면(축소) 더 촘촘하게(5열), 벌리면 더 크게(3열). 핀치 인식은 `PinchColumnsGesture`
+/// (UIKit 핀치 + 동시 인식) — `MagnifyGesture` 는 손가락 조합에 따라 스크롤에 먹혔다(그 파일 주석).
+/// 탭 → 필름스트립 브라우저(`Route.browse`).
 struct DensePhotoGrid: View {
     var concepts: [Concept]
     var category: String
@@ -154,15 +154,12 @@ struct DensePhotoGrid: View {
                 }
             }
             .animation(.spring(response: 0.35, dampingFraction: 0.86), value: columnCount)
-            .gesture(
-                MagnifyGesture()
-                    .onEnded { value in
-                        let shouldNarrow = value.magnification < 1  // 오므림 = 축소 = 더 촘촘히(5열)
-                        guard shouldNarrow != wideColumns else { return }
-                        wideColumns = shouldNarrow
-                        HapticPlayer.selection()
-                    }
-            )
+            .gesture(PinchColumnsGesture { zoomIn in
+                let next = !zoomIn  // 벌림 = 확대 = 3열(wideColumns false), 오므림 = 5열
+                guard next != wideColumns else { return }
+                wideColumns = next
+                HapticPlayer.selection()
+            })
         }
     }
 }

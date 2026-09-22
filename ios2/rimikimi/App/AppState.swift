@@ -15,6 +15,17 @@ enum Route: Hashable {
     case result(ResultPayload)
     case store
     case invite
+
+    /// 이 화면이 탭바를 그대로 두는지(`.toolbar(.hidden, for: .tabBar)` 를 안 쓰는지).
+    /// 떠 있는 카메라 원을 그릴지 판단하는 유일한 기준 — 탭바가 보이는데 카메라 원만 사라지면
+    /// 안 된다(오너 지적 2026-09-22: "카테고리 안에 들어가면 카메라 버튼 없어지는데 그대로 있어야 함").
+    /// 반대로 탭바를 숨기는 화면에서는 원도 숨겨야 한다 — 안 그러면 "만들기" 바 위에 겹친다.
+    var keepsTabBar: Bool {
+        switch self {
+        case .category: return true
+        case .concept, .browse, .result, .store, .invite: return false
+        }
+    }
 }
 
 struct ResultPayload: Hashable, Identifiable {
@@ -44,6 +55,18 @@ final class AppState {
     var galleryPath: [Route] = []
     var myPhotosPath: [Route] = []
     var profilePath: [Route] = []
+
+    /// 지금 보이는 탭의 스택. 필터 탭은 푸시가 없고, 카메라 슬롯은 탭이 아니라 동작이라 빈 스택.
+    var activePath: [Route] {
+        switch tab {
+        case .gallery: return galleryPath
+        case .myPhotos: return myPhotosPath
+        case .profile: return profilePath
+        case .filter, .camera: return []
+        }
+    }
+    /// 떠 있는 카메라 원을 그릴지 — 탭바가 실제로 보이는 화면에서만.
+    var showsCameraTabButton: Bool { activePath.last?.keepsTabBar ?? true }
 
     var loginSheet = false
     var loginMessage: String?

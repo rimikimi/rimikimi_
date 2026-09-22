@@ -34,7 +34,8 @@ struct ConceptOptionsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.s4) {
-                RemoteImage(url: concept.thumbURL, cornerRadius: Radius.card)
+                // 히어로도 거의 화면 폭 — 400px 썸네일은 여기서 뭉갠다(오너 지적 2026-09-22).
+                RemoteImage(url: concept.largeURL, cornerRadius: Radius.card, fallback: concept.thumbURL)
                     .aspectRatio(CardMetrics.aspect, contentMode: .fit)
                     .padding(.horizontal, Spacing.page)
                     .padding(.top, Spacing.s2)

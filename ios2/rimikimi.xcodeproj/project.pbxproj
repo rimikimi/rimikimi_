@@ -42,6 +42,7 @@
 		835FB99CC4F14D1B4BE717EF /* FilterTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5857D4A423BFF51BC53D5FC5 /* FilterTabView.swift */; };
 		83681C6E4FE5B31C33FBA703 /* WebToolView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7187565C059C0F50D5993AE /* WebToolView.swift */; };
 		8436F5C07886F073228BE7C7 /* ResultView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FCAE2620F30F680D2653EC8 /* ResultView.swift */; };
+		94D226F90ADD5DA58B8A4A68 /* PinchColumns.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7983BBC96EDB5683B8206D8A /* PinchColumns.swift */; };
 		963ADFB5381C6DDE8FCAC190 /* OptionBlocks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8658D32247F828A580AF2847 /* OptionBlocks.swift */; };
 		96775F190504E8EED9B273CC /* Glass.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEFA1F21B5BA38215CAC77EC /* Glass.swift */; };
 		A49C605D45AA2557EBA1C0ED /* StoreView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17428D1B0D1FCC369A59D85B /* StoreView.swift */; };
@@ -99,6 +100,7 @@
 		61E638E81671F6667AAF20CA /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		63F05841B17EA82F15D44488 /* FitSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitSheet.swift; sourceTree = "<group>"; };
 		78F5BF2A69CD169D3F7CA3A3 /* InviteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InviteView.swift; sourceTree = "<group>"; };
+		7983BBC96EDB5683B8206D8A /* PinchColumns.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinchColumns.swift; sourceTree = "<group>"; };
 		7D7392A73B81DED2F69CD07B /* ColorTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorTokens.swift; sourceTree = "<group>"; };
 		7F3709AB17F62286AD668705 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		82D0C47706658134377A1FC8 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
@@ -248,6 +250,7 @@
 				0E11BF60C2C8F9A9AA946888 /* Chips.swift */,
 				5C0421A6B64F5A6B30BFB13A /* Feedback.swift */,
 				BEFA1F21B5BA38215CAC77EC /* Glass.swift */,
+				7983BBC96EDB5683B8206D8A /* PinchColumns.swift */,
 				994985E095D76ED128B3DA7A /* RemoteImage.swift */,
 				F40ADC939FF4F14D1CED0C1C /* Rows.swift */,
 				E7187565C059C0F50D5993AE /* WebToolView.swift */,
@@ -503,6 +506,7 @@
 				668C5033B01B75CA06438738 /* MyPhotosView.swift in Sources */,
 				963ADFB5381C6DDE8FCAC190 /* OptionBlocks.swift in Sources */,
 				EF50BFFC8D73A5439B19ABC3 /* PhotoPicker.swift in Sources */,
+				94D226F90ADD5DA58B8A4A68 /* PinchColumns.swift in Sources */,
 				D2411ABFA50209D92FD9D40E /* ProfileView.swift in Sources */,
 				64C7CBBF94E5DC98E9760B76 /* PushManager.swift in Sources */,
 				08AABBCE194CCCB98ADC373B /* RemoteImage.swift in Sources */,
@@ -598,7 +602,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = rimikimi/rimikimi.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 100;
+				CURRENT_PROJECT_VERSION = 101;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = rimikimi/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -683,7 +687,7 @@
 				CODE_SIGN_ENTITLEMENTS = rimikimi/rimikimi.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 100;
+				CURRENT_PROJECT_VERSION = 101;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = rimikimi/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (

@@ -69,5 +69,9 @@ enum Config {
     static let brooklynAppStoreURL = URL(string: "https://apps.apple.com/app/id6784226620")!
 
     static func thumbURL(_ id: String) -> URL { apiBase.appendingPathComponent("thumbs/\(id).webp") }
+    /// 크게 보여주는 자리(브라우저 큰 사진·옵션 화면 히어로·앨범 표지)용 1200px WebP.
+    /// 썸네일은 400px 라 전체 폭(402pt = 1206px)에 깔면 3배 확대돼 뭉갠다(오너 지적 2026-09-22).
+    /// 아직 `large/` 가 없는 컨셉은 `RemoteImage(fallback:)` 이 썸네일로 되돌아간다.
+    static func largeURL(_ id: String) -> URL { apiBase.appendingPathComponent("large/\(id).webp") }
     static let bundleID = "com.rimikimi.app"
 }

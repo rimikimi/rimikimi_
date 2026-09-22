@@ -18,7 +18,8 @@ struct ConceptBrowserView: View {
         VStack(spacing: 0) {
             TabView(selection: $index) {
                 ForEach(Array(items.enumerated()), id: \.element.id) { i, c in
-                    RemoteImage(url: c.thumbURL, cornerRadius: 0)
+                    // 화면 전체 폭에 깔리므로 400px 썸네일이 아니라 1200px 원본(오너 지적 2026-09-22).
+                    RemoteImage(url: c.largeURL, cornerRadius: 0, fallback: c.thumbURL)
                         .aspectRatio(CardMetrics.aspect, contentMode: .fit)
                         .tag(i)
                 }

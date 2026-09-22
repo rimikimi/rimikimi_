@@ -48,14 +48,16 @@ struct RootTabView: View {
         //    아이콘·라벨은 양쪽 모두 다크 모드 색으로 제대로 나온다.
         //    `.toolbarColorScheme` / `.toolbarBackground` / `UITabBarAppearance` 는 이 떠 있는
         //    탭바에 아무 효과가 없다(불투명 단색까지 강제해 확인).
-        // 안쪽 화면(푸시)에서는 탭바가 숨으므로 카메라 원도 함께 숨긴다 — 만들기 바 위에 겹치던 문제.
+        // 탭바를 숨기는 안쪽 화면에서만 카메라 원도 함께 숨긴다 — 만들기 바 위에 겹치던 문제.
+        // ⚠️ "스택이 비었는가"로 판단하면 안 된다(2026-09-22 오너 지적): 카테고리 화면은 푸시지만
+        //    탭바를 그대로 두는데 카메라 원만 사라졌다. 판단 기준은 `Route.keepsTabBar` 하나다.
         .overlay(alignment: .bottom) {
-            if app.galleryPath.isEmpty && app.myPhotosPath.isEmpty && app.profilePath.isEmpty {
+            if app.showsCameraTabButton {
                 CameraTabButton(bottomPadding: cameraBottomPadding) { openCamera() }
                     .transition(.opacity.combined(with: .scale(scale: 0.9)))
             }
         }
-        .animation(Motion.exitCurve(), value: app.galleryPath.isEmpty && app.myPhotosPath.isEmpty && app.profilePath.isEmpty)
+        .animation(Motion.exitCurve(), value: app.showsCameraTabButton)
         .onChange(of: app.tab) { old, new in
             if new == .camera {
                 app.tab = old == .camera ? lastTab : old

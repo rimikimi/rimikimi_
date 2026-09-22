@@ -65,6 +65,8 @@ struct Concept: Identifiable, Hashable, Decodable {
     var isFeature: Bool { isArt || isIdPhoto || isFourcut }
 
     var thumbURL: URL { Config.thumbURL(id) }
+    /// 크게 깔리는 자리용 1200px 원본(없으면 `RemoteImage(fallback:)` 이 썸네일로 되돌아간다).
+    var largeURL: URL { Config.largeURL(id) }
     var sortKey: Double { publishAt?.timeIntervalSince1970 ?? (Double(id) ?? 0) }
 
     static func == (a: Concept, b: Concept) -> Bool { a.id == b.id }
