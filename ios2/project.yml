@@ -163,7 +163,8 @@ targets:
         # 2026-09-22: 2.0.1 로 올리면서 **빌드 번호를 1 부터 다시** 센다(오너 지시 — 98~101 은
         # 1.x 에서 이어받은 번호라 새 2.x 라인에 안 맞는다). 담긴 것: 미리보기 3:4 고정, 즐겨찾기,
         # 만든 컨셉 표시(저장한 것만 영구), 사진 앱 동작(확대·스크러빙·핀치), 얼굴 스캔, 시즌, 24시간.
-        CURRENT_PROJECT_VERSION: "1"
+        # 2026-09-22: 2 — 핀치/확대전환 충돌, 필름스트립 스크러버, 아래로 끌어 닫기.
+        CURRENT_PROJECT_VERSION: "2"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
       configs:
