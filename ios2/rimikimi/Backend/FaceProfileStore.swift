@@ -36,7 +36,17 @@ final class FaceProfileStore {
     }
     private func url(_ a: Angle) -> URL { dir.appendingPathComponent("\(a.rawValue).jpg") }
 
+    /// 저장 형식 판(版). 2 = 스캔본이 **90도 누워** 저장되던 것을 고친 뒤(2026-09-22, `FaceScanModel.upright`).
+    ///
+    /// 판이 올라가면 갖고 있던 사진을 버린다. 이 사진들은 생성할 때 `faceRefs` 로 그대로 모델에
+    /// 참조로 실려 가므로(`RimikimiAPI` body["faceRefs"]), 누운 참조를 계속 보내면 얼굴이 안 지켜진다
+    /// — 오너가 "스캔해온 게 더 얼굴 유지가 안 된다" 고 한 게 이것이다. 앱만 고치고 파일을 두면
+    /// 이미 스캔해 둔 사람은 계속 누운 걸 보내게 된다.
+    private static let version = 2
+    private var versionURL: URL { dir.appendingPathComponent("version") }
+
     init() {
+        discardIfStale()
         for a in Angle.allCases {
             if let data = try? Data(contentsOf: url(a)), let img = UIImage(data: data) { shots[a] = img }
         }
@@ -49,7 +59,18 @@ final class FaceProfileStore {
         Angle.allCases.compactMap { a in shots[a].map { (a, $0) } }
     }
 
+    /// 옛 판으로 저장된 사진을 지운다. 지우고 나면 프로필 화면이 다시 "얼굴 스캔하기" 로 돌아가
+    /// 새로 찍게 된다 — 누운 사진을 소리 없이 계속 쓰는 것보다 낫다.
+    private func discardIfStale() {
+        let saved = (try? String(contentsOf: versionURL, encoding: .utf8))
+            .flatMap { Int($0.trimmingCharacters(in: .whitespacesAndNewlines)) } ?? 1
+        guard saved < Self.version else { return }
+        for a in Angle.allCases { try? FileManager.default.removeItem(at: url(a)) }
+        try? String(Self.version).write(to: versionURL, atomically: true, encoding: .utf8)
+    }
+
     func save(_ new: [Angle: UIImage]) {
+        try? String(Self.version).write(to: versionURL, atomically: true, encoding: .utf8)
         for (a, img) in new {
             let small = ImageUtil.resize(img, maxSide: 1280)
             shots[a] = small
