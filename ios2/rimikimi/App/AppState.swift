@@ -101,6 +101,8 @@ final class AppState {
     var showSystemCamera = false
     /// 얼굴 스캔(Face ID 등록식) 화면 — 프로필에서 연다.
     var showFaceScan = false
+    /// 연속 촬영 카메라 — 여러 장 찍어 한 번에 필터(오너 지시 2026-09-22, 시험 중).
+    var showBurstCamera = false
     /// 시스템 사진 선택창 — 필터를 고른 뒤 여기서 사진을 먼저 고른다.
     /// (웹에서 파일창을 자동으로 못 여는 제약 때문. `PhotoPicker` 주석 참고)
     var photoPickPreset: String?     // nil 이면 닫힘
@@ -108,6 +110,9 @@ final class AppState {
     /// 카메라 구현 스위치 — true = 아이폰 기본 카메라(현재), false = 옛 웹뷰 카메라(폴백).
     /// 웹뷰 쪽은 지우지 않고 남겨 둔다(문제가 생기면 한 줄로 되돌릴 수 있게).
     static let useSystemCamera = true
+    /// 카메라 버튼이 여는 화면 — true = 연속 촬영(여러 장 → 한 번에 필터), false = 아이폰 기본 카메라 한 장.
+    /// 컨셉 사진용 경로(내 사진 등록 등)는 이 스위치와 무관하게 기본 카메라·앨범을 쓴다.
+    static let useBurstCamera = true
     /// 편집기·카메라 1단계 웹뷰(SPEC §5).
     var webTool: WebTool?
     /// 첫 실행 가이드 1장 — 실행 시 다른 팝업은 없다.
@@ -236,7 +241,10 @@ final class AppState {
         case .camera:
             // 아이폰 **기본 카메라 화면**을 띄운다(오너 지시 2026-09-17).
             // 웹뷰 카메라는 포커스·줌을 못 써서 폐기 — 폴백 경로로만 남긴다(useSystemCamera).
-            if Self.useSystemCamera { showSystemCamera = true }
+            // 2026-09-22: 필터는 "여러 장 찍어 한 번에" 가 핵심이라 연속 촬영 화면을 먼저 띄운다.
+            // 기본 카메라는 한 장 찍으면 바로 앱으로 돌아와 연속 촬영이 불가능하다(`BurstCameraView` 주석).
+            if Self.useBurstCamera { showBurstCamera = true }
+            else if Self.useSystemCamera { showSystemCamera = true }
             else { webTool = WebTool(url: Config.cameraToolURL, title: "카메라", chromeless: true) }
         }
     }
@@ -244,6 +252,19 @@ final class AppState {
     /// 기본 카메라로 찍은 직후 — 앨범에 저장하고 편집기(필터)로 넘긴다.
     /// SPEC §3: "셔터 → 즉시 앨범 저장 → 다듬기·공유". 기본 카메라는 라이브 필터를 못 얹으므로
     /// **찍고 나서** 필터를 입히는 순서가 된다.
+    /// 연속 촬영 완료 — 찍은 컷을 앨범에 남기고, 전부 편집기로 넘겨 필터를 한 번에 입힌다.
+    /// (편집기는 이미 여러 장을 받도록 돼 있다 — `PhotoEditor` 의 `srcs`.)
+    func finishBurstCamera(_ images: [UIImage]) {
+        showBurstCamera = false
+        guard !images.isEmpty else { return }
+        Task {
+            var saved = 0
+            for img in images where await CameraAlbum.save(img) { saved += 1 }
+            showToast(saved == images.count ? "\(saved)장을 앨범에 저장했어요" : "앨범 저장 권한이 없어요")
+        }
+        handlePickedPhotos(images)
+    }
+
     func handleCameraShot(_ image: UIImage) {
         showSystemCamera = false
         Task {

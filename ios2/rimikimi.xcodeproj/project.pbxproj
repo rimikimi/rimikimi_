@@ -36,9 +36,11 @@
 		603F83BCDF3401B7F3E5507A /* WebAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = A29E03020A40301A2004D95D /* WebAuth.swift */; };
 		64C7CBBF94E5DC98E9760B76 /* PushManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B53E11DE3E80A74A2E3C770 /* PushManager.swift */; };
 		668C5033B01B75CA06438738 /* MyPhotosView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1421BF409A50AC56D62FE934 /* MyPhotosView.swift */; };
+		6E4FCC14C3C40333FC50DB49 /* BurstCameraModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90FECE5BF9307038E3DB4ABD /* BurstCameraModel.swift */; };
 		6F2399D44AB229460D3A7931 /* Motion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22011AE81D18E4DA58D0FC81 /* Motion.swift */; };
 		75ABB8FC02E395FFDCE9EC5E /* GenerationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 602EA387617A8E42DFAD3C9D /* GenerationCoordinator.swift */; };
 		78962CE8BACB19DEBB10C1D0 /* e2e_sample_person.jpg in Resources */ = {isa = PBXBuildFile; fileRef = E9E942DA3CA4C0AF9A0113D7 /* e2e_sample_person.jpg */; };
+		798DBE706A3F519A59694993 /* BurstCamera.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9526E68CEA29D4F803D6681 /* BurstCamera.swift */; };
 		7B3FB9E2EEA88904B7FAD8E7 /* ConceptStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B5F41573F759B338E33F44C /* ConceptStore.swift */; };
 		835FB99CC4F14D1B4BE717EF /* FilterTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5857D4A423BFF51BC53D5FC5 /* FilterTabView.swift */; };
 		83681C6E4FE5B31C33FBA703 /* WebToolView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7187565C059C0F50D5993AE /* WebToolView.swift */; };
@@ -116,6 +118,7 @@
 		8A00E26DC6A1237AB49B4A10 /* GuideView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuideView.swift; sourceTree = "<group>"; };
 		8B7250068E2825FC854BDBCC /* Concept.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Concept.swift; sourceTree = "<group>"; };
 		8E80D37113DA80280724E361 /* SystemCamera.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemCamera.swift; sourceTree = "<group>"; };
+		90FECE5BF9307038E3DB4ABD /* BurstCameraModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BurstCameraModel.swift; sourceTree = "<group>"; };
 		91194022189926738963FD2B /* FaceScanModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FaceScanModel.swift; sourceTree = "<group>"; };
 		994985E095D76ED128B3DA7A /* RemoteImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteImage.swift; sourceTree = "<group>"; };
 		99ABF96B6B0B061F6148D8FD /* ImageUtil.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageUtil.swift; sourceTree = "<group>"; };
@@ -139,6 +142,7 @@
 		E6AD421125C4CB868836ACF9 /* AdManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdManager.swift; sourceTree = "<group>"; };
 		E7187565C059C0F50D5993AE /* WebToolView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebToolView.swift; sourceTree = "<group>"; };
 		E7BB3DB23ED6EDD1769936B5 /* FaceProfileStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FaceProfileStore.swift; sourceTree = "<group>"; };
+		E9526E68CEA29D4F803D6681 /* BurstCamera.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BurstCamera.swift; sourceTree = "<group>"; };
 		E9E942DA3CA4C0AF9A0113D7 /* e2e_sample_person.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = e2e_sample_person.jpg; sourceTree = "<group>"; };
 		F40ADC939FF4F14D1CED0C1C /* Rows.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Rows.swift; sourceTree = "<group>"; };
 		F54CE2F3200CA526ED869BFE /* RimikimiApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RimikimiApp.swift; sourceTree = "<group>"; };
@@ -242,6 +246,8 @@
 		4B78B6662847AAC97752D1F9 /* Camera */ = {
 			isa = PBXGroup;
 			children = (
+				E9526E68CEA29D4F803D6681 /* BurstCamera.swift */,
+				90FECE5BF9307038E3DB4ABD /* BurstCameraModel.swift */,
 				9C1D2B899128932E07E33229 /* PhotoPicker.swift */,
 				8E80D37113DA80280724E361 /* SystemCamera.swift */,
 			);
@@ -505,6 +511,8 @@
 				175E0A17BCE4C8EF067EB662 /* AuthSession.swift in Sources */,
 				B9DCA305D9F06A53557C8FD6 /* AuthStore.swift in Sources */,
 				22DEFE8C6B1211D5C5ECA851 /* BrandLogo.swift in Sources */,
+				798DBE706A3F519A59694993 /* BurstCamera.swift in Sources */,
+				6E4FCC14C3C40333FC50DB49 /* BurstCameraModel.swift in Sources */,
 				ED0B7B6AFDB56ED1E21A9214 /* Buttons.swift in Sources */,
 				04788E19FE0CB109D966D13C /* Chips.swift in Sources */,
 				11C4A6B2AD0D9030ED970465 /* ColorTokens.swift in Sources */,

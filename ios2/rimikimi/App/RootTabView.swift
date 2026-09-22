@@ -120,6 +120,8 @@ struct RootTabView: View {
                 .presentationCornerRadius(Radius.sheet)
                 .interactiveDismissDisabled()
         }
+        // 연속 촬영 — 여러 장 찍고 한 번에 필터.
+        .fullScreenCover(isPresented: $app.showBurstCamera) { BurstCameraView() }
         // 얼굴 스캔 — Face ID 등록처럼 영상으로 3장(정면·옆·옆)을 모은다.
         .fullScreenCover(isPresented: $app.showFaceScan) { FaceScanView() }
         // 아이폰 기본 카메라 — 애플이 만든 촬영 화면 그대로(포커스·줌·플래시 전부 동작).
