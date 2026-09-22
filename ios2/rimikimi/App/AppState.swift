@@ -68,6 +68,17 @@ final class AppState {
     /// 떠 있는 카메라 원을 그릴지 — 탭바가 실제로 보이는 화면에서만.
     var showsCameraTabButton: Bool { activePath.last?.keepsTabBar ?? true }
 
+    /// 지금 탭의 스택에 한 칸 밀어 넣는다. `NavigationLink` 를 못 쓰는 자리에서 쓴다 —
+    /// 격자처럼 **누르는 순간을 우리가 판단해야 하는** 화면(핀치 중에는 안 들어가야 한다).
+    func pushRoute(_ route: Route) {
+        switch tab {
+        case .gallery: galleryPath.append(route)
+        case .myPhotos: myPhotosPath.append(route)
+        case .profile: profilePath.append(route)
+        case .filter, .camera: break
+        }
+    }
+
     var loginSheet = false
     var loginMessage: String?
     var pending: PendingAction?
@@ -167,6 +178,9 @@ final class AppState {
     /// ⚠️ `#if DEBUG` 안에 두면 호출부를 `#if` 로 갈라야 하고, 그러면 뒤에 붙는 modifier 가
     ///    붙지 않는다(릴리스 아카이브에서 실제로 걸렸다). 그래서 빌드 구분 없이 둔다.
     var devWideColumns = false
+    /// 캡처·검증용 — 브라우저가 떠 있는 동안 이 id 로 **건너뛴다**(스와이프를 흉내 내는 용도).
+    /// 시뮬레이터에서는 좌우 스와이프를 못 하니, 열린 뒤 필름스트립이 따라오는지 이걸로 확인한다.
+    var devBrowseJump: String?
 
     /// 마지막 생성 요청 — 크레딧 부족으로 실패했을 때 구매 뒤 이어가기 위해.
     private var lastRequest: GenerateRequest?

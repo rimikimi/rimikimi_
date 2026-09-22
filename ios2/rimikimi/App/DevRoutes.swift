@@ -61,10 +61,29 @@ enum DevRoutes {
             app.galleryPath = [.category(q["name"] ?? "세계여행")]
         case "/browse":
             // 필름스트립 브라우저. `id` 없으면 그 카테고리 첫 장.
+            //
+            // ⚠️ 기본형은 **컨셉 목록이 아직 없는 채로** 열린다(앱을 막 띄웠으니까). 실제 사용은
+            //    격자에서 탭해 들어가는 것이라 목록이 이미 있다 — 두 경로는 코드가 달라서, 한쪽만
+            //    보고 "고쳤다"고 하면 안 된다(2026-09-22에 그렇게 틀렸다). `warm=1` 이 그 경로다.
+            //    `then=<id>&after=<초>` 는 연 다음 그 사진으로 넘긴 셈 쳐서(시뮬레이터엔 스와이프가
+            //    없다) 필름스트립이 따라오는지 본다.
             let name = q["name"] ?? "세계여행"
-            let first = app.concepts.concepts(in: name).first?.id ?? ""
             app.tab = .gallery
-            app.galleryPath = [.category(name), .browse(category: name, startID: q["id"] ?? first)]
+            let open = {
+                let first = app.concepts.concepts(in: name).first?.id ?? ""
+                app.galleryPath = [.category(name), .browse(category: name, startID: q["id"] ?? first)]
+                if let then = q["then"] {
+                    let delay = Double(q["after"] ?? "2") ?? 2
+                    DispatchQueue.main.asyncAfter(deadline: .now() + delay) { app.devBrowseJump = then }
+                }
+            }
+            if q["warm"] == "1", app.concepts.concepts(in: name).isEmpty {
+                // 목록이 도착할 때까지 기다렸다 연다 = 격자에서 탭해 들어간 것과 같은 상태.
+                app.galleryPath = [.category(name)]
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.5, execute: open)
+            } else {
+                open()
+            }
         case "/store": app.tab = .profile; app.profilePath = [.store]
         case "/invite": app.tab = .profile; app.profilePath = [.invite]
         case "/profile": app.tab = .profile; app.profilePath = []

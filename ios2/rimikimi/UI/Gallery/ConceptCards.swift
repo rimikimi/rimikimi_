@@ -207,6 +207,8 @@ struct DensePhotoGrid: View {
     /// 잠금 해제 예약. 새 핀치가 시작되면 이전 예약을 **취소**한다 — 안 그러면 앞 핀치가 걸어 둔
     /// 3초 안전장치가 다음 핀치 도중에 터져서 잠금이 풀린다.
     @State private var unlock: DispatchWorkItem?
+    /// 핀치가 도는 동안의 배율(1 = 안 움직임). 격자를 살짝 따라 움직이게 해서 끊겨 보이지 않게 한다.
+    @State private var pinchScale: CGFloat = 1
 
     private var columnCount: Int { wideColumns ? 5 : 3 }
     /// 타일 사이 간격과 화면 양옆 여백. 사진 앱은 끝까지 꽉 채우지만 우리 격자는 그러면 답답하다
@@ -229,7 +231,16 @@ struct DensePhotoGrid: View {
         } else {
             LazyVGrid(columns: columns, spacing: Self.gap) {
                 ForEach(concepts) { c in
-                    NavigationLink(value: Route.browse(category: category, startID: c.id)) {
+                    // ⚠️ `NavigationLink` 를 쓰면 안 된다. 손가락이 **닿는 순간** 링크가 그 터치를
+                    //    가져가 버려서, 뒤늦게 핀치가 시작돼도 이미 늦다 — 손을 뗄 때 그대로 탭으로
+                    //    들어가 엉뚱한 사진이 열린다(오너 지적 2026-09-22 "마지막 손가락 포지션을
+                    //    터치한 걸로 인식"). `allowsHitTesting` 을 도중에 꺼도 소용없다. 적중 판정은
+                    //    닿는 순간에 이미 끝났기 때문이다. 그래서 **누를 때가 아니라 동작할 때**
+                    //    막는다 — 아래 `guard` 는 손을 뗀 시점에 돈다.
+                    Button {
+                        guard !pinching else { return }
+                        app.pushRoute(.browse(category: category, startID: c.id))
+                    } label: {
                         // ⚠️ 미리보기는 무조건 3:4 (오너 지시 2026-09-22). 정방형이면 인물이 잘린다.
                         RemoteImage(url: c.thumbURL, cornerRadius: 0)
                             .photoRatio()
@@ -239,18 +250,23 @@ struct DensePhotoGrid: View {
                                     FavoriteBadge(size: wideColumns ? 16 : 20).padding(4)
                                 }
                             }
+                            // 썸네일은 전부 둥글게(오너 지시 2026-09-22 "다 라운드 적용 해").
+                            // 겹쳐 놓은 그라데이션·별까지 같이 깎이도록 **맨 바깥에서** 자른다.
+                            .clipShape(RoundedRectangle(cornerRadius: wideColumns ? 6 : Radius.thumb,
+                                                        style: .continuous))
                     }
                     .buttonStyle(.plain)
-                    // 비활성 버튼은 **흐리게** 그려져서 `.disabled` 를 쓰면 핀치 도중 격자 전체가
-                    // 반투명해진다(오너 지적 2026-09-22). 누르기만 막는다.
-                    .allowsHitTesting(!pinching)
                 }
             }
             // 핀치는 **열 수만** 바꾼다 — 3열 ↔ 5열. 페이지를 같이 확대/축소하지 않는다
             // (2026-09-22 오너 지적: 화면 전체가 작아지는 건 시스템 확대전환의 "핀치로 닫기"였다.
             //  그래서 이 화면에서는 확대전환을 쓰지 않는다 — 아래 `zoomSource` 를 뗀 이유).
-            // ⚠️ 열 수 변화에 애니메이션을 걸지 말 것. `LazyVGrid` 가 칸을 다시 배치하는 도중
+            // 핀치하는 동안 격자가 **손가락을 따라 조금 커졌다 작아진다**. 이게 없으면 열 수가
+            // 바뀌는 순간에만 화면이 툭 바뀌어서 뚝뚝 끊겨 보인다(오너 지적 2026-09-22).
+            .scaleEffect(1 + (pinchScale - 1) * 0.12, anchor: .center)
+            // ⚠️ 열 수 변화에는 **짧은** 애니메이션만. 길게 주면 `LazyVGrid` 가 다시 배치하는 동안
             //    옛 칸들이 잔상처럼 남아 겹친다(오너 지적 "미리 불러내기 된게 따라붙으면 안 된다고").
+            .animation(.easeInOut(duration: 0.18), value: columnCount)
             .padding(.horizontal, Spacing.page)
             .padding(.top, Spacing.s2)
             .onAppear { if startWide { wideColumns = true } }
@@ -259,13 +275,16 @@ struct DensePhotoGrid: View {
                     pinching = true
                     scheduleUnlock(after: 3)   // 종료 콜백을 놓쳐도 잠금이 영원히 남지 않게
                 },
+                onProgress: { s in pinchScale = s },
                 onStep: { zoomIn in
                     let next = !zoomIn  // 벌림 = 확대 = 3열(wideColumns false), 오므림 = 5열
+                    withAnimation(.snappy(duration: 0.2)) { pinchScale = 1 }
                     guard next != wideColumns else { return }
                     wideColumns = next
                     HapticPlayer.selection()
                 },
                 onEnd: {
+                    withAnimation(.snappy(duration: 0.2)) { pinchScale = 1 }
                     // 손을 뗀 직후 한 박자 뒤에 푼다 — 떼는 순간의 잔여 터치가 탭으로 새지 않게.
                     scheduleUnlock(after: 0.25)
                 }

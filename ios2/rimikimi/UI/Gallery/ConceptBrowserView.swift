@@ -25,15 +25,14 @@ struct ConceptBrowserView: View {
     /// 아래로 끌어 닫는 중의 이동량.
     @State private var dragY: CGFloat = 0
     /// 필름스트립이 가운데 두고 있는 칸. 큰 사진(`currentID`)과 **서로** 따라간다.
-    /// ⚠️ 처음부터 값을 들고 시작해야 한다 — `scrollPosition` 은 첫 레이아웃 때 이 값으로 자리를
-    ///    잡는다. `onAppear` 에서 넣으면 그 시점엔 이미 0 에 자리를 잡은 뒤라 안 움직인다(실측).
+    /// ⚠️ 처음엔 nil 이어야 한다 — `center()` 가 이 값을 **바꿔서** 스크롤을 일으키기 때문이다.
+    ///    처음부터 같은 값을 넣어 두면 바꿀 게 없어 스크롤도 안 일어난다(실측).
     @State private var stripID: String?
 
     init(category: String, startID: String) {
         self.category = category
         self.startID = startID
         _currentID = State(initialValue: startID)
-        _stripID = State(initialValue: startID)
     }
 
     private var items: [Concept] { app.concepts.concepts(in: category) }
@@ -99,6 +98,13 @@ struct ConceptBrowserView: View {
             guard old != nil else { return }
             zoomedIn = false            // 사진이 바뀌면 확대는 풀린다(사진 앱과 같다)
         }
+        // 캡처·검증용 — 시뮬레이터에선 좌우 스와이프를 못 하니, 이걸로 사진을 넘긴 셈 치고
+        // 필름스트립이 제대로 따라오는지 본다.
+        .onChange(of: app.devBrowseJump) { _, id in
+            guard let id, items.contains(where: { $0.id == id }) else { return }
+            currentID = id
+            app.devBrowseJump = nil
+        }
     }
 
     /// 아래로 끌어 닫기. 가로 페이저·필름스트립과 싸우지 않도록 **세로로 더 많이 움직였을 때만** 잡고,
@@ -131,7 +137,6 @@ struct ConceptBrowserView: View {
     private var filmstrip: some View {
         GeometryReader { geo in
             let side = max(0, (geo.size.width - Self.stripWidth) / 2)
-            ScrollViewReader { proxy in
             ScrollView(.horizontal) {
                 // ⚠️ `LazyHStack` 이면 안 된다. 게으른 스택은 화면 근처 칸만 만들어 두므로,
                 //    멀리 있는 칸으로는 `scrollPosition` 이 갈 수가 없다 — 있는 데까지만 가서 멈춘다.
@@ -159,25 +164,27 @@ struct ConceptBrowserView: View {
             // 큰 사진을 넘기면 스트립이 따라온다 — 이쪽은 부드럽게(안 그러면 툭 튄다).
             .onChange(of: currentID) { _, id in
                 guard let id, id != stripID else { return }
-                withAnimation(.spring(response: 0.32, dampingFraction: 0.9)) {
-                    proxy.scrollTo(id, anchor: .center)
-                }
+                withAnimation(.spring(response: 0.32, dampingFraction: 0.9)) { stripID = id }
             }
-            // ⚠️ 첫 자리잡기는 **반드시 명령형**이어야 한다. `scrollPosition` 바인딩에 처음부터 값을
-            //    넣어 두는 것만으로는 안 움직였다(실측 2회) — 화면이 처음 그려지는 순간엔 컨셉 목록이
-            //    아직 비어 있어 옮겨 갈 칸 자체가 없고, 목록이 도착해도 바인딩 값은 그대로라 아무 일도
-            //    일어나지 않는다. 그래서 **칸이 생긴 뒤** 직접 옮긴다.
-            .onChange(of: items.count) { _, n in
-                guard n > 0 else { return }
-                DispatchQueue.main.async { proxy.scrollTo(startID, anchor: .center) }
-            }
-            .onAppear {
-                guard !items.isEmpty else { return }   // 목록이 이미 있으면 여기서 끝낸다
-                DispatchQueue.main.async { proxy.scrollTo(startID, anchor: .center) }
-            }
-            }
+            // ⚠️ 자리잡기는 **오직 이 바인딩 하나로만** 한다. `ScrollViewReader.scrollTo` 를 같이
+            //    쓰면 한 스크롤뷰에 주인이 둘이 돼서, 여는 순간 두 명령이 엇갈려 선택 칸이 한 칸씩
+            //    빗나갔다(오너 지적 2026-09-22 "중앙으로 안 오는 애들 있는데 왜이럼").
+            //    그리고 **목록이 도착한 뒤에** 넣어야 한다 — 화면이 처음 그려질 때 컨셉 목록이 아직
+            //    비어 있으면 옮겨 갈 칸 자체가 없어서 아무 일도 안 일어난다(실측).
+            .onAppear { center() }
+            .onChange(of: items.count) { _, n in if n > 0 { center() } }
         }
         .frame(height: Self.stripWidth / CardMetrics.aspect + 8)
+    }
+
+    /// 선택 칸을 가운데로. 이미 그 칸이면 아무 일도 안 한다.
+    private func center() {
+        guard !items.isEmpty, stripID != currentID else { return }
+        // 이번 레이아웃이 끝난 다음 차례에 넣는다 — 같은 차례에 넣으면 칸이 아직 자리를 안 잡았다.
+        DispatchQueue.main.async {
+            var t = Transaction(); t.disablesAnimations = true
+            withTransaction(t) { stripID = currentID }
+        }
     }
 
     /// 필름스트립 칸 하나. (한 식에 다 쓰면 컴파일러가 타입 추론을 포기한다 — 빌드로 확인.)

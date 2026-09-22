@@ -33,9 +33,20 @@ struct PinchColumnsGesture: UIGestureRecognizerRepresentable {
     private static let zoomOut: CGFloat = 0.8
 
     final class Coordinator: NSObject, UIGestureRecognizerDelegate {
-        /// 스크롤·탭과 **동시에** 인식되게 한다. 이게 이 파일의 핵심 한 줄이다.
+        /// **스크롤과는** 동시에 인식되게 한다 — 손가락 조합·닿는 순서와 무관하게 핀치가 살아 있으려면
+        /// 스크롤의 팬 제스처와 나란히 굴러야 한다.
         func gestureRecognizer(_ g: UIGestureRecognizer,
-                               shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool { true }
+                               shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
+            other is UIPanGestureRecognizer
+        }
+
+        /// **탭은** 핀치가 실패한 뒤에야 성립한다. 이게 없으면 두 손가락 중 하나를 떼는 순간
+        /// 그 지점이 탭으로 잡혀 엉뚱한 사진이 열리고, 손가락 밑 칸이 눌린 것처럼 반짝인다
+        /// (오너 지적 2026-09-22 "마지막 손가락 포지션을 터치한 걸로 인식하는건 안 고칠거냐").
+        func gestureRecognizer(_ g: UIGestureRecognizer,
+                               shouldBeRequiredToFailBy other: UIGestureRecognizer) -> Bool {
+            !(other is UIPanGestureRecognizer)
+        }
     }
 
     func makeCoordinator(converter: CoordinateSpaceConverter) -> Coordinator { Coordinator() }
