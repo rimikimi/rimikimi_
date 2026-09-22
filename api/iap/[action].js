@@ -20,7 +20,27 @@ import {
   purchaseTime,
   grantCreditsForTransaction,
   isSandboxPurchase,
+  PRODUCT_META,
 } from "../_lib/iapGrant.js";
+
+// 샌드박스 크레딧 팩 적립은 사용자당 24시간에 이 횟수까지만.
+const SANDBOX_DAILY_GRANTS = 3;
+
+async function sandboxGrantsToday(admin, userId) {
+  const since = new Date(Date.now() - 86400 * 1000).toISOString();
+  const { count, error } = await admin
+    .from("iap_events")
+    .select("transaction_id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .like("store", "sandbox:%")
+    .gte("created_at", since);
+  // 집계 실패 시엔 적립하지 않는다(무한 발급보다 0 이 낫다).
+  if (error) {
+    console.error("sandbox grant count error", error);
+    return Infinity;
+  }
+  return count || 0;
+}
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin","*");
@@ -84,12 +104,21 @@ async function handleGrant(req, res) {
     entry = mine.slice().sort((a, b) => purchaseTime(a) - purchaseTime(b)).pop();
   }
 
-  // 샌드박스(테스트) 결제는 실서비스 크레딧을 주지 않는다. 2026-09-16 사고 참고
-  // (iapGrant.js isSandboxPurchase 주석). 조용히 성공시키면 테스터가 눈치를 못 채니
-  // 명시적으로 알린다.
-  if (isSandboxPurchase(entry)) {
-    console.warn(`[iap] 샌드박스 결제 적립 거부 user=${user.id} product=${productId}`);
-    return res.status(200).json({ ok: true, sandbox: true, credits: 0, alreadyGranted: true });
+  // 샌드박스(테스트) 결제: 구독은 적립하지 않는다 — 2026-09-16 사고는 샌드박스 **구독
+  // 가속 갱신**이었다(iapGrant.js isSandboxPurchase 주석). 1회성 크레딧 팩은 갱신이 없으니
+  // 적립하되, 샌드박스 애플 ID 로 팩을 무한 구매해 찍어내지 못하게 하루 한도를 건다.
+  // (App Review 가 샌드박스로 결제해 보고 크레딧이 0 이면 2.1 반려 위험 — 9/23 오너 결정)
+  const sandbox = isSandboxPurchase(entry);
+  if (sandbox) {
+    const isConsumable = PRODUCT_META[productId]?.kind === "consumable";
+    const used = isConsumable ? await sandboxGrantsToday(admin, user.id) : Infinity;
+    if (used >= SANDBOX_DAILY_GRANTS) {
+      console.warn(
+        `[iap] 샌드박스 결제 적립 거부 user=${user.id} product=${productId} ` +
+          (isConsumable ? `오늘 ${used}회` : "구독")
+      );
+      return res.status(200).json({ ok: true, sandbox: true, credits: 0, alreadyGranted: true });
+    }
   }
 
   const txKey = purchaseTxId(entry);
@@ -102,7 +131,8 @@ async function handleGrant(req, res) {
     userId: user.id,
     productId,
     transactionId: txKey,
-    store: entry?.store || null,
+    // 샌드박스 적립은 store 를 "sandbox:…" 로 남겨 하루 한도 집계에 쓴다.
+    store: sandbox ? `sandbox:${entry?.store || "unknown"}` : entry?.store || null,
   });
   if (result.error) {
     return res.status(result.status || 500).json({ error: result.error });

@@ -16,7 +16,7 @@ export const PRODUCT_CREDITS = Object.fromEntries(
 );
 
 // productId → { kind, period } (구독 주기 가드용)
-const PRODUCT_META = Object.fromEntries(
+export const PRODUCT_META = Object.fromEntries(
   ALL_PACKAGES.map((p) => [p.id, { kind: p.kind, period: p.period || null }])
 );
 
@@ -30,7 +30,8 @@ const PERIOD_MIN_GAP_SEC = { week: 5 * 86400, month: 25 * 86400, year: 300 * 864
 //    가속 갱신이 그대로 프로덕션 DB 에 꽂힌 것이다. 샌드박스 애플 ID 만 있으면
 //    누구나 크레딧을 무한정 찍어낼 수 있었다.
 //    ⇒ 아래 3중 방어. 셋 중 하나만 빠져도 다시 뚫린다.
-//      ① 샌드박스 거래는 적립하지 않는다 (isSandboxPurchase)
+//      ① 샌드박스 구독은 적립하지 않는다 (isSandboxPurchase). 9/23 부터 샌드박스
+//         크레딧 팩만 하루 3회 한도로 적립 (App Review 대응, iap/[action].js)
 //      ② 구독은 주기당 1회만 적립한다 (PERIOD_MIN_GAP_SEC)
 //      ③ 멱등키는 **스토어 거래ID 한 종류만** 쓴다 (purchaseTxId 의 p.id 폴백 제거)
 export function isSandboxPurchase(p) {
