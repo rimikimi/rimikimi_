@@ -142,8 +142,6 @@ final class AppState {
     /// 뒤에 실행돼 GalleryHomeView 가 이미 첫 렌더(스크롤 위치 확정)를 끝낸 뒤라 `.defaultScrollAnchor`
     /// 가 안 먹는다 — 그래서 여기 `init()` 에서 launch argument 를 동기적으로 직접 읽는다.
     var devScrollToBottom = ProcessInfo.processInfo.arguments.contains { $0.contains("devscrollbottom") }
-    /// 캡처용 — 카테고리 격자를 5열로 시작.
-    var devWideColumns = false
     #endif
 
     struct WebTool: Identifiable {
@@ -165,6 +163,11 @@ final class AppState {
     let store = StoreManager()
     let push = PushManager.shared
     private(set) var quota: QuotaInfo?
+    /// 캡처·검증용 — 카테고리 격자를 5열로 시작(dev 라우트에서만 켜진다. 릴리스에선 항상 false).
+    /// ⚠️ `#if DEBUG` 안에 두면 호출부를 `#if` 로 갈라야 하고, 그러면 뒤에 붙는 modifier 가
+    ///    붙지 않는다(릴리스 아카이브에서 실제로 걸렸다). 그래서 빌드 구분 없이 둔다.
+    var devWideColumns = false
+
     /// 마지막 생성 요청 — 크레딧 부족으로 실패했을 때 구매 뒤 이어가기 위해.
     private var lastRequest: GenerateRequest?
 
