@@ -153,6 +153,8 @@ struct ResultView: View {
             defer { saving = false }
             do {
                 try await PHPhotoLibrary.shared().performChanges { PHAssetChangeRequest.creationRequestForAsset(from: img) }
+                // 앨범에 저장한 컨셉만 "만든 컨셉" 표시가 영구로 남는다(오너 지시 2026-09-22).
+                app.favorites.markSaved(payload.conceptId)
                 HapticPlayer.success()
                 app.showToast("사진첩에 저장됐어요")
             } catch {

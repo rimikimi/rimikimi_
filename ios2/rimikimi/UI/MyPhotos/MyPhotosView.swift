@@ -100,8 +100,11 @@ struct MyPhotosView: View {
         defer { loading = false }
         do {
             items = try await RimikimiAPI.shared.fetchGallery(token: token)
-            // 격자에 "이미 만든 컨셉" 표시를 남기기 위해 — 서버 갤러리는 24시간만 보관된다.
-            app.favorites.markGenerated(items.compactMap(\.conceptId))
+            // 격자의 "만든 컨셉" 표시 — 만든 시각은 갤러리 항목의 `createdAt` 을 그대로 쓴다.
+            // (지금 시각으로 적으면 표시 수명이 실제 보관 기간보다 길어진다.)
+            app.favorites.markGenerated(items.compactMap { item in
+                item.conceptId.map { ($0, item.createdAt ?? Date()) }
+            })
             error = nil
         } catch {
             self.error = "갤러리를 불러오지 못했어요. 잠시 후 다시 시도해 주세요."
