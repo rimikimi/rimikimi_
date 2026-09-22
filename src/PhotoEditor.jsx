@@ -202,7 +202,7 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
   const [fitErr, setFitErr] = useState("");
   const [presetKey, setPresetKey] = useState(initialPresetKey);
   const [fx, setFx] = useState(() => fxOf(presetByKey(initialPresetKey)));
-  const [chipGroup, setChipGroup] = useState(() => presetByKey(initialPresetKey).group || "film");
+  const [chipGroup, setChipGroup] = useState(() => presetByKey(initialPresetKey).group || "phone");
   // 필터 강도 (오너 지시): %표시 없는 슬라이더, 기본 0.7 = 지금의 풀 프리셋 룩.
   // 1.0 까지 올리면 더 진하게(외삽), 0 이면 원본.
   const [strength, setStrength] = useState(0.7);
