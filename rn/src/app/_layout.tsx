@@ -108,6 +108,7 @@ export default function RootLayout() {
                   <Stack.Screen name="category/[name]" options={{ animation: "slide_from_right", animationDuration: transitions.stepForward.duration }} />
                   <Stack.Screen name="store" options={{ animation: "slide_from_right", animationDuration: transitions.stepForward.duration }} />
                   <Stack.Screen name="camera" options={{ presentation: "modal", animationDuration: transitions.sheetIn.duration }} />
+                  <Stack.Screen name="face-scan" options={{ presentation: "modal", animationDuration: transitions.sheetIn.duration }} />
                   <Stack.Screen name="editor" options={{ presentation: "modal", animationDuration: transitions.sheetIn.duration }} />
                   {/* dev 전용 화면 프리뷰 (scripts/previews.tsx) — 릴리스 번들에서는 라우트가 빈 화면 */}
                   <Stack.Screen name="dev/index" />

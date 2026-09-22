@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Alert, Linking, Pressable, Share, StyleSheet, Switch, TextInput, View } from "react-native";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { Image } from "expo-image";
 import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
@@ -15,7 +15,7 @@ import { useQuota } from "@/lib/quota";
 import { useStore } from "@/lib/store";
 import { accountDelete, referralClaim } from "@/lib/api";
 import { getEnv } from "@/lib/env";
-import { createProfileFrom, deleteProfile, getProfileMeta, type ProfileMeta } from "@/lib/faceProfile";
+import { createProfileFrom, deleteProfile, getProfileMeta, scanCount, type ProfileMeta } from "@/lib/faceProfile";
 import { disableNotifications, getPermissionState, setupNotifications } from "@/lib/push";
 import { NOTIFY_ON_KEY, getFlag } from "@/lib/prefs";
 import { clearRegisteredPhoto } from "@/lib/photo";
@@ -140,7 +140,11 @@ export default function ProfileTab() {
   // 페이스 프로필
   const [face, setFace] = useState<ProfileMeta | null>(null);
   const [faceBusy, setFaceBusy] = useState(false);
+  /** 얼굴 스캔으로 모아 둔 장수. 스캔이 있으면 그게 앵커보다 우선이다(loadProfileRefs). */
+  const [scanN, setScanN] = useState(0);
   useEffect(() => { getProfileMeta().then(setFace); }, []);
+  // 스캔 화면에서 돌아오면 다시 읽는다 — 안 그러면 방금 등록한 게 "없음" 으로 보인다.
+  useFocusEffect(useCallback(() => { void scanCount().then(setScanN); }, []));
   const makeFace = () => {
     if (!photo) { Alert.alert(copy.account.faceNeedPhoto); return; }
     requireLogin("make", async () => {
@@ -151,7 +155,7 @@ export default function ProfileTab() {
       finally { setFaceBusy(false); }
     });
   };
-  const removeFace = async () => { await deleteProfile(); setFace(null); };
+  const removeFace = async () => { await deleteProfile(); setFace(null); setScanN(0); };
 
   const onDeleteAccount = () => {
     Alert.alert(copy.profile.deleteAccount, copy.account.deleteConfirm, [
@@ -228,16 +232,25 @@ export default function ProfileTab() {
         <Sep />
         <Row
           label={copy.account.faceProfile}
-          value={face ? "등록됨" : "없음"}
+          value={scanN ? `${scanN}장 등록됨` : face ? "등록됨" : "없음"}
           trailing={
-            face ? (
-              <Button label={copy.account.faceDelete} variant="quiet" size="sm" onPress={() => { void removeFace(); }} />
-            ) : (
-              <Button label={copy.account.faceMake} variant="secondary" size="sm" loading={faceBusy} onPress={makeFace} />
-            )
+            <View style={styles.faceBtns}>
+              {/* 스캔이 기본 경로다(아이폰과 같게). 셀카 1장 앵커는 스캔 전까지의 폴백으로만 남긴다. */}
+              <Button
+                label={scanN ? "다시 스캔" : "얼굴 스캔"}
+                variant={scanN || face ? "quiet" : "secondary"}
+                size="sm"
+                onPress={() => router.push("/face-scan")}
+              />
+              {scanN || face ? (
+                <Button label={copy.account.faceDelete} variant="quiet" size="sm" onPress={() => { void removeFace(); }} />
+              ) : (
+                <Button label={copy.account.faceMake} variant="quiet" size="sm" loading={faceBusy} onPress={makeFace} />
+              )}
+            </View>
           }
         />
-        <Text size="caption" tone="subtle" weight="medium" style={styles.rowNote}>{face ? copy.account.faceOn : copy.account.faceOff} · {copy.account.faceNote}</Text>
+        <Text size="caption" tone="subtle" weight="medium" style={styles.rowNote}>{scanN || face ? copy.account.faceOn : copy.account.faceOff} · {copy.account.faceNote}</Text>
         {session ? (
           <>
             <Sep />
@@ -270,6 +283,7 @@ const styles = themedStyles(() => StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", minHeight: 50, paddingHorizontal: space.s4, gap: space.s2 },
   rowTrail: { flexDirection: "row", alignItems: "center", gap: space.s2 },
   rowNote: { paddingHorizontal: space.s4, paddingBottom: space.s3 },
+  faceBtns: { flexDirection: "row", gap: space.s2 },
   sep: { height: StyleSheet.hairlineWidth, backgroundColor: color.line, marginLeft: space.s4 },
   myCode: { alignItems: "center", gap: 2, padding: space.s3, borderRadius: radius.btn, backgroundColor: color.fill },
   codeRow: { flexDirection: "row", alignItems: "center", gap: space.s2 },
