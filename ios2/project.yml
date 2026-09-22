@@ -54,6 +54,11 @@ targets:
         aps-environment: $(APS_ENVIRONMENT)
     sources:
       - path: rimikimi
+        # ⚠️ iCloud Drive 가 만드는 충돌 사본("FaceProfileStore 2.swift")을 타깃에 넣지 않는다.
+        #    한 번 당했다: 옛 내용이 든 사본이 같이 컴파일되면서 "ambiguous use of 'FaceProfileStore'"
+        #    로 아카이브가 깨졌다. git 은 무시하지만 XcodeGen 은 디스크를 보므로 여기서 걸러야 한다.
+        excludes:
+          - "**/* [0-9].swift"
     dependencies:
       - package: RevenueCat
         product: RevenueCat
