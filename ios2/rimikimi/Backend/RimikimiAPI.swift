@@ -70,6 +70,8 @@ struct GenerateRequest {
     var fourcutStyle: String? = nil
     /// 페이스 프로필 참조(등록 사진). 매직부스는 안 보낸다.
     var faceRef: UIImage? = nil
+    /// 얼굴 스캔으로 모은 다각도 참조(정면·옆·옆). 비면 `faceRef` 한 장만 간다.
+    var faceProfile: [(image: UIImage, angle: String)] = []
 
     var prompt: String { concept.isFourcut ? "인생네컷" : concept.text }
     var skipFacePrecheck: Bool { concept.isArtTransform }
@@ -122,6 +124,15 @@ final class RimikimiAPI {
         let (data, resp) = try await session.data(for: req)
         try Self.check(resp, data)
         return try JSONDecoder().decode([Concept].self, from: data)
+    }
+
+    /// 시즌 표(`/seasons.json`). 해마다 날짜가 움직이는 명절을 앱 업데이트 없이 고치기 위해 서버에서 받는다.
+    func fetchSeasons() async throws -> [Season] {
+        var req = URLRequest(url: Config.apiBase.appendingPathComponent("seasons.json"))
+        req.cachePolicy = .reloadIgnoringLocalCacheData
+        let (data, resp) = try await session.data(for: req)
+        try Self.check(resp, data)
+        return try JSONDecoder().decode([Season].self, from: data)
     }
 
     func fetchPopular() async throws -> [String] {
@@ -184,9 +195,16 @@ final class RimikimiAPI {
         if let pushToken { body["pushToken"] = pushToken }
         // 페이스 프로필(1.x `loadProfileRefs`): 등록 사진을 참조로 같이 보낸다. 서버는 참조로만 쓰고 저장하지 않는다.
         // 매직부스(얼굴 미유지)는 1.x 와 같이 보내지 않는다.
-        if !r.skipFacePrecheck, let anchor = r.faceRef {
-            let p = ImageUtil.jpegPayload(anchor, maxSide: 1024, quality: 0.85)
-            body["faceRefs"] = [["mimeType": p.mimeType, "base64": p.base64, "angle": "anchor"]]
+        if !r.skipFacePrecheck {
+            if !r.faceProfile.isEmpty {
+                body["faceRefs"] = r.faceProfile.prefix(3).map { ref -> [String: String] in
+                    let p = ImageUtil.jpegPayload(ref.image, maxSide: 1024, quality: 0.85)
+                    return ["mimeType": p.mimeType, "base64": p.base64, "angle": ref.angle]
+                }
+            } else if let anchor = r.faceRef {
+                let p = ImageUtil.jpegPayload(anchor, maxSide: 1024, quality: 0.85)
+                body["faceRefs"] = [["mimeType": p.mimeType, "base64": p.base64, "angle": "anchor"]]
+            }
         }
 
         var req = authed("api/generate", token: token)

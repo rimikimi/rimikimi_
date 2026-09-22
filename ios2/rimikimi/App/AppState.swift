@@ -99,6 +99,8 @@ final class AppState {
     #endif
     /// 아이폰 기본 카메라 화면 표시 여부.
     var showSystemCamera = false
+    /// 얼굴 스캔(Face ID 등록식) 화면 — 프로필에서 연다.
+    var showFaceScan = false
     /// 시스템 사진 선택창 — 필터를 고른 뒤 여기서 사진을 먼저 고른다.
     /// (웹에서 파일창을 자동으로 못 여는 제약 때문. `PhotoPicker` 주석 참고)
     var photoPickPreset: String?     // nil 이면 닫힘
@@ -151,6 +153,7 @@ final class AppState {
     let generation = GenerationCoordinator()
     let concepts = ConceptStore()
     let favorites = FavoritesStore()
+    let faceProfile = FaceProfileStore()
     let userPhoto = UserPhotoStore()
     let store = StoreManager()
     let push = PushManager.shared
@@ -163,6 +166,14 @@ final class AppState {
         // 의존하지 않도록 클로저로 잇는다.
         concepts.favoriteIDs = { [favorites] in favorites.concepts }
         concepts.favoriteCategories = { [favorites] in favorites.categories }
+    }
+
+    /// 얼굴 스캔 결과 저장 — 3장은 기기에, 정면 1장은 기존 "내 사진" 자리에도 넣는다(옵션 화면·
+    /// 커플·매직부스 등 기존 경로가 전부 `userPhoto` 를 본다).
+    func saveFaceProfile(_ shots: [FaceProfileStore.Angle: UIImage]) {
+        faceProfile.save(shots)
+        if let front = shots[.front] { userPhoto.set(front) }
+        toast = "얼굴 프로필을 저장했어요"
     }
 
     // MARK: 로그인 게이트
@@ -206,6 +217,12 @@ final class AppState {
                 return
             }
             if req.faceRef == nil, !req.concept.isArtTransform { req.faceRef = userPhoto.image }
+            // 얼굴 스캔을 해 뒀으면 정면·좌·우 3장을 참조로 보낸다 — 각도가 여러 장일수록 얼굴
+            // 재현이 정확하다(스튜디오 실증, `_design/face-profile-v1.md` §0). 서버는 이미
+            // 여러 장(`faceRefs`)을 받도록 돼 있어 서버 변경은 없다.
+            if !req.concept.isArtTransform, req.faceProfile.isEmpty {
+                req.faceProfile = faceProfile.ordered.map { ($0.image, $0.angle.rawValue) }
+            }
             lastRequest = req
             HapticPlayer.commit()
             generation.start(req, token: token, pushToken: push.fcmToken)

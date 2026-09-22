@@ -5,6 +5,7 @@ import PhotosUI
 /// STEP 02(사진 업로드) 화면은 없다 — 매직부스 일회용 사진·커플 상대 사진·드레스룸 의상은 여기 슬롯.
 struct ConceptOptionsView: View {
     @Environment(AppState.self) private var app
+    @Environment(\.zoomNamespace) private var zoomNS
     var concept: Concept
 
     @State private var batchCount = 1
@@ -86,6 +87,7 @@ struct ConceptOptionsView: View {
         .background(Color.bg)
         .inlineTitle(concept.title)
         .toolbar(.hidden, for: .tabBar)
+        .zoomDestination("concept:" + concept.id, in: zoomNS)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 FavoriteToolbarButton(isOn: app.favorites.isFavorite(concept: concept.id)) {

@@ -27,6 +27,10 @@ struct ProfileView: View {
                     // 변경·삭제를 프로필에도 추가.
                     CardGroup {
                         MyPhotoRow()
+                        // 얼굴 스캔 — 각도 3장은 한 장보다 얼굴 재현이 정확하다(`_design/face-profile-v1.md`).
+                        SettingsRow(title: app.faceProfile.hasProfile ? "얼굴 다시 스캔하기" : "얼굴 스캔하기",
+                                    value: app.faceProfile.hasProfile ? "\(app.faceProfile.ordered.count)장 등록됨" : nil,
+                                    systemImage: "faceid") { app.showFaceScan = true }
                     }
                     CardGroup {
                         SettingsRow(title: "계정", value: providerLabel, systemImage: "person.crop.circle", chevron: false) {}
@@ -175,7 +179,7 @@ struct MyPhotoRow: View {
             }
             Spacer(minLength: Spacing.s2)
             if app.userPhoto.hasPhoto {
-                Button("삭제") { app.userPhoto.clear() }
+                Button("삭제") { app.userPhoto.clear(); app.faceProfile.clear() }
                     .buttonStyle(TextButtonStyle(color: .accent))
             }
             PhotosPicker(selection: $pick, matching: .images, photoLibrary: .shared()) {

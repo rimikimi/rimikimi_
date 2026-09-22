@@ -61,6 +61,7 @@ struct NewBadge: View {
 /// 컨셉 카드 — 흰 카드(모서리 14) 안에 3:4 썸네일 + 제목 14/600 한 줄 말줄임. 탭 → 옵션 화면(푸시).
 struct ConceptCard: View {
     @Environment(AppState.self) private var app
+    @Environment(\.zoomNamespace) private var zoomNS
     var concept: Concept
 
     var body: some View {
@@ -89,6 +90,7 @@ struct ConceptCard: View {
             .shadow(color: .black.opacity(0.10), radius: 12, y: 8)
         }
         .buttonStyle(PressScaleButtonStyle())
+        .zoomSource("concept:" + concept.id, in: zoomNS)
     }
 }
 
@@ -97,6 +99,7 @@ struct ConceptCard: View {
 ///    줄마다 높이가 들쭉날쭉해진다.
 struct AlbumGridTile: View {
     @Environment(AppState.self) private var app
+    @Environment(\.zoomNamespace) private var zoomNS
     var tile: ConceptStore.AlbumTile
 
     var body: some View {
@@ -114,6 +117,7 @@ struct AlbumGridTile: View {
             }
         }
         .buttonStyle(PressScaleButtonStyle())
+        .zoomSource("album:" + tile.name, in: zoomNS)
     }
 }
 
@@ -196,6 +200,8 @@ struct DensePhotoGrid: View {
     var concepts: [Concept]
     var category: String
     @State private var wideColumns = false  // false = 3열(큼), true = 5열(촘촘)
+    /// 핀치하는 **동안** 따라 움직이는 배율(사진 앱처럼 손가락을 따라오게).
+    @State private var liveScale: CGFloat = 1
 
     private var columnCount: Int { wideColumns ? 5 : 3 }
     private var columns: [GridItem] {
@@ -220,16 +226,30 @@ struct DensePhotoGrid: View {
                             }
                     }
                     .buttonStyle(.plain)
-                    .zoomSource(c.id, in: zoomNS)
+                    .zoomSource("photo:" + c.id, in: zoomNS)
                 }
             }
+            // 손가락을 벌리는 **동안** 격자가 같이 커진다(사진 앱과 같다). 문턱을 넘으면 열 수가
+            // 바뀌고 배율은 1 로 되돌아가, 확대가 열 수 변화로 "넘어가는" 느낌이 난다.
+            .scaleEffect(liveScale, anchor: .top)
             .animation(.spring(response: 0.35, dampingFraction: 0.86), value: columnCount)
-            .gesture(PinchColumnsGesture { zoomIn in
-                let next = !zoomIn  // 벌림 = 확대 = 3열(wideColumns false), 오므림 = 5열
-                guard next != wideColumns else { return }
-                wideColumns = next
-                HapticPlayer.selection()
-            })
+            .animation(.interactiveSpring(response: 0.22, dampingFraction: 0.9), value: liveScale)
+            .gesture(PinchColumnsGesture(
+                onProgress: { magnification in
+                    // 바뀔 수 있는 방향으로만 늘어난다 — 3열에서 더 벌려도 커지기만 하면 거짓말이 된다.
+                    let canGrow = wideColumns, canShrink = !wideColumns
+                    if magnification > 1 { liveScale = canGrow ? min(1.18, magnification) : 1 + (min(1.1, magnification) - 1) * 0.25 }
+                    else { liveScale = canShrink ? max(0.88, magnification) : 1 - (1 - max(0.92, magnification)) * 0.25 }
+                },
+                onStep: { zoomIn in
+                    liveScale = 1
+                    let next = !zoomIn  // 벌림 = 확대 = 3열(wideColumns false), 오므림 = 5열
+                    guard next != wideColumns else { return }
+                    wideColumns = next
+                    HapticPlayer.selection()
+                },
+                onEnd: { liveScale = 1 }
+            ))
         }
     }
 }

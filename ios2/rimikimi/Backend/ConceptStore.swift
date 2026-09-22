@@ -8,6 +8,14 @@ import Observation
 final class ConceptStore {
     private(set) var concepts: [Concept] = []
     private(set) var popularIDs: [String] = []
+    /// 시즌 표(`/seasons.json`). 지금 활성인 시즌의 카테고리는 카테고리 목록·앨범 격자에서 맨 앞으로 간다.
+    private(set) var seasons: [Season] = []
+    /// 지금 활성인 시즌 카테고리들(겹칠 수 있다 — 표에 적힌 순서를 지킨다).
+    var activeSeasonCategories: [String] {
+        seasons.filter { $0.isActive() }.map(\.category)
+    }
+    /// 활성 시즌이면 0,1,2… 아니면 nil. 정렬 키로 쓴다.
+    func seasonRank(_ name: String) -> Int? { activeSeasonCategories.firstIndex(of: name) }
     private(set) var isLoading = true
     private(set) var loadedFromBundle = false
 
@@ -38,8 +46,14 @@ final class ConceptStore {
     var categories: [Category] {
         var counts: [String: Int] = [:]
         for c in pool { for cat in c.categories { counts[cat, default: 0] += 1 } }
+        // 활성 시즌(추석·크리스마스…)은 기간 동안 항상 맨 앞(오너 지시 2026-09-22).
         return counts.map { Category(name: $0.key, count: $0.value) }
-            .sorted { (CategoryOrder.rank($0.name), $0.name) < (CategoryOrder.rank($1.name), $1.name) }
+            .sorted { a, b in
+                let ra = seasonRank(a.name).map { (0, $0) } ?? (1, CategoryOrder.rank(a.name))
+                let rb = seasonRank(b.name).map { (0, $0) } ?? (1, CategoryOrder.rank(b.name))
+                if ra != rb { return ra < rb }
+                return a.name < b.name
+            }
     }
 
     /// 추천 5: 서버 인기순 → 부족하면 최신으로 채움 → `pinFeatured` 자리 고정.
@@ -89,9 +103,12 @@ final class ConceptStore {
         var tiles = rows.map { AlbumTile(name: $0.name, count: counts[$0.name] ?? $0.items.count,
                                          coverURL: $0.items.first?.largeURL, coverFallbackURL: $0.items.first?.thumbURL) }
         // 즐겨찾기한 카테고리를 위로(오너 지시 2026-09-22 "실제로 배열도 바꿔주고"). 그 안에서는 원래 순서.
-        // (`sort` 는 안정 정렬이 아니라 같은 그룹 안 순서가 흔들린다 — 두 덩어리로 갈라 붙인다.)
+        // (`sort` 는 안정 정렬이 아니라 같은 그룹 안 순서가 흔들린다 — 덩어리로 갈라 붙인다.)
         let favCats = favoriteCategories()
         tiles = tiles.filter { favCats.contains($0.name) } + tiles.filter { !favCats.contains($0.name) }
+        // 활성 시즌은 즐겨찾기보다도 앞 — "활성화 기간에는 항상 제일 먼저"(오너 지시 2026-09-22).
+        let season = activeSeasonCategories
+        tiles = season.compactMap { n in tiles.first { $0.name == n } } + tiles.filter { !season.contains($0.name) }
         // 고른 컨셉이 있으면 맨 앞에 "⭐ 즐겨찾기" 앨범.
         let favItems = concepts(in: FavoritesStore.albumName)
         if let cover = favItems.first {
@@ -140,6 +157,19 @@ final class ConceptStore {
             loadedFromBundle = true
         }
         if let ids = try? await RimikimiAPI.shared.fetchPopular() { popularIDs = ids }
+        if let list = try? await RimikimiAPI.shared.fetchSeasons(), !list.isEmpty {
+            seasons = list
+        } else if seasons.isEmpty {
+            seasons = Self.loadBundledSeasons()
+        }
+    }
+
+    /// 서버 시즌 표를 못 받았을 때 — 앱에 구운 스냅샷. 날짜가 지난 시즌은 그냥 비활성이라 해가 없다.
+    static func loadBundledSeasons() -> [Season] {
+        guard let url = Bundle.main.url(forResource: "seasons.fallback", withExtension: "json"),
+              let data = try? Data(contentsOf: url),
+              let list = try? JSONDecoder().decode([Season].self, from: data) else { return [] }
+        return list
     }
 
     static func loadBundled() -> [Concept]? {
