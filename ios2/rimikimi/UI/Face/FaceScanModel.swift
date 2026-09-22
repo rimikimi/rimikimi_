@@ -25,6 +25,17 @@ final class FaceScanModel {
     private var holdFrames = 0
     private var lastQualityFail: String?
 
+    /// 화면 조명을 켜야 하는가 — 어두운 데서만 켠다(오너 지시 2026-09-23).
+    ///
+    /// ⚠️ 프레임 평균 밝기로 판정하면 안 된다. **자동노출이 밝기를 정규화**하기 때문에 깜깜한 방에서도
+    ///    중간 톤으로 들어온다. 대신 카메라가 그 밝기를 만들려고 **얼마나 무리하고 있는지**(ISO)를 본다.
+    ///
+    /// 한 번 켜지면 스캔이 끝날 때까지 **끄지 않는다**. 켜는 순간 얼굴이 밝아져 ISO 가 떨어지고,
+    /// 그럼 다시 꺼지고, 다시 어두워지고 — 깜빡임이 된다. 다시 찍기(`reset`)에서만 풀린다.
+    private(set) var needsLight = false
+    private var darkFrames = 0
+    private var device: AVCaptureDevice?
+
     private let queue = DispatchQueue(label: "facescan.video")
     private let output = AVCaptureVideoDataOutput()
     private var delegate: FrameDelegate?
@@ -56,6 +67,9 @@ final class FaceScanModel {
         }
     }
 
+    /// 최대 ISO 의 이만큼 이상을 쓰고 있으면 어두운 것으로 본다.
+    private static let darkISOFraction: Float = 0.4
+    private static let darkFramesNeeded = 8
     private static let holdNeeded = 3          // 연속 프레임
     private static let minFaceWidth: CGFloat = 0.28
     private static let minQuality: Float = 0.35
@@ -75,6 +89,7 @@ final class FaceScanModel {
         if let cam = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front),
            let input = try? AVCaptureDeviceInput(device: cam), session.canAddInput(input) {
             session.addInput(input)
+            device = cam
         }
         output.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
         output.alwaysDiscardsLateVideoFrames = true
@@ -111,6 +126,8 @@ final class FaceScanModel {
         step = .front
         holdFrames = 0
         firstSideSign = 0
+        needsLight = false
+        darkFrames = 0
         Task { await start() }
     }
 
@@ -118,6 +135,7 @@ final class FaceScanModel {
 
     private func handle(_ buffer: CVPixelBuffer) {
         guard step != .done else { return }
+        checkLight()
 
         // Vision 에도 **같은** 방향을 준다 — 누운 프레임을 `.up` 이라고 하면 정면/옆모습 판정이
         // 돌아간 좌표계에서 이뤄진다.
@@ -165,6 +183,26 @@ final class FaceScanModel {
         guard holdFrames >= Self.holdNeeded else { return }
         holdFrames = 0
         capture(buffer, yaw: yaw)
+    }
+
+    /// 카메라가 감도를 얼마나 끌어올리고 있나. 기기마다 최대 ISO 가 달라 **최대 대비 비율**로 본다.
+    /// 잠깐 손으로 가린 정도로는 안 켜지게 연속 프레임을 요구한다.
+    ///
+    /// 문턱값은 첫 판이다 — 기기에서 확인하고 조정할 것. 너무 낮으면 밝은 데서도 켜져 눈부시고,
+    /// 너무 높으면 정작 어두운 데서 안 켜진다.
+    private func checkLight() {
+        // ⚠️ `isAdjustingExposure` 를 꼭 본다. 세션이 막 열리면 카메라가 높은 ISO 에서 시작해
+        //    0.5~1초에 걸쳐 내려온다 — 그 사이 프레임만 세면 **밝은 방에서도** 조명이 켜져 버린다.
+        //    오너가 피하라고 한 바로 그 경우다.
+        guard !needsLight, let d = device, !d.isAdjustingExposure else { return }
+        let maxISO = d.activeFormat.maxISO
+        guard maxISO > 0 else { return }
+        if d.iso / maxISO >= Self.darkISOFraction {
+            darkFrames += 1
+            if darkFrames >= Self.darkFramesNeeded { needsLight = true }
+        } else {
+            darkFrames = 0
+        }
     }
 
     private func fail(_ message: String?) {

@@ -16,12 +16,21 @@ import UIKit
 struct FaceScanView: View {
     @Environment(AppState.self) private var app
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
 
     @State private var model = FaceScanModel()
+    /// 들어오기 전 화면 밝기 — 나갈 때 그대로 되돌린다.
+    @State private var savedBrightness: CGFloat?
+
+    /// 어두울 때만 화면을 **조명으로** 쓴다(오너 지시 2026-09-23). 바탕이 흰색으로 바뀌고 밝기가 올라간다.
+    /// 밝은 데서는 그대로 검은 화면이다 — 늘 켜 두면 눈부시다.
+    private var lightOn: Bool { model.needsLight }
+    /// 바탕 위 글자·선 색. 조명이 켜지면 먹색, 아니면 흰색.
+    private var fg: Color { lightOn ? Self.onLight : .white }
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            (lightOn ? Color.white : Color.black).ignoresSafeArea()
 
             if model.captured.count < 3 {
                 scanning
@@ -29,9 +38,37 @@ struct FaceScanView: View {
                 confirm
             }
         }
+        .animation(.easeInOut(duration: 0.28), value: lightOn)
         .task { await model.start() }
-        .onDisappear { model.stop() }
+        // 조명이 켜지는 순간에만 화면 밝기를 올린다. 원래 밝기는 처음 한 번만 기억한다.
+        // 꺼질 때(= 다시 찍기)는 되돌린다 — 안 그러면 바탕만 검어지고 밝기는 100% 로 남는다.
+        .onChange(of: lightOn) { _, on in
+            if on {
+                if savedBrightness == nil { savedBrightness = UIScreen.main.brightness }
+                UIScreen.main.brightness = 1
+            } else if let b = savedBrightness {
+                UIScreen.main.brightness = b
+            }
+        }
+        // ⚠️ 화면 밝기는 **시스템 설정**이라 앱을 벗어나도 그대로 남는다. 스캔 도중 전화가 오거나
+        //    홈으로 나가면 `onDisappear` 가 안 불려서 잠금화면·다른 앱까지 100% 로 남는다.
+        //    그래서 앱이 물러날 때 되돌리고, 돌아오면 조명이 켜져 있던 경우에만 다시 올린다.
+        .onChange(of: scenePhase) { _, phase in
+            switch phase {
+            case .active:
+                if lightOn { UIScreen.main.brightness = 1 }
+            default:
+                if let b = savedBrightness { UIScreen.main.brightness = b }
+            }
+        }
+        .onDisappear {
+            if let b = savedBrightness { UIScreen.main.brightness = b }
+            model.stop()
+        }
     }
+
+    /// 흰 바탕 위 글자색. 다크 모드에서 뒤집히면 안 되므로 토큰이 아니라 고정 먹색이다.
+    private static let onLight = Color(uiColor: UIColor(hex: 0x231F20))
 
     // MARK: 스캔 중
 
@@ -39,7 +76,7 @@ struct FaceScanView: View {
         VStack(spacing: 0) {
             HStack {
                 Button("닫기") { dismiss() }
-                    .foregroundStyle(.white)
+                    .foregroundStyle(fg)
                 Spacer()
             }
             .padding(.horizontal, Spacing.page)
@@ -50,11 +87,11 @@ struct FaceScanView: View {
             ZStack {
                 CameraPreview(session: model.session)
                     .clipShape(Circle())
-                    .overlay { Circle().strokeBorder(.white.opacity(0.18), lineWidth: 2) }
+                    .overlay { Circle().strokeBorder(fg.opacity(0.16), lineWidth: 2) }
                     .frame(width: 300, height: 300)
 
                 // Face ID 등록의 그 고리 — 한 칸씩 차오른다.
-                FaceScanRing(progress: model.ringProgress, flash: model.justCaptured)
+                FaceScanRing(progress: model.ringProgress, flash: model.justCaptured, tint: fg)
                     .frame(width: 328, height: 328)
             }
 
@@ -63,11 +100,11 @@ struct FaceScanView: View {
             VStack(spacing: Spacing.s2) {
                 Text(model.title)
                     .font(AppFont.sectionTitle)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(fg)
                     .contentTransition(.opacity)
                 Text(model.hint)
                     .font(AppFont.footnote)
-                    .foregroundStyle(.white.opacity(0.7))
+                    .foregroundStyle(fg.opacity(0.66))
                     .multilineTextAlignment(.center)
                     .frame(height: 34)
             }
@@ -78,7 +115,7 @@ struct FaceScanView: View {
 
             HStack(spacing: Spacing.s3) {
                 ForEach(FaceProfileStore.Angle.allCases, id: \.self) { a in
-                    ShotSlot(image: model.captured[a], label: a.label)
+                    ShotSlot(image: model.captured[a], label: a.label, tint: fg)
                 }
             }
             .padding(.bottom, Spacing.s5)
@@ -91,15 +128,15 @@ struct FaceScanView: View {
         VStack(spacing: Spacing.s4) {
             Spacer()
             Text("이 얼굴을 사용할까요?")
-                .font(AppFont.title2).foregroundStyle(.white)
+                .font(AppFont.title2).foregroundStyle(fg)
             Text("이 사진들은 이 아이폰 안에만 저장돼요.\n사진을 만들 때만 참조로 쓰이고 서버에 보관하지 않아요.")
-                .font(AppFont.footnote).foregroundStyle(.white.opacity(0.72))
+                .font(AppFont.footnote).foregroundStyle(fg.opacity(0.7))
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, Spacing.page)
 
             HStack(spacing: Spacing.s3) {
                 ForEach(FaceProfileStore.Angle.allCases, id: \.self) { a in
-                    ShotSlot(image: model.captured[a], label: a.label, size: 96)
+                    ShotSlot(image: model.captured[a], label: a.label, tint: fg, size: 96)
                 }
             }
             Spacer()
@@ -110,7 +147,7 @@ struct FaceScanView: View {
                 }
                 .buttonStyle(PrimaryButtonStyle(isDisabled: false))
                 Button("다시 찍기") { model.reset() }
-                    .buttonStyle(TextButtonStyle(color: .white))
+                    .buttonStyle(TextButtonStyle(color: fg))
             }
             .padding(.horizontal, Spacing.page)
             .padding(.bottom, Spacing.s5)
@@ -122,13 +159,14 @@ struct FaceScanView: View {
 private struct ShotSlot: View {
     var image: UIImage?
     var label: String
+    var tint: Color
     var size: CGFloat = 64
 
     var body: some View {
         VStack(spacing: 6) {
             ZStack {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(.white.opacity(0.12))
+                    .fill(tint.opacity(0.12))
                 if let image {
                     Image(uiImage: image).resizable().scaledToFill()
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
@@ -137,7 +175,7 @@ private struct ShotSlot: View {
             }
             .frame(width: size, height: size / CardMetrics.aspect * 0.75)
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-            Text(label).font(AppFont.caption).foregroundStyle(.white.opacity(image == nil ? 0.4 : 0.85))
+            Text(label).font(AppFont.caption).foregroundStyle(tint.opacity(image == nil ? 0.42 : 0.85))
         }
         .animation(.spring(response: 0.34, dampingFraction: 0.8), value: image != nil)
     }
@@ -147,6 +185,7 @@ private struct ShotSlot: View {
 private struct FaceScanRing: View {
     var progress: Double
     var flash: Bool
+    var tint: Color
 
     private let ticks = 36
 
@@ -155,7 +194,7 @@ private struct FaceScanRing: View {
             ForEach(0..<ticks, id: \.self) { i in
                 let on = Double(i) / Double(ticks) < progress
                 Capsule()
-                    .fill(on ? Color.white : Color.white.opacity(0.22))
+                    .fill(on ? tint : tint.opacity(0.24))
                     .frame(width: 3, height: on ? 16 : 11)
                     .offset(y: -160)
                     .rotationEffect(.degrees(Double(i) / Double(ticks) * 360))
