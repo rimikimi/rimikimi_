@@ -1,29 +1,30 @@
 import React, { useMemo } from "react";
-import { StyleSheet, View, useWindowDimensions } from "react-native";
-import { useLocalSearchParams } from "expo-router";
+import { View } from "react-native";
+import { router, useLocalSearchParams } from "expo-router";
 import { Screen } from "@/ui/Screen";
 import { AppHeader } from "@/ui/AppHeader";
-import { ConceptCard } from "@/ui/ConceptCard";
+import { DensePhotoGrid } from "@/ui/DensePhotoGrid";
 import { useStore } from "@/lib/store";
 import { byNewest, categoriesOf } from "@/lib/concepts";
-import { space } from "@/theme/tokens";
 
-// 카테고리 더보기 — 2열 격자, 최신순.
+// 카테고리 더보기 — 빽빽한 격자(핀치로 3열 ↔ 5열), 최신순. 탭 = 필름스트립 브라우저.
+// 2열 카드 격자였던 것을 iOS 2.0 과 맞췄다(오너 지시 2026-09-22 "안드로이드도 동일하게").
 export default function CategoryScreen() {
-  const { name } = useLocalSearchParams<{ name: string }>();
+  const { name, cols } = useLocalSearchParams<{ name: string; cols?: string }>();
   const { concepts } = useStore();
-  const { width } = useWindowDimensions();
-  const items = useMemo(() => concepts.filter((c) => categoriesOf(c).includes(name ?? "")).sort(byNewest), [concepts, name]);
-  const cardW = Math.floor((width - space.screen * 2 - space.s3) / 2);
+  const items = useMemo(
+    () => concepts.filter((c) => categoriesOf(c).includes(name ?? "")).sort(byNewest),
+    [concepts, name],
+  );
   return (
     <Screen scrollModel="scroll" header={<AppHeader title={name ?? ""} back right={<View />} />}>
-      <View style={styles.grid}>
-        {items.map((c) => <ConceptCard key={String(c.id)} concept={c} width={cardW} />)}
-      </View>
+      <DensePhotoGrid
+        items={items}
+        startWide={cols === "5"}
+        onOpen={(c) =>
+          router.push({ pathname: "/browse/[name]", params: { name: name ?? "", start: String(c.id) } })
+        }
+      />
     </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  grid: { flexDirection: "row", flexWrap: "wrap", gap: space.s3, paddingHorizontal: space.screen },
-});
