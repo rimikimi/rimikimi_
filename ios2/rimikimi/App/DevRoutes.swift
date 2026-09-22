@@ -49,6 +49,17 @@ enum DevRoutes {
             // 실제 알림 배너는 시뮬레이터에서 탭할 수 없다 — "완료 푸시 탭" 경로(PushManager → RootTabView)를 그대로 태운다.
             // galleryId 를 실으면 4주차 "정확한 결과 열기" 경로, 안 실으면 기존 "최신 항목" 폴백 경로를 탄다.
             app.push.simulateTap(kind: q["kind"] ?? "genDone", galleryId: q["galleryId"])
+        case "/category":
+            // 카테고리 그리드로 바로 — 시뮬레이터에서는 앨범 타일을 탭할 수 없다(캡처·검증용).
+            // 여기서 카메라 원이 그대로 보이는지 확인한다(2026-09-22 결함).
+            app.tab = .gallery
+            app.galleryPath = [.category(q["name"] ?? "세계여행")]
+        case "/browse":
+            // 필름스트립 브라우저. `id` 없으면 그 카테고리 첫 장.
+            let name = q["name"] ?? "세계여행"
+            let first = app.concepts.concepts(in: name).first?.id ?? ""
+            app.tab = .gallery
+            app.galleryPath = [.category(name), .browse(category: name, startID: q["id"] ?? first)]
         case "/store": app.tab = .profile; app.profilePath = [.store]
         case "/invite": app.tab = .profile; app.profilePath = [.invite]
         case "/profile": app.tab = .profile; app.profilePath = []
