@@ -86,12 +86,32 @@ final class ConceptStore {
     /// 진짜 총합을 따로 조회한다.
     var albumTiles: [AlbumTile] {
         let counts = Dictionary(uniqueKeysWithValues: categories.map { ($0.name, $0.count) })
-        return rows.map { AlbumTile(name: $0.name, count: counts[$0.name] ?? $0.items.count,
-                                    coverURL: $0.items.first?.largeURL, coverFallbackURL: $0.items.first?.thumbURL) }
+        var tiles = rows.map { AlbumTile(name: $0.name, count: counts[$0.name] ?? $0.items.count,
+                                         coverURL: $0.items.first?.largeURL, coverFallbackURL: $0.items.first?.thumbURL) }
+        // 즐겨찾기한 카테고리를 위로(오너 지시 2026-09-22 "실제로 배열도 바꿔주고"). 그 안에서는 원래 순서.
+        // (`sort` 는 안정 정렬이 아니라 같은 그룹 안 순서가 흔들린다 — 두 덩어리로 갈라 붙인다.)
+        let favCats = favoriteCategories()
+        tiles = tiles.filter { favCats.contains($0.name) } + tiles.filter { !favCats.contains($0.name) }
+        // 고른 컨셉이 있으면 맨 앞에 "⭐ 즐겨찾기" 앨범.
+        let favItems = concepts(in: FavoritesStore.albumName)
+        if let cover = favItems.first {
+            tiles.insert(AlbumTile(name: FavoritesStore.albumName, count: favItems.count,
+                                   coverURL: cover.largeURL, coverFallbackURL: cover.thumbURL), at: 0)
+        }
+        return tiles
     }
 
+    /// 즐겨찾기 앨범은 카테고리가 아니라 사용자가 고른 목록이다 — `AppState` 가 주입한다.
+    /// (뷰들이 전부 `concepts(in:)` 을 부르고 있어 여기서 가로채는 게 변경이 가장 작다.)
+    var favoriteIDs: () -> Set<String> = { [] }
+    var favoriteCategories: () -> Set<String> = { [] }
+
     func concepts(in category: String) -> [Concept] {
-        pool.filter { $0.categories.contains(category) }
+        if category == FavoritesStore.albumName {
+            let ids = favoriteIDs()
+            return pool.filter { ids.contains($0.id) }.sorted(by: Self.byNewest)
+        }
+        return pool.filter { $0.categories.contains(category) }
     }
 
     func concept(id: String) -> Concept? { concepts.first { $0.id == id } }

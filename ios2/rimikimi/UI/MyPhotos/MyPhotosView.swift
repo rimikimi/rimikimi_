@@ -27,7 +27,7 @@ struct MyPhotosView: View {
                 } else if items.isEmpty {
                     EmptyState(message: error ?? "아직 생성한 이미지가 없어요", actionTitle: "컨셉 선택하러 가기") { app.tab = .gallery }
                 } else {
-                    Text("생성된 이미지는 1시간만 보관돼요. 오래 보관하려면 앨범에 저장해 주세요.")
+                    Text("생성된 이미지는 24시간만 보관돼요. 오래 보관하려면 앨범에 저장해 주세요.")
                         .font(AppFont.footnote).foregroundStyle(Color.ink2)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, Spacing.page)
@@ -100,6 +100,8 @@ struct MyPhotosView: View {
         defer { loading = false }
         do {
             items = try await RimikimiAPI.shared.fetchGallery(token: token)
+            // 격자에 "이미 만든 컨셉" 표시를 남기기 위해 — 서버 갤러리는 24시간만 보관된다.
+            app.favorites.markGenerated(items.compactMap(\.conceptId))
             error = nil
         } catch {
             self.error = "갤러리를 불러오지 못했어요. 잠시 후 다시 시도해 주세요."

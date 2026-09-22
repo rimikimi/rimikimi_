@@ -60,6 +60,7 @@ struct NewBadge: View {
 
 /// 컨셉 카드 — 흰 카드(모서리 14) 안에 3:4 썸네일 + 제목 14/600 한 줄 말줄임. 탭 → 옵션 화면(푸시).
 struct ConceptCard: View {
+    @Environment(AppState.self) private var app
     var concept: Concept
 
     var body: some View {
@@ -67,6 +68,12 @@ struct ConceptCard: View {
             VStack(alignment: .leading, spacing: 0) {
                 RemoteImage(url: concept.thumbURL, cornerRadius: 0)
                     .aspectRatio(CardMetrics.aspect, contentMode: .fit)
+                    .overlay { if app.favorites.hasGenerated(concept.id) { GeneratedScrim() } }
+                    .overlay(alignment: .topTrailing) {
+                        if app.favorites.isFavorite(concept: concept.id) {
+                            FavoriteBadge().padding(Spacing.s2)
+                        }
+                    }
                 Text(concept.title)
                     .font(AppFont.cardTitle)
                     .foregroundStyle(Color.ink)
@@ -85,20 +92,73 @@ struct ConceptCard: View {
     }
 }
 
-/// 홈의 "앨범" 타일 — 표지 1장(정방형) + 이름 + 장수. 탭 → 그 카테고리의 빽빽한 그리드(`DensePhotoGrid`).
+/// 홈의 "앨범" 타일 — 표지 1장 + 이름 + 장수. 탭 → 그 카테고리의 빽빽한 그리드(`DensePhotoGrid`).
+/// ⚠️ 미리보기는 **무조건 3:4** 다(오너 지시 2026-09-22). 정방형으로 자르면 인물 사진이 잘리고
+///    줄마다 높이가 들쭉날쭉해진다.
 struct AlbumGridTile: View {
+    @Environment(AppState.self) private var app
     var tile: ConceptStore.AlbumTile
 
     var body: some View {
         NavigationLink(value: Route.category(tile.name)) {
             VStack(alignment: .leading, spacing: Spacing.s1) {
                 RemoteImage(url: tile.coverURL, cornerRadius: Radius.card, fallback: tile.coverFallbackURL)
-                    .aspectRatio(1, contentMode: .fit)
+                    .aspectRatio(CardMetrics.aspect, contentMode: .fit)
+                    .overlay(alignment: .topTrailing) {
+                        if app.favorites.isFavorite(category: tile.name) {
+                            FavoriteBadge().padding(Spacing.s2)
+                        }
+                    }
                 Text(tile.name).font(AppFont.cardTitle).foregroundStyle(Color.ink).lineLimit(1)
                 Text("\(tile.count)장").font(AppFont.footnote).foregroundStyle(Color.ink3)
             }
         }
         .buttonStyle(PressScaleButtonStyle())
+    }
+}
+
+/// 상단바의 별 버튼 — 카테고리·컨셉 즐겨찾기 공용(오너 지시 2026-09-22 "우측 상단에 별표").
+struct FavoriteToolbarButton: View {
+    var isOn: Bool
+    var action: () -> Void
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: isOn ? "star.fill" : "star")
+                .foregroundStyle(isOn ? Color.favoriteStar : Color.ink)
+                .contentTransition(.symbolEffect(.replace))
+        }
+        .accessibilityLabel(isOn ? "즐겨찾기 해제" : "즐겨찾기")
+    }
+}
+
+/// 즐겨찾기 표시 — 사진 위에 얹으므로 어두운 원 안의 노란 별(사진 밝기와 무관하게 보이게).
+struct FavoriteBadge: View {
+    var size: CGFloat = 22
+    var body: some View {
+        Image(systemName: "star.fill")
+            .font(.system(size: size * 0.52, weight: .semibold))
+            .foregroundStyle(Color.favoriteStar)
+            .frame(width: size, height: size)
+            .background(.black.opacity(0.35), in: Circle())
+            .accessibilityLabel("즐겨찾기")
+    }
+}
+
+/// "이미 만들어 본 컨셉" 표시 — 아래쪽 반투명 그라데이션 + 체크(오너 지시 2026-09-22:
+/// "이미 생성했던걸 사용자가 한 눈에 알 수 있도록"). 사진을 가리지 않을 만큼만 덮는다.
+struct GeneratedScrim: View {
+    var body: some View {
+        ZStack(alignment: .bottomLeading) {
+            LinearGradient(colors: [.clear, .black.opacity(0.55)], startPoint: .center, endPoint: .bottom)
+            HStack(spacing: 3) {
+                Image(systemName: "checkmark.circle.fill").font(.system(size: 11, weight: .bold))
+                Text("만든 컨셉").font(.system(size: 10, weight: .semibold))
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 6).padding(.vertical, 5)
+        }
+        .allowsHitTesting(false)
+        .accessibilityLabel("이미 만든 컨셉")
     }
 }
 
@@ -131,6 +191,8 @@ struct AlbumsGrid: View {
 /// (UIKit 핀치 + 동시 인식) — `MagnifyGesture` 는 손가락 조합에 따라 스크롤에 먹혔다(그 파일 주석).
 /// 탭 → 필름스트립 브라우저(`Route.browse`).
 struct DensePhotoGrid: View {
+    @Environment(AppState.self) private var app
+    @Environment(\.zoomNamespace) private var zoomNS
     var concepts: [Concept]
     var category: String
     @State private var wideColumns = false  // false = 3열(큼), true = 5열(촘촘)
@@ -147,10 +209,18 @@ struct DensePhotoGrid: View {
             LazyVGrid(columns: columns, spacing: 2) {
                 ForEach(concepts) { c in
                     NavigationLink(value: Route.browse(category: category, startID: c.id)) {
+                        // ⚠️ 미리보기는 무조건 3:4 (오너 지시 2026-09-22). 정방형이면 인물이 잘린다.
                         RemoteImage(url: c.thumbURL, cornerRadius: 0)
-                            .aspectRatio(1, contentMode: .fit)
+                            .aspectRatio(CardMetrics.aspect, contentMode: .fit)
+                            .overlay { if app.favorites.hasGenerated(c.id) { GeneratedScrim() } }
+                            .overlay(alignment: .topTrailing) {
+                                if app.favorites.isFavorite(concept: c.id) {
+                                    FavoriteBadge(size: wideColumns ? 16 : 20).padding(4)
+                                }
+                            }
                     }
                     .buttonStyle(.plain)
+                    .zoomSource(c.id, in: zoomNS)
                 }
             }
             .animation(.spring(response: 0.35, dampingFraction: 0.86), value: columnCount)

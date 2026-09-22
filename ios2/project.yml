@@ -157,7 +157,9 @@ targets:
         # 탐색(앨범 그리드·핀치줌 그리드·필름스트립 브라우저, 커밋 dfea643)이 들어가 다시 올린다.
         # 2026-09-22: 101 — 오너 피드백 3건(카테고리 화면에서 사라지던 카메라 버튼, 손가락 조합을
         # 타던 핀치줌, 큰 사진 해상도 = large/ 1200px 도입).
-        CURRENT_PROJECT_VERSION: "101"
+        # 2026-09-22: 102 — 미리보기 3:4 고정, 즐겨찾기(카테고리·컨셉), 이미 만든 컨셉 표시,
+        # 사진 앱식 확대 전환(아래로 끌어 닫기), 보관 기간 24시간 문구.
+        CURRENT_PROJECT_VERSION: "102"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
       configs:

@@ -6,6 +6,7 @@ import SwiftUI
 /// 여기서 하지 않고 기존 `ConceptOptionsView`로 넘긴다 — 이 화면은 훑어보기 전용.
 struct ConceptBrowserView: View {
     @Environment(AppState.self) private var app
+    @Environment(\.zoomNamespace) private var zoomNS
     var category: String
     var startID: String
 
@@ -50,6 +51,17 @@ struct ConceptBrowserView: View {
         .background(Color.bg)
         .inlineTitle(category)
         .toolbar(.hidden, for: .tabBar)
+        .toolbar {
+            if let current {
+                ToolbarItem(placement: .topBarTrailing) {
+                    FavoriteToolbarButton(isOn: app.favorites.isFavorite(concept: current.id)) {
+                        app.favorites.toggle(concept: current.id)
+                    }
+                }
+            }
+        }
+        // 지금 보고 있는 사진으로 되돌아가게 — 처음 누른 칸이 아니라(사진 앱과 같다).
+        .zoomDestination(current?.id ?? startID, in: zoomNS)
         .onAppear {
             if let i = items.firstIndex(where: { $0.id == startID }) { index = i }
         }

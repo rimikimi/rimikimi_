@@ -86,6 +86,13 @@ struct ConceptOptionsView: View {
         .background(Color.bg)
         .inlineTitle(concept.title)
         .toolbar(.hidden, for: .tabBar)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                FavoriteToolbarButton(isOn: app.favorites.isFavorite(concept: concept.id)) {
+                    app.favorites.toggle(concept: concept.id)
+                }
+            }
+        }
         .scrollEdgeEffectStyle(.hard, for: .bottom)
         .safeAreaBar(edge: .bottom) {
             VStack(spacing: Spacing.s2) {

@@ -42,6 +42,8 @@ extension Color {
     static let heartBlue = Color(uiColor: UIColor(hex: 0x60C9DE))
     static let heartPurple = Color(uiColor: UIColor(hex: 0x8A5DA7))
     static let hearts: [Color] = [.heartRed, .heartYellow, .heartBlue, .heartPurple]
+    /// 즐겨찾기 별 — 하트 노랑을 그대로 쓴다(브랜드 안에서 도는 색).
+    static let favoriteStar = Color.heartYellow
     /// 칩 i 번째의 활성색 (0 → 빨강, 1 → 노랑 …).
     static func heart(_ index: Int) -> Color { hearts[((index % 4) + 4) % 4] }
 

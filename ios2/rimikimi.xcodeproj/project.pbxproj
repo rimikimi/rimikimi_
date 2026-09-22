@@ -42,6 +42,7 @@
 		835FB99CC4F14D1B4BE717EF /* FilterTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5857D4A423BFF51BC53D5FC5 /* FilterTabView.swift */; };
 		83681C6E4FE5B31C33FBA703 /* WebToolView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7187565C059C0F50D5993AE /* WebToolView.swift */; };
 		8436F5C07886F073228BE7C7 /* ResultView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FCAE2620F30F680D2653EC8 /* ResultView.swift */; };
+		87C1D9D1AE7692F2D85BCB7B /* FavoritesStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FD97965DB921BD965EBF742 /* FavoritesStore.swift */; };
 		94D226F90ADD5DA58B8A4A68 /* PinchColumns.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7983BBC96EDB5683B8206D8A /* PinchColumns.swift */; };
 		963ADFB5381C6DDE8FCAC190 /* OptionBlocks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8658D32247F828A580AF2847 /* OptionBlocks.swift */; };
 		96775F190504E8EED9B273CC /* Glass.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEFA1F21B5BA38215CAC77EC /* Glass.swift */; };
@@ -112,6 +113,7 @@
 		99ABF96B6B0B061F6148D8FD /* ImageUtil.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageUtil.swift; sourceTree = "<group>"; };
 		9BAF466244F7888654F1B6F3 /* GalleryHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GalleryHomeView.swift; sourceTree = "<group>"; };
 		9C1D2B899128932E07E33229 /* PhotoPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoPicker.swift; sourceTree = "<group>"; };
+		9FD97965DB921BD965EBF742 /* FavoritesStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoritesStore.swift; sourceTree = "<group>"; };
 		A29E03020A40301A2004D95D /* WebAuth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebAuth.swift; sourceTree = "<group>"; };
 		A81AB1D2A679E0FC5857C3C8 /* ConceptCards.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConceptCards.swift; sourceTree = "<group>"; };
 		A926DC441FC2160654C0583C /* LoginSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginSheet.swift; sourceTree = "<group>"; };
@@ -322,6 +324,7 @@
 				8B7250068E2825FC854BDBCC /* Concept.swift */,
 				1B5F41573F759B338E33F44C /* ConceptStore.swift */,
 				1D0C7847AA2242A68E84ED84 /* Config.swift */,
+				9FD97965DB921BD965EBF742 /* FavoritesStore.swift */,
 				602EA387617A8E42DFAD3C9D /* GenerationCoordinator.swift */,
 				99ABF96B6B0B061F6148D8FD /* ImageUtil.swift */,
 				4B53E11DE3E80A74A2E3C770 /* PushManager.swift */,
@@ -489,6 +492,7 @@
 				56C8581B4E154AC56E47CD07 /* Config.swift in Sources */,
 				D0D65C24A947A34D4E36E83F /* DevRoutes.swift in Sources */,
 				48A33FC6218521911E5F7025 /* FaceCrop.swift in Sources */,
+				87C1D9D1AE7692F2D85BCB7B /* FavoritesStore.swift in Sources */,
 				3F80252D1AC27E24F99EC75B /* Feedback.swift in Sources */,
 				835FB99CC4F14D1B4BE717EF /* FilterTabView.swift in Sources */,
 				E1601BFBC8EA13805A0542DE /* FitSheet.swift in Sources */,
@@ -602,7 +606,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = rimikimi/rimikimi.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 101;
+				CURRENT_PROJECT_VERSION = 102;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = rimikimi/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -687,7 +691,7 @@
 				CODE_SIGN_ENTITLEMENTS = rimikimi/rimikimi.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 101;
+				CURRENT_PROJECT_VERSION = 102;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = rimikimi/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (

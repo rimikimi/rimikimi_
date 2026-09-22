@@ -27,7 +27,7 @@ struct GuideView: View {
                     .staggerIn(delay: Double(i) * 0.06)
                 }
             }
-            Text("만든 사진은 1시간 뒤 사라져요. 마음에 들면 꼭 저장하세요.")
+            Text("만든 사진은 24시간 뒤 사라져요. 마음에 들면 꼭 저장하세요.")
                 .font(AppFont.footnote).foregroundStyle(Color.ink2).padding(.top, Spacing.s3)
             Spacer(minLength: 0)
             Button("시작하기") { HapticPlayer.commit(); onDone() }

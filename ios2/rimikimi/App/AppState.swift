@@ -150,12 +150,20 @@ final class AppState {
     let auth = AuthStore.shared
     let generation = GenerationCoordinator()
     let concepts = ConceptStore()
+    let favorites = FavoritesStore()
     let userPhoto = UserPhotoStore()
     let store = StoreManager()
     let push = PushManager.shared
     private(set) var quota: QuotaInfo?
     /// 마지막 생성 요청 — 크레딧 부족으로 실패했을 때 구매 뒤 이어가기 위해.
     private var lastRequest: GenerateRequest?
+
+    init() {
+        // "⭐ 즐겨찾기" 앨범과 홈 정렬만 `FavoritesStore` 를 알면 된다 — `ConceptStore` 가 직접
+        // 의존하지 않도록 클로저로 잇는다.
+        concepts.favoriteIDs = { [favorites] in favorites.concepts }
+        concepts.favoriteCategories = { [favorites] in favorites.categories }
+    }
 
     // MARK: 로그인 게이트
 
@@ -367,6 +375,8 @@ final class AppState {
     // MARK: 결과 화면
 
     func present(_ items: [GenerationCoordinator.ResultItem], job: GenerationCoordinator.Job?) {
+        // "이미 만들어 본 컨셉" 표시용 — 서버 갤러리는 24시간만 남으므로 여기서 기기에 적어 둔다.
+        if let id = job?.conceptId { favorites.markGenerated([id]) }
         let payload = ResultPayload(items: items, conceptId: job?.conceptId, conceptTitle: job?.conceptTitle ?? "")
         tab = .myPhotos
         myPhotosPath = [.result(payload)]
