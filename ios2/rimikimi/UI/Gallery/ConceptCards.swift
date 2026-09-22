@@ -207,22 +207,16 @@ struct DensePhotoGrid: View {
     /// 잠금 해제 예약. 새 핀치가 시작되면 이전 예약을 **취소**한다 — 안 그러면 앞 핀치가 걸어 둔
     /// 3초 안전장치가 다음 핀치 도중에 터져서 잠금이 풀린다.
     @State private var unlock: DispatchWorkItem?
-    /// 격자 배율은 **두 겹**이다. 하나로 합쳐 두면 안 된다 — 문턱을 넘은 뒤에도 손가락은 계속
-    /// 움직이고 `onProgress` 가 매 프레임 값을 덮어써서, 아래 `step(to:)` 이 건 애니메이션이
-    /// 다음 프레임에 지워진다(핀치로는 한 번도 안 보이고 dev 토글로만 보였을 뻔했다).
-    /// 열이 바뀐 직후 1 로 돌아오며 칸이 스르르 줄거나 늘어나게 하는 몫.
-    @State private var stepScale: CGFloat = 1
-    /// 손가락을 그대로 따라가는 몫.
+    /// 문턱을 넘기 전, 손가락을 따라 아주 조금 움직이는 몫.
     @State private var liveScale: CGFloat = 1
+    /// 사라지는 쪽 격자의 열 수. 전환하는 동안만 값이 있고, 위에 겹쳐서 흐려진다.
+    @State private var fadingColumns: Int?
+    @State private var fadeOpacity: CGFloat = 0
 
     private var columnCount: Int { wideColumns ? 5 : 3 }
     /// 타일 사이 간격과 화면 양옆 여백. 사진 앱은 끝까지 꽉 채우지만 우리 격자는 그러면 답답하다
     /// (오너 지적 2026-09-22 "여백 안 주냐").
     private static let gap: CGFloat = 4
-    private var columns: [GridItem] {
-        Array(repeating: GridItem(.flexible(), spacing: Self.gap), count: columnCount)
-    }
-
     /// 5열로 좁히면 화면에 칸이 세 배 가까이 늘어난다. 미리 받아 두지 않으면 그 칸들이 잠깐
     /// 빈 회색으로 있다가 하나씩 뜬다(녹화해서 확인 — 약 0.1초). 썸네일은 장당 수십 KB라
     /// 한 화면 분량을 미리 받아 두는 편이 낫다.
@@ -234,26 +228,74 @@ struct DensePhotoGrid: View {
         }
     }
 
-    /// 열 수를 바꾼다 — **재배열은 한 프레임에, 움직임은 배율로.**
+    /// 열 수를 바꾼다 — **배치는 한 프레임에 갈아끼우고, 옛 화면을 위에 겹쳐 흐린다.**
     ///
-    /// `LazyVGrid` 의 열 수에 애니메이션을 걸면 칸들이 대각선으로 흩어졌다 겹치며 날아 들어온다
-    /// (녹화해서 프레임으로 확인했다. 오너 지적 3회의 정체가 이거다). 게으른 격자는 열 수가 바뀌는
-    /// 순간 칸을 새로 만들고 버려서, 중간 상태를 그릴 재료 자체가 없기 때문이다.
+    /// 네이티브 사진 앱이 정확히 이렇게 한다. 오너가 전환 순간을 직접 캡처해 왔는데(2026-09-22),
+    /// 타일 자리는 **이미 최종 배열**이고 칸 안에서 옛 사진과 새 사진이 겹쳐 있었다. 자리를 옮기는
+    /// 게 아니라 두 화면을 **크로스페이드** 하는 것이다.
     ///
-    /// 그래서 네이티브 사진 앱과 같은 방식을 쓴다 — **재배열하지 않고 확대/축소한다.** 3열에서
-    /// 5열로 갈 때 새 칸은 3/5 크기다. 바뀌는 순간 격자 전체를 5/3 배로 키워 두면 방금 전과 똑같은
-    /// 크기로 보이고, 이 배율이 1 로 돌아오는 동안 칸이 **스르르 줄어든다**. 반대도 같다.
-    /// 움직이는 건 격자 통째로 하나뿐이라 겹치거나 흩어질 수가 없다.
+    /// 자리를 진짜로 옮기는 것(칸마다 제 자리로 보간)도 만들어 봤다 — `Layout` 까지 짰다. 결과는
+    /// 계단처럼 흩어졌다. 칸마다 이동 거리가 제각각이라(맨 아래 칸은 몇 줄씩 올라온다) 중간 프레임이
+    /// 성기게 벌어진다. 사진 앱이 이 방식을 안 쓰는 이유다. 되돌렸다.
     private func step(to next: Bool) {
-        let from = CGFloat(columnCount)
+        // ⚠️ 두 장을 **같은 프레임에** 바꾸면 안 된다. 그 순간 위아래 격자가 둘 다 갓 만들어진
+        //    상태라 어느 쪽도 아직 안 그려져서, 한 프레임 동안 배경만 보인다(녹화해서 확인 —
+        //    화면이 허옇게 뜬다). 그래서 **한 프레임 나눠서** 한다.
         var t = Transaction(); t.disablesAnimations = true
+        // 프레임 0 — 지금 배치 그대로 한 장을 위에 더 얹는다(화면은 그대로 보인다).
         withTransaction(t) {
-            wideColumns = next
-            stepScale = CGFloat(next ? 5 : 3) / from   // 바뀌기 전과 같은 크기로 보이게
+            fadingColumns = columnCount
+            fadeOpacity = 1
             liveScale = 1
         }
-        withAnimation(.snappy(duration: 0.28, extraBounce: 0.02)) { stepScale = 1 }
         HapticPlayer.selection()
+        DispatchQueue.main.async {
+            // 프레임 1 — 위 장이 다 그려졌으니, 그 **뒤에서** 배치를 갈아끼운다. 안 보인다.
+            withTransaction(t) { wideColumns = next }
+            // 그리고 위 장을 흐린다 = 새 배치가 비쳐 나온다. 네이티브 사진 앱과 같은 겹침.
+            withAnimation(.easeInOut(duration: 0.24)) { fadeOpacity = 0 }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                if fadeOpacity == 0 { fadingColumns = nil }
+            }
+        }
+    }
+
+    private func columns(_ n: Int) -> [GridItem] {
+        Array(repeating: GridItem(.flexible(), spacing: Self.gap), count: n)
+    }
+
+    /// 격자 한 장. 열 수만 다르게 해서 전환 중엔 두 장을 겹친다.
+    @ViewBuilder
+    private func grid(_ n: Int) -> some View {
+        LazyVGrid(columns: columns(n), spacing: Self.gap) {
+            ForEach(concepts) { c in
+                // ⚠️ `NavigationLink` 를 쓰면 안 된다. 손가락이 **닿는 순간** 링크가 그 터치를
+                //    가져가 버려서, 뒤늦게 핀치가 시작돼도 이미 늦다 — 손을 뗄 때 그대로 탭으로
+                //    들어가 엉뚱한 사진이 열린다(오너 지적 2026-09-22 "마지막 손가락 포지션을
+                //    터치한 걸로 인식"). `allowsHitTesting` 을 도중에 꺼도 소용없다. 적중 판정은
+                //    닿는 순간에 이미 끝났기 때문이다. 그래서 **누를 때가 아니라 동작할 때**
+                //    막는다 — 아래 `guard` 는 손을 뗀 시점에 돈다.
+                Button {
+                    guard !pinching else { return }
+                    app.pushRoute(.browse(category: category, startID: c.id))
+                } label: {
+                    // ⚠️ 미리보기는 무조건 3:4 (오너 지시 2026-09-22). 정방형이면 인물이 잘린다.
+                    RemoteImage(url: c.thumbURL, cornerRadius: 0)
+                        .photoRatio()
+                        .overlay { if app.favorites.hasGenerated(c.id) { GeneratedScrim() } }
+                        .overlay(alignment: .topTrailing) {
+                            if app.favorites.isFavorite(concept: c.id) {
+                                FavoriteBadge(size: n == 5 ? 16 : 20).padding(4)
+                            }
+                        }
+                        // 썸네일은 전부 둥글게(오너 지시 2026-09-22 "다 라운드 적용 해").
+                        // 겹쳐 놓은 그라데이션·별까지 같이 깎이도록 **맨 바깥에서** 자른다.
+                        .clipShape(RoundedRectangle(cornerRadius: n == 5 ? 6 : Radius.thumb,
+                                                    style: .continuous))
+                }
+                .buttonStyle(.plain)
+            }
+        }
     }
 
     private func scheduleUnlock(after seconds: Double) {
@@ -267,40 +309,26 @@ struct DensePhotoGrid: View {
         if concepts.isEmpty {
             EmptyState(message: "검색 결과가 없어요")
         } else {
-            LazyVGrid(columns: columns, spacing: Self.gap) {
-                ForEach(concepts) { c in
-                    // ⚠️ `NavigationLink` 를 쓰면 안 된다. 손가락이 **닿는 순간** 링크가 그 터치를
-                    //    가져가 버려서, 뒤늦게 핀치가 시작돼도 이미 늦다 — 손을 뗄 때 그대로 탭으로
-                    //    들어가 엉뚱한 사진이 열린다(오너 지적 2026-09-22 "마지막 손가락 포지션을
-                    //    터치한 걸로 인식"). `allowsHitTesting` 을 도중에 꺼도 소용없다. 적중 판정은
-                    //    닿는 순간에 이미 끝났기 때문이다. 그래서 **누를 때가 아니라 동작할 때**
-                    //    막는다 — 아래 `guard` 는 손을 뗀 시점에 돈다.
-                    Button {
-                        guard !pinching else { return }
-                        app.pushRoute(.browse(category: category, startID: c.id))
-                    } label: {
-                        // ⚠️ 미리보기는 무조건 3:4 (오너 지시 2026-09-22). 정방형이면 인물이 잘린다.
-                        RemoteImage(url: c.thumbURL, cornerRadius: 0)
-                            .photoRatio()
-                            .overlay { if app.favorites.hasGenerated(c.id) { GeneratedScrim() } }
-                            .overlay(alignment: .topTrailing) {
-                                if app.favorites.isFavorite(concept: c.id) {
-                                    FavoriteBadge(size: wideColumns ? 16 : 20).padding(4)
-                                }
-                            }
-                            // 썸네일은 전부 둥글게(오너 지시 2026-09-22 "다 라운드 적용 해").
-                            // 겹쳐 놓은 그라데이션·별까지 같이 깎이도록 **맨 바깥에서** 자른다.
-                            .clipShape(RoundedRectangle(cornerRadius: wideColumns ? 6 : Radius.thumb,
-                                                        style: .continuous))
+            grid(columnCount)
+                // 전환하는 동안만, 옛 배치를 그대로 위에 얹어 흐린다. 자리를 차지하지 않게
+                // `overlay` 로 얹는다 — 아래 새 배치가 스크롤 높이를 정한다.
+                .overlay(alignment: .top) {
+                    if let fadingColumns {
+                        grid(fadingColumns)
+                            // ⚠️ `overlay` 는 아래 격자의 크기를 그대로 물려받는다. 그런데 아래가
+                            //    새 배치로 바뀌면서 높이가 확 줄면, 이 사라질 장까지 덩달아 다시
+                            //    배치돼서 한 프레임 허옇게 뜬다(녹화해서 확인). 제 높이를 쓰게 해
+                            //    아래 크기 변화와 끊어 놓는다.
+                            .fixedSize(horizontal: false, vertical: true)
+                            .opacity(fadeOpacity)
+                            .allowsHitTesting(false)
                     }
-                    .buttonStyle(.plain)
                 }
-            }
             // 핀치는 **열 수만** 바꾼다 — 3열 ↔ 5열. 페이지를 같이 확대/축소하지 않는다
             // (2026-09-22 오너 지적: 화면 전체가 작아지는 건 시스템 확대전환의 "핀치로 닫기"였다.
             //  그래서 이 화면에서는 확대전환을 쓰지 않는다 — 아래 `zoomSource` 를 뗀 이유).
-            // 재배열은 **한 프레임에** 끝내고, 자연스러움은 전부 이 배율이 만든다. 아래 주석 참고.
-            .scaleEffect(stepScale * liveScale, anchor: .center)
+            // 문턱을 넘기 전 "핀치가 먹고 있다"는 느낌만 준다.
+            .scaleEffect(liveScale, anchor: .center)
             .padding(.horizontal, Spacing.page)
             .padding(.top, Spacing.s2)
             .onAppear {
@@ -316,7 +344,7 @@ struct DensePhotoGrid: View {
                     scheduleUnlock(after: 3)   // 종료 콜백을 놓쳐도 잠금이 영원히 남지 않게
                 },
                 // 문턱을 넘기 전에도 손가락을 따라 조금 움직인다 — 핀치가 먹고 있다는 느낌.
-                onProgress: { s in liveScale = 1 + (s - 1) * 0.4 },
+                onProgress: { s in liveScale = 1 + (s - 1) * 0.1 },
                 onStep: { zoomIn in
                     let next = !zoomIn  // 벌림 = 확대 = 3열(wideColumns false), 오므림 = 5열
                     guard next != wideColumns else {

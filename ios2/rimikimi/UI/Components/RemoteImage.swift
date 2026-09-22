@@ -13,6 +13,21 @@ struct RemoteImage: View {
     var fallback: URL? = nil
     @State private var image: UIImage?
 
+    /// ⚠️ 캐시에 이미 있으면 **만들어지는 그 자리에서** 꺼내 온다.
+    ///
+    /// `task` 로만 꺼내면 아무리 캐시가 채워져 있어도 첫 프레임은 반드시 회색이다(비동기라 한 박자
+    /// 뒤에 온다). 한두 칸이면 몰라도, 격자 열 수를 바꾸면 수십 칸이 **동시에** 새로 만들어져서
+    /// 화면 전체가 허옇게 떴다가 사진이 돌아온다. 핀치 전환이 "새로고침" 같아 보이던 진짜 이유가
+    /// 이거였다 — 배치를 어떻게 바꾸든(애니메이션·확대축소·크로스페이드) 다 이 깜빡임에 먹혔다.
+    /// 밝기를 프레임마다 재서 찾았다.
+    init(url: URL?, cornerRadius: CGFloat = Radius.thumb, fallback: URL? = nil) {
+        self.url = url
+        self.cornerRadius = cornerRadius
+        self.fallback = fallback
+        _image = State(initialValue: url.flatMap(ImageLoader.cached)
+                                  ?? fallback.flatMap(ImageLoader.cached))
+    }
+
     var body: some View {
         ZStack {
             Color.fill
@@ -25,7 +40,7 @@ struct RemoteImage: View {
         .animation(.easeOut(duration: 0.2), value: image != nil)
         .task(id: url) {
             guard let url else { image = nil; return }
-            if let cached = ImageLoader.shared.cached(url) { image = cached; return }
+            if let hit = ImageLoader.cached(url) { image = hit; return }   // 대개 init 에서 이미 잡힌다
             if let loaded = await ImageLoader.shared.load(url) { image = loaded; return }
             guard let fallback, fallback != url else { return }
             if let hit = ImageLoader.shared.cached(fallback) { image = hit }
@@ -54,7 +69,9 @@ extension View {
 final class ImageLoader {
     static let shared = ImageLoader()
 
-    private let cache: NSCache<NSURL, UIImage> = {
+    /// 액터 **밖**에 둔다 — `NSCache` 는 스스로 스레드 안전하고, 뷰가 만들어지는 그 자리(동기)에서
+    /// 바로 꺼낼 수 있어야 첫 프레임부터 사진이 보인다(`RemoteImage.init` 주석 참고).
+    nonisolated(unsafe) fileprivate static let cache: NSCache<NSURL, UIImage> = {
         let c = NSCache<NSURL, UIImage>()
         c.countLimit = 600
         c.totalCostLimit = 128 << 20
@@ -69,7 +86,9 @@ final class ImageLoader {
         return URLSession(configuration: cfg)
     }()
 
-    func cached(_ url: URL) -> UIImage? { cache.object(forKey: url as NSURL) }
+    /// 동기 조회. 비동기 대기 없이 바로 답한다.
+    nonisolated static func cached(_ url: URL) -> UIImage? { cache.object(forKey: url as NSURL) }
+    func cached(_ url: URL) -> UIImage? { Self.cached(url) }
 
     /// 갤러리 원본은 2K PNG(≈10MB)라 그대로 디코드하면 느리고 메모리도 크다 — ImageIO 로 긴 변 `maxPixel` 까지만 푼다.
     /// (앨범 저장은 원본이 필요하므로 별도 경로 — 2주차.)
@@ -103,7 +122,7 @@ final class ImageLoader {
         let image = await task.value
         inflight[url] = nil
         if let image {
-            cache.setObject(image, forKey: url as NSURL, cost: Int(image.size.width * image.size.height * 4))
+            Self.cache.setObject(image, forKey: url as NSURL, cost: Int(image.size.width * image.size.height * 4))
         }
         return image
     }
