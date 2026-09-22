@@ -24,13 +24,16 @@ struct ConceptBrowserView: View {
     @State private var zoomedIn = false
     /// 아래로 끌어 닫는 중의 이동량.
     @State private var dragY: CGFloat = 0
-    /// 필름스트립을 사용자가 스크롤하는 중인가(양방향 되먹임을 막는다).
-    @State private var scrolling = false
+    /// 필름스트립이 가운데 두고 있는 칸. 큰 사진(`currentID`)과 **서로** 따라간다.
+    /// ⚠️ 처음부터 값을 들고 시작해야 한다 — `scrollPosition` 은 첫 레이아웃 때 이 값으로 자리를
+    ///    잡는다. `onAppear` 에서 넣으면 그 시점엔 이미 0 에 자리를 잡은 뒤라 안 움직인다(실측).
+    @State private var stripID: String?
 
     init(category: String, startID: String) {
         self.category = category
         self.startID = startID
         _currentID = State(initialValue: startID)
+        _stripID = State(initialValue: startID)
     }
 
     private var items: [Concept] { app.concepts.concepts(in: category) }
@@ -122,60 +125,79 @@ struct ConceptBrowserView: View {
 
     private var dismissProgress: CGFloat { min(1, max(0, dragY / 300)) }
 
-    /// 필름스트립 — `scrollPosition` 으로 페이저와 **양방향**으로 묶인다. 끌면 스크러빙, 탭하면 점프.
-    ///
-    /// ⚠️ 스크러빙 중에는 큰 사진을 **애니메이션 없이** 갈아 끼운다(`scrubSelection`). 안 그러면
-    /// 필름스트립을 한 번 끌 때 지나친 사진 수만큼 페이지 넘김 애니메이션이 줄줄이 걸려 늦게 따라온다
-    /// (오너 지적 2026-09-22 "사진 따라붙는 방식 이상하고"). 사진 앱도 스크러빙 중엔 그냥 바뀐다.
-    /// 필름스트립 — **진짜 스크롤**이다(관성·바운스 전부 시스템 것). 스크롤하는 동안 가운데 칸을
-    /// 계속 따라가며 큰 사진을 바꾼다. 직접 만든 스크러버는 칸 단위로 끊겨서 버렸다
-    /// (오너 지적 2026-09-22 "하단에 있는 슬라이드도 뚝뚝 끊기는데 부드럽게 넘어가야함").
+    /// 필름스트립 — 진짜 스크롤(관성·바운스 전부 시스템 것). 가운데 칸이 곧 선택이고,
+    /// 큰 사진과 **양방향**으로 물려 있다. 스크롤 좌표를 직접 계산하던 방식은 위아래가 따로 놀아서
+    /// 버렸다(오너 지적 2026-09-22 "싱크랑 위치 하나도 안 맞음") — `scrollPosition` 하나로 맡긴다.
     private var filmstrip: some View {
         GeometryReader { geo in
             let side = max(0, (geo.size.width - Self.stripWidth) / 2)
             ScrollViewReader { proxy in
-                ScrollView(.horizontal) {
-                    LazyHStack(spacing: Self.stripGap) {
-                        ForEach(items) { c in
-                            Button { jump(to: c.id) } label: {
-                                // 미리보기는 전부 3:4 (오너 지시) — 필름스트립도 예외가 아니다.
-                                RemoteImage(url: c.thumbURL, cornerRadius: Radius.button - 4)
-                                    .photoRatio()
-                                    .frame(width: Self.stripWidth)
-                                    .overlay {
-                                        RoundedRectangle(cornerRadius: Radius.button - 4, style: .continuous)
-                                            .strokeBorder(c.id == currentID ? Color.accent : .clear, lineWidth: 2)
-                                    }
-                                    .opacity(c.id == currentID ? 1 : 0.55)
-                            }
-                            .buttonStyle(PressScaleButtonStyle())
-                            .id(c.id)
-                        }
+            ScrollView(.horizontal) {
+                // ⚠️ `LazyHStack` 이면 안 된다. 게으른 스택은 화면 근처 칸만 만들어 두므로,
+                //    멀리 있는 칸으로는 `scrollPosition` 이 갈 수가 없다 — 있는 데까지만 가서 멈춘다.
+                //    선택한 사진이 **맨 오른쪽에 붙어 있던 진짜 원인**이다(오너 지적 2026-09-22
+                //    "선택한 이미지가 왜 제일 오른쪽에 가있음"). 52pt 썸네일 몇십 장은 한꺼번에
+                //    만들어도 부담이 없고, 격자에서 이미 캐시돼 있다.
+                HStack(spacing: Self.stripGap) {
+                    ForEach(items) { c in
+                        stripCell(c)
                     }
-                    .scrollTargetLayout()
-                    // 양 끝 칸도 가운데까지 올 수 있게.
-                    .padding(.horizontal, side)
                 }
-                .scrollIndicators(.hidden)
-                .scrollTargetBehavior(.viewAligned)
-                // 스크롤 위치 → 가운데 칸. 손가락을 따라 **연속으로** 바뀐다.
-                .onScrollGeometryChange(for: Int.self) { g in
-                    Int((g.contentOffset.x / (Self.stripWidth + Self.stripGap)).rounded())
-                } action: { _, idx in
-                    guard scrolling, items.indices.contains(idx), items[idx].id != currentID else { return }
-                    var t = Transaction(); t.disablesAnimations = true
-                    withTransaction(t) { currentID = items[idx].id }
+                .scrollTargetLayout()
+            }
+            .scrollIndicators(.hidden)
+            // 양 끝 칸도 가운데까지 올 수 있게.
+            .contentMargins(.horizontal, side, for: .scrollContent)
+            .scrollTargetBehavior(.viewAligned)
+            .scrollPosition(id: $stripID, anchor: .center)
+            // 스트립을 굴리면 큰 사진이 따라온다(애니메이션 없이 — 여러 장을 지나갈 때 끊기지 않게).
+            .onChange(of: stripID) { _, id in
+                guard let id, id != currentID else { return }
+                var t = Transaction(); t.disablesAnimations = true
+                withTransaction(t) { currentID = id }
+            }
+            // 큰 사진을 넘기면 스트립이 따라온다 — 이쪽은 부드럽게(안 그러면 툭 튄다).
+            .onChange(of: currentID) { _, id in
+                guard let id, id != stripID else { return }
+                withAnimation(.spring(response: 0.32, dampingFraction: 0.9)) {
+                    proxy.scrollTo(id, anchor: .center)
                 }
-                .onScrollPhaseChange { _, phase in scrolling = phase != .idle }
-                .onAppear { proxy.scrollTo(startID, anchor: .center) }
-                .onChange(of: currentID) { _, id in
-                    // 큰 사진을 넘겨서 바뀐 경우에만 스트립을 옮긴다 — 스트립을 끌고 있을 땐 건드리지 않는다.
-                    guard !scrolling, let id else { return }
-                    withAnimation(.spring(response: 0.32, dampingFraction: 0.9)) { proxy.scrollTo(id, anchor: .center) }
-                }
+            }
+            // ⚠️ 첫 자리잡기는 **반드시 명령형**이어야 한다. `scrollPosition` 바인딩에 처음부터 값을
+            //    넣어 두는 것만으로는 안 움직였다(실측 2회) — 화면이 처음 그려지는 순간엔 컨셉 목록이
+            //    아직 비어 있어 옮겨 갈 칸 자체가 없고, 목록이 도착해도 바인딩 값은 그대로라 아무 일도
+            //    일어나지 않는다. 그래서 **칸이 생긴 뒤** 직접 옮긴다.
+            .onChange(of: items.count) { _, n in
+                guard n > 0 else { return }
+                DispatchQueue.main.async { proxy.scrollTo(startID, anchor: .center) }
+            }
+            .onAppear {
+                guard !items.isEmpty else { return }   // 목록이 이미 있으면 여기서 끝낸다
+                DispatchQueue.main.async { proxy.scrollTo(startID, anchor: .center) }
+            }
             }
         }
         .frame(height: Self.stripWidth / CardMetrics.aspect + 8)
+    }
+
+    /// 필름스트립 칸 하나. (한 식에 다 쓰면 컴파일러가 타입 추론을 포기한다 — 빌드로 확인.)
+    @ViewBuilder
+    private func stripCell(_ c: Concept) -> some View {
+        let selected = c.id == currentID
+        Button { jump(to: c.id) } label: {
+            // 미리보기는 전부 3:4 (오너 지시) — 필름스트립도 예외가 아니다.
+            RemoteImage(url: c.thumbURL, cornerRadius: Radius.button - 4)
+                .photoRatio()
+                .frame(width: Self.stripWidth)
+                .overlay {
+                    RoundedRectangle(cornerRadius: Radius.button - 4, style: .continuous)
+                        .strokeBorder(selected ? Color.accent : Color.clear, lineWidth: 2)
+                }
+            // 안 고른 칸을 흐리게 하지 않는다 — 사진 앱도 안 그러고, 반투명은 이 앱에서
+            // 이미 한 번 오해를 샀다(테두리만으로 충분히 구분된다).
+        }
+        .buttonStyle(PressScaleButtonStyle())
+        .id(c.id)
     }
 
     private func jump(to id: String) {

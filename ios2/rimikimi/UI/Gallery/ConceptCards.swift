@@ -204,6 +204,9 @@ struct DensePhotoGrid: View {
     /// 핀치하는 동안엔 셀을 못 누르게 한다 — 손을 뗀 지점이 탭으로 잡혀 엉뚱한 사진이 열렸다
     /// (오너 지적 2026-09-22 "마지막 손가락 지점을 터치로 인식하는거 같음").
     @State private var pinching = false
+    /// 잠금 해제 예약. 새 핀치가 시작되면 이전 예약을 **취소**한다 — 안 그러면 앞 핀치가 걸어 둔
+    /// 3초 안전장치가 다음 핀치 도중에 터져서 잠금이 풀린다.
+    @State private var unlock: DispatchWorkItem?
 
     private var columnCount: Int { wideColumns ? 5 : 3 }
     /// 타일 사이 간격과 화면 양옆 여백. 사진 앱은 끝까지 꽉 채우지만 우리 격자는 그러면 답답하다
@@ -211,6 +214,13 @@ struct DensePhotoGrid: View {
     private static let gap: CGFloat = 4
     private var columns: [GridItem] {
         Array(repeating: GridItem(.flexible(), spacing: Self.gap), count: columnCount)
+    }
+
+    private func scheduleUnlock(after seconds: Double) {
+        unlock?.cancel()
+        let item = DispatchWorkItem { pinching = false }
+        unlock = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + seconds, execute: item)
     }
 
     var body: some View {
@@ -231,18 +241,24 @@ struct DensePhotoGrid: View {
                             }
                     }
                     .buttonStyle(.plain)
-                    .disabled(pinching)
+                    // 비활성 버튼은 **흐리게** 그려져서 `.disabled` 를 쓰면 핀치 도중 격자 전체가
+                    // 반투명해진다(오너 지적 2026-09-22). 누르기만 막는다.
+                    .allowsHitTesting(!pinching)
                 }
             }
             // 핀치는 **열 수만** 바꾼다 — 3열 ↔ 5열. 페이지를 같이 확대/축소하지 않는다
             // (2026-09-22 오너 지적: 화면 전체가 작아지는 건 시스템 확대전환의 "핀치로 닫기"였다.
             //  그래서 이 화면에서는 확대전환을 쓰지 않는다 — 아래 `zoomSource` 를 뗀 이유).
-            .animation(.spring(response: 0.35, dampingFraction: 0.86), value: columnCount)
+            // ⚠️ 열 수 변화에 애니메이션을 걸지 말 것. `LazyVGrid` 가 칸을 다시 배치하는 도중
+            //    옛 칸들이 잔상처럼 남아 겹친다(오너 지적 "미리 불러내기 된게 따라붙으면 안 된다고").
             .padding(.horizontal, Spacing.page)
             .padding(.top, Spacing.s2)
             .onAppear { if startWide { wideColumns = true } }
             .gesture(PinchColumnsGesture(
-                onBegan: { pinching = true },
+                onBegan: {
+                    pinching = true
+                    scheduleUnlock(after: 3)   // 종료 콜백을 놓쳐도 잠금이 영원히 남지 않게
+                },
                 onStep: { zoomIn in
                     let next = !zoomIn  // 벌림 = 확대 = 3열(wideColumns false), 오므림 = 5열
                     guard next != wideColumns else { return }
@@ -251,7 +267,7 @@ struct DensePhotoGrid: View {
                 },
                 onEnd: {
                     // 손을 뗀 직후 한 박자 뒤에 푼다 — 떼는 순간의 잔여 터치가 탭으로 새지 않게.
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { pinching = false }
+                    scheduleUnlock(after: 0.25)
                 }
             ))
         }
