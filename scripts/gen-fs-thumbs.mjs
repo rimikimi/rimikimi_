@@ -9,7 +9,10 @@ import { dirname, join } from "node:path";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SRC = join(ROOT, "store_assets/filter_thumb_src.jpg");
-const W = 400, H = 536;
+// 2026-09-22: 400 → 800 (오너 지적 "미리보기 사진 해상도가 넘 낮음"). 96×128pt 타일도
+// @3x 면 288×384px 이고, 더 큰 타일로 바꾸면 400px 는 바로 뭉갠다. 원본이 1019×1365 라
+// 800 폭까지는 업스케일 없이 뽑힌다.
+const W = 800, H = 1072;
 
 const meta = await sharp(SRC).metadata();
 const { data, info } = await sharp(SRC)

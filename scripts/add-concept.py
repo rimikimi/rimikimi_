@@ -60,9 +60,10 @@ if not imgs:
     sys.exit("2페이지에 이미지 없음")
 src_img = Image.open(io.BytesIO(imgs[0].data)).convert("RGB")
 w, h = src_img.size
-src_img.thumbnail((400, int(h * 400 / w)), Image.LANCZOS)
+thumb_img = src_img.copy()          # 원본은 large/ 용으로 남겨 둔다
+thumb_img.thumbnail((400, int(h * 400 / w)), Image.LANCZOS)
 buf = io.BytesIO()
-src_img.save(buf, format="WEBP", quality=80, method=6)
+thumb_img.save(buf, format="WEBP", quality=80, method=6)
 webp_bytes = buf.getvalue()
 
 # 3. ⚠️ 중복 이미지 검사 — 같은 내용의 썸네일이 이미 있는지
@@ -81,6 +82,19 @@ for existing in thumbs_dir.glob("*.webp"):
 out_path = thumbs_dir / f"{args.id}.webp"
 out_path.write_bytes(webp_bytes)
 print(f"🖼️  썸네일 저장: {out_path} ({len(webp_bytes)} bytes, md5 {new_hash[:8]})")
+
+# 3b. 큰 사진용 1200px (브라우저 큰 사진·옵션 히어로). 400px 썸네일을 전체 폭에 깔면 3배 확대돼
+#     뭉갠다(오너 지적 2026-09-22) — `Config.largeURL` 이 여기를 본다. 원본이 1200 보다 작으면
+#     만들지 않는다: 앱이 알아서 썸네일로 되돌아간다(`RemoteImage(fallback:)`).
+large_dir = root / "public" / "large"
+if w >= 1200:
+    large_dir.mkdir(parents=True, exist_ok=True)
+    large_path = large_dir / f"{args.id}.webp"
+    src_img.resize((1200, round(h * 1200 / w)), Image.LANCZOS).save(
+        large_path, format="WEBP", quality=78, method=6)
+    print(f"🔍 큰 사진 저장: {large_path}")
+else:
+    print(f"⚠️  원본이 작아({w}px) large/ 는 만들지 않음 — 앱은 썸네일로 표시합니다.")
 
 # 4. concepts.json 업데이트 (맨 앞에 추가, 같은 ID 면 교체)
 concepts = json.loads(concepts_json.read_text()) if concepts_json.exists() else []
