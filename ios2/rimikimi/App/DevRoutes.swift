@@ -56,6 +56,7 @@ enum DevRoutes {
         case "/category":
             // 카테고리 그리드로 바로 — 시뮬레이터에서는 앨범 타일을 탭할 수 없다(캡처·검증용).
             // 여기서 카메라 원이 그대로 보이는지 확인한다(2026-09-22 결함).
+            app.devWideColumns = q["cols"] == "5"
             app.tab = .gallery
             app.galleryPath = [.category(q["name"] ?? "세계여행")]
         case "/browse":

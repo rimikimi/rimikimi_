@@ -205,7 +205,8 @@ struct CategoryListView: View {
     var name: String
     var body: some View {
         ScrollView {
-            DensePhotoGrid(concepts: app.concepts.concepts(in: name), category: name)
+            DensePhotoGrid(concepts: app.concepts.concepts(in: name), category: name,
+                           startWide: app.devWideColumns)
                 .padding(.bottom, app.contentBottomPad)
         }
         .background(Color.bg)

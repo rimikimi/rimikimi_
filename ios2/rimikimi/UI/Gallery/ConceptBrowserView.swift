@@ -24,8 +24,8 @@ struct ConceptBrowserView: View {
     @State private var zoomedIn = false
     /// 아래로 끌어 닫는 중의 이동량.
     @State private var dragY: CGFloat = 0
-    /// 필름스트립 스크럽 시작 시점의 칸 번호. nil 이면 스크럽 중이 아니다.
-    @State private var scrubStart: Int?
+    /// 필름스트립을 사용자가 스크롤하는 중인가(양방향 되먹임을 막는다).
+    @State private var scrolling = false
 
     init(category: String, startID: String) {
         self.category = category
@@ -43,7 +43,7 @@ struct ConceptBrowserView: View {
                     ZoomableImage(isZoomed: $zoomedIn) {
                         // 화면 전체 폭에 깔리므로 400px 썸네일이 아니라 1200px 원본.
                         RemoteImage(url: c.largeURL, cornerRadius: 0, fallback: c.thumbURL)
-                            .aspectRatio(CardMetrics.aspect, contentMode: .fit)
+                            .photoRatio()
                     }
                     .tag(Optional(c.id))
                 }
@@ -127,8 +127,12 @@ struct ConceptBrowserView: View {
     /// ⚠️ 스크러빙 중에는 큰 사진을 **애니메이션 없이** 갈아 끼운다(`scrubSelection`). 안 그러면
     /// 필름스트립을 한 번 끌 때 지나친 사진 수만큼 페이지 넘김 애니메이션이 줄줄이 걸려 늦게 따라온다
     /// (오너 지적 2026-09-22 "사진 따라붙는 방식 이상하고"). 사진 앱도 스크러빙 중엔 그냥 바뀐다.
+    /// 필름스트립 — **진짜 스크롤**이다(관성·바운스 전부 시스템 것). 스크롤하는 동안 가운데 칸을
+    /// 계속 따라가며 큰 사진을 바꾼다. 직접 만든 스크러버는 칸 단위로 끊겨서 버렸다
+    /// (오너 지적 2026-09-22 "하단에 있는 슬라이드도 뚝뚝 끊기는데 부드럽게 넘어가야함").
     private var filmstrip: some View {
         GeometryReader { geo in
+            let side = max(0, (geo.size.width - Self.stripWidth) / 2)
             ScrollViewReader { proxy in
                 ScrollView(.horizontal) {
                     LazyHStack(spacing: Self.stripGap) {
@@ -136,7 +140,8 @@ struct ConceptBrowserView: View {
                             Button { jump(to: c.id) } label: {
                                 // 미리보기는 전부 3:4 (오너 지시) — 필름스트립도 예외가 아니다.
                                 RemoteImage(url: c.thumbURL, cornerRadius: Radius.button - 4)
-                                    .frame(width: Self.stripWidth, height: Self.stripWidth / CardMetrics.aspect)
+                                    .photoRatio()
+                                    .frame(width: Self.stripWidth)
                                     .overlay {
                                         RoundedRectangle(cornerRadius: Radius.button - 4, style: .continuous)
                                             .strokeBorder(c.id == currentID ? Color.accent : .clear, lineWidth: 2)
@@ -147,45 +152,30 @@ struct ConceptBrowserView: View {
                             .id(c.id)
                         }
                     }
-                    .padding(.horizontal, max(0, (geo.size.width - Self.stripWidth) / 2))
+                    .scrollTargetLayout()
+                    // 양 끝 칸도 가운데까지 올 수 있게.
+                    .padding(.horizontal, side)
                 }
                 .scrollIndicators(.hidden)
-                // 스크롤은 끄고 **직접 만든 스크러버**로만 움직인다.
-                // ⚠️ `scrollPosition(id:)` + `viewAligned` 로 묶어 봤지만 처음 위치를 못 잡고
-                //    (고른 칸이 끝에 붙어 있었다) 한 번 끌 때 사진이 늦게 따라왔다(오너 지적).
-                //    손가락 이동량 → 칸 수로 바로 환산하는 쪽이 예측 가능하고 즉각적이다.
-                .scrollDisabled(true)
-                .highPriorityGesture(scrubGesture)
+                .scrollTargetBehavior(.viewAligned)
+                // 스크롤 위치 → 가운데 칸. 손가락을 따라 **연속으로** 바뀐다.
+                .onScrollGeometryChange(for: Int.self) { g in
+                    Int((g.contentOffset.x / (Self.stripWidth + Self.stripGap)).rounded())
+                } action: { _, idx in
+                    guard scrolling, items.indices.contains(idx), items[idx].id != currentID else { return }
+                    var t = Transaction(); t.disablesAnimations = true
+                    withTransaction(t) { currentID = items[idx].id }
+                }
+                .onScrollPhaseChange { _, phase in scrolling = phase != .idle }
                 .onAppear { proxy.scrollTo(startID, anchor: .center) }
                 .onChange(of: currentID) { _, id in
-                    guard let id else { return }
-                    // 스크럽 중에는 애니메이션 없이 따라온다(한 칸씩 튀지 않게).
-                    if scrubStart == nil {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) { proxy.scrollTo(id, anchor: .center) }
-                    } else {
-                        var t = Transaction(); t.disablesAnimations = true
-                        withTransaction(t) { proxy.scrollTo(id, anchor: .center) }
-                    }
+                    // 큰 사진을 넘겨서 바뀐 경우에만 스트립을 옮긴다 — 스트립을 끌고 있을 땐 건드리지 않는다.
+                    guard !scrolling, let id else { return }
+                    withAnimation(.spring(response: 0.32, dampingFraction: 0.9)) { proxy.scrollTo(id, anchor: .center) }
                 }
             }
         }
         .frame(height: Self.stripWidth / CardMetrics.aspect + 8)
-    }
-
-    /// 필름스트립 스크러버 — 끈 거리를 칸 수로 환산해 지금 사진을 바꾼다.
-    private var scrubGesture: some Gesture {
-        DragGesture(minimumDistance: 3)
-            .onChanged { v in
-                if scrubStart == nil { scrubStart = items.firstIndex { $0.id == currentID } ?? 0 }
-                guard let s = scrubStart else { return }
-                let step = Int((-v.translation.width / (Self.stripWidth + Self.stripGap)).rounded())
-                let i = min(items.count - 1, max(0, s + step))
-                guard items.indices.contains(i), items[i].id != currentID else { return }
-                var t = Transaction(); t.disablesAnimations = true
-                withTransaction(t) { currentID = items[i].id }
-                HapticPlayer.selection()
-            }
-            .onEnded { _ in scrubStart = nil }
     }
 
     private func jump(to id: String) {
@@ -225,14 +215,16 @@ struct ZoomableImage<Content: View>: View {
                         if scale <= 1.02 { reset() } else { isZoomed = true }
                     }
             )
+            // ⚠️ 확대했을 때만 건다. 그냥 달아 두면 배율이 1이어도 이 제스처가 가로 끌기를 가져가
+            //    **페이저 스와이프가 통째로 죽는다**(오너 지적 2026-09-22 "위에 있는 이미지 슬라이드는 왜 안 됨").
             .simultaneousGesture(
                 DragGesture()
                     .onChanged { v in
-                        guard scale > 1 else { return }
                         offset = CGSize(width: lastOffset.width + v.translation.width,
                                         height: lastOffset.height + v.translation.height)
                     }
-                    .onEnded { _ in lastOffset = offset }
+                    .onEnded { _ in lastOffset = offset },
+                including: scale > 1 ? .all : .subviews
             )
             .onTapGesture(count: 2) {
                 withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {

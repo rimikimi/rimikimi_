@@ -34,6 +34,21 @@ struct RemoteImage: View {
     }
 }
 
+extension View {
+    /// 사진 미리보기를 **3:4 로 강제**한다.
+    ///
+    /// ⚠️ `RemoteImage(...).aspectRatio(0.75, contentMode: .fit)` 만으로는 안 된다 — 썸네일마다
+    /// 원본 비율이 달라서(400×536 도 있고 400×716 도 있다) 그 비율이 그대로 새어 나와 격자 줄마다
+    /// 높이가 들쭉날쭉했다(5열에서 실측, 오너 지적 2026-09-22). 비율이 없는 `Color.clear` 로 틀을
+    /// 먼저 잡고 그 위에 사진을 얹으면 원본이 뭐든 정확히 3:4 가 된다.
+    func photoRatio(_ ratio: CGFloat = CardMetrics.aspect) -> some View {
+        Color.clear
+            .aspectRatio(ratio, contentMode: .fit)
+            .overlay { self }
+            .clipped()
+    }
+}
+
 /// 캐시형 로더 — 같은 URL 의 동시 요청은 하나로 합친다.
 @MainActor
 final class ImageLoader {

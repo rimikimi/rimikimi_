@@ -27,7 +27,7 @@ struct ResultView: View {
                     }
                 }
                 .tabViewStyle(.page(indexDisplayMode: payload.items.count > 1 ? .automatic : .never))
-                .aspectRatio(CardMetrics.aspect, contentMode: .fit)
+                .photoRatio()
                 .padding(.horizontal, Spacing.page)
                 .padding(.top, Spacing.s2)
 

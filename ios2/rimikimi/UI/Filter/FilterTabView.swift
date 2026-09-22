@@ -170,7 +170,7 @@ struct FilterTabView: View {
             VStack(spacing: 6) {
                 // 미리보기는 무조건 3:4 (오너 지시 2026-09-22).
                 RemoteImage(url: Config.thumbURL("fs_\(p.key)"), cornerRadius: Radius.card - 2)
-                    .aspectRatio(CardMetrics.aspect, contentMode: .fit)
+                    .photoRatio()
                 Text(p.label)
                     .font(AppFont.footnote).foregroundStyle(Color.ink)
                     .lineLimit(1).minimumScaleFactor(0.85)

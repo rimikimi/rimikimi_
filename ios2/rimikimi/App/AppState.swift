@@ -142,6 +142,8 @@ final class AppState {
     /// 뒤에 실행돼 GalleryHomeView 가 이미 첫 렌더(스크롤 위치 확정)를 끝낸 뒤라 `.defaultScrollAnchor`
     /// 가 안 먹는다 — 그래서 여기 `init()` 에서 launch argument 를 동기적으로 직접 읽는다.
     var devScrollToBottom = ProcessInfo.processInfo.arguments.contains { $0.contains("devscrollbottom") }
+    /// 캡처용 — 카테고리 격자를 5열로 시작.
+    var devWideColumns = false
     #endif
 
     struct WebTool: Identifiable {

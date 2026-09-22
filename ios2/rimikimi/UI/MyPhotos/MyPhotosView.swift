@@ -21,7 +21,7 @@ struct MyPhotosView: View {
                     }
                 } else if loading && items.isEmpty {
                     LazyVGrid(columns: columns, spacing: 6) {
-                        ForEach(0..<6, id: \.self) { _ in SkeletonBlock(cornerRadius: Radius.thumb).aspectRatio(CardMetrics.aspect, contentMode: .fit) }
+                        ForEach(0..<6, id: \.self) { _ in SkeletonBlock(cornerRadius: Radius.thumb).photoRatio() }
                     }
                     .padding(.horizontal, Spacing.page)
                 } else if items.isEmpty {
@@ -37,7 +37,7 @@ struct MyPhotosView: View {
                                 items: [.init(id: item.id, image: nil, url: item.url, expiresAt: item.expiresAt)],
                                 conceptId: item.conceptId, conceptTitle: item.conceptTitle ?? ""))) {
                                 RemoteImage(url: item.url, cornerRadius: Radius.thumb)
-                                    .aspectRatio(CardMetrics.aspect, contentMode: .fit)
+                                    .photoRatio()
                                     .overlay(alignment: .bottomLeading) {
                                         if let e = item.expiresAt {
                                             Text(e, style: .timer)

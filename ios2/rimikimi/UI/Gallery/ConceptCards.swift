@@ -68,7 +68,7 @@ struct ConceptCard: View {
         NavigationLink(value: Route.concept(concept)) {
             VStack(alignment: .leading, spacing: 0) {
                 RemoteImage(url: concept.thumbURL, cornerRadius: 0)
-                    .aspectRatio(CardMetrics.aspect, contentMode: .fit)
+                    .photoRatio()
                     .overlay { if app.favorites.hasGenerated(concept.id) { GeneratedScrim() } }
                     .overlay(alignment: .topTrailing) {
                         if app.favorites.isFavorite(concept: concept.id) {
@@ -106,7 +106,7 @@ struct AlbumGridTile: View {
         NavigationLink(value: Route.category(tile.name)) {
             VStack(alignment: .leading, spacing: Spacing.s1) {
                 RemoteImage(url: tile.coverURL, cornerRadius: Radius.card, fallback: tile.coverFallbackURL)
-                    .aspectRatio(CardMetrics.aspect, contentMode: .fit)
+                    .photoRatio()
                     .overlay(alignment: .topTrailing) {
                         if app.favorites.isFavorite(category: tile.name) {
                             FavoriteBadge().padding(Spacing.s2)
@@ -198,23 +198,31 @@ struct DensePhotoGrid: View {
     @Environment(\.zoomNamespace) private var zoomNS
     var concepts: [Concept]
     var category: String
+    /// 캡처·검증용 — 5열 상태로 바로 띄운다(시뮬레이터엔 핀치가 없다).
+    var startWide: Bool = false
     @State private var wideColumns = false  // false = 3열(큼), true = 5열(촘촘)
+    /// 핀치하는 동안엔 셀을 못 누르게 한다 — 손을 뗀 지점이 탭으로 잡혀 엉뚱한 사진이 열렸다
+    /// (오너 지적 2026-09-22 "마지막 손가락 지점을 터치로 인식하는거 같음").
+    @State private var pinching = false
 
     private var columnCount: Int { wideColumns ? 5 : 3 }
+    /// 타일 사이 간격과 화면 양옆 여백. 사진 앱은 끝까지 꽉 채우지만 우리 격자는 그러면 답답하다
+    /// (오너 지적 2026-09-22 "여백 안 주냐").
+    private static let gap: CGFloat = 4
     private var columns: [GridItem] {
-        Array(repeating: GridItem(.flexible(), spacing: 2), count: columnCount)
+        Array(repeating: GridItem(.flexible(), spacing: Self.gap), count: columnCount)
     }
 
     var body: some View {
         if concepts.isEmpty {
             EmptyState(message: "검색 결과가 없어요")
         } else {
-            LazyVGrid(columns: columns, spacing: 2) {
+            LazyVGrid(columns: columns, spacing: Self.gap) {
                 ForEach(concepts) { c in
                     NavigationLink(value: Route.browse(category: category, startID: c.id)) {
                         // ⚠️ 미리보기는 무조건 3:4 (오너 지시 2026-09-22). 정방형이면 인물이 잘린다.
                         RemoteImage(url: c.thumbURL, cornerRadius: 0)
-                            .aspectRatio(CardMetrics.aspect, contentMode: .fit)
+                            .photoRatio()
                             .overlay { if app.favorites.hasGenerated(c.id) { GeneratedScrim() } }
                             .overlay(alignment: .topTrailing) {
                                 if app.favorites.isFavorite(concept: c.id) {
@@ -223,18 +231,29 @@ struct DensePhotoGrid: View {
                             }
                     }
                     .buttonStyle(.plain)
+                    .disabled(pinching)
                 }
             }
             // 핀치는 **열 수만** 바꾼다 — 3열 ↔ 5열. 페이지를 같이 확대/축소하지 않는다
             // (2026-09-22 오너 지적: 화면 전체가 작아지는 건 시스템 확대전환의 "핀치로 닫기"였다.
             //  그래서 이 화면에서는 확대전환을 쓰지 않는다 — 아래 `zoomSource` 를 뗀 이유).
             .animation(.spring(response: 0.35, dampingFraction: 0.86), value: columnCount)
-            .gesture(PinchColumnsGesture { zoomIn in
-                let next = !zoomIn  // 벌림 = 확대 = 3열(wideColumns false), 오므림 = 5열
-                guard next != wideColumns else { return }
-                wideColumns = next
-                HapticPlayer.selection()
-            })
+            .padding(.horizontal, Spacing.page)
+            .padding(.top, Spacing.s2)
+            .onAppear { if startWide { wideColumns = true } }
+            .gesture(PinchColumnsGesture(
+                onBegan: { pinching = true },
+                onStep: { zoomIn in
+                    let next = !zoomIn  // 벌림 = 확대 = 3열(wideColumns false), 오므림 = 5열
+                    guard next != wideColumns else { return }
+                    wideColumns = next
+                    HapticPlayer.selection()
+                },
+                onEnd: {
+                    // 손을 뗀 직후 한 박자 뒤에 푼다 — 떼는 순간의 잔여 터치가 탭으로 새지 않게.
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { pinching = false }
+                }
+            ))
         }
     }
 }

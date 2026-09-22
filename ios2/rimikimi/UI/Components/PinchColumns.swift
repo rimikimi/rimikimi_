@@ -19,7 +19,9 @@ import UIKit
 /// 벌리면 다음 단계로 이어진다.
 @available(iOS 18.0, *)
 struct PinchColumnsGesture: UIGestureRecognizerRepresentable {
-    /// 핀치가 도는 **동안** 매 프레임 — 지금 배율(문턱 기준 1.0 부근). 격자를 손가락에 붙여 움직인다.
+    /// 두 번째 손가락이 닿아 핀치가 시작된 순간.
+    var onBegan: () -> Void = {}
+    /// 핀치가 도는 **동안** 매 프레임 — 지금 배율(문턱 기준 1.0 부근).
     var onProgress: (CGFloat) -> Void = { _ in }
     /// 문턱을 넘은 순간 1회 — `true` 면 벌린 것(더 크게 = 적은 열), `false` 면 오므린 것(더 촘촘히).
     var onStep: (Bool) -> Void
@@ -48,6 +50,7 @@ struct PinchColumnsGesture: UIGestureRecognizerRepresentable {
         switch recognizer.state {
         case .began:
             recognizer.scale = 1
+            onBegan()
         case .changed:
             if recognizer.scale >= Self.zoomIn {
                 recognizer.scale = 1
