@@ -84,10 +84,10 @@ final class FaceScanModel {
         delegate = d
         output.setSampleBufferDelegate(d, queue: queue)
         if session.canAddOutput(output) { session.addOutput(output) }
-        // 세로로 세운 프레임을 받는다 — 그래야 Vision 의 yaw/roll 과 저장 이미지가 사람이 보는 것과 같다.
-        if let c = output.connection(with: .video) {
-            if c.isVideoRotationAngleSupported(90) { c.videoRotationAngle = 90 }
-        }
+        // ⚠️ 여기서 `connection.videoRotationAngle = 90` 으로 세워 놓지 **않는다**.
+        //    그렇게 걸어 뒀었는데 오너 기기에서 저장된 세 장이 전부 90도 누워 나왔다(2026-09-22 캡처 실측).
+        //    프리뷰(`AVCaptureVideoPreviewLayer`)는 제 연결을 따로 갖고 있어 멀쩡히 보이는 바람에
+        //    촬영 중에는 드러나지도 않았다. 각도가 걸렸는지는 믿지 말고 **버퍼 크기로 실측**한다(`upright`).
         session.commitConfiguration()
         await startRunning()
     }
@@ -119,7 +119,9 @@ final class FaceScanModel {
     private func handle(_ buffer: CVPixelBuffer) {
         guard step != .done else { return }
 
-        let handler = VNImageRequestHandler(cvPixelBuffer: buffer, orientation: .up, options: [:])
+        // Vision 에도 **같은** 방향을 준다 — 누운 프레임을 `.up` 이라고 하면 정면/옆모습 판정이
+        // 돌아간 좌표계에서 이뤄진다.
+        let handler = VNImageRequestHandler(cvPixelBuffer: buffer, orientation: Self.upright(buffer), options: [:])
         let faces = VNDetectFaceRectanglesRequest()
         faces.revision = VNDetectFaceRectanglesRequestRevision3   // yaw/roll/pitch 를 준다
         try? handler.perform([faces])
@@ -195,8 +197,19 @@ final class FaceScanModel {
         }
     }
 
+    /// 이 버퍼를 똑바로 세우려면 어떤 EXIF 방향으로 읽어야 하는가.
+    ///
+    /// 전면 카메라 센서는 **가로로 누운 채** 프레임을 준다. 그대로 두면 90도 돌아간 사진이 남는다
+    /// (오너 기기 실측: 저장본을 반시계 90도 돌려야 똑바로 섰다 → EXIF 8 = `.left`).
+    /// 연결에 회전각이 걸려 세로로 들어오는 기기라면 손댈 게 없으므로 `.up`.
+    private static func upright(_ buffer: CVPixelBuffer) -> CGImagePropertyOrientation {
+        CVPixelBufferGetWidth(buffer) > CVPixelBufferGetHeight(buffer) ? .left : .up
+    }
+
     private static func image(from buffer: CVPixelBuffer) -> UIImage? {
-        let ci = CIImage(cvPixelBuffer: buffer)
+        // 회전은 **픽셀에 굽는다**. `UIImage.imageOrientation` 으로만 표시해 두면 리사이즈·JPEG 인코딩을
+        // 거치는 동안(FaceProfileStore.save) 방향이 떨어져 나가 다시 눕는다.
+        let ci = CIImage(cvPixelBuffer: buffer).oriented(upright(buffer))
         let ctx = CIContext()
         guard let cg = ctx.createCGImage(ci, from: ci.extent) else { return nil }
         return UIImage(cgImage: cg)
