@@ -117,7 +117,6 @@ struct AlbumGridTile: View {
             }
         }
         .buttonStyle(PressScaleButtonStyle())
-        .zoomSource("album:" + tile.name, in: zoomNS)
     }
 }
 
@@ -200,8 +199,6 @@ struct DensePhotoGrid: View {
     var concepts: [Concept]
     var category: String
     @State private var wideColumns = false  // false = 3열(큼), true = 5열(촘촘)
-    /// 핀치하는 **동안** 따라 움직이는 배율(사진 앱처럼 손가락을 따라오게).
-    @State private var liveScale: CGFloat = 1
 
     private var columnCount: Int { wideColumns ? 5 : 3 }
     private var columns: [GridItem] {
@@ -226,30 +223,18 @@ struct DensePhotoGrid: View {
                             }
                     }
                     .buttonStyle(.plain)
-                    .zoomSource("photo:" + c.id, in: zoomNS)
                 }
             }
-            // 손가락을 벌리는 **동안** 격자가 같이 커진다(사진 앱과 같다). 문턱을 넘으면 열 수가
-            // 바뀌고 배율은 1 로 되돌아가, 확대가 열 수 변화로 "넘어가는" 느낌이 난다.
-            .scaleEffect(liveScale, anchor: .top)
+            // 핀치는 **열 수만** 바꾼다 — 3열 ↔ 5열. 페이지를 같이 확대/축소하지 않는다
+            // (2026-09-22 오너 지적: 화면 전체가 작아지는 건 시스템 확대전환의 "핀치로 닫기"였다.
+            //  그래서 이 화면에서는 확대전환을 쓰지 않는다 — 아래 `zoomSource` 를 뗀 이유).
             .animation(.spring(response: 0.35, dampingFraction: 0.86), value: columnCount)
-            .animation(.interactiveSpring(response: 0.22, dampingFraction: 0.9), value: liveScale)
-            .gesture(PinchColumnsGesture(
-                onProgress: { magnification in
-                    // 바뀔 수 있는 방향으로만 늘어난다 — 3열에서 더 벌려도 커지기만 하면 거짓말이 된다.
-                    let canGrow = wideColumns, canShrink = !wideColumns
-                    if magnification > 1 { liveScale = canGrow ? min(1.18, magnification) : 1 + (min(1.1, magnification) - 1) * 0.25 }
-                    else { liveScale = canShrink ? max(0.88, magnification) : 1 - (1 - max(0.92, magnification)) * 0.25 }
-                },
-                onStep: { zoomIn in
-                    liveScale = 1
-                    let next = !zoomIn  // 벌림 = 확대 = 3열(wideColumns false), 오므림 = 5열
-                    guard next != wideColumns else { return }
-                    wideColumns = next
-                    HapticPlayer.selection()
-                },
-                onEnd: { liveScale = 1 }
-            ))
+            .gesture(PinchColumnsGesture { zoomIn in
+                let next = !zoomIn  // 벌림 = 확대 = 3열(wideColumns false), 오므림 = 5열
+                guard next != wideColumns else { return }
+                wideColumns = next
+                HapticPlayer.selection()
+            })
         }
     }
 }

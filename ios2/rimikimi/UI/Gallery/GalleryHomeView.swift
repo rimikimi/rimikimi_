@@ -210,7 +210,6 @@ struct CategoryListView: View {
         }
         .background(Color.bg)
         .inlineTitle(name)
-        .zoomDestination("album:" + name, in: zoomNS)
         .toolbar {
             // 즐겨찾기 앨범 자체엔 별을 달지 않는다(자기 자신을 즐겨찾기 할 수 없다).
             if name != FavoritesStore.albumName {
