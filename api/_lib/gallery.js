@@ -1,14 +1,16 @@
 // ============================================================
-// 갤러리 헬퍼 — 1시간 자동 만료
+// 갤러리 헬퍼 — 24시간 자동 만료 (오너 지시 2026-09-22, 기존 1시간)
 //
 // 핵심:
 //   - 결과 이미지를 Storage(private 버킷)에 업로드
-//   - DB에 expires_at = now() + 1h 기록
+//   - DB에 expires_at = now() + 24h 기록
 //   - 갤러리 조회 시 expires_at 안 지난 것만 + signed URL 발급
 //   - 만료된 것은 cron이 진짜 삭제 (이 파일에 helper 만 정의)
 // ============================================================
 
-export const TTL_MINUTES = 60; // 1시간
+// ⚠️ 이 값을 바꾸면 개인정보처리방침·이용약관·회원탈퇴 안내(public/*.html)와 앱 문구,
+//    App Store 개인정보 라벨의 보관기간 표기도 같이 고쳐야 한다. 전부 '보관 기간'을 명시한다.
+export const TTL_MINUTES = 24 * 60; // 24시간 (오너 지시 2026-09-22, 기존 60분)
 
 // 이미지 base64 → Storage 업로드 + DB 기록.
 // 저장 직전에 이 사용자의 만료된 옛 파일을 청소 (lazy purge — 작성 시).
@@ -111,12 +113,12 @@ export async function listGallery(admin, userId) {
 
   if (error) return { error: error.message };
 
-  // 각 항목에 signed URL 발급 (1시간 유효)
+  // 각 항목에 signed URL 발급 (24시간 유효 — 보관 기간과 맞춘다)
   const items = await Promise.all(
     (data || []).map(async (row) => {
       const { data: sig } = await admin.storage
         .from("gallery")
-        .createSignedUrl(row.storage_path, 60 * 60);
+        .createSignedUrl(row.storage_path, 24 * 60 * 60);
       return {
         id: row.id,
         conceptId: row.concept_id,

@@ -3884,7 +3884,7 @@ function LangSelector() {
 }
 
 /* ============================================================
-   내 갤러리 (1시간 보관)
+   내 갤러리 (24시간 보관)
    ============================================================ */
 function MyGalleryScreen({ accessToken, onBack, onShared, onLoginRequest }) {
   const [items, setItems] = useState(null); // null=로딩, []=빈, [...]=있음

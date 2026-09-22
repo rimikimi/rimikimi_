@@ -82,7 +82,7 @@
       <ul>
         <li><strong>업로드한 원본 사진</strong>: 서버에 저장하지 않으며, 이미지 생성 요청 시 일시적으로 전송되어 처리 후 즉시 폐기됩니다.</li>
         <li><strong>얼굴 프로필(선택 기능)</strong>: 이용자가 올린 얼굴 사진(1~3장)은 기준 사진 1장을 생성하는 데에만 일시 사용되고 <strong>저장되지 않습니다</strong>. 이용자가 확인·동의한 기준 사진 1장은 <strong>이용자 기기 내부에만</strong> 저장되며 회사 서버·클라우드에는 보관하지 않습니다. 이미지 생성 시에만 기준 사진이 위 원본 사진과 동일한 경로로 일시 전송되어 처리 후 즉시 폐기됩니다. 회사는 이 사진으로 본인 인증·신원 확인을 하지 않으며, 얼굴인식 특징정보(임베딩)를 생성하거나 보관하지 않습니다. 앱 내 [프로필 &gt; 얼굴 프로필]에서 언제든 교체·삭제할 수 있고 삭제 시 기기에서 즉시 제거되며, 앱 삭제·기기 변경 시에도 함께 사라집니다.</li>
-        <li><strong>생성된 결과 이미지</strong>: 이용자의 갤러리에 <strong>1시간</strong> 동안 보관된 뒤 자동 삭제됩니다.</li>
+        <li><strong>생성된 결과 이미지</strong>: 이용자의 갤러리에 <strong>24시간</strong> 동안 보관된 뒤 자동 삭제됩니다.</li>
         <li><strong>회원 정보(이메일, 닉네임 등)</strong>: 회원 탈퇴 시까지 보관 후 즉시 파기.</li>
         <li><strong>사용 기록(생성 시각, 친구 초대)</strong>: 회원 탈퇴 후 30일 내 파기.</li>
       </ul>
@@ -122,7 +122,7 @@
         <li>HTTPS 전구간 암호화</li>
         <li>API 키 등 비밀 정보는 서버 측 환경 변수에만 보관, 브라우저에 노출되지 않음</li>
         <li>이용자의 사진은 서버 영구 저장소에 보관되지 않음</li>
-        <li>생성 결과 이미지는 1시간 후 자동 삭제</li>
+        <li>생성 결과 이미지는 24시간 후 자동 삭제</li>
       </ul>
 
       <h2>8. 만 14세 미만 아동에 대한 안내</h2>
@@ -177,7 +177,7 @@
       <h2>3. Data Retention</h2>
       <ul>
         <li><strong>Original uploaded photos</strong>: not persisted; discarded after generation.</li>
-        <li><strong>Generated images</strong>: kept in your gallery for <strong>1 hour</strong>, then auto-deleted.</li>
+        <li><strong>Generated images</strong>: kept in your gallery for <strong>24 hours</strong>, then auto-deleted.</li>
         <li><strong>Account info</strong>: retained until you delete your account.</li>
         <li><strong>Usage logs and referral records</strong>: deleted within 30 days after account deletion.</li>
       </ul>
@@ -214,7 +214,7 @@
         <li>HTTPS in transit.</li>
         <li>API keys and secrets kept only in server-side environment variables.</li>
         <li>No long-term storage of user-uploaded photos.</li>
-        <li>Generated images expire automatically after 1 hour.</li>
+        <li>Generated images expire automatically after 24 hours.</li>
       </ul>
 
       <h2>8. Children</h2>

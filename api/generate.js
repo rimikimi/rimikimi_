@@ -1773,7 +1773,7 @@ export default async function handler(req, res) {
   const outMime = small.mime;
   const outData = small.base64;
 
-  // 7) 결과를 갤러리에 1시간 보관 — ⚠️ 원본 화질로 저장 (갤러리 다운로드 = 원본).
+  // 7) 결과를 갤러리에 24시간 보관 — ⚠️ 원본 화질로 저장 (갤러리 다운로드 = 원본).
   //    갤러리는 Supabase signed URL 직접 다운로드라 Vercel 응답 한도와 무관.
   let galleryId = null;
   let galleryExpiresAt = null;

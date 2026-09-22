@@ -8,7 +8,7 @@ Vercel이 이 폴더의 각 `.js` 파일을 자동으로 서버 함수로 만들
 ## 엔드포인트
 - `generate.js` — 이미지 생성 프록시 (인증 → 한도/크레딧 체크 → 얼굴 사전검사 → Gemini 호출 → 갤러리 저장)
 - `quota.js` — 사용자의 오늘 사용량 / 크레딧 / 차단 여부 조회
-- `gallery.js` — 내 갤러리 목록 / 삭제 (1시간 만료)
+- `gallery.js` — 내 갤러리 목록 / 삭제 (24시간 만료)
 - `auth/naver/start.js`, `auth/naver/callback.js` — 네이버 커스텀 OAuth
 - `referral/claim.js` — 친구 초대 관계 기록
 - `checkout/packages.js` — 크레딧 패키지/결제수단 목록
