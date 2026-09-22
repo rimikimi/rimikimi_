@@ -33,7 +33,7 @@ const BG = "#FBF8F3";
 const config: ExpoConfig = {
   name: "리미키미",
   slug: "rimikimi",
-  version: "2.0.0",
+  version: "2.0.1",
   orientation: "portrait",
   scheme: "com.rimikimi.app",
   icon: "./assets/images/icon.png",
