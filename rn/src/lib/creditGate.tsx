@@ -11,8 +11,11 @@ import { useQuota } from "./quota";
 interface GateValue {
   open: boolean;
   need: number;
-  /** 잔액이 충분하면 즉시 proceed. 아니면 시트를 열고 구매 뒤 proceed. */
-  request: (cost: number, proceed: () => void) => void;
+  /** 잔액이 충분하면 즉시 proceed. 아니면 시트를 열고 구매 뒤 proceed.
+   *  creditsOnly: 묶음(2장+)·채워 맞춤은 서버에서 **크레딧 전용**이다 — 하루 무료 1장을 더하면 안 된다. */
+  request: (cost: number, proceed: () => void, opts?: { creditsOnly?: boolean }) => void;
+  /** 잔액 계산과 상관없이 시트를 연다 — 서버가 크레딧 부족이라고 답했을 때. */
+  force: (cost: number, proceed: () => void) => void;
   /** 시트가 "구매 성공" 을 알린다 → 잔액 새로고침 뒤 pending proceed 실행 */
   onPurchased: () => void;
   close: () => void;
@@ -26,18 +29,28 @@ export function useCreditGate(): GateValue {
 }
 
 export function CreditGateProvider({ children }: { children: React.ReactNode }) {
-  const { available, loaded, refresh } = useQuota();
+  const { available, loaded, refresh, quota } = useQuota();
   const [open, setOpen] = useState(false);
   const [need, setNeed] = useState(1);
   const pending = useRef<(() => void) | null>(null);
 
-  const request = useCallback<GateValue["request"]>((cost, proceed) => {
-    // 잔액을 아직 모르면(로드 전) 서버 판정에 맡긴다 — 서버가 402/429 로 거절하면 카드에 실패로 뜬다.
-    if (!loaded || available >= cost) { proceed(); return; }
+  const force = useCallback<GateValue["force"]>((cost, proceed) => {
     pending.current = proceed;
     setNeed(cost);
     setOpen(true);
-  }, [available, loaded]);
+  }, []);
+
+  const request = useCallback<GateValue["request"]>((cost, proceed, opts) => {
+    // ⚠️ 묶음·채워 맞춤은 서버가 크레딧만 본다(api/generate.js). 무료 1장을 더해 통과시키면
+    //    서버에서 거절되고 — 채워 맞춤은 거절 뒤 다시 이 게이트를 불러 **요청이 끝없이 반복**됐다
+    //    (2026-09-23 스윕 확정). 그래서 크레딧 전용이면 크레딧만 센다.
+    const usable = opts?.creditsOnly
+      ? (quota?.unlimited ? Infinity : (quota?.credits ?? 0))
+      : available;
+    // 잔액을 아직 모르면(로드 전) 서버 판정에 맡긴다 — 서버가 402/429 로 거절하면 카드에 실패로 뜬다.
+    if (!loaded || usable >= cost) { proceed(); return; }
+    force(cost, proceed);
+  }, [available, loaded, quota, force]);
 
   const onPurchased = useCallback(() => {
     refresh();
@@ -50,6 +63,6 @@ export function CreditGateProvider({ children }: { children: React.ReactNode }) 
 
   const close = useCallback(() => { pending.current = null; setOpen(false); }, []);
 
-  const value = useMemo<GateValue>(() => ({ open, need, request, onPurchased, close }), [open, need, request, onPurchased, close]);
+  const value = useMemo<GateValue>(() => ({ open, need, request, force, onPurchased, close }), [open, need, request, force, onPurchased, close]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

@@ -270,7 +270,8 @@ export async function generateImage(token: string, photo: EncodedPhoto, promptTe
     const msg = (json?.error as string) || "이미지 생성 실패 (오류 " + res.status + ")";
     const detail = json?.detail ? "\n\n[원문] " + String(json.detail).slice(0, 300) : "";
     throw new ApiError(msg + detail, res.status, {
-      quotaExceeded: res.status === 429,
+      // 크레딧 부족 = 429(단건) 또는 402(묶음 3·6·12장). 402 를 놓쳐 충전 안내가 안 떴다(2026-09-23 스윕).
+      quotaExceeded: res.status === 429 || res.status === 402,
       quotaUsed: typeof json?.quotaUsed === "number" ? json.quotaUsed : undefined,
       quotaLimit: typeof json?.quotaLimit === "number" ? json.quotaLimit : undefined,
     });

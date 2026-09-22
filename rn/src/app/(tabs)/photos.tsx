@@ -62,7 +62,8 @@ export default function PhotosTab() {
       header={<AppHeader title={copy.photos.title} />}
       refreshControl={<RefreshControl refreshing={refreshing} tintColor={color.accent} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />}
     >
-      <ProgressCards />
+      {/* 로그인한 사람의 카드만. 로그아웃 상태에서 앞사람 카드가 보이던 것(2026-09-23 스윕) */}
+      {session ? <ProgressCards /> : null}
       {!session ? (
         <View style={styles.empty}>
           <Text tone="muted" center>{copy.photos.loginRequired}</Text>

@@ -6,6 +6,8 @@ import type { Session } from "@supabase/supabase-js";
 import { bindAppStateRefresh, supabase } from "./supabase";
 import { NATIVE_REDIRECT, getEnv } from "./env";
 import { loginIap, logoutIap } from "./iap";
+import { clearRegisteredPhoto } from "./photo";
+import { deleteProfile } from "./faceProfile";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -180,6 +182,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = useCallback(async () => {
     await logoutIap();
     await supabase().auth.signOut();
+    // ⚠️ 로그아웃하면 기기에 남은 **이 사람의 얼굴 데이터**도 지운다 (2026-09-23 스윕 확정).
+    //    예전엔 세션만 지워서, 다음 계정이 로그인하면 앞사람의 등록 사진·얼굴 스캔 3장이
+    //    그대로 생성 요청에 실려 나갔다(앞사람 얼굴로 이미지가 만들어졌다). iOS 는 dfe153b.
+    //    진행/완성 카드·마커는 GenerationProvider 가 사용자 변경을 보고 비운다.
+    try { await clearRegisteredPhoto(); } catch { /* ignore */ }
+    try { await deleteProfile(); } catch { /* ignore */ }
     setSession(null);
   }, []);
 

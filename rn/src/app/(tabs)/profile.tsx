@@ -254,7 +254,8 @@ export default function ProfileTab() {
         {session ? (
           <>
             <Sep />
-            <Row label={copy.profile.logout} onPress={() => { void signOut(); }} />
+            {/* signOut 이 기기의 사진·얼굴 스캔을 지운다 — 이 화면의 표시도 같이 비운다 */}
+            <Row label={copy.profile.logout} onPress={() => { void signOut().then(() => { setPhoto(null); setFace(null); setScanN(0); }); }} />
             <Sep />
             <Row label={copy.profile.deleteAccount} danger onPress={onDeleteAccount} />
           </>

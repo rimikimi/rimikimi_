@@ -51,8 +51,11 @@ export function FitSheet({ open, uri, onClose, onFitted }: { open: boolean; uri:
     } catch (err) {
       const e = err as ApiError;
       if (e?.quotaExceeded) {
-        // 크레딧 부족 — 기존 크레딧 시트로 넘기고, 구매 후 이어서 재시도한다.
-        gate.request(1, () => { void runOutpaint(); });
+        // 크레딧 부족 — 시트를 **바로** 연다(gate.force). 예전엔 gate.request 를 다시 불렀는데,
+        // 무료 1장을 크레딧처럼 세서 곧장 통과 → 또 429 → 또 통과… 로 **서버 요청이 끝없이
+        // 반복**됐다(2026-09-23 스윕 확정 · 무료 사용자 기본 상태에서 재현). 구매하면 이어서 재시도.
+        refreshQuota();
+        gate.force(1, () => { void runOutpaint(); });
       } else {
         Alert.alert(e?.message || copy.common.retry);
       }
@@ -63,7 +66,8 @@ export function FitSheet({ open, uri, onClose, onFitted }: { open: boolean; uri:
 
   const outpaint = () => {
     if (busy || outBusy) return;
-    gate.request(1, () => { void runOutpaint(); });
+    // 채워 맞춤은 1크레딧 고정 — 하루 무료 한도로는 안 된다(서버 outpaint 분기).
+    gate.request(1, () => { void runOutpaint(); }, { creditsOnly: true });
   };
 
   return (

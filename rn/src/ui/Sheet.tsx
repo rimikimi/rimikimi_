@@ -1,6 +1,6 @@
 // 바텀 시트 — SPEC §1: 열림 320 · 닫힘 220 · 드래그 1:1 · 45% 넘게 끌거나 빠르면 닫힘.
 import { type ReactNode, useEffect } from "react";
-import { Dimensions, Pressable, StyleSheet, View } from "react-native";
+import { BackHandler, Dimensions, Pressable, StyleSheet, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { ReduceMotion, runOnJS, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
@@ -16,6 +16,15 @@ export function Sheet({ open, title, onClose, children }: { open: boolean; title
   const insets = useSafeAreaInsets();
   const y = useSharedValue(SCREEN_H);
   const h = useSharedValue(SCREEN_H * 0.6);
+
+  // 안드로이드 뒤로가기 = 시트 닫기. 이 시트는 Modal 이 아니라 화면 위에 얹힌 View 라
+  // 뒤로가기가 **밑의 화면**을 닫아 버렸다(크레딧 시트가 남은 채 컨셉 화면만 사라지고,
+  // 탭 루트에선 앱이 꺼졌다 — 2026-09-23 스윕). 열려 있는 동안 뒤로가기를 가로챈다.
+  useEffect(() => {
+    if (!open) return;
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => { onClose(); return true; });
+    return () => sub.remove();
+  }, [open, onClose]);
 
   useEffect(() => {
     y.value = withTiming(open ? 0 : SCREEN_H, {

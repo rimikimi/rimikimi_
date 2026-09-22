@@ -11,7 +11,7 @@ import { type Concept, ID_BGS, buildIdPhotoPrompt, isArtOnly, isIdPhoto, isResto
 import { getPushToken } from "./push";
 import { showInterstitial } from "./ads";
 import { loadProfileRefs } from "./faceProfile";
-import { setLastDoneJob } from "./lastJob";
+import { clearLastDoneJob, setLastDoneJob } from "./lastJob";
 import { FIRST_GEN_DONE_KEY, INVITE_CARD_DUE_KEY, getFlag, setFlag } from "./prefs";
 
 // ============================================================================
@@ -166,6 +166,26 @@ export function GenerationProvider({ children }: { children: React.ReactNode }) 
   const recovering = useRef<Set<string>>(new Set());
   const tokenRef = useRef<string | undefined>(undefined);
   tokenRef.current = session?.access_token;
+  // 지금 로그인한 사람. 작업은 시작한 사람 것이다 — 로그아웃·계정 전환 뒤 늦게 끝난 결과가
+  // 다음 사람 화면에 뜨지 않게, 시작 시 owner 를 잡아 두고 결과를 쓸 때 대조한다.
+  const uid = session?.user?.id;
+  const uidRef = useRef<string | undefined>(uid);
+  uidRef.current = uid;
+  const prevUid = useRef<string | undefined>(uid);
+  useEffect(() => {
+    if (prevUid.current && prevUid.current !== uid) {
+      // 로그아웃(또는 다른 계정) — 앞사람의 진행/완성 카드·복구 마커·푸시 대상을 전부 버린다.
+      setJobs([]);
+      void (async () => {
+        try {
+          const keys = await AsyncStorage.getAllKeys();
+          await AsyncStorage.multiRemove(keys.filter((k) => k.startsWith(PENDING_GEN_PREFIX) || k === PENDING_GEN_LEGACY_KEY));
+        } catch { /* ignore */ }
+        await clearLastDoneJob();
+      })();
+    }
+    prevUid.current = uid;
+  }, [uid]);
 
   const patch = useCallback((id: string, p: Partial<Job>) => {
     setJobs((prev) => prev.map((j) => (j.id === id ? { ...j, ...p } : j)));
@@ -182,6 +202,7 @@ export function GenerationProvider({ children }: { children: React.ReactNode }) 
   const lookupPendingResult = useCallback(async (p: PendingMarker): Promise<boolean | "offline"> => {
     const token = tokenRef.current;
     if (!token) return false;
+    const owner = uidRef.current;
     let items: GalleryItem[];
     try {
       items = await fetchGallery(token);
@@ -191,7 +212,7 @@ export function GenerationProvider({ children }: { children: React.ReactNode }) 
     const mine = items.filter(
       (it) => it.url && String(it.conceptId) === String(p.conceptId) && new Date(it.createdAt).getTime() >= p.startedAt - 5000
     );
-    if (mine.length) {
+    if (mine.length && uidRef.current === owner) {
       const images = mine.map((it) => ({ uri: it.url!, galleryId: it.id, galleryExpiresAt: it.expiresAt }));
       setJobs((prev) => {
         const exists = prev.some((j) => j.id === p.jobId);
@@ -259,6 +280,8 @@ export function GenerationProvider({ children }: { children: React.ReactNode }) 
     const startedAt = Date.now();
     const job: Job = { id, concept, count, startedAt, status: "running", images: [], input };
     const showAds = showAdsRef.current; // 1.x 와 같이 "누른 시점" 판정
+    const owner = uidRef.current;
+    const mine = () => uidRef.current === owner; // 끝났을 때도 같은 사람인가
     setJobs((prev) => [job, ...prev]);
     // 햅틱은 확정 시점에만 — 만들기가 확정된 지금.
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
@@ -309,6 +332,7 @@ export function GenerationProvider({ children }: { children: React.ReactNode }) 
           ? await Promise.all(r.batch.map(async (b) => ({ uri: await fitOne(b.imageDataUrl), galleryId: b.galleryId, galleryExpiresAt: b.galleryExpiresAt })))
           : [{ uri: await fitOne(r.imageDataUrl), galleryId: r.galleryId, galleryExpiresAt: r.galleryExpiresAt }];
         await clearPendingGen(id);
+        if (!mine()) return; // 그새 로그아웃·계정 전환 — 결과를 다음 사람에게 보이지 않는다
         patch(id, { status: "done", images });
         refreshQuota();
         void noteDone();
@@ -322,6 +346,7 @@ export function GenerationProvider({ children }: { children: React.ReactNode }) 
         const recovered = await tryRecover(id, { poll: !!e?.networkFail });
         if (!recovered) {
           await clearPendingGen(id);
+          if (!mine()) return;
           patch(id, { status: "failed", error: e?.message || "이미지 생성에 실패했어요." });
           if (e?.quotaExceeded) refreshQuota();
         }

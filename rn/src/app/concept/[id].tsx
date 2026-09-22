@@ -100,6 +100,7 @@ export default function ConceptOptions() {
     const route = `/concept/${String(concept.id)}`;
     // 만들기 → (로그인 → 크레딧 부족이면 팩·구독·초대 시트, 구매 즉시 이어감) → 홈 복귀 + 진행 카드
     requireLogin("make", () => {
+      // 묶음(2장+)은 서버에서 크레딧 전용(402). 인생네컷·아트는 1장 취급.
       gate.request(cost, () => {
         start({
           concept,
@@ -116,7 +117,7 @@ export default function ConceptOptions() {
         // 홈으로 복귀 + 내 사진 진행 카드 (SPEC §3): 스택을 탭까지 걷고 내 사진 탭으로.
         router.dismissAll();
         router.navigate("/(tabs)/photos");
-      });
+      }, { creditsOnly: !fourcut && !art && batchCount > 1 });
     }, route);
   };
 

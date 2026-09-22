@@ -27,6 +27,11 @@ export async function setLastDoneJob(j: Omit<LastDoneJob, "at">): Promise<void> 
   } catch { /* 무시 — 없으면 그냥 내 사진 탭으로 간다 */ }
 }
 
+/** 로그아웃 — 앞사람 결과로 푸시 탭이 열리지 않게. */
+export async function clearLastDoneJob(): Promise<void> {
+  try { await AsyncStorage.removeItem(KEY); } catch { /* ignore */ }
+}
+
 /** 알림 탭 시점에 읽는다. 오래됐으면(10분+) null — 엉뚱한 결과로 튀는 것 방지. */
 export async function peekLastDoneJob(): Promise<LastDoneJob | null> {
   try {
