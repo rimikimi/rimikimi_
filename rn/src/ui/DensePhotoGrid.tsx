@@ -5,7 +5,9 @@ import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { Thumb, photoHeight } from "./Thumb";
+import { FavoriteBadge, GeneratedScrim } from "./FavoriteBits";
 import { thumbUrl, type Concept } from "@/lib/concepts";
+import { useStore } from "@/lib/store";
 import { radius, space } from "@/theme/tokens";
 import { ease } from "@/theme/motion";
 
@@ -39,6 +41,7 @@ export function DensePhotoGrid({
   startWide?: boolean;
 }) {
   const { width } = useWindowDimensions();
+  const { isGenerated, isFavoriteConcept } = useStore();
   const [wide, setWide] = useState(!!startWide);
   /** 사라지는 쪽 격자의 열 수. 전환하는 동안만 값이 있고, 위에 겹쳐서 흐려진다. */
   const [fadingCols, setFadingCols] = useState<number | null>(null);
@@ -117,7 +120,15 @@ export function DensePhotoGrid({
               onOpen(c);
             }}
           >
-            <Thumb uri={thumbUrl(c.id)} width={w} height={h} rounded={r} />
+            <View style={{ width: w, height: h, borderRadius: r, overflow: "hidden" }}>
+              <Thumb uri={thumbUrl(c.id)} width={w} height={h} rounded={r} />
+              {isGenerated(c.id) ? <GeneratedScrim compact={n === WIDE} /> : null}
+              {isFavoriteConcept(c.id) ? (
+                <View style={styles.badge}>
+                  <FavoriteBadge size={n === WIDE ? 16 : 20} />
+                </View>
+              ) : null}
+            </View>
           </Pressable>
         ))}
       </View>
@@ -143,4 +154,5 @@ const styles = StyleSheet.create({
   wrap: { paddingHorizontal: space.screen, paddingTop: space.s2 },
   grid: { flexDirection: "row", flexWrap: "wrap" },
   fadeLayer: { position: "absolute", left: space.screen, right: space.screen, top: space.s2 },
+  badge: { position: "absolute", top: 4, right: 4 },
 });

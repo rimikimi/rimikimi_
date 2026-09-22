@@ -9,8 +9,9 @@ import { AppHeader } from "@/ui/AppHeader";
 import { Button } from "@/ui/Button";
 import { Text } from "@/ui/Text";
 import { Thumb, photoHeight } from "@/ui/Thumb";
+import { FavoriteStarButton } from "@/ui/FavoriteBits";
 import { useStore } from "@/lib/store";
-import { byNewest, categoriesOf, thumbUrl, type Concept } from "@/lib/concepts";
+import { conceptsIn, thumbUrl, type Concept } from "@/lib/concepts";
 import { color, radius, space } from "@/theme/tokens";
 import { ease } from "@/theme/motion";
 
@@ -29,12 +30,12 @@ const DISMISS_Y = 140;
 
 export default function BrowseScreen() {
   const { name, start } = useLocalSearchParams<{ name: string; start?: string }>();
-  const { concepts } = useStore();
+  const { concepts, favoriteConcepts, isFavoriteConcept, toggleFavoriteConcept } = useStore();
   const { width } = useWindowDimensions();
 
   const items = useMemo(
-    () => concepts.filter((c) => categoriesOf(c).includes(name ?? "")).sort(byNewest),
-    [concepts, name],
+    () => conceptsIn(concepts, name ?? "", favoriteConcepts),
+    [concepts, name, favoriteConcepts],
   );
   const startIndex = Math.max(0, items.findIndex((c) => String(c.id) === String(start)));
   const [index, setIndex] = useState(startIndex < 0 ? 0 : startIndex);
@@ -188,7 +189,25 @@ export default function BrowseScreen() {
   const bigH = photoHeight(width);
 
   return (
-    <Screen scrollModel="fixed" header={<AppHeader title={name ?? ""} back right={<View />} />}>
+    <Screen
+      scrollModel="fixed"
+      header={
+        <AppHeader
+          title={name ?? ""}
+          back
+          right={
+            current ? (
+              <FavoriteStarButton
+                on={isFavoriteConcept(current.id)}
+                onPress={() => toggleFavoriteConcept(current.id)}
+              />
+            ) : (
+              <View />
+            )
+          }
+        />
+      }
+    >
       <GestureDetector gesture={drag}>
         <Animated.View style={[styles.body, sheet]}>
           <FlatList

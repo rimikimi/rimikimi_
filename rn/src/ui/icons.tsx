@@ -27,6 +27,23 @@ function Base({ size = 24, color = "currentColor", children, rotate }: IconProps
   );
 }
 
+/**
+ * 별 — 즐겨찾기(오너 지시 2026-09-22 "우측 상단에 별표"). `filled` 면 속을 채운다.
+ * 채운 별은 `Base` 의 `fill="none"` 을 덮어야 하므로 따로 그린다.
+ */
+export const IconStar = ({ size = 24, color = "currentColor", filled }: IconProps & { filled?: boolean }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M12 3.6 L14.6 9 L20.5 9.8 L16.2 14 L17.3 19.9 L12 17.1 L6.7 19.9 L7.8 14 L3.5 9.8 L9.4 9 Z"
+      stroke={color}
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      fill={filled ? color : "none"}
+    />
+  </Svg>
+);
+
 export const IconCheck = (p: IconProps) => (
   <Base {...p}><Path d="M5.5 12.5 L10 17 L18.5 7.5" /></Base>
 );

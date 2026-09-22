@@ -1,4 +1,5 @@
 import { getEnv } from "./env";
+import { FAVORITES_ALBUM } from "./favorites";
 
 // ============================================================================
 // 컨셉 목록 — 원격 우선(https://rimikimi-app.vercel.app/concepts.json), 실패하면 번들 폴백.
@@ -143,6 +144,21 @@ export const CATEGORY_ORDER = [
   "예술 / 클래식",
   "판타지 / 콘셉트",
 ];
+
+/**
+ * 어떤 앨범(카테고리)에 속한 컨셉들 — 최신순.
+ *
+ * "⭐ 즐겨찾기" 는 실제 카테고리가 아니라 **여기서 가로채는 특별한 이름**이다. 별을 단 순서를
+ * 그대로 쓴다(최신순으로 다시 정렬하지 않는다 — 사용자가 고른 순서가 더 뜻이 있다).
+ */
+export function conceptsIn(pool: Concept[], name: string, favoriteConcepts: string[]): Concept[] {
+  if (name === FAVORITES_ALBUM) {
+    return favoriteConcepts
+      .map((id) => pool.find((c) => String(c.id) === id))
+      .filter((c): c is Concept => !!c);
+  }
+  return pool.filter((c) => categoriesOf(c).includes(name)).sort(byNewest);
+}
 
 export function thumbUrl(id: number | string): string {
   return `${getEnv().apiBase}/thumbs/${id}.webp`;
