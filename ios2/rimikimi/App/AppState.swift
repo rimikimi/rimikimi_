@@ -235,7 +235,11 @@ final class AppState {
                 return
             }
             // 크레딧 부족이면 시트 먼저 — 서버에 보내 봐야 429 다(SPEC §3 "크레딧 부족이면 팩·구독·초대 시트").
-            if let q = quota, q.unlimited != true, q.creditsAvailable + q.freeLeft < req.creditCost {
+            // ⚠️ 묶음(2장 이상)은 서버에서 **크레딧 전용**이다(무료 1장으로는 불가, 서버 402).
+            //    무료 한도를 더해 통과시키면 서버까지 갔다가 실패만 보고 시트가 안 떴다.
+            let usable = req.effectiveCount > 1 ? (quota?.creditsAvailable ?? 0)
+                                                : (quota?.creditsAvailable ?? 0) + (quota?.freeLeft ?? 0)
+            if let q = quota, q.unlimited != true, usable < req.creditCost {
                 pendingAfterPurchase = req
                 creditsSheet = true
                 return
@@ -358,6 +362,12 @@ final class AppState {
         }
     }
 
+    /// 크레딧 시트를 구매 없이 닫았을 때 — 미뤄둔 생성·채워 맞춤을 버린다.
+    func dropPendingPurchase() {
+        pendingAfterPurchase = nil
+        pendingOutpaintPhoto = nil
+    }
+
     /// 구매 성공 → 크레딧 갱신 → 하던 생성(또는 채워 맞춤) 이어가기.
     func continueAfterPurchase() async {
         await refreshQuota()
@@ -391,7 +401,8 @@ final class AppState {
 
     private func runOutpaint(_ image: UIImage) async {
         guard let token = await auth.validAccessToken() else { loginSheet = true; return }
-        if let q = quota, q.unlimited != true, q.creditsAvailable + q.freeLeft < 1 {
+        // 채워 맞춤은 1크레딧 고정 — 하루 무료 한도로는 안 된다(서버 api/generate.js outpaint 분기).
+        if let q = quota, q.unlimited != true, q.creditsAvailable < 1 {
             pendingOutpaintPhoto = image
             creditsSheet = true
             return
@@ -407,6 +418,14 @@ final class AppState {
             outpaintCompletion?(result.image)
             outpaintCompletion = nil
         } catch let error as APIError {
+            // quota 가 낡아 게이트를 통과했는데 서버가 크레딧 부족을 준 경우 — 이유 모를 실패 대신 충전 시트.
+            if error.quotaExceeded {
+                outpaintPhase = .idle
+                pendingOutpaintPhoto = image
+                creditsSheet = true
+                await refreshQuota()
+                return
+            }
             outpaintPhase = .error(error.message)
         } catch {
             outpaintPhase = .error("채워 맞춤에 실패했어요. 잠시 후 다시 시도해 주세요.")
@@ -426,6 +445,16 @@ final class AppState {
     func signOut() {
         auth.signOut()
         quota = nil
+        // ⚠️ 로그아웃하면 **기기에 남은 이 사람의 것**도 같이 지운다 (2026-09-18 버그 스윕 확정).
+        //    예전엔 세션만 지워서, 다음 계정이 로그인하면 앞사람의 등록 얼굴 사진·얼굴 스캔이
+        //    그대로 생성 요청에 실려 나갔고(앞사람 얼굴로 이미지가 만들어졌다), 진행 카드·
+        //    완성 카드도 새 계정 화면에 남았다.
+        //    (AuthStore.signOut() 을 직접 타는 경로는 이제 "토큰이 진짜로 거절됐을 때" 뿐이다.)
+        userPhoto.clear()
+        faceProfile.clear()
+        generation.clearAll()
+        pendingAfterPurchase = nil
+        pendingOutpaintPhoto = nil
         Task { await store.logOut() }
     }
 

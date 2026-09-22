@@ -70,8 +70,14 @@ final class AuthStore {
             adopt(json: json, provider: s.provider)
             return session?.accessToken
         } catch {
-            AppLog.auth.error("refresh.failed \(error.localizedDescription, privacy: .public)")
-            signOut()
+            // ⚠️ 서버가 **명시적으로 거절(4xx: invalid_grant 등)** 했을 때만 로그아웃한다.
+            //    예전엔 catch 가 모든 에러를 로그아웃 사유로 봐서, 지하철·비행기모드처럼 잠깐
+            //    끊긴 상태에서 앱을 켜기만 해도 로그아웃되고 키체인의 refresh_token 까지 지워졌다
+            //    (2026-09-18 버그 스윕 확정 · 사용자는 아무것도 안 눌렀다). 네트워크 실패·5xx·
+            //    취소는 세션을 그대로 두고 nil 만 돌려준다 — 연결이 돌아오면 다음 호출이 갱신한다.
+            let status = (error as? SupabaseAuthAPI.Failure)?.status ?? 0
+            AppLog.auth.error("refresh.failed status=\(status) \(error.localizedDescription, privacy: .public)")
+            if (400...499).contains(status) { signOut() }
             return nil
         }
     }
@@ -244,7 +250,12 @@ final class AuthStore {
 
 /// Supabase GoTrue REST — 클라이언트 SDK 없이 두 엔드포인트만 쓴다.
 enum SupabaseAuthAPI {
-    struct Failure: LocalizedError { var message: String; var errorDescription: String? { message } }
+    struct Failure: LocalizedError {
+        var message: String
+        /// HTTP 상태. 0 = 서버 응답을 못 받음(네트워크). 로그아웃 여부를 이 값으로 가른다.
+        var status: Int = 0
+        var errorDescription: String? { message }
+    }
 
     static func token(grant: String, body: [String: Any]) async throws -> [String: Any] {
         var req = URLRequest(url: URL(string: Config.supabaseURL.absoluteString + "/auth/v1/token?grant_type=" + grant)!)
@@ -256,7 +267,7 @@ enum SupabaseAuthAPI {
         let json = (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
         guard let http = resp as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             let msg = (json["error_description"] as? String) ?? (json["msg"] as? String) ?? (json["error"] as? String) ?? "로그인에 실패했어요."
-            throw Failure(message: msg)
+            throw Failure(message: msg, status: (resp as? HTTPURLResponse)?.statusCode ?? 0)
         }
         return json
     }

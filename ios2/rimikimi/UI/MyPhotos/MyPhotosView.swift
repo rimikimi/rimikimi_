@@ -147,22 +147,32 @@ struct ProgressCard: View {
                 }
             }
         case .done(let items):
-            Button { app.present(items, job: job) } label: {
-                card {
-                    HStack(spacing: Spacing.s3) {
-                        if let first = items.first {
-                            ResultThumb(item: first)
+            // ⚠️ 닫기(X)가 없어 완성 카드가 세션 내내 쌓였다(2026-09-18 스윕 확정).
+            //    X 를 "보기" 버튼 **안**에 넣으면 버튼이 중첩돼 탭이 엉킨다 — 형제 버튼으로 둔다.
+            card {
+                HStack(spacing: Spacing.s3) {
+                    Button { app.present(items, job: job) } label: {
+                        HStack(spacing: Spacing.s3) {
+                            if let first = items.first {
+                                ResultThumb(item: first)
+                            }
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("완성!").font(AppFont.headline)
+                                Text(job.conceptTitle).font(AppFont.footnote).foregroundStyle(Color.ink2)
+                            }
+                            Spacer()
+                            Text("보기").font(AppFont.calloutEmphasis).foregroundStyle(Color.accent)
                         }
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("완성!").font(AppFont.headline)
-                            Text(job.conceptTitle).font(AppFont.footnote).foregroundStyle(Color.ink2)
-                        }
-                        Spacer()
-                        Text("보기").font(AppFont.calloutEmphasis).foregroundStyle(Color.accent)
+                        .contentShape(Rectangle())
                     }
+                    .buttonStyle(PressScaleButtonStyle(scale: 0.985))
+                    Button { app.generation.dismiss(entry.id) } label: {
+                        Image(systemName: "xmark").font(.system(size: 12, weight: .bold)).foregroundStyle(Color.ink2)
+                            .frame(width: 28, height: 28).background(Color.fill, in: Circle())
+                    }
+                    .buttonStyle(.plain).accessibilityLabel("닫기")
                 }
             }
-            .buttonStyle(PressScaleButtonStyle(scale: 0.985))
         case .failed(let message):
             card {
                 HStack(alignment: .top, spacing: Spacing.s3) {

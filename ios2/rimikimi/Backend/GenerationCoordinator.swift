@@ -120,6 +120,7 @@ final class GenerationCoordinator {
     private func run(_ request: GenerateRequest, job: Job, token: String, pushToken: String?) async {
         do {
             let r = try await RimikimiAPI.shared.generate(request, token: token, pushToken: pushToken)
+            guard isLive(job.id) else { return }
             lastCredits = r.credits
             let items = r.items.map { ResultItem(id: $0.id, image: $0.image, url: nil, expiresAt: $0.galleryExpiresAt) }
             removeMarker(job.id)
@@ -134,6 +135,7 @@ final class GenerationCoordinator {
             AppLog.api.error("gen.failed status=\(e.status) networkFail=\(e.networkFail) msg=\(e.message, privacy: .public)")
             // 서버 판정을 못 받은 경우만 기다린다. 429/402 는 기다려도 달라지지 않는다.
             if await recover(job, poll: e.networkFail) { return }
+            guard isLive(job.id) else { return }
             quotaExceeded = e.quotaExceeded
             removeMarker(job.id)
             setPhase(job.id, .failed(e.message))
@@ -141,6 +143,7 @@ final class GenerationCoordinator {
             HapticPlayer.warning()
         } catch {
             if await recover(job, poll: true) { return }
+            guard isLive(job.id) else { return }
             removeMarker(job.id)
             setPhase(job.id, .failed(error.localizedDescription))
             failedTick &+= 1
@@ -176,6 +179,7 @@ final class GenerationCoordinator {
         while true {
             switch await lookup(job) {
             case .found(let items):
+                guard isLive(job.id) else { return false }
                 removeMarker(job.id)
                 setPhase(job.id, .done(items))
                 pendingPresentation = items
@@ -198,6 +202,7 @@ final class GenerationCoordinator {
     }
 
     private func finishWaiting(_ job: Job) -> Bool {
+        guard isLive(job.id) else { return false }   // 로그아웃 뒤면 실패 카드도 띄우지 않는다
         removeMarker(job.id)
         setPhase(job.id, .failed("결과를 받지 못했어요. 내 사진에서 다시 확인해 주세요."))
         failedTick &+= 1
@@ -239,6 +244,19 @@ final class GenerationCoordinator {
         entries.removeAll { $0.id == id }
         removeMarker(id)
     }
+    /// 로그아웃 — 이 계정의 작업·마커·보여줄 결과를 전부 버린다.
+    /// 돌고 있던 Task 는 끝나도 아래 `isLive(_:)` 가드에 걸려 아무것도 남기지 않는다.
+    func clearAll() {
+        entries.removeAll()
+        writeMarkers([])
+        pendingPresentation = nil
+        pendingPresentationJob = nil
+        quotaExceeded = false
+    }
+    /// 이 작업이 아직 화면에 살아 있나. 로그아웃(clearAll)이나 닫기로 사라졌으면 결과를 버린다.
+    /// ⚠️ 없으면: A 가 생성 중 로그아웃 → B 로그인 → A 의 결과가 B 에게 결과 화면으로 뜬다.
+    private func isLive(_ id: String) -> Bool { entries.contains { $0.id == id } }
+
     /// 끝난 카드 전부 닫기. 돌고 있는 건 남긴다.
     func dismissFinished() {
         entries.removeAll { if case .running = $0.phase { return false } else { return true } }

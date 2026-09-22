@@ -106,7 +106,10 @@ struct RootTabView: View {
                 .presentationDetents([.medium, .large])
                 .presentationCornerRadius(Radius.sheet)
         }
-        .sheet(isPresented: $app.creditsSheet) {
+        // ⚠️ 구매 없이 닫으면 "이어서 만들기" 예약을 버린다. 예전엔 남아 있다가, 나중에 스토어에서
+        //    크레딧을 사는 순간 묻지도 않고 그때 그 생성이 돌아가 크레딧이 차감됐다(2026-09-18 스윕).
+        //    구매 성공 경로(continueAfterPurchase)는 시트를 닫기 **전에** 예약을 꺼내 쓰므로 안전하다.
+        .sheet(isPresented: $app.creditsSheet, onDismiss: { app.dropPendingPurchase() }) {
             CreditsSheet()
                 .presentationDetents([.large])
                 .presentationCornerRadius(Radius.sheet)

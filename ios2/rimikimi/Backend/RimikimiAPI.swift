@@ -7,7 +7,9 @@ struct APIError: LocalizedError {
     var status: Int = 0
     /// fetch 자체가 죽은 경우 — 서버 판정을 못 받았으므로 호출부는 갤러리를 폴링한다.
     var networkFail = false
-    var quotaExceeded: Bool { status == 429 }
+    /// 크레딧 부족 = 429(단건·채워 맞춤) 또는 402(묶음 3·6·12장). 예전엔 429 만 봐서 묶음이
+    /// 크레딧 부족으로 실패하면 충전 시트·버튼이 안 떴다(안드로이드는 떴다 · 2026-09-18 스윕).
+    var quotaExceeded: Bool { status == 429 || status == 402 }
     var errorDescription: String? { message }
 }
 
@@ -270,7 +272,8 @@ final class RimikimiAPI {
         }
         guard (200...299).contains(status) else {
             AppLog.ui.error("outpaint.failed status=\(status, privacy: .public) body=\(String(describing: json["error"]), privacy: .private)")
-            // 부족한 크레딧(429)은 클라이언트가 네트워크 전에 이미 걸러낸다 — 여기 오는 건 그 밖의 서버 거절.
+            // 부족한 크레딧(429·402)은 대개 클라이언트가 네트워크 전에 걸러낸다(AppState.perform) — 그래도
+            // quota 가 낡았으면 여기로 올 수 있고, 그땐 APIError.quotaExceeded 가 시트를 띄운다.
             throw APIError(message: "채워 맞춤을 하지 못했어요. 크레딧은 차감되지 않았어요 🙂", status: status)
         }
         guard let b64 = json["base64"] as? String, let img = ImageUtil.decode(base64: b64) else {
