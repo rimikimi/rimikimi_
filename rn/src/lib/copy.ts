@@ -102,7 +102,7 @@ export const copy = {
     empty: "아직 만든 사진이 없어요",
     emptyCta: "컨셉 고르러 가기",
     loginRequired: "로그인하면 내가 만든 사진을 볼 수 있어요",
-    notice: "생성된 사진은 1시간만 보관돼요. 오래 보관하려면 앨범에 저장해 주세요.",
+    notice: "생성된 사진은 24시간만 보관돼요. 오래 보관하려면 앨범에 저장해 주세요.",
     deleteConfirm: "이 사진을 삭제할까요?",
     delete: "삭제",
     cancel: "취소",
