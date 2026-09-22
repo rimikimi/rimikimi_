@@ -78,6 +78,11 @@ const config: ExpoConfig = {
       "android.permission.READ_MEDIA_IMAGES",
       "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
       "android.permission.READ_EXTERNAL_STORAGE",
+      // ⚠️ expo-brightness 가 제 설정 플러그인으로 **자동으로** 집어넣는다(SDK 57 은 설치된
+      //    패키지의 app.plugin.js 를 plugins 에 안 적어도 적용한다 — prebuild 실측으로 확인).
+      //    우리는 `setBrightnessAsync`(이 액티비티 창 밝기, 권한 불필요)만 쓰고 시스템 밝기를
+      //    바꾸는 `setSystemBrightnessAsync` 는 안 쓴다. 안 쓰는 특수 권한을 달고 심사에 넣지 않는다.
+      "android.permission.WRITE_SETTINGS",
     ],
   },
 

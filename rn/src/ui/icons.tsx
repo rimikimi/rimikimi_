@@ -135,6 +135,17 @@ export const IconFlash = ({ off, ...p }: IconProps & { off?: boolean }) => (
   </Base>
 );
 
+/** 화면 조명 — 어두운 데서 얼굴 스캔할 때 화면을 흰 조명판으로 쓴다. 켜지면 속을 채운다. */
+export const IconLight = ({ on, size = 24, color = "currentColor" }: IconProps & { on?: boolean }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Circle cx={12} cy={12} r={4.4} stroke={color} strokeWidth={2} fill={on ? color : "none"} />
+    <G stroke={color} strokeWidth={2} strokeLinecap="round">
+      <Path d="M12 2.4 V4.6 M12 19.4 V21.6 M2.4 12 H4.6 M19.4 12 H21.6" />
+      <Path d="M5.2 5.2 L6.8 6.8 M17.2 17.2 L18.8 18.8 M18.8 5.2 L17.2 6.8 M6.8 17.2 L5.2 18.8" />
+    </G>
+  </Svg>
+);
+
 export const IconGrid = (p: IconProps) => (
   <Base {...p}>
     <Rect x={5} y={5} width={6.4} height={6.4} rx={1.6} />

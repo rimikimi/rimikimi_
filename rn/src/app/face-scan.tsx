@@ -3,13 +3,14 @@ import { Alert, Linking, Pressable, StyleSheet, View } from "react-native";
 import { router } from "expo-router";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as ImageManipulator from "expo-image-manipulator";
+import * as Brightness from "expo-brightness";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import Svg, { Circle, Path } from "react-native-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Text } from "@/ui/Text";
 import { Spinner } from "@/ui/Spinner";
-import { IconCamera } from "@/ui/icons";
+import { IconCamera, IconLight } from "@/ui/icons";
 import { color, radius, space } from "@/theme/tokens";
 import { ANGLES, saveScanShots, type FaceAngle } from "@/lib/faceProfile";
 
@@ -23,6 +24,9 @@ import { ANGLES, saveScanShots, type FaceAngle } from "@/lib/faceProfile";
 //    그래서 여기서는 단계별로 안내하고 **셔터를 직접 누른다**. 모이는 결과(3각도 참조 사진)는 같다.
 //    라이브 자동 촬영은 ML Kit/vision-camera 를 넣는 별도 빌드가 필요하다.
 //
+// ⚠️ 화면 조명도 아이폰과 **다르게** 동작한다. 아이폰은 카메라 ISO 로 어두운지 보고 **자동으로**
+//    켠다. expo-camera 는 ISO 를 안 내주므로 여기서는 **수동 토글**이다(오너 결정 2026-09-23).
+//
 // 저장·전송 규약은 아이폰과 같다: 사진 3장만 앱 전용 폴더에 두고, 생성할 때만 `faceRefs` 로
 // 참조 전송한다(서버는 저장하지 않는다). 얼굴 특징정보(임베딩)는 만들지 않는다.
 // ============================================================================
@@ -31,6 +35,11 @@ import { ANGLES, saveScanShots, type FaceAngle } from "@/lib/faceProfile";
 const REF_MAX_LONG = 1024;
 const RING = 328;
 const LENS = 300;
+
+/** 조명을 켰을 때 흰 바탕 위 글자색. 이 화면은 테마와 무관하게 늘 같은 톤이라 토큰이 아니라
+ *  고정값이다 — `color.ink` 를 쓰면 다크 모드에서 흰색으로 뒤집혀 흰 바탕에 안 보인다.
+ *  값은 아이폰 `FaceScanView.onLight` 와 같다. */
+const INK = "#231F20";
 
 interface Shot {
   uri: string;
@@ -60,8 +69,31 @@ export default function FaceScanScreen() {
   const [saving, setSaving] = useState(false);
   const shooting = useRef(false);
 
+  // 화면을 조명판으로 쓴다 — 어두운 데서 얼굴이 안 잡힐 때 직접 켠다.
+  const [light, setLight] = useState(false);
+
   const done = ANGLES.every((a) => shots[a]);
   const step: FaceAngle = ANGLES.find((a) => !shots[a]) ?? "side2";
+
+  // 바탕과 그 위에 얹는 색. 조명을 켜면 통째로 뒤집힌다.
+  const bg = light ? "#FFFFFF" : "#000000";
+  const fg = light ? INK : "#FFFFFF";
+  const fgDim = light ? "rgba(35,31,32,0.72)" : "rgba(255,255,255,0.72)";
+  const fgFaint = light ? "rgba(35,31,32,0.16)" : "rgba(255,255,255,0.16)";
+
+  // ⚠️ `setBrightnessAsync` 는 **이 액티비티 창**의 밝기만 바꾼다(네이티브 구현 실측:
+  //    `window.attributes.screenBrightness`). 시스템 설정을 건드리는 `setSystemBrightnessAsync`
+  //    와 달리 권한이 필요 없고, 앱을 벗어나면 안드로이드가 알아서 되돌린다 — 아이폰에서 겪은
+  //    "잠금화면까지 100% 로 남는" 문제가 여기선 구조적으로 안 생긴다.
+  //    그래서 `expo-brightness` 는 `plugins` 에 **넣지 않는다**. 넣으면 쓰지도 않는
+  //    `WRITE_SETTINGS` 가 매니페스트에 박힌다(plugin/build/withBrightness.js 확인).
+  useEffect(() => {
+    if (light) Brightness.setBrightnessAsync(1).catch(() => {});
+    else Brightness.restoreSystemBrightnessAsync().catch(() => {});
+  }, [light]);
+  useEffect(() => () => {
+    Brightness.restoreSystemBrightnessAsync().catch(() => {});
+  }, []);
 
   const asked = useRef(false);
   useEffect(() => {
@@ -164,15 +196,20 @@ export default function FaceScanScreen() {
 
   if (done) {
     return (
-      <View style={[styles.root, { paddingTop: insets.top + space.s5, paddingBottom: insets.bottom + space.s5 }]}>
+      <View
+        style={[
+          styles.root,
+          { backgroundColor: bg, paddingTop: insets.top + space.s5, paddingBottom: insets.bottom + space.s5 },
+        ]}
+      >
         <View style={styles.grow} />
-        <Text size="title2" style={styles.onDark}>이 얼굴을 사용할까요?</Text>
-        <Text size="footnote" style={[styles.dim, styles.centered]}>
+        <Text size="title2" style={{ color: fg }}>이 얼굴을 사용할까요?</Text>
+        <Text size="footnote" style={[styles.centered, { color: fgDim }]}>
           {"이 사진들은 이 휴대폰 안에만 저장돼요.\n사진을 만들 때만 참조로 쓰이고 서버에 보관하지 않아요."}
         </Text>
         <View style={styles.slots}>
           {ANGLES.map((a) => (
-            <Slot key={a} uri={shots[a]?.uri} label={LABEL[a]} size={96} />
+            <Slot key={a} uri={shots[a]?.uri} label={LABEL[a]} tint={fg} size={96} />
           ))}
         </View>
         <View style={styles.grow} />
@@ -180,7 +217,7 @@ export default function FaceScanScreen() {
           {saving ? <Spinner size={18} color={color.accentOn} /> : <Text size="callout" style={styles.primaryLabel}>이 얼굴로 시작하기</Text>}
         </Pressable>
         <Pressable accessibilityRole="button" onPress={reset} hitSlop={10} style={styles.textBtn}>
-          <Text size="footnote" style={styles.onDark}>다시 찍기</Text>
+          <Text size="footnote" style={{ color: fg }}>다시 찍기</Text>
         </Pressable>
       </View>
     );
@@ -191,10 +228,27 @@ export default function FaceScanScreen() {
   const progress = ANGLES.filter((a) => shots[a]).length / ANGLES.length;
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top + space.s3, paddingBottom: insets.bottom + space.s5 }]}>
+    <View
+      style={[
+        styles.root,
+        { backgroundColor: bg, paddingTop: insets.top + space.s3, paddingBottom: insets.bottom + space.s5 },
+      ]}
+    >
       <View style={styles.topRow}>
         <Pressable accessibilityRole="button" onPress={() => router.back()} hitSlop={10}>
-          <Text size="callout" style={styles.onDark}>닫기</Text>
+          <Text size="callout" style={{ color: fg }}>닫기</Text>
+        </Pressable>
+        {/* 어두운 데서 얼굴이 안 잡힐 때 화면을 조명판으로 쓴다. 아이폰은 자동, 여긴 수동. */}
+        <Pressable
+          accessibilityRole="switch"
+          accessibilityState={{ checked: light }}
+          accessibilityLabel="화면 조명"
+          onPress={() => setLight((v) => !v)}
+          hitSlop={10}
+          style={[styles.lightBtn, { borderColor: fgFaint }]}
+        >
+          <IconLight size={20} color={fg} on={light} />
+          <Text size="footnote" style={{ color: fg }}>조명</Text>
         </Pressable>
       </View>
 
@@ -209,14 +263,16 @@ export default function FaceScanScreen() {
         {/* ⚠️ 미리보기를 동그랗게 자를 방법이 없다 — expo-camera 의 안드로이드 미리보기는 CameraX
             `PreviewView` 기본값(PERFORMANCE = SurfaceView)이라 부모의 `borderRadius`·`overflow:hidden`
             이 안 먹고 제 레이아웃 **밖으로도** 그린다(실측: 원 오른쪽에 세로 선이 새어 나왔다).
-            그래서 검은 판을 덮고 원만 뚫는다. 판을 렌즈(300)가 아니라 **고리 크기(328)** 로 잡아
-            양옆 14 씩 여유를 준다 — 새어 나온 만큼까지 덮인다. */}
+            그래서 바탕색 판을 덮고 원만 뚫는다. 판을 렌즈(300)가 아니라 **고리 크기(328)** 로 잡아
+            양옆 14 씩 여유를 준다 — 새어 나온 만큼까지 덮인다.
+            ⚠️ 판 색은 **바탕색과 같아야 한다** — 조명을 켜면 흰색으로 같이 바뀐다. 검은색으로
+            고정해 두면 흰 화면 한가운데 검은 네모가 남는다. */}
         <Svg width={RING} height={RING} style={styles.mask} pointerEvents="none">
-          <Path d={maskPath(RING, RING, RING / 2, RING / 2, LENS / 2)} fill="#000000" fillRule="evenodd" />
+          <Path d={maskPath(RING, RING, RING / 2, RING / 2, LENS / 2)} fill={bg} fillRule="evenodd" />
         </Svg>
         {/* Face ID 등록의 그 고리 — 한 칸씩 차오른다. */}
         <Svg width={RING} height={RING} style={styles.ring} pointerEvents="none">
-          <Circle cx={RING / 2} cy={RING / 2} r={RING / 2 - 4} stroke="rgba(255,255,255,0.16)" strokeWidth={4} fill="none" />
+          <Circle cx={RING / 2} cy={RING / 2} r={RING / 2 - 4} stroke={fgFaint} strokeWidth={4} fill="none" />
           <Circle
             cx={RING / 2}
             cy={RING / 2}
@@ -236,15 +292,15 @@ export default function FaceScanScreen() {
       <View style={styles.grow} />
 
       <View style={styles.copy}>
-        <Text size="headline" style={styles.onDark}>{TITLE[step]}</Text>
-        <Text size="footnote" style={[styles.dim, styles.centered]}>{HINT[step]}</Text>
+        <Text size="headline" style={{ color: fg }}>{TITLE[step]}</Text>
+        <Text size="footnote" style={[styles.centered, { color: fgDim }]}>{HINT[step]}</Text>
       </View>
 
       <View style={styles.grow} />
 
       <View style={styles.slots}>
         {ANGLES.map((a) => (
-          <Slot key={a} uri={shots[a]?.uri} label={LABEL[a]} />
+          <Slot key={a} uri={shots[a]?.uri} label={LABEL[a]} tint={fg} />
         ))}
       </View>
 
@@ -252,9 +308,11 @@ export default function FaceScanScreen() {
         accessibilityRole="button"
         accessibilityLabel="촬영"
         onPress={capture}
-        style={styles.shutterRing}
+        style={[styles.shutterRing, { borderColor: light ? "rgba(35,31,32,0.9)" : "rgba(255,255,255,0.9)" }]}
       >
-        {({ pressed }) => <View style={[styles.shutterCore, pressed && styles.shutterPressed]} />}
+        {({ pressed }) => (
+          <View style={[styles.shutterCore, { backgroundColor: fg }, pressed && styles.shutterPressed]} />
+        )}
       </Pressable>
 
     </View>
@@ -267,16 +325,18 @@ function maskPath(w: number, h: number, cx: number, cy: number, r: number): stri
 }
 
 /** 모아 놓은 컷 한 칸 — 아직 안 찍은 칸은 빈 자리로 둔다(아이폰 ShotSlot 과 같게). */
-function Slot({ uri, label, size = 64 }: { uri?: string; label: string; size?: number }) {
+function Slot({ uri, label, tint, size = 64 }: { uri?: string; label: string; tint: string; size?: number }) {
   const h = Math.round((size / (3 / 4)) * 0.75);
+  // 빈 칸 바탕·글자는 바탕색 위에서 흐리게 — 조명을 켜면 tint 가 먹색이라 같이 뒤집힌다.
+  const box = tint === INK ? "rgba(35,31,32,0.12)" : "rgba(255,255,255,0.12)";
   return (
     <View style={styles.slot}>
-      <View style={[styles.slotBox, { width: size, height: h }]}>
+      <View style={[styles.slotBox, { width: size, height: h, backgroundColor: box }]}>
         {uri ? (
           <Image source={{ uri }} style={{ width: size, height: h }} contentFit="cover" transition={120} cachePolicy="memory-disk" />
         ) : null}
       </View>
-      <Text size="caption" style={uri ? styles.slotOn : styles.slotOff}>{label}</Text>
+      <Text size="caption" style={{ color: tint, opacity: uri ? 0.85 : 0.4 }}>{label}</Text>
     </View>
   );
 }
@@ -285,7 +345,16 @@ const styles = StyleSheet.create({
   root: { flex: 1, alignItems: "center", backgroundColor: "#000000", paddingHorizontal: space.screen },
   blank: { flex: 1, alignItems: "center", justifyContent: "center", gap: space.s3, backgroundColor: "#000000" },
   grow: { flex: 1 },
-  topRow: { alignSelf: "stretch", flexDirection: "row" },
+  topRow: { alignSelf: "stretch", flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  lightBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    height: 34,
+    paddingHorizontal: space.s3,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+  },
 
   lensWrap: { width: RING, height: RING, alignItems: "center", justifyContent: "center" },
   // 둥글게 자르지 않는다 — 위에 덮는 마스크가 원을 만든다(SurfaceView 는 부모 라운드가 안 먹는다).
@@ -298,20 +367,17 @@ const styles = StyleSheet.create({
 
   slots: { flexDirection: "row", gap: space.s3, marginBottom: space.s4 },
   slot: { alignItems: "center", gap: 6 },
-  slotBox: { borderRadius: 12, overflow: "hidden", backgroundColor: "rgba(255,255,255,0.12)" },
-  slotOn: { color: "rgba(255,255,255,0.85)" },
-  slotOff: { color: "rgba(255,255,255,0.4)" },
+  slotBox: { borderRadius: 12, overflow: "hidden" },
 
   shutterRing: {
     width: 74,
     height: 74,
     borderRadius: 37,
     borderWidth: 4,
-    borderColor: "rgba(255,255,255,0.9)",
     alignItems: "center",
     justifyContent: "center",
   },
-  shutterCore: { width: 56, height: 56, borderRadius: 28, backgroundColor: "#FFFFFF" },
+  shutterCore: { width: 56, height: 56, borderRadius: 28 },
   shutterPressed: { transform: [{ scale: 0.88 }] },
 
   onDark: { color: "#FFFFFF" },
