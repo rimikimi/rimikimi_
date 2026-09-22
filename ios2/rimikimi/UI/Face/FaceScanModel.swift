@@ -199,11 +199,25 @@ final class FaceScanModel {
 
     /// 이 버퍼를 똑바로 세우려면 어떤 EXIF 방향으로 읽어야 하는가.
     ///
-    /// 전면 카메라 센서는 **가로로 누운 채** 프레임을 준다. 그대로 두면 90도 돌아간 사진이 남는다
-    /// (오너 기기 실측: 저장본을 반시계 90도 돌려야 똑바로 섰다 → EXIF 8 = `.left`).
-    /// 연결에 회전각이 걸려 세로로 들어오는 기기라면 손댈 게 없으므로 `.up`.
+    /// 전면 카메라 센서는 **가로로 누운 채** 프레임을 준다. 그대로 두면 돌아간 사진이 남는다.
+    ///
+    /// ⚠️ 빌드 8 이 **180도 뒤집힌** 사진을 남겼다(오너 기기 캡처 실측: 180도 돌리면 똑바로 선다).
+    ///    빌드 8 은 여기서 가로면 `.left`, 세로면 `.up` 이었는데 **어느 쪽이 탔는지는 모른다** —
+    ///    둘 다 "180도 어긋남" 을 만들 수 있다.
+    ///      · 가로 분기였다면: 저장본 = CCW90(버퍼) → 버퍼 = CCW90(똑바로) → 필요한 건 CW90(`.right`)
+    ///      · 세로 분기였다면: `.up` 은 아무것도 안 하므로 저장본 = 버퍼 = 180도(똑바로) → 필요한 건 180도(`.down`)
+    ///    그래서 **두 분기 모두** 빌드 8 저장본을 180도 돌린 결과가 나오게 값을 잡았다. 어느 쪽이
+    ///    실제 경로든 결과는 같다.
+    ///
+    ///    (빌드 8 이 틀린 이유는 계산이 아니라 비교 대상이었다: 빌드 7 저장본으로 보정값을 쟀는데
+    ///     그 버퍼엔 연결 회전 `videoRotationAngle = 90` 이 걸려 있었다. 그 회전을 떼면서 보정값만
+    ///     그대로 가져다 썼다 — 한 번에 둘을 바꿔 놓고 하나만 바뀐 셈 쳤다.)
+    ///
+    ///    회전 방향은 돌려서 확인했다: `.right` 는 좌상단→우상단(CW90), `.down` 은 좌상단→우하단(180도).
+    ///    ⚠️ 언젠가 **이미 똑바로 선 세로 버퍼**를 주는 기기가 나오면 `.down` 이 그걸 뒤집는다.
+    ///       그때의 제대로 된 답은 `AVCaptureDevice.RotationCoordinator` 다 — 지금은 한 번에 하나만 바꾼다.
     private static func upright(_ buffer: CVPixelBuffer) -> CGImagePropertyOrientation {
-        CVPixelBufferGetWidth(buffer) > CVPixelBufferGetHeight(buffer) ? .left : .up
+        CVPixelBufferGetWidth(buffer) > CVPixelBufferGetHeight(buffer) ? .right : .down
     }
 
     private static func image(from buffer: CVPixelBuffer) -> UIImage? {

@@ -36,13 +36,15 @@ final class FaceProfileStore {
     }
     private func url(_ a: Angle) -> URL { dir.appendingPathComponent("\(a.rawValue).jpg") }
 
-    /// 저장 형식 판(版). 2 = 스캔본이 **90도 누워** 저장되던 것을 고친 뒤(2026-09-22, `FaceScanModel.upright`).
+    /// 저장 형식 판(版).
+    ///   2 = 스캔본이 90도 누워 저장되던 것을 고친 뒤(2026-09-22)
+    ///   3 = 그 고침이 **방향을 반대로 잡아** 180도 뒤집혀 저장되던 것을 다시 고친 뒤(빌드 8 실측)
     ///
     /// 판이 올라가면 갖고 있던 사진을 버린다. 이 사진들은 생성할 때 `faceRefs` 로 그대로 모델에
     /// 참조로 실려 가므로(`RimikimiAPI` body["faceRefs"]), 누운 참조를 계속 보내면 얼굴이 안 지켜진다
     /// — 오너가 "스캔해온 게 더 얼굴 유지가 안 된다" 고 한 게 이것이다. 앱만 고치고 파일을 두면
     /// 이미 스캔해 둔 사람은 계속 누운 걸 보내게 된다.
-    private static let version = 2
+    private static let version = 3
     private var versionURL: URL { dir.appendingPathComponent("version") }
 
     init() {
