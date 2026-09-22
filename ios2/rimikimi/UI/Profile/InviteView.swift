@@ -85,7 +85,7 @@ struct InviteView: View {
         claiming = true
         Task {
             defer { claiming = false }
-            guard let token = await app.auth.validAccessToken() else { app.loginSheet = true; return }
+            guard let token = await app.auth.validAccessToken() else { app.handleNoToken(); return }
             do {
                 let r = try await RimikimiAPI.shared.referralClaim(code: code, token: token)
                 if r.ok {

@@ -64,7 +64,7 @@ final class AuthStore {
     func validAccessToken() async -> String? {
         guard let s = session else { return nil }
         if !s.isExpiringSoon { return s.accessToken }
-        guard let refresh = s.refreshToken else { signOut(); return nil }
+        guard let refresh = s.refreshToken else { forcedSignOut(); return nil }
         do {
             let json = try await SupabaseAuthAPI.token(grant: "refresh_token", body: ["refresh_token": refresh])
             adopt(json: json, provider: s.provider)
@@ -77,7 +77,8 @@ final class AuthStore {
             //    취소는 세션을 그대로 두고 nil 만 돌려준다 — 연결이 돌아오면 다음 호출이 갱신한다.
             let status = (error as? SupabaseAuthAPI.Failure)?.status ?? 0
             AppLog.auth.error("refresh.failed status=\(status) \(error.localizedDescription, privacy: .public)")
-            if (400...499).contains(status) { signOut() }
+            // 429(요청 제한)·408, 공용 Wi-Fi 포털이 주는 엉뚱한 4xx 로는 로그아웃하지 않는다.
+            if [400, 401, 403].contains(status) { forcedSignOut() }
             return nil
         }
     }
@@ -218,6 +219,15 @@ final class AuthStore {
     func signOut() {
         session = nil
         keychain.clear()
+    }
+
+    /// 서버가 토큰을 **거절**해 강제로 로그아웃될 때 앱 전체 정리(얼굴 사진·스캔·카드·탭 스택)를
+    /// 돌리게 AppState 가 연결한다. 없으면 이 경로만 정리를 건너뛰어, 다음 계정이 로그인했을 때
+    /// 앞사람 얼굴이 생성 참조로 나갔다(2026-09-23 스윕 U3).
+    var onForcedSignOut: (() -> Void)?
+    private func forcedSignOut() {
+        signOut()
+        onForcedSignOut?()
     }
 
     // MARK: -

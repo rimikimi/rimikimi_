@@ -190,6 +190,8 @@ final class AppState {
         // 의존하지 않도록 클로저로 잇는다.
         concepts.favoriteIDs = { [favorites] in favorites.concepts }
         concepts.favoriteCategories = { [favorites] in favorites.categories }
+        // 토큰이 서버에서 거절돼 강제 로그아웃될 때도 앱 전체 정리를 탄다(얼굴 사진·스캔·카드·탭 스택).
+        auth.onForcedSignOut = { [weak self] in self?.signOut() }
     }
 
     /// 얼굴 스캔 결과 저장 — 3장은 기기에, 정면 1장은 기존 "내 사진" 자리에도 넣는다(옵션 화면·
@@ -227,7 +229,7 @@ final class AppState {
     func perform(_ action: PendingAction) async {
         switch action {
         case .generate(var req):
-            guard let token = await auth.validAccessToken() else { loginSheet = true; return }
+            guard let token = await auth.validAccessToken() else { handleNoToken(); return }
             // 제3자 AI 전송 고지 — 계정당(기기당) 1회만. 동의 전이면 요청을 미뤄두고 시트를 띄운다.
             guard Self.aiConsentGiven else {
                 pendingAfterConsent = req
@@ -369,6 +371,13 @@ final class AppState {
     }
 
     /// 구매 성공 → 크레딧 갱신 → 하던 생성(또는 채워 맞춤) 이어가기.
+    /// 스토어 탭(크레딧 시트가 아닌 곳)에서 샀을 때 — 잔액만 새로 받고 **아무것도 이어가지 않는다**.
+    /// 시트가 못 뜬 채 남은 예약(다른 모달 위에서 부족이 났을 때)이 여기서 몰래 실행되면 안 된다.
+    func refreshAfterStorePurchase() async {
+        dropPendingPurchase()
+        await refreshQuota()
+    }
+
     func continueAfterPurchase() async {
         await refreshQuota()
         creditsSheet = false
@@ -399,12 +408,17 @@ final class AppState {
         Task { await runOutpaint(image) }
     }
 
+    /// ⚠️ 채워 맞춤은 결과 화면 위 FitSheet(.sheet) 에서 돈다. 여기서 크레딧 시트를 띄우면
+    ///    iOS 는 "프레젠터당 모달 1개" 라 조용히 무시한다 — 무반응인 데다, 남은 예약
+    ///    (pendingOutpaintPhoto)이 나중에 스토어에서 살 때 **보이지 않게 채워 맞춤을 돌려
+    ///    1크레딧을 썼다**(2026-09-23 스윕). 그래서 FitSheet 안에 이유를 보여 주고 끝낸다.
+    static let outpaintNeedCredit = "채워 맞춤은 1크레딧이 필요해요. 프로필 › 크레딧 충전 뒤 다시 눌러 주세요."
+
     private func runOutpaint(_ image: UIImage) async {
-        guard let token = await auth.validAccessToken() else { loginSheet = true; return }
+        guard let token = await auth.validAccessToken() else { handleNoToken(); return }
         // 채워 맞춤은 1크레딧 고정 — 하루 무료 한도로는 안 된다(서버 api/generate.js outpaint 분기).
         if let q = quota, q.unlimited != true, q.creditsAvailable < 1 {
-            pendingOutpaintPhoto = image
-            creditsSheet = true
+            outpaintPhase = .error(Self.outpaintNeedCredit)
             return
         }
         outpaintPhase = .running
@@ -420,9 +434,7 @@ final class AppState {
         } catch let error as APIError {
             // quota 가 낡아 게이트를 통과했는데 서버가 크레딧 부족을 준 경우 — 이유 모를 실패 대신 충전 시트.
             if error.quotaExceeded {
-                outpaintPhase = .idle
-                pendingOutpaintPhoto = image
-                creditsSheet = true
+                outpaintPhase = .error(Self.outpaintNeedCredit)
                 await refreshQuota()
                 return
             }
@@ -455,7 +467,21 @@ final class AppState {
         generation.clearAll()
         pendingAfterPurchase = nil
         pendingOutpaintPhoto = nil
+        // 결과 화면·옵션 화면이 탭 스택에 남아 있으면 앞사람 결과 사진(메모리의 UIImage)과
+        // 커플 상대·의상 사진이 그대로 보이고 저장·공유까지 됐다(2026-09-23 스윕 blocker).
+        galleryPath.removeAll()
+        myPhotosPath.removeAll()
+        profilePath.removeAll()
+        webTool = nil
         Task { await store.logOut() }
+    }
+
+    /// 토큰을 못 받았을 때 — **로그인 안 된 것**과 **오프라인**을 구분한다.
+    /// 오프라인이면 세션은 살아 있으니(①, dfe153b) 로그인 시트를 띄우면 안 된다 —
+    /// 프로필은 로그인 상태인데 로그인하라는 시트가 뜨고, 하던 요청은 사라졌다(스윕 H1).
+    func handleNoToken() {
+        if auth.session == nil { loginSheet = true }
+        else { showToast("인터넷 연결을 확인한 뒤 다시 시도해 주세요.") }
     }
 
     // MARK: 결과 화면

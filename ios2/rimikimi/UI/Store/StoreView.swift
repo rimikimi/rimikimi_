@@ -65,11 +65,11 @@ struct StoreView: View {
         busyID = pack.id
         Task {
             defer { busyID = nil }
-            guard let token = await app.auth.validAccessToken() else { app.loginSheet = true; return }
+            guard let token = await app.auth.validAccessToken() else { app.handleNoToken(); return }
             do {
                 if let n = try await app.store.purchase(pack, token: token) {
                     app.showToast("🎉 +\(n) 크레딧 충전 완료!")
-                    await app.continueAfterPurchase()
+                    await app.refreshAfterStorePurchase() // 스토어 탭 — 예약 이어가지 않음
                 }
             } catch {
                 app.showToast("결제 처리 실패: \(error.localizedDescription)")
@@ -173,7 +173,10 @@ struct CreditsSheet: View {
         busyID = pack.id
         Task {
             defer { busyID = nil }
-            guard let token = await app.auth.validAccessToken() else { dismiss(); app.loginSheet = true; return }
+            guard let token = await app.auth.validAccessToken() else {
+                if app.auth.session == nil { dismiss(); app.loginSheet = true } else { app.handleNoToken() }
+                return
+            }
             do {
                 if let n = try await app.store.purchase(pack, token: token) {
                     app.showToast("🎉 +\(n) 크레딧 충전 완료!")

@@ -1687,8 +1687,11 @@ export default async function handler(req, res) {
   if (!upstream.ok) {
     const raw = await upstream.text().catch(() => "");
     console.error("[generate] 최종 실패:", upstream.status, raw.slice(0, 300));
-    // 혼잡 계열(5xx/404)은 사용자 잘못이 아니므로 안내 문구로, 그 외(400 등)만 원문을 보여준다.
-    if (upstream.status === 404 || upstream.status >= 500) {
+    // 혼잡 계열(5xx/404/429)은 사용자 잘못이 아니므로 안내 문구로, 그 외(400 등)만 원문을 보여준다.
+    // ⚠️ 이미지 모델의 429(RESOURCE_EXHAUSTED)를 그대로 넘기면 앱은 429 를 **크레딧 부족**으로
+    //    읽는다 — 크레딧이 있는데 충전 시트가 떴다(2026-09-23 iOS 스윕 H2). 우리 쿼터의 429 는
+    //    위에서 이미 따로 돌려주므로, 여기 오는 429 는 전부 업스트림 혼잡이다 → 503.
+    if (upstream.status === 404 || upstream.status === 429 || upstream.status >= 500) {
       return res.status(503).json({
         error: BUSY_MSG,
         busy: true,
