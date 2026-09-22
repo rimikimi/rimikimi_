@@ -115,6 +115,26 @@ export const IconCamera = (p: IconProps) => (
   </Base>
 );
 
+/** 전/후면 전환 — 카메라 위에 화살표 두 개가 도는 모양(아이폰 arrow.triangle.2.circlepath.camera 자리). */
+export const IconCameraFlip = (p: IconProps) => (
+  <Base {...p}>
+    <Path d="M9 7.5 L10.2 5 L13.8 5 L15 7.5" />
+    <Rect x={3.5} y={7.5} width={17} height={12} rx={3} />
+    <Path d="M9.2 13.8 A2.9 2.9 0 0 1 14.8 13" />
+    <Path d="M14.8 13 L14.9 10.9 M14.8 13 L12.7 13.1" />
+    <Path d="M14.8 13.2 A2.9 2.9 0 0 1 9.2 14" />
+    <Path d="M9.2 14 L9.1 16.1 M9.2 14 L11.3 13.9" />
+  </Base>
+);
+
+/** 플래시 — `off` 면 번개에 사선을 긋는다. */
+export const IconFlash = ({ off, ...p }: IconProps & { off?: boolean }) => (
+  <Base {...p}>
+    <Path d="M13.4 3 L6.8 13 L11.4 13 L10.6 21 L17.2 11 L12.6 11 Z" />
+    {off ? <Path d="M4.5 4.5 L19.5 19.5" /> : null}
+  </Base>
+);
+
 export const IconGrid = (p: IconProps) => (
   <Base {...p}>
     <Rect x={5} y={5} width={6.4} height={6.4} rx={1.6} />

@@ -105,6 +105,11 @@ const config: ExpoConfig = {
         microphonePermission: false,
       },
     ],
+    // 연속 촬영 화면(src/app/camera.tsx). 기본 카메라로는 한 장 찍으면 앱으로 돌아와 버려서
+    // 뷰파인더를 직접 띄운다(아이폰 BurstCamera.swift 와 같은 이유).
+    // ⚠️ `recordAudioAndroid: false` 가 핵심 — 안 주면 expo-camera 가 제 매니페스트의
+    //    RECORD_AUDIO 를 그대로 합쳐 **쓰지도 않는 마이크 권한**이 스토어 목록에 뜬다.
+    ["expo-camera", { cameraPermission: "여러 장을 찍어 한 번에 필터를 입히기 위해 카메라를 사용해요.", recordAudioAndroid: false }],
     [
       "expo-media-library",
       {
