@@ -166,33 +166,33 @@ Apple Guideline 3.1.2 — 구독을 파는 앱은 앱 설명 안에 **표준 EUL
 
 ---
 
-## 3-3. 이번 업데이트 노트 (2.0.1 — "새로운 기능", App Store Connect 버전별 필드)
+## 3-3. 이번 업데이트 노트 (2.0.1 — "새로운 기능", ASC 적용본. 라이브 1.40 → 네이티브 2.0 첫 출시)
 
 > ⚠️ 8/28 4.3(a) 반려 원인 = 필터 위주 노트. AI 기능을 앞에, 필터·카메라는 넣지 않는다.
 > 얼굴 스캔은 "더 정확해진다" 같은 효과 문구 금지 — 편의성만 말한다(face_profile_ab).
 
 ### 한국어
 ```
-rimikimi 2.0.1 업데이트
+리미키미 2.0 — 더 빠르고 매끄러운 네이티브 앱으로 새로 만들었어요
 
 · 얼굴 스캔: 정면·좌·우 세 방향을 한 번 찍어 두면, 컨셉마다 사진을 다시 올릴 필요 없이 바로 만들 수 있어요
 · 동시 생성: 여러 컨셉을 한꺼번에 맡겨 두고, 완성되는 대로 '내 사진'에서 확인하세요
-· 드레스룸: 옷 사진을 올리면 그 옷을 입은 내 모습을 만들어 드려요 (한 번에 5벌까지)
+· 드레스룸: 옷 사진을 최대 5장 올리면 그 코디를 입은 내 모습을 만들어 드려요
 · 보관 기간 연장: 만든 사진을 24시간 동안 보관해요 (기존 1시간)
-· 로그인 유지·결제 안정성 등 여러 문제를 고쳤어요
+· 다크 모드 지원, 화면 전환이 더 자연스러워졌어요
 
 의견은 결과 화면의 "신고" 버튼이나 enquiry@rimikimi.com 으로 알려주세요.
 ```
 
 ### English
 ```
-rimikimi 2.0.1
+rimikimi 2.0 — rebuilt from the ground up as a faster, smoother native app
 
 · Face scan: capture front, left and right once, then create any concept without re-uploading a photo
 · Generate in parallel: queue several concepts at once and find each one in My Photos as it finishes
-· Dress room: upload clothing photos and see yourself wearing them (up to 5 at a time)
+· Dressing Room: upload up to 5 clothing photos and see yourself wearing the outfit
 · Longer storage: generated photos are now kept for 24 hours (was 1 hour)
-· Fixes for sign-in persistence, purchases and more
+· Dark mode and smoother transitions
 
 Feedback? Use the report button on the result screen, or email enquiry@rimikimi.com.
 ```
@@ -297,8 +297,18 @@ Subscriptions (rimikimi+) remove ads in sandbox; their monthly credit top-up is
 granted only for production purchases. Please use a credit pack to verify credits.
 "구매 복원" (Restore Purchases) is on the Store screen.
 
-- Face photos and face-scan photos are stored only on the device; they are sent
-  to our server only as reference images when you generate, and are not retained.
+FACE SCAN (optional, Profile > "얼굴 스캔하기") — convenience only, so the user does
+not have to pick a photo for every concept:
+- The camera captures 3 photos (front, left, right). Apple's Vision framework is
+  used on-device only to check head angle and image quality while capturing.
+- The user reviews the 3 photos and taps "이 얼굴로 시작하기" to save them. They are
+  stored ONLY on the device (app sandbox), never on our servers.
+- They are sent to our backend as reference images only when the user generates,
+  and are discarded right after. No face embeddings/templates are created or
+  stored, and they are not used for authentication or identification.
+- Delete any time: Profile > 내 사진 > 삭제. Also removed on sign-out.
+
+- Uploaded photos are sent to Google Gemini for generation and are not retained.
 - Generated images are deleted from our server after 24 hours.
 - Account deletion: Profile > 계정 삭제 (Delete account).
 - Report an inappropriate result: the report button on the result screen.
