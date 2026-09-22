@@ -166,7 +166,7 @@ targets:
         # 2026-09-22: 2 — 핀치/확대전환 충돌, 필름스트립 스크러버, 아래로 끌어 닫기.
         # 2026-09-22: 3 — 연속 촬영 카메라(여러 장 → 한 번에 필터) + 필터 탭 새 레이아웃(A안).
         # 2026-09-22: 4 — 미리보기 3:4 전면 강제, 격자 여백, 큰 사진 스와이프 복구, 필름스트립 부드럽게.
-        CURRENT_PROJECT_VERSION: "4"
+        CURRENT_PROJECT_VERSION: "5"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
       configs:
