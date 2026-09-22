@@ -100,7 +100,7 @@
 
 🔒 안심하세요
 · 업로드한 사진은 서버에 저장되지 않아요
-· 생성된 이미지는 1시간만 보관 후 자동 삭제
+· 생성된 이미지는 24시간만 보관 후 자동 삭제
 · 개인정보는 안전하게 보호됩니다
 
 지금 rimikimi로 나만의 인생 프로필을 만들어보세요!
@@ -143,7 +143,7 @@ oil paintings, watercolors, charcoal drawings, and more.
 
 🔒 Privacy First
 · Your uploaded photo is never stored on our servers
-· Generated images auto-delete after 1 hour
+· Generated images auto-delete after 24 hours
 · Your personal data stays protected
 
 Create your dream profile with rimikimi today!
@@ -166,32 +166,35 @@ Apple Guideline 3.1.2 — 구독을 파는 앱은 앱 설명 안에 **표준 EUL
 
 ---
 
-## 3-3. 이번 업데이트 노트 (2.0 — "새로운 기능", App Store Connect 버전별 필드)
+## 3-3. 이번 업데이트 노트 (2.0.1 — "새로운 기능", App Store Connect 버전별 필드)
+
+> ⚠️ 8/28 4.3(a) 반려 원인 = 필터 위주 노트. AI 기능을 앞에, 필터·카메라는 넣지 않는다.
+> 얼굴 스캔은 "더 정확해진다" 같은 효과 문구 금지 — 편의성만 말한다(face_profile_ab).
 
 ### 한국어
 ```
-🎉 완전히 새로워진 rimikimi 2.0
+rimikimi 2.0.1 업데이트
 
-· 더 빠르고 매끄러운 네이티브 앱으로 새로 만들었어요
-· 카메라가 아이폰 기본 카메라처럼 바로 찍혀요
-· 이미지를 여러 개 동시에 만들 수 있어요
-· 화면 전환과 애니메이션이 더 자연스러워졌어요
-· 다크 모드를 지원해요
+· 얼굴 스캔: 정면·좌·우 세 방향을 한 번 찍어 두면, 컨셉마다 사진을 다시 올릴 필요 없이 바로 만들 수 있어요
+· 동시 생성: 여러 컨셉을 한꺼번에 맡겨 두고, 완성되는 대로 '내 사진'에서 확인하세요
+· 드레스룸: 옷 사진을 올리면 그 옷을 입은 내 모습을 만들어 드려요 (한 번에 5벌까지)
+· 보관 기간 연장: 만든 사진을 24시간 동안 보관해요 (기존 1시간)
+· 로그인 유지·결제 안정성 등 여러 문제를 고쳤어요
 
-버그나 의견은 결과 화면의 "신고" 버튼이나 enquiry@rimikimi.com 으로 알려주세요.
+의견은 결과 화면의 "신고" 버튼이나 enquiry@rimikimi.com 으로 알려주세요.
 ```
 
 ### English
 ```
-🎉 rimikimi 2.0 — Completely Rebuilt
+rimikimi 2.0.1
 
-· Rebuilt from the ground up as a faster, smoother native app
-· The camera now opens exactly like your iPhone's built-in camera
-· Generate multiple images at once
-· Smoother screen transitions and animations
-· Dark mode support
+· Face scan: capture front, left and right once, then create any concept without re-uploading a photo
+· Generate in parallel: queue several concepts at once and find each one in My Photos as it finishes
+· Dress room: upload clothing photos and see yourself wearing them (up to 5 at a time)
+· Longer storage: generated photos are now kept for 24 hours (was 1 hour)
+· Fixes for sign-in persistence, purchases and more
 
-Found a bug or have feedback? Use the report button on the result screen, or email enquiry@rimikimi.com.
+Feedback? Use the report button on the result screen, or email enquiry@rimikimi.com.
 ```
 
 ## 3-4. TestFlight "무엇을 테스트할지" (build 99, 내부 테스터용)
@@ -264,29 +267,41 @@ One selfie is all it takes! AI-crafted profile pictures in endless concepts.
 > **사진 입력 다음 단계로 넘어갈 때** 뜬다 — 심사 메모에 그 경로가 적혀 있어야 한다.
 > (무료 1장/일 개방 — 아무 계정으로도 생성 테스트 가능. 크레딧/구독 흐름은 데모 계정으로 Sandbox 결제 테스트)
 
-### 심사 메모 (Notes) — 영어 예시
+### 심사 메모 (Notes) — 영어 (2.0.1, 네이티브 SwiftUI 앱 기준)
 ```
-This app generates AI portraits from a user-uploaded photo.
+rimikimi creates AI portraits from the user's own face photo. This is a native
+SwiftUI app; image generation runs on our backend via the Google Gemini API.
 
-The app is fully browsable WITHOUT an account. Sign-in is requested only when the
-user moves past the photo step (generated images are saved to the account), so the
-first screen is the app itself — not a login wall.
+The app is browsable WITHOUT an account. Sign-in is requested only when you tap
+Create (generated images are saved to the account).
+
+Demo account: appreview@rimikimi.com (password below). It has credits pre-loaded,
+so multi-image generation and Dress room can be tested without purchasing.
 
 To test:
-1. Launch the app. You are signed out; browse and pick a style freely.
-2. Pick a concept from the gallery.
-3. Add a face photo (any sample selfie works).
-4. Tap Next (다음).
-5. A sign-in sheet appears ("Sign in to save your generated image").
-   Sign in with the demo account below, or any social login.
-6. Your style and photo are preserved — the flow continues where you left off.
+1. Launch the app and pick any concept from the Home tab.
+2. Add a face photo (any sample selfie) or use Profile > Face scan (3 angles).
+3. Tap Create. Sign in with the demo account when the sheet appears.
+   Before the very first generation a one-time consent sheet explains that the
+   photo is sent to Google Gemini; tap "동의하고 계속" (Agree and continue).
+4. The result appears in about 30-60 seconds. Several generations can run at the
+   same time; progress is shown in the My Photos tab.
+5. Dress room: open the "드레스룸" (Dress room) concept in the "매직 부스" (Magic booth)
+   category and add up to 5 clothing photos.
 
-Notes:
-- Image generation runs on our backend via the Google Gemini API.
-- Photos picked before sign-in are kept only on the device (IndexedDB/localStorage)
-  and are moved to the account slot after sign-in. They are never uploaded until
-  generation, which always requires an authenticated request.
-- Account deletion is available in-app under Settings.
+App Tracking Transparency: the ATT prompt appears about 1 second after your FIRST
+generated result is shown. This timing is intentional (it is not shown at launch).
+
+In-App Purchase (sandbox): credit packs grant credits in the sandbox environment.
+Subscriptions (rimikimi+) remove ads in sandbox; their monthly credit top-up is
+granted only for production purchases. Please use a credit pack to verify credits.
+"구매 복원" (Restore Purchases) is on the Store screen.
+
+- Face photos and face-scan photos are stored only on the device; they are sent
+  to our server only as reference images when you generate, and are not retained.
+- Generated images are deleted from our server after 24 hours.
+- Account deletion: Profile > 계정 삭제 (Delete account).
+- Report an inappropriate result: the report button on the result screen.
 
 App bundle ID: com.rimikimi.app
 ```
