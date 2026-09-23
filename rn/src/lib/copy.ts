@@ -130,7 +130,7 @@ export const copy = {
   filter: {
     title: "필터",
     shoot: "카메라로 찍기",
-    groups: { film: "필름", camera: "카메라", fun: "재미" },
+    groups: { phone: "폰카", film: "필름", camera: "카메라", fun: "재미" },
     open: "편집기 열기",
   },
   camera: { title: "카메라" },

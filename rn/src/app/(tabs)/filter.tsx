@@ -25,6 +25,7 @@ import { color, radius, space, themedStyles } from "@/theme/tokens";
  */
 
 const GROUP_LABEL: Record<string, string> = {
+  phone: copy.filter.groups.phone,
   film: copy.filter.groups.film,
   camera: copy.filter.groups.camera,
   fun: copy.filter.groups.fun,
