@@ -86,7 +86,7 @@ final class FaceScanModel {
     private static let holdFront: TimeInterval = 1.2
     private static let holdSide: TimeInterval = 0.8
     /// 화면이 열린 뒤 / 한 컷 찍은 뒤 찍지 않는 시간(초).
-    private static let warmUp: TimeInterval = 1.5
+    private static let warmUp: TimeInterval = 2.0
     private static let betweenShots: TimeInterval = 1.2
     private static let minFaceWidth: CGFloat = 0.28
     private static let minQuality: Float = 0.35
