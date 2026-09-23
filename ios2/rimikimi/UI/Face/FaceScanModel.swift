@@ -9,8 +9,12 @@ import Observation
 ///  1) 얼굴이 **하나만** 보인다
 ///  2) 얼굴이 화면에서 충분히 크다(가로 ≥ 28%) — `_design/face-profile-v1.md` 품질 게이트
 ///  3) `VNDetectFaceCaptureQualityRequest` 점수가 기준 이상(흐림·저조도·눈감음을 한 번에 거른다)
-/// 여기에 단계별 각도 조건(정면 = |yaw| 작음, 옆 = |yaw| 큼)을 더하고, **연속 3프레임** 유지될 때만
+/// 여기에 단계별 각도 조건(정면 = |yaw| 작음, 옆 = |yaw| 큼)을 더하고, 그 자세를 **정해진 시간** 유지할 때만
 /// 잡는다(고개가 스쳐 지나가는 순간에 찍히지 않게).
+///
+/// ⚠️ 예전엔 "연속 3프레임"이었다 = 30fps 에서 0.1초. 화면이 열리자마자 정면 컷이 찍혀
+///    준비도 안 된 얼굴이 저장됐다(오너 지적 2026-09-23). 그래서 ① 열린 뒤 준비 시간 ② 자세 유지 시간
+///    ③ 컷 사이 쉬는 시간을 둔다. 유지 시간 동안 고리가 차올라 "곧 찍힌다"가 보인다.
 @MainActor
 @Observable
 final class FaceScanModel {
@@ -22,7 +26,13 @@ final class FaceScanModel {
     private(set) var justCaptured = false
     /// 첫 옆모습에서 잡힌 yaw 부호. 두 번째 옆모습은 **반대 부호**를 요구한다.
     private var firstSideSign: Double = 0
-    private var holdFrames = 0
+    /// 조건이 맞기 시작한 시각. 조건이 깨지면 nil.
+    private var validSince: Date?
+    /// 이 시각 전에는 찍지 않는다 — 화면이 막 열렸을 때·방금 한 컷 찍었을 때.
+    private var blockedUntil = Date.distantPast
+    /// 지금 컷의 유지 진행률 0…1 (고리 표시용 — 프레임마다 갱신해 화면이 따라 움직인다).
+    private(set) var holdProgress: Double = 0
+    private(set) var isWarmingUp = true
     private var lastQualityFail: String?
 
     /// 화면 조명을 켜야 하는가 — 어두운 데서만 켠다(오너 지시 2026-09-23).
@@ -48,9 +58,9 @@ final class FaceScanModel {
         case .done: return 1
         }
     }
-    private var holdProgress: Double { min(1, Double(holdFrames) / Double(Self.holdNeeded)) }
 
     var title: String {
+        if isWarmingUp && step == .front { return "준비하세요" }
         switch step {
         case .front: return "정면을 봐주세요"
         case .side1: return "고개를 한쪽으로 천천히"
@@ -59,7 +69,9 @@ final class FaceScanModel {
         }
     }
     var hint: String {
+        if isWarmingUp && step == .front { return "얼굴을 원 안에 맞춰 주세요 · 곧 시작해요" }
         if let lastQualityFail { return lastQualityFail }
+        if holdProgress > 0 { return "그대로 멈춰 주세요" }
         switch step {
         case .front: return "얼굴을 원 안에 꽉 채워 주세요"
         case .side1, .side2: return "45도쯤에서 잠깐 멈추면 자동으로 찍혀요"
@@ -70,7 +82,12 @@ final class FaceScanModel {
     /// 최대 ISO 의 이만큼 이상을 쓰고 있으면 어두운 것으로 본다.
     private static let darkISOFraction: Float = 0.4
     private static let darkFramesNeeded = 8
-    private static let holdNeeded = 3          // 연속 프레임
+    /// 자세를 이만큼 유지해야 찍힌다(초). 정면은 표정·머리 정리할 시간을 조금 더 준다.
+    private static let holdFront: TimeInterval = 1.2
+    private static let holdSide: TimeInterval = 0.8
+    /// 화면이 열린 뒤 / 한 컷 찍은 뒤 찍지 않는 시간(초).
+    private static let warmUp: TimeInterval = 1.5
+    private static let betweenShots: TimeInterval = 1.2
     private static let minFaceWidth: CGFloat = 0.28
     private static let minQuality: Float = 0.35
     private static let frontYaw: Double = 10   // 도
@@ -80,6 +97,7 @@ final class FaceScanModel {
 
     func start() async {
         guard await AVCaptureDevice.requestAccess(for: .video) else { return }
+        beginWarmUp()
         guard session.inputs.isEmpty else {
             if !session.isRunning { await startRunning() }
             return
@@ -121,10 +139,16 @@ final class FaceScanModel {
         queue.async { if s.isRunning { s.stopRunning() } }
     }
 
+    private func beginWarmUp() {
+        isWarmingUp = true
+        blockedUntil = Date().addingTimeInterval(Self.warmUp)
+        validSince = nil
+        holdProgress = 0
+    }
+
     func reset() {
         captured = [:]
         step = .front
-        holdFrames = 0
         firstSideSign = 0
         needsLight = false
         darkFrames = 0
@@ -179,10 +203,19 @@ final class FaceScanModel {
         }
 
         lastQualityFail = nil
-        holdFrames += 1
-        guard holdFrames >= Self.holdNeeded else { return }
-        holdFrames = 0
+        let now = Date()
+        // 준비 시간·컷 사이 쉬는 시간에는 조건이 맞아도 세지 않는다.
+        guard now >= blockedUntil else { validSince = nil; holdProgress = 0; return }
+        isWarmingUp = false
+        let since = validSince ?? now
+        validSince = since
+        let need = step == .front ? Self.holdFront : Self.holdSide
+        holdProgress = min(1, now.timeIntervalSince(since) / need)
+        guard holdProgress >= 1 else { return }
+        validSince = nil
+        holdProgress = 0
         capture(buffer, yaw: yaw)
+        blockedUntil = Date().addingTimeInterval(Self.betweenShots)
     }
 
     /// 카메라가 감도를 얼마나 끌어올리고 있나. 기기마다 최대 ISO 가 달라 **최대 대비 비율**로 본다.
@@ -206,7 +239,9 @@ final class FaceScanModel {
     }
 
     private func fail(_ message: String?) {
-        holdFrames = 0
+        validSince = nil
+        holdProgress = 0
+        if Date() >= blockedUntil { isWarmingUp = false }
         lastQualityFail = message
     }
 
