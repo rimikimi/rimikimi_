@@ -731,3 +731,249 @@ export function correctLensDistortion(data, w, h, amount) {
     }
   }
 }
+
+// ============================================================
+// 정방향 (기울기·원근 보정) — 2026-09-23 오너 지시
+//
+// "가로·세로 축이 틀어지고 각도가 이상한 사진"을 직각으로 편다. 사용자가 올린 사진 전용
+// (AI 생성 이미지는 대상 아님). 아이폰 사진 앱 자르기 도구의 기울기·세로·가로 3종과 같다.
+//
+//  · 기하 모델 = 호모그래피 한 장:  H = Zoom · R(tilt) · K(pv, ph)   (정규화 좌표, 중심 원점)
+//      K = [[1,0,0],[0,1,0],[ph,pv,1]] — pv≠0 이면 위아래로 갈수록 가로 폭이 달라진다
+//      (아래서 올려 찍어 모인 세로선을 편다). ph 는 좌우 방향 같은 것.
+//  · 렌더는 출력 픽셀 → H⁻¹ → (렌즈 반경 보정) → 원본을 양선형 1패스로 샘플링한다.
+//    두 번 리샘플하면 눈에 띄게 뭉개진다.
+//  · 돌리거나 펴면 모서리가 빈다 → 원본 비율 그대로, 빈 곳이 안 보일 만큼만 확대(cover).
+//    가장자리 픽셀을 늘려 채우는 클램프는 "고장"처럼 보여서 쓰지 않는다.
+//  · 자동: 선 방향(구조 텐서)을 모아 "보정 후 가로·세로에 딱 맞는 선이 가장 많아지는"
+//    (tilt, pv, ph) 를 찾는다. 증거가 약하면 손대지 않는다.
+// ============================================================
+
+function geoMatrix(tilt, pv, ph) {
+  // R(tilt) · K(pv, ph). tilt 는 도(시계 방향 +).
+  const t = (tilt || 0) * Math.PI / 180, c = Math.cos(t), s = Math.sin(t);
+  // K 행: [1,0,0],[0,1,0],[ph,pv,1]  → R·K
+  return [c, -s, 0, s, c, 0, ph || 0, pv || 0, 1];
+}
+function invert3(m) {
+  const [a, b, c, d, e, f, g, h, i] = m;
+  const A = e * i - f * h, B = -(d * i - f * g), C = d * h - e * g;
+  const det = a * A + b * B + c * C;
+  if (Math.abs(det) < 1e-12) return null;
+  const k = 1 / det;
+  return [A * k, -(b * i - c * h) * k, (b * f - c * e) * k,
+          B * k, (a * i - c * g) * k, -(a * f - c * d) * k,
+          C * k, -(a * h - b * g) * k, (a * e - b * d) * k];
+}
+function mapPt(m, x, y) {
+  const w = m[6] * x + m[7] * y + m[8];
+  return [(m[0] * x + m[1] * y + m[2]) / w, (m[3] * x + m[4] * y + m[5]) / w, w];
+}
+
+// 보정 후 빈 모서리가 안 보이게 필요한 확대율. 출력 사각형(반폭 ax, 반높이 ay, 정규화)의
+// 테두리를 H⁻¹ 로 원본에 되돌려 전부 원본 안에 들어오는 가장 큰 배율을 이분 탐색한다.
+function coverZoom(inv, ax, ay) {
+  const inside = (s) => {
+    const N = 24;
+    for (let k = 0; k <= N; k++) {
+      const u = -1 + (2 * k) / N;
+      const pts = [[u * ax * s, -ay * s], [u * ax * s, ay * s], [-ax * s, u * ay * s], [ax * s, u * ay * s]];
+      for (const [x, y] of pts) {
+        const [sx, sy, w] = mapPt(inv, x, y);
+        if (w <= 0 || Math.abs(sx) > ax + 1e-6 || Math.abs(sy) > ay + 1e-6) return false;
+      }
+    }
+    return true;
+  };
+  let lo = 0.2, hi = 1;
+  if (inside(1)) return 1;
+  for (let i = 0; i < 30; i++) { const mid = (lo + hi) / 2; if (inside(mid)) lo = mid; else hi = mid; }
+  return 1 / lo;
+}
+
+// geo = { tilt(도), pv, ph, lens(-1..1) }. 원본 크기·비율 그대로 결과를 data 에 쓴다.
+export function applyGeometry(data, w, h, geo = {}) {
+  const tilt = geo.tilt || 0, pv = geo.pv || 0, ph = geo.ph || 0, lens = Math.max(-1, Math.min(1, geo.lens || 0));
+  if (!tilt && !pv && !ph && !lens) return;
+  const S = Math.max(w, h) / 2;              // 등방 정규화(회전이 찌그러지지 않게)
+  const cx = (w - 1) / 2, cy = (h - 1) / 2;
+  const ax = w / 2 / S, ay = h / 2 / S;
+  const H = geoMatrix(tilt, pv, ph);
+  const inv = invert3(H);
+  if (!inv) return;
+  const z = coverZoom(inv, ax, ay);
+  // 렌즈(반경) 보정 — 예전 correctLensDistortion 과 같은 모델, 같은 패스 안에서.
+  const k = lens * 0.35, norm = Math.hypot(ax, ay), lensZoom = 1 + Math.max(0, k);
+  const src = new Uint8ClampedArray(data);
+  for (let y = 0; y < h; y++) {
+    const oy = (y - cy) / S / z;
+    for (let x = 0; x < w; x++) {
+      const ox = (x - cx) / S / z;
+      let [qx, qy] = mapPt(inv, ox, oy);
+      if (k) {
+        const dx = qx / norm, dy = qy / norm, f = (1 + k * (dx * dx + dy * dy)) / lensZoom;
+        qx *= f; qy *= f;
+      }
+      let sxf = qx * S + cx, syf = qy * S + cy;
+      if (sxf < 0) sxf = 0; else if (sxf > w - 1) sxf = w - 1;
+      if (syf < 0) syf = 0; else if (syf > h - 1) syf = h - 1;
+      const x0 = sxf | 0, y0 = syf | 0;
+      const x1 = x0 + 1 < w ? x0 + 1 : x0, y1 = y0 + 1 < h ? y0 + 1 : y0;
+      const fx = sxf - x0, fy = syf - y0;
+      const i00 = (y0 * w + x0) * 4, i10 = (y0 * w + x1) * 4, i01 = (y1 * w + x0) * 4, i11 = (y1 * w + x1) * 4;
+      const o = (y * w + x) * 4;
+      for (let c = 0; c < 3; c++) {
+        const top = src[i00 + c] + (src[i10 + c] - src[i00 + c]) * fx;
+        const bot = src[i01 + c] + (src[i11 + c] - src[i01 + c]) * fx;
+        data[o + c] = top + (bot - top) * fy;
+      }
+      data[o + 3] = 255;
+    }
+  }
+}
+
+// 선 방향 샘플 추출 — 구조 텐서(그래디언트 외적을 이웃 평균)로 "선처럼 한 방향으로
+// 곧은" 픽셀만 고른다. 얼굴·머리카락·나뭇잎은 방향이 흩어져 coherence 가 낮아 빠진다.
+function lineSamples(data, w, h) {
+  // ⚠️ 줄이는 방법이 각도 정확도를 좌우한다(실측 2건):
+  //   · 픽셀 건너뛰기(최근접) → 비스듬한 선이 계단이 돼 0° 로 쏠림
+  //   · 비정수 배율 면적평균(칸이 2·3px 로 들쭉날쭉) → 기울기를 약 10% 덜 읽음(4°→3.6°)
+  //   → 정수 f×f 칸을 똑같이 평균낸다.
+  const f = Math.max(1, Math.ceil(Math.max(w, h) / 480));
+  const W = Math.max(8, Math.floor(w / f)), Hh = Math.max(8, Math.floor(h / f));
+  const g = new Float32Array(W * Hh), inv = 1 / (f * f);
+  for (let ty = 0; ty < Hh; ty++) for (let tx = 0; tx < W; tx++) {
+    let sum = 0;
+    for (let yy = 0; yy < f; yy++) {
+      let i = ((ty * f + yy) * w + tx * f) * 4;
+      for (let xx = 0; xx < f; xx++, i += 4) sum += 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+    }
+    g[ty * W + tx] = sum * inv;
+  }
+  const jxx = new Float32Array(W * Hh), jyy = new Float32Array(W * Hh), jxy = new Float32Array(W * Hh);
+  for (let y = 1; y < Hh - 1; y++) for (let x = 1; x < W - 1; x++) {
+    const p = y * W + x;
+    // Scharr(3·10·3) — 소벨(1·2·1)은 방향 오차가 커서 4° 기울기를 3.5° 로 읽었다(실측).
+    const gx = 3 * (g[p - W + 1] + g[p + W + 1]) + 10 * g[p + 1] - 3 * (g[p - W - 1] + g[p + W - 1]) - 10 * g[p - 1];
+    const gy = 3 * (g[p + W - 1] + g[p + W + 1]) + 10 * g[p + W] - 3 * (g[p - W - 1] + g[p - W + 1]) - 10 * g[p - W];
+    jxx[p] = gx * gx; jyy[p] = gy * gy; jxy[p] = gx * gy;
+  }
+  const box = (a) => {                         // 5×5 평균 (가로→세로)
+    const t = new Float32Array(a.length), r = 2;
+    for (let y = 0; y < Hh; y++) for (let x = 0; x < W; x++) {
+      let s = 0; for (let d = -r; d <= r; d++) s += a[y * W + Math.min(W - 1, Math.max(0, x + d))]; t[y * W + x] = s;
+    }
+    for (let y = 0; y < Hh; y++) for (let x = 0; x < W; x++) {
+      let s = 0; for (let d = -r; d <= r; d++) s += t[Math.min(Hh - 1, Math.max(0, y + d)) * W + x]; a[y * W + x] = s;
+    }
+  };
+  box(jxx); box(jyy); box(jxy);
+  const cand = [];
+  for (let y = 3; y < Hh - 3; y += 2) for (let x = 3; x < W - 3; x += 2) {
+    const p = y * W + x, E = jxx[p] + jyy[p];
+    if (E <= 0) continue;
+    const coh = Math.sqrt((jxx[p] - jyy[p]) ** 2 + 4 * jxy[p] ** 2) / E;
+    if (coh < 0.75) continue;
+    // 그래디언트 방향 → 선 방향(+90°)
+    const a = 0.5 * Math.atan2(2 * jxy[p], jxx[p] - jyy[p]) + Math.PI / 2;
+    // 가로·세로에서 30° 이내만 (대각선 무늬는 판단에 안 쓴다)
+    let d = ((a % (Math.PI / 2)) + Math.PI / 2) % (Math.PI / 2); if (d > Math.PI / 4) d -= Math.PI / 2;
+    if (Math.abs(d) > Math.PI / 6) continue;
+    cand.push({ x, y, a, e: E * coh });
+  }
+  if (cand.length < 40) return [];
+  // 에너지 상위 25% 만 (약한 결은 잡음)
+  const es = cand.map((c) => c.e).sort((p, q) => p - q);
+  const cut = es[Math.floor(es.length * 0.75)];
+  const S = Math.max(W, Hh) / 2, cx = (W - 1) / 2, cy = (Hh - 1) / 2;
+  const out = [];
+  for (const c of cand) if (c.e >= cut) out.push({ x: (c.x - cx) / S, y: (c.y - cy) / S, dx: Math.cos(c.a), dy: Math.sin(c.a), w: Math.sqrt(c.e) });
+  // 너무 많으면 균등 솎기
+  const step = Math.max(1, Math.floor(out.length / 2500));
+  return out.filter((_, i) => i % step === 0);
+}
+
+// 보정 H 를 걸었을 때 선들이 가로·세로에 얼마나 딱 맞는가.
+function alignScore(pts, tilt, pv, ph, sigma) {
+  const m = geoMatrix(tilt, pv, ph);
+  let s = 0;
+  for (const p of pts) {
+    const wq = m[6] * p.x + m[7] * p.y + 1;
+    if (wq <= 0.05) continue;
+    const X = (m[0] * p.x + m[1] * p.y) / wq, Y = (m[3] * p.x + m[4] * p.y) / wq;
+    // 야코비안 · 방향
+    const jx = ((m[0] - X * m[6]) * p.dx + (m[1] - X * m[7]) * p.dy) / wq;
+    const jy = ((m[3] - Y * m[6]) * p.dx + (m[4] - Y * m[7]) * p.dy) / wq;
+    let d = Math.atan2(jy, jx);
+    d = ((d % (Math.PI / 2)) + Math.PI / 2) % (Math.PI / 2); if (d > Math.PI / 4) d -= Math.PI / 2;
+    s += p.w * Math.exp(-(d * d) / (2 * sigma * sigma));
+  }
+  return s;
+}
+
+// 자동 정방향. 반환 { tilt, pv, ph, confident } — confident=false 면 증거가 약해 원본 유지 권장.
+// perspective=false 면 기울기만 찾는다(사람 사진 등).
+export function autoStraighten(data, w, h, { perspective = true } = {}) {
+  const pts = lineSamples(data, w, h);
+  const none = { tilt: 0, pv: 0, ph: 0, confident: false };
+  if (pts.length < 60) return none;
+  const deg = Math.PI / 180;
+  // 큰 보정일수록 살짝 불리하게(잡음에 끌려 크게 돌리는 것 방지). 너무 세면 진짜 4° 도
+  // 3° 로 덜 돌린다(실측) — 아주 약하게만.
+  const prior = (t, v, hh) => Math.exp(-(t * t) / (2 * 25 * 25) - (v * v) / (2 * 0.8 * 0.8) - (hh * hh) / (2 * 0.6 * 0.6));
+  const score = (t, v, hh, sg) => alignScore(pts, t, v, hh, sg) * prior(t, v, hh);
+  // 1) 기울기만 거칠게
+  let best = { t: 0, v: 0, h: 0, s: score(0, 0, 0, 1.5 * deg) };
+  for (let t = -15; t <= 15.001; t += 0.5) {
+    const s = score(t, 0, 0, 1.5 * deg); if (s > best.s) best = { t, v: 0, h: 0, s };
+  }
+  // 2) 원근까지 (기울기 주변 × pv × ph)
+  if (perspective) {
+    const t0 = best.t;
+    for (let t = t0 - 2; t <= t0 + 2.001; t += 0.5)
+      for (let v = -0.5; v <= 0.501; v += 0.05)
+        for (let hh = 0; hh <= 0; hh += 1) {   // 가로 원근은 자동에서 뺀다 — 테스트에서 오히려 더 틀어졌다(인위 왜곡 C). 슬라이더로만.
+          const s = score(t, v, hh, 1.5 * deg); if (s > best.s) best = { t, v, h: hh, s };
+        }
+  }
+  // 3) 촘촘히 다듬기 (좌표 하강)
+  const steps = [[0.1, 0.01, 0.02], [0.05, 0.005, 0.01]];
+  for (const [dt, dv, dh] of steps) {
+    for (let it = 0; it < 6; it++) {
+      let moved = false;
+      for (const [a, b, c] of [[dt, 0, 0], [-dt, 0, 0], [0, dv, 0], [0, -dv, 0]]) {
+        if (!perspective && (b || c)) continue;
+        const s = score(best.t + a, best.v + b, best.h + c, 0.8 * deg);
+        if (s > best.s * 1.0005) { best = { t: best.t + a, v: best.v + b, h: best.h + c, s }; moved = true; }
+      }
+      if (!moved) break;
+    }
+  }
+  // 증거 판정 — 반듯한 사진을 괜히 돌리지 않는 게 먼저다(대조군이 1° 돌아갔다, 실측).
+  //  · 기울기: 기울기만 고친 결과가 원본보다 확실히(>1.3배) 나아야 한다.
+  //  · 원근: 원근까지 고친 결과가 "기울기만" 보다 다시 확실히(>1.3배) 나아야 한다.
+  //    아니면 원근은 0 으로 두고 기울기만 쓴다.
+  const sg = 0.8 * deg;
+  const base = alignScore(pts, 0, 0, 0, sg);
+  let tOnly = { t: 0, s: base };
+  for (let t = best.t - 3; t <= best.t + 3.001; t += 0.1) {
+    const s = alignScore(pts, t, 0, 0, sg); if (s > tOnly.s) tOnly = { t, s };
+  }
+  const fin = alignScore(pts, best.t, best.v, best.h, sg);
+  const total = pts.reduce((a, p) => a + p.w, 0);
+  const tiltOk = tOnly.s > base * 1.3 && Math.abs(tOnly.t) >= 0.5;
+  const perspOk = perspective && fin > Math.max(tOnly.s, base) * 1.3 && (Math.abs(best.v) >= 0.03 || Math.abs(best.h) >= 0.03);
+  if (perspOk) {
+    // 원근 채택 — best 그대로
+  } else if (tiltOk) {
+    best = { t: tOnly.t, v: 0, h: 0, s: tOnly.s };
+  } else {
+    best = { t: 0, v: 0, h: 0, s: base };
+  }
+  const confident = (perspOk || tiltOk) && best.s / total > 0.1;
+  const gain = base > 0 ? best.s / base : Infinity;
+  return {
+    tilt: Math.round(Math.max(-15, Math.min(15, best.t)) * 10) / 10,   // 슬라이더 범위(±15°) 안으로 pv: Math.round(best.v * 1000) / 1000, ph: Math.round(best.h * 1000) / 1000,
+    confident, gain: Math.round(gain * 100) / 100, share: Math.round((best.s / total) * 100) / 100,
+  };
+}

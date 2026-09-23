@@ -15,7 +15,7 @@
 // ============================================================
 import { useEffect, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { FILM_PRESETS, presetByKey, applyLook, applyLookWithStrength, correctLensDistortion } from "./filters";
+import { FILM_PRESETS, presetByKey, applyLook, applyLookWithStrength, applyGeometry, autoStraighten } from "./filters";
 import { isNative, nativeSaveToAlbum } from "./nativeBridge";
 import { shareImage } from "./share";
 import { t, getLang } from "./i18n";
@@ -207,6 +207,11 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
   // 1.0 까지 올리면 더 진하게(외삽), 0 이면 원본.
   const [strength, setStrength] = useState(0.7);
   const [lens, setLens] = useState(0);
+  // 정방향(기울기·세로·가로 원근) — 사진별. geoAuto = 자동 판정 결과(한 번만 돌린다).
+  const ZERO_GEO = { tilt: 0, pv: 0, ph: 0 };
+  const [geo, setGeo] = useState(ZERO_GEO);
+  const [geoAuto, setGeoAuto] = useState(null);
+  const [geoBusy, setGeoBusy] = useState(false);
   // 룩(프리셋·효과·강도)은 사진별 (오너 지시: "각각 적용 + 전체 적용 버튼").
   // presetKey/fx/strength 는 "지금 보는 사진"의 룩이고, lookByIdx 가 장부 —
   // 룩을 바꾸는 곳은 반드시 updateLook 을 거쳐 둘을 같이 쓴다. (effect 로 미러링하면
@@ -216,15 +221,19 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
     fx: fxOf(presetByKey(initialPresetKey)),
     strength: 0.7,
     lens: 0,   // 렌즈 왜곡 보정 -1..1 (0 = 원본)
+    geo: { tilt: 0, pv: 0, ph: 0 },
+    geoAuto: null,
   });
   const [lookByIdx, setLookByIdx] = useState({});
   const lookOf = (i) => lookByIdx[i] || defaultLook();
   function updateLook(patch) {
-    const next = { presetKey, fx, strength, lens, ...patch };
+    const next = { presetKey, fx, strength, lens, geo, geoAuto, ...patch };
     setPresetKey(next.presetKey);
     setFx(next.fx);
     setStrength(next.strength);
     setLens(next.lens || 0);
+    setGeo(next.geo || ZERO_GEO);
+    setGeoAuto(next.geoAuto || null);
     setLookByIdx((p) => ({ ...p, [idx]: next }));
   }
   function switchPhoto(i) {
@@ -233,6 +242,8 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
     setFx(lk.fx);
     setStrength(lk.strength);
     setLens(lk.lens || 0);
+    setGeo(lk.geo || ZERO_GEO);
+    setGeoAuto(lk.geoAuto || null);
     const g = presetByKey(lk.presetKey).group;
     if (g) setChipGroup(g);
     setReady(false);
@@ -242,7 +253,11 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
     hap.tap();
     const cur = { presetKey, fx, strength, lens };
     const all = {};
-    for (let i = 0; i < sources.length; i++) all[i] = cur;
+    // 정방향(기울기·원근)은 사진마다 다르다 — 전체 적용에서 옮기지 않고 각 사진 것을 둔다.
+    for (let i = 0; i < sources.length; i++) {
+      const own = lookOf(i);
+      all[i] = { ...cur, geo: i === idx ? geo : (own.geo || ZERO_GEO), geoAuto: i === idx ? geoAuto : (own.geoAuto || null) };
+    }
     setLookByIdx(all);
     flashToast(t("edit.applyAllDone", { n: sources.length }));
   }
@@ -402,12 +417,13 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
         return;
       }
       const copy = new ImageData(new Uint8ClampedArray(base.data), w, h);
-      if (lens) correctLensDistortion(copy.data, w, h, lens);  // 기하 보정은 룩보다 먼저
+      // 기하 보정(정방향·렌즈)은 룩보다 먼저, 한 번의 리샘플로
+      if (lens || geo.tilt || geo.pv || geo.ph) applyGeometry(copy.data, w, h, { ...geo, lens });
       applyLookWithStrength(copy.data, w, h, presetByKey(presetKey), { ...fx, seed: GRAIN_SEED }, strength);
       ctx.putImageData(copy, 0, 0);
       if (dateStyle !== "none") drawDateStamp(ctx, w, h, dateStyle);
     });
-  }, [presetKey, fx, dateStyle, peeking, strength, lens]);
+  }, [presetKey, fx, dateStyle, peeking, strength, lens, geo]);
 
   useEffect(() => { if (ready) renderPreview(); }, [ready, renderPreview, idx]);
 
@@ -434,6 +450,25 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
     const b = baseRef.current;
     if (!b) return true;
     return Math.abs(b.width / b.height - 0.75) < 0.02;
+  }
+
+  // 자동 정방향 — "정방향" 탭을 처음 열 때 사진마다 한 번. 선(문틀·수평선·건물)을 보고
+  // 기울기와 세로 원근을 찾는다. 증거가 약하면(반듯한 사진·선이 없는 사진) 손대지 않는다.
+  // 가로 원근은 자동에서 뺐다(테스트에서 오히려 더 틀어짐) — 슬라이더로만.
+  function runAutoStraighten() {
+    const b = baseRef.current;
+    if (!b || geoBusy) return;
+    setGeoBusy(true);
+    setTimeout(() => {           // "찾는 중" 표시가 먼저 그려지게 한 프레임 양보
+      try {
+        const r = autoStraighten(b.data, b.width, b.height);
+        const info = { confident: r.confident, tilt: r.tilt, pv: r.pv };
+        if (r.confident) updateLook({ geo: { tilt: r.tilt, pv: r.pv, ph: 0 }, geoAuto: info });
+        else updateLook({ geoAuto: info });
+      } catch (_) {
+        updateLook({ geoAuto: { confident: false, tilt: 0, pv: 0 } });
+      } finally { setGeoBusy(false); }
+    }, 30);
   }
 
   // 편집기 상태를 새 이미지로 갈아끼운다(맞춤 결과 반영).
@@ -821,9 +856,12 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
         || lk.fx.twinkle;
       // ⚠️ 왜곡 보정은 룩이 없어도 저장본에 반영돼야 한다 — hasLook 에만 걸어두면
       //    "필터 없이 왜곡만 고친" 사진이 원본 그대로 저장된다.
-      if (hasLook || lk.lens) {
+      const g = lk.geo || {};
+      const hasGeo = !!(lk.lens || g.tilt || g.pv || g.ph);
+      // ⚠️ 정방향도 같은 이유로 여기 걸어야 한다 — 필터 없이 기울기만 고친 사진.
+      if (hasLook || hasGeo) {
         const id = ctx.getImageData(0, 0, w, h);
-        if (lk.lens) correctLensDistortion(id.data, w, h, lk.lens);
+        if (hasGeo) applyGeometry(id.data, w, h, { ...g, lens: lk.lens || 0 });
         // 원본이 커서(2K) 수백 ms 걸릴 수 있다 — 호출측이 busy 표시를 켠 채로 부른다
         if (hasLook) applyLookWithStrength(id.data, w, h, presetByKey(lk.presetKey), { ...lk.fx, seed: GRAIN_SEED }, lk.strength);
         ctx.putImageData(id, 0, 0);
@@ -1094,7 +1132,10 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
             <button
               key={k}
               style={{ ...ES.tabBtn, ...(tab === k ? ES.tabBtnOn : null) }}
-              onClick={() => { hap.tap(); setTab(k); }}
+              onClick={() => {
+                hap.tap(); setTab(k);
+                if (k === "fit" && !geoAuto) runAutoStraighten();
+              }}
             >{label}</button>
           ))}
         </div>
@@ -1162,6 +1203,45 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
 
         {tab === "fit" && (
           <div style={ES.fitCol}>
+            <div style={ES.fitHint}>
+              {geoBusy ? "기울어진 선을 찾는 중…" :
+               geoAuto?.confident && (geo.tilt || geo.pv) ? "자동으로 반듯하게 맞췄어요." :
+               geoAuto?.confident ? "원래 사진으로 돌려놨어요." :
+               geoAuto ? "반듯한 사진이에요. 필요하면 아래에서 직접 맞춰 주세요." : ""}
+            </div>
+            {geoAuto?.confident && (
+              <div style={{ display: "flex", gap: 8 }}>
+                <button style={ES.fitBtnGhost} disabled={geoBusy}
+                  onClick={() => { hap.tap(); updateLook({ geo: ZERO_GEO }); }}>원래대로</button>
+                <button style={ES.fitBtnGhost} disabled={geoBusy}
+                  onClick={() => { hap.tap(); updateLook({ geo: { tilt: geoAuto.tilt, pv: geoAuto.pv, ph: 0 } }); }}>자동 다시 적용</button>
+              </div>
+            )}
+            {[
+              ["tilt", "기울기", -15, 15, 0.1, (v) => `${v > 0 ? "+" : ""}${v.toFixed(1)}°`],
+              ["pv", "세로 원근", -0.5, 0.5, 0.01, (v) => `${Math.round(v * 100)}`],
+              ["ph", "가로 원근", -0.5, 0.5, 0.01, (v) => `${Math.round(v * 100)}`],
+            ].map(([key, label, min, max, step, fmt]) => (
+              <div key={key}>
+                <div style={{ ...ES.fitNote, display: "flex", justifyContent: "space-between" }}>
+                  <span>{label}</span><span>{fmt(geo[key] || 0)}</span>
+                </div>
+                <input
+                  className="pe-range"
+                  type="range" min={min} max={max} step={step}
+                  value={geo[key] || 0}
+                  onChange={(e) => updateLook({ geo: { ...geo, [key]: Number(e.target.value) } })}
+                  onPointerDown={beginDrag}
+                  onPointerUp={endDragSoon}
+                  onPointerCancel={endDragSoon}
+                  onTouchStart={beginDrag}
+                  onTouchEnd={endDragSoon}
+                  style={{ width: "100%" }}
+                />
+              </div>
+            ))}
+
+            <div style={{ ...ES.fitHint, marginTop: 6 }}>3:4 맞춤</div>
             <div style={ES.fitHint}>
               {isThreeFour() ? "이미 3:4 예요. 맞출 게 없어요." :
                "이 사진은 3:4 가 아니에요. 잘라서 맞추거나, 바깥을 채워서 맞출 수 있어요."}
@@ -1396,7 +1476,11 @@ const ES = {
     display: "inline-flex", gap: 2, margin: "0 16px 12px", padding: 3,
     background: "rgba(255,255,255,.07)", borderRadius: 13, alignSelf: "flex-start",
   },
-  fitCol: { padding: "12px 18px 4px", display: "flex", flexDirection: "column", gap: 10 },
+  // 정방향 슬라이더 3개 + 3:4 맞춤 + 렌즈 — 그냥 쌓으면 사진이 화면 밖으로 밀려난다(실측) → 효과 탭처럼 높이 제한 + 스크롤
+  fitCol: {
+    padding: "8px 18px 4px", display: "flex", flexDirection: "column", gap: 10,
+    maxHeight: "34vh", overflowY: "auto", WebkitOverflowScrolling: "touch",
+  },
   fitHint: { fontSize: 13.5, lineHeight: 1.5, color: "rgba(255,255,255,0.8)" },
   fitBtn: {
     height: 46, borderRadius: 12, border: "none", background: "#E6403C", color: "#fff",
