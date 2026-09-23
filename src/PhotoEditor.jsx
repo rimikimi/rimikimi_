@@ -471,6 +471,12 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
     }, 30);
   }
 
+  // "정방향" 탭에 있는 동안 사진마다 한 번 자동 — 탭을 열 때만 돌리면 탭에 머문 채 다음 사진으로
+  // 넘기면 자동이 안 돌았다(스윕 9/23). ready = 새 사진의 baseRef 가 준비된 뒤.
+  useEffect(() => {
+    if (tab === "fit" && ready && !geoAuto && !geoBusy) runAutoStraighten();
+  }, [tab, idx, ready]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // 편집기 상태를 새 이미지로 갈아끼운다(맞춤 결과 반영).
   async function replaceWithDataUrl(dataUrl) {
     const img = new Image();
@@ -1109,7 +1115,8 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
             <button
               key={i}
               style={{ ...ES.photoThumbBtn, ...(i === idx ? ES.photoThumbOn : null) }}
-              onClick={() => { if (i !== idx) { hap.tap(); switchPhoto(i); } }}
+              // 자동 정방향 계산 중엔 사진을 못 바꾼다 — 끝난 결과가 바뀐 사진의 장부에 잘못 들어간다(스윕 9/23).
+              onClick={() => { if (i !== idx && !geoBusy) { hap.tap(); switchPhoto(i); } }}
             >
               <img src={s} alt={"" + (i + 1)} style={ES.photoThumbImg} />
               {(stickersByIdx[i] || []).length > 0 && <span style={ES.photoThumbDot} />}
@@ -1134,7 +1141,6 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
               style={{ ...ES.tabBtn, ...(tab === k ? ES.tabBtnOn : null) }}
               onClick={() => {
                 hap.tap(); setTab(k);
-                if (k === "fit" && !geoAuto) runAutoStraighten();
               }}
             >{label}</button>
           ))}

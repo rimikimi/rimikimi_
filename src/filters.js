@@ -973,7 +973,9 @@ export function autoStraighten(data, w, h, { perspective = true } = {}) {
   const confident = (perspOk || tiltOk) && best.s / total > 0.1;
   const gain = base > 0 ? best.s / base : Infinity;
   return {
-    tilt: Math.round(Math.max(-15, Math.min(15, best.t)) * 10) / 10,   // 슬라이더 범위(±15°) 안으로 pv: Math.round(best.v * 1000) / 1000, ph: Math.round(best.h * 1000) / 1000,
+    // 슬라이더 범위(±15°) 안으로
+    tilt: Math.round(Math.max(-15, Math.min(15, best.t)) * 10) / 10,
+    pv: Math.round(best.v * 1000) / 1000, ph: Math.round(best.h * 1000) / 1000,
     confident, gain: Math.round(gain * 100) / 100, share: Math.round((best.s / total) * 100) / 100,
   };
 }
