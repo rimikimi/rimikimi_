@@ -15,7 +15,11 @@ PDF (1 page 프롬프트, 2 page 썸네일) 에서 새 컨셉을 자동 추가.
   2. PDF 2page 이미지 → public/thumbs/<id>.webp (400px 폭, WebP)
   3. ⚠️ 중복 이미지 검사 — 새 썸네일이 기존 썸네일과 내용이 같으면 중단
      (실수로 같은 샘플 이미지를 두 컨셉에 쓰는 사고 방지. 정말 의도했다면 --allow-dup)
-  4. public/concepts.json 맨 앞에 새 컨셉 추가 (title_en, categories[] 포함)
+  4. api/_data/concepts.json 맨 앞에 새 컨셉 추가 (title_en, categories[] 포함) — publishAt 없음 = 즉시 공개
+
+⚠️ public/concepts.json 을 만들면 안 된다: Vercel 은 정적 파일을 rewrite 보다 먼저 내보내서
+   /concepts.json → /api/concepts(예약 공개 필터)가 가려진다. 9/16 이 스크립트가 그 파일을 다시
+   만들어 9/17 이후 새 컨셉이 앱·웹 전부에서 안 보였다(9/23 발견).
 """
 import argparse, json, os, re, sys, io, hashlib
 from pathlib import Path
@@ -35,7 +39,9 @@ args = p.parse_args()
 
 root = Path(args.root)
 thumbs_dir = root / "public" / "thumbs"
-concepts_json = root / "public" / "concepts.json"
+concepts_json = root / "api" / "_data" / "concepts.json"
+if (root / "public" / "concepts.json").exists():
+    sys.exit("public/concepts.json 이 있으면 /concepts.json 예약 공개가 가려진다 — 지우고 다시 실행하세요.")
 thumbs_dir.mkdir(parents=True, exist_ok=True)
 
 # 1. PDF 읽기
@@ -98,7 +104,7 @@ else:
 
 # 4. concepts.json 업데이트 (맨 앞에 추가, 같은 ID 면 교체)
 concepts = json.loads(concepts_json.read_text()) if concepts_json.exists() else []
-concepts = [c for c in concepts if c["id"] != args.id]
+concepts = [c for c in concepts if str(c["id"]) != str(args.id)]
 new_entry = {
     "id": args.id,
     "title": args.title,
@@ -109,6 +115,6 @@ new_entry = {
     "sensitive": args.sensitive,
 }
 concepts.insert(0, new_entry)
-concepts_json.write_text(json.dumps(concepts, ensure_ascii=False, indent=2))
+concepts_json.write_text(json.dumps(concepts, ensure_ascii=False, indent=2) + "\n")
 print(f"📋 concepts.json 업데이트 (총 {len(concepts)}개)")
 print(f"\n✅ 완료. ID {args.id} '{args.title}' / {args.category} 추가됨.")
