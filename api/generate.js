@@ -1293,8 +1293,16 @@ export default async function handler(req, res) {
   const ENGINE_POLICY = process.env.ENGINE_POLICY || "all_pro";
   const useProEngine = ENGINE_POLICY === "tiered" ? usePro : true;
 
-  // 편집(image-to-image) 모드에선 Gemini가 generationConfig.imageConfig.aspectRatio 를 무시하고
-  // 오히려 출력을 세로로 크롭하는 정황 → 설정을 빼고 편집 기본동작(입력 비율 유지)에 맡긴다.
+  // 결과 비율: 생성 이미지는 **항상 세로 3:4** (오너 지시 2026-09-23).
+  //   예전엔 "편집 모드에선 aspectRatio 를 무시하고 세로로 크롭하는 정황"이라며 설정을 빼고
+  //   입력 비율을 따르게 했다 → 가로 사진을 올리면 결과도 가로로 나왔다(실측 입력 1019×764 →
+  //   2390×1792). gemini-3-pro-image 에 "3:4" 를 주면 자르지 않고 세로로 다시 구도를 잡는다
+  //   (같은 입력 → 1792×2400, 실측 9/23).
+  //   예외: 네컷(칸 수별 비율) · 사진 복원(원본 구도 유지) · 아트 변환(사용자 사진을 그대로
+  //   다시 그리는 것이라 원본 비율 유지).
+  const keepSourceRatio = isRestore || !!skipFacePrecheck;
+  const ratioFor = () =>
+    isStrip ? STRIP_RATIO[stripN] : isDressroom ? "3:4" : keepSourceRatio ? null : "3:4";
   const bodyFor = (isPro, shotIdx = 0) => ({
     contents: [
       {
@@ -1328,11 +1336,11 @@ export default async function handler(req, res) {
     // 스트립은 분할 수에 맞는 비율을 명시해야 칸이 잘리지 않는다.
     // 드레스룸도 3:4 를 명시한다 — 편집 모드는 입력 비율을 따라가는데, 의상이 쇼핑몰
     // 풀스크린 캡처(아이폰 화면비 1:2.16)면 출력이 그 비율로 늘어났다(실측 1408×3040).
+    // 기본 모델(폴백)에도 비율은 준다 — 빠지면 폴백 결과만 입력 비율(가로)로 나온다.
     ...(isPro
       ? { generationConfig: { imageConfig: { imageSize: "2K",
-          ...(isStrip ? { aspectRatio: STRIP_RATIO[stripN] }
-            : isDressroom ? { aspectRatio: "3:4" } : {}) } } }
-      : {}),
+          ...(ratioFor() ? { aspectRatio: ratioFor() } : {}) } } }
+      : ratioFor() ? { generationConfig: { imageConfig: { aspectRatio: ratioFor() } } } : {}),
   });
 
   // Gemini 한 번 호출(타임아웃 포함). 네트워크 예외(hang/AbortError 포함)는 upstream 없이 반환.
