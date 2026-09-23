@@ -467,6 +467,7 @@
 {"id":3,"title":"핑크 볼가운 스테이지","category":"하이패션 / 화보","sensitive":false,"categories":["하이패션 / 화보"],"title_en":"Pink Ballgown Stage"},
 {"id":2,"title":"그리스 여신 파르테논","category":"세계여행","sensitive":false,"categories":["세계여행","판타지 / 콘셉트"],"title_en":"Greek Goddess Parthenon"},
 {"id":1,"title":"피치 튤립 브라이덜","category":"웨딩 / 브라이덜","sensitive":false,"categories":["웨딩 / 브라이덜"],"title_en":"Peach Tulip Bridal"},
+{"id":"964","title":"픽셀 캐릭터","title_en":"Pixel Character","category":"🪄 매직 부스","categories":["🪄 매직 부스"],"sensitive":false},
 {"id":"963","title":"프렌치 자수","title_en":"French Embroidery","category":"🪄 매직 부스","categories":["🪄 매직 부스"],"sensitive":false},
 {"id":"793","title":"드레스룸","title_en":"Dressroom","category":"🪄 매직 부스","categories":["🪄 매직 부스"],"mode":"dressroom","sensitive":false},
 {"id":"792","title":"즉석 사진","title_en":"Instant Photo","category":"🪄 매직 부스","categories":["🪄 매직 부스"],"sensitive":false},

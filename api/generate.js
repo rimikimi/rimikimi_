@@ -15,6 +15,7 @@ import { saveToGallery } from "./_lib/gallery.js";
 import { buildDressroom, expectedHem, checkHem } from "./_lib/dressroom.js";
 import { buildEditorialStrip } from "./_lib/fourcutEditorial.js";
 import { buildGlowStrip } from "./_lib/fourcutGlow.js";
+import { SPRITE_CONCEPT_IDS, describeForSprite } from "./_lib/sprite.js";
 // 컨셉 원본(프롬프트 포함). **서버가 프롬프트의 출처**여야 한다 — 아래 resolvePrompt 참고.
 import ALL_CONCEPTS from "./_data/concepts.json" with { type: "json" };
 
@@ -1264,8 +1265,15 @@ export default async function handler(req, res) {
   // PHOTOREALISM(AI 티 억제)은 아트 스타일 변환 모드(skipFacePrecheck)만 제외하고 전 모드에 적용.
   //   제외 이유: 그 모드는 "일러스트/회화 등 다른 매체로 재해석"이 목적이라 "반드시 실제 사진처럼
   //   보여야 한다(not an illustration, not a digital painting)"는 지시와 정면 충돌한다.
-  const instruction =
-    (skipFacePrecheck ? conceptInstruction : PHOTOREALISM + conceptInstruction) + headTiltClause + faceClause;
+  // 픽셀 캐릭터(964): 사진을 글로 옮긴 뒤 **사진 없이** 그린다(api/_lib/sprite.js 주석 — 사진을 넣으면
+  // 원본이 새어 나온다). 설명을 못 얻으면 기존 매직 부스 경로로 폴백(덜 깨끗해도 결과는 나온다).
+  const spriteDesc = SPRITE_CONCEPT_IDS.has(String(conceptId))
+    ? await describeForSprite({ base64, mimeType, apiKey })
+    : null;
+  const isSprite = !!spriteDesc;
+  const instruction = isSprite
+    ? prompt + "\n\nSUBJECT DESCRIPTION: " + spriteDesc
+    : (skipFacePrecheck ? conceptInstruction : PHOTOREALISM + conceptInstruction) + headTiltClause + faceClause;
 
   // 드레스룸 일상컷: 장면 토큰을 "이 샷의 배경"으로 치환한다. 배치에서 shotIdx 가
   // 달라지면 같은 그룹 안의 다른 배경이 들어간다(오너: "그룹 안에서는 랜덤이어야").
@@ -1308,7 +1316,7 @@ export default async function handler(req, res) {
   //   다시 그리는 것이라 원본 비율 유지).
   const keepSourceRatio = isRestore || !!skipFacePrecheck;
   const ratioFor = () =>
-    isStrip ? STRIP_RATIO[stripN] : isDressroom ? "3:4" : keepSourceRatio ? null : "3:4";
+    isStrip ? STRIP_RATIO[stripN] : isDressroom || isSprite ? "3:4" : keepSourceRatio ? null : "3:4";
   const bodyFor = (isPro, shotIdx = 0) => ({
     contents: [
       {
@@ -1317,7 +1325,8 @@ export default async function handler(req, res) {
         role: "user",
         parts: [
           { text: instructionAt(shotIdx) },
-          { inline_data: { mime_type: mimeType, data: base64 } },
+          // 픽셀 캐릭터는 사진을 넣지 않는다(설명만) — 넣으면 편집 모드로 원본이 섞인다.
+          ...(isSprite ? [] : [{ inline_data: { mime_type: mimeType, data: base64 } }]),
           // 커플: 두 번째 참조 사진 (순서가 곧 "first/second reference image")
           ...(hasSecond
             ? [{ inline_data: { mime_type: mimeType2, data: base64_2 } }]
