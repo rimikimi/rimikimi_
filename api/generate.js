@@ -14,6 +14,7 @@ import { getCreditInfo, consumeCredit, consumeCredits, refundCredits, getProSamp
 import { saveToGallery } from "./_lib/gallery.js";
 import { buildDressroom, expectedHem, checkHem } from "./_lib/dressroom.js";
 import { buildEditorialStrip } from "./_lib/fourcutEditorial.js";
+import { buildGlowStrip } from "./_lib/fourcutGlow.js";
 // 컨셉 원본(프롬프트 포함). **서버가 프롬프트의 출처**여야 한다 — 아래 resolvePrompt 참고.
 import ALL_CONCEPTS from "./_data/concepts.json" with { type: "json" };
 
@@ -1053,6 +1054,9 @@ export default async function handler(req, res) {
     // mood/acc/extra 는 구버전 앱(컷별 생성) 호환용.
     editorial: { mood: "raw direct-flash fashion editorial aesthetic on a pure white #FFFFFF seamless backdrop, hard on-camera flash, crushed blacks #0A0A0A, Kodak Portra 400 film grain, 90s magazine test-shoot vibe",
                  acc: "a single thin silver #C0C0C0 ring and nothing else", extra: "wearing a fitted black #0A0A0A sleeveless camisole tank top with thin spaghetti straps, deep crimson matte red #7A1B2E lipstick, loose undone waves" },
+    // 글로우(오너 레퍼런스 2026-09-23): 스트립은 api/_lib/fourcutGlow.js 전용 프롬프트. 아래는 구버전 앱(컷별) 호환용.
+    glow:      { mood: "fresh idol self-photo-booth aesthetic on a plain light grey-white #E9EAEC backdrop, soft bright beauty-dish lighting, dewy glass skin, subtle dreamy bloom",
+                 acc: "no jewelry at all", extra: "wearing a fitted white #FFFFFF ribbed sleeveless mock-neck top, glossy peach-coral #EE8E86 gradient lips, long glossy voluminous hair with face-framing layers" },
   };
   // 컷별 포즈 — 과장된 연출(V사인·윙크·놀란표정)은 뺐다. 실제로 연속 촬영한 것처럼
   // 표정·시선·각도만 미묘하게 다른 자연스러운 프레임들.
@@ -1081,6 +1085,8 @@ export default async function handler(req, res) {
   const stripN = STRIP_GRID[Number(cutCount)] ? Number(cutCount) : 4;
   const stripInstruction = fourcutStyle === "editorial"
     ? buildEditorialStrip(stripN, STRIP_GRID[stripN])
+    : fourcutStyle === "glow"
+    ? buildGlowStrip(stripN, STRIP_GRID[stripN])
     : `Create a Korean photo-booth (인생네컷) PHOTO STRIP as ONE single image, using the person in the provided photo.\n\n` +
     `LAYOUT: exactly ${stripN} photo cells arranged in ${STRIP_GRID[stripN]} on one clean strip. ` +
     `Even gutters between cells, a wider margin at the bottom. Each cell has slightly rounded corners. ` +

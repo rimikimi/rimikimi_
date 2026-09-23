@@ -1,8 +1,9 @@
 #!/usr/bin/env node
-// 인생네컷 "화보" 스타일 실사 테스트 — 서버와 같은 프롬프트 모듈(api/_lib/fourcutEditorial.js), 같은 모델.
-//   node scripts/test-fourcut.mjs --person=a.png [--count=4] [--out=fourcut-test.png] [--print]
+// 인생네컷 전용 프롬프트 스타일 실사 테스트 — 서버와 같은 프롬프트 모듈, 같은 모델.
+//   node scripts/test-fourcut.mjs --person=a.png [--style=editorial|glow] [--count=4] [--out=fourcut-test.png] [--print]
 import { readFileSync, writeFileSync } from "node:fs";
 import { buildEditorialStrip } from "../api/_lib/fourcutEditorial.js";
+import { buildGlowStrip } from "../api/_lib/fourcutGlow.js";
 
 const args = process.argv.slice(2);
 const get = (k, d) => { const a = args.find((x) => x.startsWith(`--${k}=`)); return a ? a.slice(k.length + 3) : d; };
@@ -21,7 +22,8 @@ if (!apiKey) { console.error(".env.local 에 GEMINI_API_KEY 가 없습니다"); 
 
 const GRID = { 2: "1 column x 2 rows", 3: "1 column x 3 rows", 4: "2 columns x 2 rows", 6: "2 columns x 3 rows" };
 const RATIO = { 2: "3:4", 3: "9:16", 4: "3:4", 6: "3:4" };
-const instruction = buildEditorialStrip(n, GRID[n]);
+const style = get("style", "editorial");
+const instruction = (style === "glow" ? buildGlowStrip : buildEditorialStrip)(n, GRID[n]);
 if (args.includes("--print")) console.log("\n----- 프롬프트 -----\n" + instruction + "\n-------------------\n");
 
 const mimeOf = (p) => (/\.png$/i.test(p) ? "image/png" : /\.webp$/i.test(p) ? "image/webp" : "image/jpeg");

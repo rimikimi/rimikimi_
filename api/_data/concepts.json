@@ -7628,6 +7628,11 @@
     "key": "editorial",
     "label": "화보",
     "emoji": "📷"
+   },
+   {
+    "key": "glow",
+    "label": "글로우",
+    "emoji": "🤍"
    }
   ]
  },
