@@ -179,6 +179,7 @@ Apple Guideline 3.1.2 — 구독을 파는 앱은 앱 설명 안에 **표준 EUL
 · 동시 생성: 여러 컨셉을 한꺼번에 맡겨 두고, 완성되는 대로 '내 사진'에서 확인하세요
 · 드레스룸: 옷 사진을 최대 5장 올리면 그 코디를 입은 내 모습을 만들어 드려요
 · 보관 기간 연장: 만든 사진을 24시간 동안 보관해요 (기존 1시간)
+· 폰카 필터 8종: 16 Pro부터 3GS까지, 그 시절 폰카 색감을 입혀 보세요
 · 다크 모드 지원, 화면 전환이 더 자연스러워졌어요
 
 의견은 결과 화면의 "신고" 버튼이나 enquiry@rimikimi.com 으로 알려주세요.
@@ -192,6 +193,7 @@ rimikimi 2.0 — rebuilt from the ground up as a faster, smoother native app
 · Generate in parallel: queue several concepts at once and find each one in My Photos as it finishes
 · Dressing Room: upload up to 5 clothing photos and see yourself wearing the outfit
 · Longer storage: generated photos are now kept for 24 hours (was 1 hour)
+· 8 phone-camera filters: from 16 Pro back to 3GS, try the look of each era
 · Dark mode and smoother transitions
 
 Feedback? Use the report button on the result screen, or email enquiry@rimikimi.com.
