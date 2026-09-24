@@ -1133,8 +1133,8 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
           {[
             ["filter", t("edit.tab.filter")],
             ["fx", t("edit.tab.fx")],
-            ["fit", "정방향"],
-            ["sticker", "꾸미기"],
+            ["fit", getLang() === "ko" ? "정방향" : "Straighten"],
+            ["sticker", getLang() === "ko" ? "꾸미기" : "Decorate"],
           ].map(([k, label]) => (
             <button
               key={k}
@@ -1358,9 +1358,12 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
 /* ---------- 스타일 ----------
    에디터는 어두운 배경(색 판단이 정확)이되, 본 앱과 같은 급의 마감으로:
    세그먼트 탭 · 화이트 필 버튼 · 커스텀 슬라이더 · 선택 링 · 진입 모션. */
+// 편집기 전체 글꼴 — 지정이 없어 영어(라틴 글자)가 브라우저 기본 세리프(Times)로 나왔다(2026-09-25 영어화 때 발견).
+const EDITOR_FONT = '-apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", Roboto, "Segoe UI", sans-serif';
 const ES = {
   overlay: {
     position: "fixed", inset: 0, zIndex: 300, display: "flex", flexDirection: "column",
+    fontFamily: EDITOR_FONT,
     background: "#0f0d0b",
     paddingTop: "env(safe-area-inset-top, 0px)",
     paddingBottom: "env(safe-area-inset-bottom, 0px)",

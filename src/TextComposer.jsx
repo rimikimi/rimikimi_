@@ -27,6 +27,9 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import * as hap from "./haptics";
+import { getLang } from "./i18n";
+/** 한/영 문구 — 앱 영어 사용자(?lang=en)용. 한국어는 그대로. */
+const L = (ko, en) => (getLang() === "ko" ? ko : en);
 
 /** 글꼴 목록. `g` 는 Google Fonts family 이름(없으면 시스템). */
 export const TEXT_FONTS = [
@@ -35,15 +38,15 @@ export const TEXT_FONTS = [
   // **뺀 것**: 나눔손글씨·나눔붓글씨·개구·감자꽃·Poor Story·Song Myung·Dongle —
   //   전부 촌스럽거나 옛 한글 웹폰트 느낌이라 사진 위에 얹으면 싸구려로 보인다.
   // `g` = Google Fonts family, `url` = 그 밖의 CDN(구글에 없는 것).
-  { key: "pretendard", ko: "기본", weight: 700, css: "'Pretendard'",
+  { key: "pretendard", ko: "기본", en: "Default", weight: 700, css: "'Pretendard'",
     url: "https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard-dynamic-subset.css" },
-  { key: "serif",   ko: "세리프", g: "Hahmlet",        css: "'Hahmlet'",        weight: 700 },
-  { key: "elegant", ko: "고운",   g: "Gowun Batang",   css: "'Gowun Batang'",   weight: 700 },
-  { key: "thin",    ko: "가는",   g: "Diphylleia",     css: "'Diphylleia'",     weight: 400 },
-  { key: "impact",  ko: "임팩트", g: "Black Han Sans", css: "'Black Han Sans'", weight: 400 },
-  { key: "bold",    ko: "볼드",   g: "Gasoek One",     css: "'Gasoek One'",     weight: 400 },
-  { key: "sharp",   ko: "각진",   g: "Do Hyeon",       css: "'Do Hyeon'",       weight: 400 },
-  { key: "hand",    ko: "손글씨", g: "Single Day",     css: "'Single Day'",     weight: 400 },
+  { key: "serif",   ko: "세리프", en: "Serif", g: "Hahmlet",        css: "'Hahmlet'",        weight: 700 },
+  { key: "elegant", ko: "고운", en: "Elegant",   g: "Gowun Batang",   css: "'Gowun Batang'",   weight: 700 },
+  { key: "thin",    ko: "가는", en: "Thin",   g: "Diphylleia",     css: "'Diphylleia'",     weight: 400 },
+  { key: "impact",  ko: "임팩트", en: "Impact", g: "Black Han Sans", css: "'Black Han Sans'", weight: 400 },
+  { key: "bold",    ko: "볼드", en: "Bold",   g: "Gasoek One",     css: "'Gasoek One'",     weight: 400 },
+  { key: "sharp",   ko: "각진", en: "Sharp",   g: "Do Hyeon",       css: "'Do Hyeon'",       weight: 400 },
+  { key: "hand",    ko: "손글씨", en: "Handwritten", g: "Single Day",     css: "'Single Day'",     weight: 400 },
 ];
 export const fontOf = (k) => TEXT_FONTS.find((f) => f.key === k) || TEXT_FONTS[0];
 /** 실제로 쓸 font-family — 못 받았으면 시스템으로 떨어진다(편집을 막지 않는다). */
@@ -124,7 +127,7 @@ export function contrastInk(hex) {
 const BG_ORDER = ["none", "solid", "soft"];
 /** 효과 — 화면(CSS)과 저장본(캔버스) **양쪽에 같은 결과로** 그릴 수 있는 것만 넣었다.
  *  움직이는 효과(Pop/Jump/Shimmer)는 결과물이 정지 이미지(JPEG)라 담기지 않으므로 뺐다. */
-export const TEXT_EFFECTS = [["none", "기본"], ["neon", "네온"], ["stroke", "테두리"]];
+export const TEXT_EFFECTS = [["none", "기본", "Plain"], ["neon", "네온", "Neon"], ["stroke", "테두리", "Outline"]];
 const MAX_TEXT_LEN = 140;
 
 /**
@@ -591,7 +594,7 @@ export default function TextComposer({ at, wrapRef, pickColorAt, onDone }) {
     setTimeout(() => taRef.current?.focus(), 0);
   }
 
-  const mirrorText = (v) => (v === "" ? "문구 입력" : v + (v.endsWith("\n") ? "\u200B" : ""));
+  const mirrorText = (v) => (v === "" ? L("문구 입력", "Type here") : v + (v.endsWith("\n") ? "\u200B" : ""));
   /** 글자 수 상한을 DOM 에 직접 적용하고 그 값을 돌려준다(비제어 textarea 라 여기서 자른다). */
   function clampLen(el) {
     if (el.value.length > MAX_TEXT_LEN) el.value = el.value.slice(0, MAX_TEXT_LEN);
@@ -813,12 +816,12 @@ export default function TextComposer({ at, wrapRef, pickColorAt, onDone }) {
           <button
             style={S.iconBtn}
             onClick={() => { hap.tap(); setAlign(align === "center" ? "left" : align === "left" ? "right" : "center"); }}
-            aria-label="정렬"
+            aria-label={L("정렬", "Alignment")}
           ><AlignIcon align={align} /></button>
           <button
             style={{ ...S.iconBtn, ...(bg !== "none" ? S.iconBtnOn : null) }}
             onClick={cycleBg}
-            aria-label="글자 배경"
+            aria-label={L("글자 배경", "Text background")}
           >A</button>
           <button
             style={{ ...S.effBtn, ...(effect !== "none" ? S.iconBtnOn : null) }}
@@ -827,12 +830,12 @@ export default function TextComposer({ at, wrapRef, pickColorAt, onDone }) {
               const i = TEXT_EFFECTS.findIndex(([k]) => k === effect);
               setEffect(TEXT_EFFECTS[(i + 1) % TEXT_EFFECTS.length][0]);
             }}
-            aria-label="글자 효과"
-          >{(TEXT_EFFECTS.find(([k]) => k === effect) || TEXT_EFFECTS[0])[1]}</button>
+            aria-label={L("글자 효과", "Text effect")}
+          >{(() => { const e = TEXT_EFFECTS.find(([k]) => k === effect) || TEXT_EFFECTS[0]; return L(e[1], e[2]); })()}</button>
         </div>
         <div style={S.topGroup}>
-          <button style={S.topBtn} onClick={() => { hap.tap(); onDone(null); }}>취소</button>
-          <button style={{ ...S.topBtn, ...S.topDone }} onClick={done}>완료</button>
+          <button style={S.topBtn} onClick={() => { hap.tap(); onDone(null); }}>{L("취소", "Cancel")}</button>
+          <button style={{ ...S.topBtn, ...S.topDone }} onClick={done}>{L("완료", "Done")}</button>
         </div>
       </div>
 
@@ -843,7 +846,7 @@ export default function TextComposer({ at, wrapRef, pickColorAt, onDone }) {
         value={Math.round(scale * 100)}
         onChange={(e) => setScale(Number(e.target.value) / 100)}
         style={{ ...S.sizeSlider, top: rect ? rect.top + rect.height / 2 : "45%" }}
-        aria-label="글자 크기"
+        aria-label={L("글자 크기", "Text size")}
       />
 
       {/* 아래 — 키보드 바로 위에 붙는다(색 줄 + 글꼴 캐러셀) */}
@@ -851,7 +854,7 @@ export default function TextComposer({ at, wrapRef, pickColorAt, onDone }) {
         {/* 배경을 켜면 글자색/배경색을 따로 고른다 (흰 배경 + 분홍 글씨 같은 조합이 가능해진다) */}
         {bg !== "none" && (
           <div style={S.targetRow}>
-            {[["text", "글자색"], ["bg", "배경색"]].map(([k, label]) => (
+            {[["text", L("글자색", "Text")], ["bg", L("배경색", "Background")]].map(([k, label]) => (
               <button
                 key={k}
                 style={{ ...S.targetBtn, ...(target === k ? S.targetOn : null) }}
@@ -876,7 +879,7 @@ export default function TextComposer({ at, wrapRef, pickColorAt, onDone }) {
           <button
             style={{ ...S.sideBtn, ...(picking ? S.sideBtnOn : null) }}
             onClick={beginPick}
-            aria-label="사진에서 색 집기"
+            aria-label={L("사진에서 색 집기", "Pick a color from the photo")}
           >💧</button>
 
           {/* 기본 색 — 3페이지, 좌우로 넘긴다 */}
@@ -891,7 +894,7 @@ export default function TextComposer({ at, wrapRef, pickColorAt, onDone }) {
                     onPointerMove={swatchMove}
                     onPointerUp={swatchUp}
                     onPointerCancel={swatchCancel}
-                    aria-label={`색 ${c}`}
+                    aria-label={`${L("색", "Color")} ${c}`}
                   />
                 ))}
               </div>
@@ -902,7 +905,7 @@ export default function TextComposer({ at, wrapRef, pickColorAt, onDone }) {
           <button
             style={{ ...S.sideBtn, background: "conic-gradient(#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00)", ...(padSticky ? S.sideBtnOn : null) }}
             onClick={() => { hap.tap(); const n = !padSticky; setPadSticky(n); setPadOpen(n); }}
-            aria-label="색 직접 고르기"
+            aria-label={L("색 직접 고르기", "Choose a color")}
           />
         </div>
 
@@ -917,7 +920,7 @@ export default function TextComposer({ at, wrapRef, pickColorAt, onDone }) {
                 ...(font === f.key ? S.fontChipOn : null),
               }}
               onClick={() => { hap.tap(); setFont(f.key); }}
-            >{f.ko}</button>
+            >{L(f.ko, f.en)}</button>
           ))}
         </div>
       </div>
@@ -935,7 +938,7 @@ export default function TextComposer({ at, wrapRef, pickColorAt, onDone }) {
           onPointerUp={endPick}
           onPointerCancel={endPick}
         >
-          <div style={S.pickHint}>사진을 눌러 색을 집으세요</div>
+          <div style={S.pickHint}>{L("사진을 눌러 색을 집으세요", "Tap the photo to pick a color")}</div>
           <div ref={loupeRef} style={{ ...S.loupe, background: activeColor }} />
         </div>
       )}
@@ -946,7 +949,7 @@ export default function TextComposer({ at, wrapRef, pickColorAt, onDone }) {
 
 const S = {
   // 배경을 깔지 않는다 — 사진이 그대로 보여야 편집 중 모습이 곧 결과다.
-  root: { position: "fixed", inset: 0, zIndex: 4000 },
+  root: { position: "fixed", inset: 0, zIndex: 4000, fontFamily: '-apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", Roboto, "Segoe UI", sans-serif' },
   catcher: { position: "absolute", inset: 0 },
   top: {
     position: "fixed", left: 0, right: 0,
