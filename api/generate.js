@@ -1588,6 +1588,7 @@ export default async function handler(req, res) {
         inspectImage({ base64: inline.data, mimeType: inline.mime, apiKey, ...qaOpts,
           timeoutMs: Math.max(5000, Math.min(20000, left() - 45000)) }),
       ]);
+      console.log(`[qa] ${qa.ok === false ? "불량" : qa.ok ? "통과" : "판단불가"} concept=${conceptId} shot=${shotIdx}${qa.issue ? ` "${qa.issue}"` : ""}`);
       if (hemOk !== false && qa.ok !== false) return r;
       console.log(`[generate] 불량 → 재생성 shot=${shotIdx} concept=${conceptId}` +
         (hemOk === false ? ` 기장(기대 ${dressWantHem})` : "") + (qa.ok === false ? ` qa="${qa.issue}"` : ""));
@@ -1718,6 +1719,7 @@ export default async function handler(req, res) {
       ? await inspectImage({ base64: inline.data, mimeType: inline.mime, apiKey, ...qaOpts,
           timeoutMs: Math.max(5000, Math.min(20000, left() - 45000)) })
       : { ok: null };
+    console.log(`[qa] ${qa.ok === false ? "불량" : qa.ok ? "통과" : "판단불가"} concept=${conceptId}${qa.issue ? ` "${qa.issue}"` : ""}`);
     if (qa.ok === false) {
       console.log(`[generate] 불량 → 재생성 concept=${conceptId} qa="${qa.issue}"`);
       let again = null;
