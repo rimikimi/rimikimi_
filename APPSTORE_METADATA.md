@@ -221,9 +221,15 @@ AI프로필,프로필사진,증명사진,인생네컷,AI사진,셀카,사진편�
 ```
 
 ### 영어
+> ⚠️ 2026-09-24 실측: **라이브 en-US 키워드는 이 목록이 아니었다** —
+> `rimikimi,ai photoshoot,concept,daily,photobooth,4 cut,couple,dressing room,ai art,portrait,selfie`.
+> 이름(rimikimi - personal photobooth)·부제목(New AI photo concepts daily)에 있는 단어
+> (rimikimi, photobooth, ai, photo, concept, daily)는 이미 색인되니 키워드에서 빼고 검색량 있는 말로 채운다.
+> **다음 버전 제출 때 en-US 키워드를 아래로 교체**(라이브 버전은 키워드 수정 불가):
 ```
-AI profile,headshot,portrait,selfie,photo editor,avatar,AI art,profile picture,LinkedIn,resume,oil painting,caricature
+headshot,profile picture,portrait,selfie,id photo,passport,couple,wedding,avatar,4cut,booth,linkedin
 ```
+> 한국어도 라이브 값 확인 필요(2026-09-24 라이브: 리미키미,컨셉,화보,AI화보,매일,드롭,네컷,인생네컷,커플,드레스룸,AI아트,유화,수채화,아바타,초상화,셀카,즉석사진).
 
 ---
 

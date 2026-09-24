@@ -1,22 +1,175 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://rimikimi-app.vercel.app/</loc><lastmod>2026-09-22</lastmod><priority>1.0</priority></url>
-  <url><loc>https://rimikimi-app.vercel.app/download</loc><lastmod>2026-09-22</lastmod><priority>0.9</priority></url>
-  <url><loc>https://rimikimi-app.vercel.app/c/studio</loc><lastmod>2026-09-22</lastmod><priority>0.8</priority></url>
-  <url><loc>https://rimikimi-app.vercel.app/c/id-photo</loc><lastmod>2026-09-22</lastmod><priority>0.8</priority></url>
-  <url><loc>https://rimikimi-app.vercel.app/c/fourcut</loc><lastmod>2026-09-22</lastmod><priority>0.8</priority></url>
-  <url><loc>https://rimikimi-app.vercel.app/c/couple</loc><lastmod>2026-09-22</lastmod><priority>0.8</priority></url>
-  <url><loc>https://rimikimi-app.vercel.app/c/wedding</loc><lastmod>2026-09-22</lastmod><priority>0.8</priority></url>
-  <url><loc>https://rimikimi-app.vercel.app/c/men</loc><lastmod>2026-09-22</lastmod><priority>0.8</priority></url>
-  <url><loc>https://rimikimi-app.vercel.app/c/daily</loc><lastmod>2026-09-22</lastmod><priority>0.8</priority></url>
-  <url><loc>https://rimikimi-app.vercel.app/c/fashion</loc><lastmod>2026-09-22</lastmod><priority>0.8</priority></url>
-  <url><loc>https://rimikimi-app.vercel.app/c/travel</loc><lastmod>2026-09-22</lastmod><priority>0.8</priority></url>
-  <url><loc>https://rimikimi-app.vercel.app/c/art</loc><lastmod>2026-09-22</lastmod><priority>0.8</priority></url>
-  <url><loc>https://rimikimi-app.vercel.app/c/fantasy</loc><lastmod>2026-09-22</lastmod><priority>0.8</priority></url>
-  <url><loc>https://rimikimi-app.vercel.app/c/beach</loc><lastmod>2026-09-22</lastmod><priority>0.8</priority></url>
-  <url><loc>https://rimikimi-app.vercel.app/c/street</loc><lastmod>2026-09-22</lastmod><priority>0.8</priority></url>
-  <url><loc>https://rimikimi-app.vercel.app/c/party</loc><lastmod>2026-09-22</lastmod><priority>0.8</priority></url>
-  <url><loc>https://rimikimi-app.vercel.app/c/magic</loc><lastmod>2026-09-22</lastmod><priority>0.8</priority></url>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url><loc>https://rimikimi-app.vercel.app/</loc><lastmod>2026-09-24</lastmod><priority>1.0</priority>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://rimikimi-app.vercel.app/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://rimikimi-app.vercel.app/?lang=en"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://rimikimi-app.vercel.app/"/>
+  </url>
+  <url><loc>https://rimikimi-app.vercel.app/?lang=en</loc><lastmod>2026-09-24</lastmod><priority>1.0</priority>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://rimikimi-app.vercel.app/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://rimikimi-app.vercel.app/?lang=en"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://rimikimi-app.vercel.app/"/>
+  </url>
+  <url><loc>https://rimikimi-app.vercel.app/download</loc><lastmod>2026-09-24</lastmod><priority>0.9</priority>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://rimikimi-app.vercel.app/download"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://rimikimi-app.vercel.app/download?lang=en"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://rimikimi-app.vercel.app/download"/>
+  </url>
+  <url><loc>https://rimikimi-app.vercel.app/download?lang=en</loc><lastmod>2026-09-24</lastmod><priority>0.9</priority>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://rimikimi-app.vercel.app/download"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://rimikimi-app.vercel.app/download?lang=en"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://rimikimi-app.vercel.app/download"/>
+  </url>
+  <url><loc>https://rimikimi-app.vercel.app/c/studio</loc><lastmod>2026-09-24</lastmod><priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://rimikimi-app.vercel.app/c/studio"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://rimikimi-app.vercel.app/en/c/studio"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://rimikimi-app.vercel.app/c/studio"/>
+  </url>
+  <url><loc>https://rimikimi-app.vercel.app/en/c/studio</loc><lastmod>2026-09-24</lastmod><priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://rimikimi-app.vercel.app/c/studio"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://rimikimi-app.vercel.app/en/c/studio"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://rimikimi-app.vercel.app/c/studio"/>
+  </url>
+  <url><loc>https://rimikimi-app.vercel.app/c/id-photo</loc><lastmod>2026-09-24</lastmod><priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://rimikimi-app.vercel.app/c/id-photo"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://rimikimi-app.vercel.app/en/c/id-photo"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://rimikimi-app.vercel.app/c/id-photo"/>
+  </url>
+  <url><loc>https://rimikimi-app.vercel.app/en/c/id-photo</loc><lastmod>2026-09-24</lastmod><priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://rimikimi-app.vercel.app/c/id-photo"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://rimikimi-app.vercel.app/en/c/id-photo"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://rimikimi-app.vercel.app/c/id-photo"/>
+  </url>
+  <url><loc>https://rimikimi-app.vercel.app/c/fourcut</loc><lastmod>2026-09-24</lastmod><priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://rimikimi-app.vercel.app/c/fourcut"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://rimikimi-app.vercel.app/en/c/fourcut"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://rimikimi-app.vercel.app/c/fourcut"/>
+  </url>
+  <url><loc>https://rimikimi-app.vercel.app/en/c/fourcut</loc><lastmod>2026-09-24</lastmod><priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://rimikimi-app.vercel.app/c/fourcut"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://rimikimi-app.vercel.app/en/c/fourcut"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://rimikimi-app.vercel.app/c/fourcut"/>
+  </url>
+  <url><loc>https://rimikimi-app.vercel.app/c/couple</loc><lastmod>2026-09-24</lastmod><priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://rimikimi-app.vercel.app/c/couple"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://rimikimi-app.vercel.app/en/c/couple"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://rimikimi-app.vercel.app/c/couple"/>
+  </url>
+  <url><loc>https://rimikimi-app.vercel.app/en/c/couple</loc><lastmod>2026-09-24</lastmod><priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://rimikimi-app.vercel.app/c/couple"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://rimikimi-app.vercel.app/en/c/couple"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://rimikimi-app.vercel.app/c/couple"/>
+  </url>
+  <url><loc>https://rimikimi-app.vercel.app/c/wedding</loc><lastmod>2026-09-24</lastmod><priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://rimikimi-app.vercel.app/c/wedding"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://rimikimi-app.vercel.app/en/c/wedding"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://rimikimi-app.vercel.app/c/wedding"/>
+  </url>
+  <url><loc>https://rimikimi-app.vercel.app/en/c/wedding</loc><lastmod>2026-09-24</lastmod><priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://rimikimi-app.vercel.app/c/wedding"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://rimikimi-app.vercel.app/en/c/wedding"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://rimikimi-app.vercel.app/c/wedding"/>
+  </url>
+  <url><loc>https://rimikimi-app.vercel.app/c/men</loc><lastmod>2026-09-24</lastmod><priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://rimikimi-app.vercel.app/c/men"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://rimikimi-app.vercel.app/en/c/men"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://rimikimi-app.vercel.app/c/men"/>
+  </url>
+  <url><loc>https://rimikimi-app.vercel.app/en/c/men</loc><lastmod>2026-09-24</lastmod><priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://rimikimi-app.vercel.app/c/men"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://rimikimi-app.vercel.app/en/c/men"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://rimikimi-app.vercel.app/c/men"/>
+  </url>
+  <url><loc>https://rimikimi-app.vercel.app/c/daily</loc><lastmod>2026-09-24</lastmod><priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://rimikimi-app.vercel.app/c/daily"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://rimikimi-app.vercel.app/en/c/daily"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://rimikimi-app.vercel.app/c/daily"/>
+  </url>
+  <url><loc>https://rimikimi-app.vercel.app/en/c/daily</loc><lastmod>2026-09-24</lastmod><priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://rimikimi-app.vercel.app/c/daily"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://rimikimi-app.vercel.app/en/c/daily"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://rimikimi-app.vercel.app/c/daily"/>
+  </url>
+  <url><loc>https://rimikimi-app.vercel.app/c/fashion</loc><lastmod>2026-09-24</lastmod><priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://rimikimi-app.vercel.app/c/fashion"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://rimikimi-app.vercel.app/en/c/fashion"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://rimikimi-app.vercel.app/c/fashion"/>
+  </url>
+  <url><loc>https://rimikimi-app.vercel.app/en/c/fashion</loc><lastmod>2026-09-24</lastmod><priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://rimikimi-app.vercel.app/c/fashion"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://rimikimi-app.vercel.app/en/c/fashion"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://rimikimi-app.vercel.app/c/fashion"/>
+  </url>
+  <url><loc>https://rimikimi-app.vercel.app/c/travel</loc><lastmod>2026-09-24</lastmod><priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://rimikimi-app.vercel.app/c/travel"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://rimikimi-app.vercel.app/en/c/travel"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://rimikimi-app.vercel.app/c/travel"/>
+  </url>
+  <url><loc>https://rimikimi-app.vercel.app/en/c/travel</loc><lastmod>2026-09-24</lastmod><priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://rimikimi-app.vercel.app/c/travel"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://rimikimi-app.vercel.app/en/c/travel"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://rimikimi-app.vercel.app/c/travel"/>
+  </url>
+  <url><loc>https://rimikimi-app.vercel.app/c/art</loc><lastmod>2026-09-24</lastmod><priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://rimikimi-app.vercel.app/c/art"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://rimikimi-app.vercel.app/en/c/art"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://rimikimi-app.vercel.app/c/art"/>
+  </url>
+  <url><loc>https://rimikimi-app.vercel.app/en/c/art</loc><lastmod>2026-09-24</lastmod><priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://rimikimi-app.vercel.app/c/art"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://rimikimi-app.vercel.app/en/c/art"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://rimikimi-app.vercel.app/c/art"/>
+  </url>
+  <url><loc>https://rimikimi-app.vercel.app/c/fantasy</loc><lastmod>2026-09-24</lastmod><priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://rimikimi-app.vercel.app/c/fantasy"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://rimikimi-app.vercel.app/en/c/fantasy"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://rimikimi-app.vercel.app/c/fantasy"/>
+  </url>
+  <url><loc>https://rimikimi-app.vercel.app/en/c/fantasy</loc><lastmod>2026-09-24</lastmod><priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://rimikimi-app.vercel.app/c/fantasy"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://rimikimi-app.vercel.app/en/c/fantasy"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://rimikimi-app.vercel.app/c/fantasy"/>
+  </url>
+  <url><loc>https://rimikimi-app.vercel.app/c/beach</loc><lastmod>2026-09-24</lastmod><priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://rimikimi-app.vercel.app/c/beach"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://rimikimi-app.vercel.app/en/c/beach"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://rimikimi-app.vercel.app/c/beach"/>
+  </url>
+  <url><loc>https://rimikimi-app.vercel.app/en/c/beach</loc><lastmod>2026-09-24</lastmod><priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://rimikimi-app.vercel.app/c/beach"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://rimikimi-app.vercel.app/en/c/beach"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://rimikimi-app.vercel.app/c/beach"/>
+  </url>
+  <url><loc>https://rimikimi-app.vercel.app/c/street</loc><lastmod>2026-09-24</lastmod><priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://rimikimi-app.vercel.app/c/street"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://rimikimi-app.vercel.app/en/c/street"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://rimikimi-app.vercel.app/c/street"/>
+  </url>
+  <url><loc>https://rimikimi-app.vercel.app/en/c/street</loc><lastmod>2026-09-24</lastmod><priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://rimikimi-app.vercel.app/c/street"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://rimikimi-app.vercel.app/en/c/street"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://rimikimi-app.vercel.app/c/street"/>
+  </url>
+  <url><loc>https://rimikimi-app.vercel.app/c/party</loc><lastmod>2026-09-24</lastmod><priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://rimikimi-app.vercel.app/c/party"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://rimikimi-app.vercel.app/en/c/party"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://rimikimi-app.vercel.app/c/party"/>
+  </url>
+  <url><loc>https://rimikimi-app.vercel.app/en/c/party</loc><lastmod>2026-09-24</lastmod><priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://rimikimi-app.vercel.app/c/party"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://rimikimi-app.vercel.app/en/c/party"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://rimikimi-app.vercel.app/c/party"/>
+  </url>
+  <url><loc>https://rimikimi-app.vercel.app/c/magic</loc><lastmod>2026-09-24</lastmod><priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://rimikimi-app.vercel.app/c/magic"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://rimikimi-app.vercel.app/en/c/magic"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://rimikimi-app.vercel.app/c/magic"/>
+  </url>
+  <url><loc>https://rimikimi-app.vercel.app/en/c/magic</loc><lastmod>2026-09-24</lastmod><priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://rimikimi-app.vercel.app/c/magic"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://rimikimi-app.vercel.app/en/c/magic"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://rimikimi-app.vercel.app/c/magic"/>
+  </url>
   <url><loc>https://rimikimi-app.vercel.app/privacy</loc><lastmod>2026-09-22</lastmod><priority>0.3</priority></url>
   <url><loc>https://rimikimi-app.vercel.app/terms</loc><lastmod>2026-09-22</lastmod><priority>0.3</priority></url>
   <url><loc>https://rimikimi-app.vercel.app/refund</loc><lastmod>2026-09-22</lastmod><priority>0.3</priority></url>

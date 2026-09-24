@@ -3,6 +3,10 @@
   "framework": "vite",
   "rewrites": [
     {
+      "source": "/en/c/:name",
+      "destination": "/en/c/:name.html"
+    },
+    {
       "source": "/c/magic",
       "destination": "/c/magic.html"
     },

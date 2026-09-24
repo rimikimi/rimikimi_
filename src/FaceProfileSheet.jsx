@@ -182,7 +182,7 @@ export default function FaceProfile({ accessToken, onClose, onSaved }) {
   return (
     <div style={S.backdrop} onClick={onClose}>
       <div style={S.sheet} onClick={(e) => e.stopPropagation()}>
-        <button style={S.close} onClick={onClose} aria-label="닫기">✕</button>
+        <button style={S.close} onClick={onClose}>닫기</button>
         {/* 앵커 생성 대기 스피너용 — 전역 CSS 에 spin 키프레임이 없어 여기서 선언 */}
         <style>{"@keyframes rk-spin { to { transform: rotate(360deg); } }"}</style>
         <input ref={fileRef} type="file" accept="image/*" onChange={onFile} style={{ display: "none" }} />
@@ -222,7 +222,12 @@ export default function FaceProfile({ accessToken, onClose, onSaved }) {
           </>
         )}
 
-        {step === "shoot" && (
+        {step === "shoot" && mode === "camera" && !isNative() && (
+          <ScanView shots={shots} busy={busy} err={err} onShot={accept}
+            onClose={() => setStep("intro")} onNext={startConfirm} />
+        )}
+
+        {step === "shoot" && !(mode === "camera" && !isNative()) && (
           <>
             <h2 style={S.title}>{mode === "album" ? "사진을 올려주세요" : "셀카를 찍어주세요"}</h2>
             <p style={S.lead}>
@@ -349,6 +354,143 @@ export default function FaceProfile({ accessToken, onClose, onSaved }) {
   );
 }
 
+/* ---------- 웹 얼굴 스캔 화면 — 2.0 앱 FaceScanView 모양, 셔터로 3장 수동 촬영 ----------
+   앱은 Vision 으로 각도를 재서 자동으로 찍는다. 웹은 그 판정을 못 하니 같은 화면에서 셔터를 누른다.
+   찍은 컷은 기존 accept()(기기 화질 검사 → 서버 얼굴 검출)를 그대로 거친다. */
+const SCAN_STEPS = [
+  { key: "front",   label: "정면",     title: "정면을 봐주세요",       hint: "얼굴을 원 안에 꽉 채우고 셔터를 눌러 주세요" },
+  { key: "left45",  label: "옆모습 ①", title: "고개를 한쪽으로 천천히", hint: "45도쯤 돌리고 셔터를 눌러 주세요" },
+  { key: "right45", label: "옆모습 ②", title: "이제 반대쪽으로",       hint: "반대쪽으로 45도쯤 돌리고 셔터를 눌러 주세요" },
+];
+
+function ScanView({ shots, busy, err, onShot, onClose, onNext }) {
+  const videoRef = React.useRef(null);
+  const [camErr, setCamErr] = useState("");
+  const [flash, setFlash] = useState(false);
+  useEffect(() => {
+    let stream = null, dead = false;
+    navigator.mediaDevices?.getUserMedia({ video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 960 } }, audio: false })
+      .then((st) => {
+        if (dead) { st.getTracks().forEach((t) => t.stop()); return; }
+        stream = st;
+        if (videoRef.current) { videoRef.current.srcObject = st; videoRef.current.play().catch(() => {}); }
+      })
+      .catch(() => { if (!dead) setCamErr("카메라를 열 수 없어요. 브라우저에서 카메라를 허용해 주세요."); });
+    return () => { dead = true; stream?.getTracks().forEach((t) => t.stop()); };
+  }, []);
+
+  const idx = SCAN_STEPS.findIndex((st) => !shots[st.key]);
+  const cur = idx < 0 ? null : SCAN_STEPS[idx];
+  const doneCount = SCAN_STEPS.filter((st) => shots[st.key]).length;
+  const curErr = cur && err[cur.key];
+
+  function capture() {
+    const v = videoRef.current;
+    if (!cur || busy || !v || !v.videoWidth) return;
+    // 3:4 세로로 가운데를 잘라 원본 방향(거울 아님)으로 담는다.
+    const vw = v.videoWidth, vh = v.videoHeight;
+    let cw = vw, ch = Math.round(vw * 4 / 3);
+    if (ch > vh) { ch = vh; cw = Math.round(vh * 3 / 4); }
+    const c = document.createElement("canvas");
+    c.width = cw; c.height = ch;
+    c.getContext("2d").drawImage(v, (vw - cw) / 2, (vh - ch) / 2, cw, ch, 0, 0, cw, ch);
+    setFlash(true); setTimeout(() => setFlash(false), 220);
+    onShot(cur.key, c.toDataURL("image/jpeg", 0.95));
+  }
+
+  const ticks = 36;
+  const progress = doneCount / 3;
+  return (
+    <div style={SC.root}>
+      <div style={SC.top}><button type="button" style={SC.textBtn} onClick={onClose}>닫기</button></div>
+      <div style={SC.stage}>
+        <div style={{ ...SC.ring, transform: flash ? "scale(1.04)" : "scale(1)" }} aria-hidden="true">
+          {Array.from({ length: ticks }).map((_, i) => {
+            const on = i / ticks < progress;
+            return (
+              <span key={i} style={{
+                ...SC.tick, height: on ? 16 : 11, opacity: on ? 1 : 0.24,
+                transform: `rotate(${(i / ticks) * 360}deg) translateY(-160px)`,
+              }} />
+            );
+          })}
+        </div>
+        <div style={SC.circle}>
+          <video ref={videoRef} playsInline muted autoPlay style={SC.video} />
+        </div>
+      </div>
+      <div style={SC.texts}>
+        <div style={SC.title}>{camErr ? "카메라가 필요해요" : cur ? cur.title : "다 됐어요"}</div>
+        <div style={{ ...SC.hint, color: curErr ? "#ff8a80" : "rgba(255,255,255,0.66)" }}>
+          {camErr || (busy ? "사진을 확인하고 있어요…" : curErr || (cur ? cur.hint : "이 사진들로 기준 사진을 만들어요"))}
+        </div>
+      </div>
+      <div style={SC.slots}>
+        {SCAN_STEPS.map((st) => (
+          <div key={st.key} style={SC.slot}>
+            <div style={SC.slotBox}>{shots[st.key] && <img src={shots[st.key]} alt="" style={SC.slotImg} />}</div>
+            <div style={{ ...SC.slotLabel, opacity: shots[st.key] ? 0.85 : 0.42 }}>{st.label}</div>
+          </div>
+        ))}
+      </div>
+      <div style={SC.controls}>
+        <div style={{ width: 96 }} />
+        {cur ? (
+          <button type="button" aria-label="촬영" style={SC.shutter} disabled={!!busy || !!camErr} onClick={capture}>
+            <span style={{ ...SC.shutterRing, opacity: busy || camErr ? 0.3 : 0.9 }} />
+            <span style={{ ...SC.shutterDot, opacity: busy || camErr ? 0.3 : 1 }} />
+          </button>
+        ) : <div style={{ width: 74, height: 74 }} />}
+        <div style={{ width: 96, display: "flex", justifyContent: "flex-end" }}>
+          {/* 옆모습은 선택 — 정면만 찍고도 넘어갈 수 있다(기존 필수 규칙 그대로) */}
+          {shots.front && !busy && (
+            <button type="button" style={SC.next} onClick={onNext}>{cur ? "이대로 진행" : "다음"}</button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const SC = {
+  root: {
+    position: "fixed", inset: 0, zIndex: 430, background: "#000", color: "#fff",
+    display: "flex", flexDirection: "column", alignItems: "center",
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif',
+    padding: "calc(env(safe-area-inset-top, 0px) + 12px) 16px calc(env(safe-area-inset-bottom, 0px) + 20px)",
+  },
+  top: { alignSelf: "stretch", display: "flex" },
+  textBtn: { background: "none", border: "none", color: "#fff", fontSize: 17, cursor: "pointer", padding: 0 },
+  stage: { position: "relative", width: 328, height: 328, marginTop: "auto", flexShrink: 0 },
+  ring: { position: "absolute", inset: 0, transition: "transform 300ms cubic-bezier(.2,.9,.3,1.3)" },
+  tick: {
+    position: "absolute", left: "50%", top: "50%", width: 3, marginLeft: -1.5, marginTop: -8,
+    borderRadius: 2, background: "#fff", transformOrigin: "50% 50%",
+    transition: "height 250ms ease-out, opacity 250ms ease-out",
+  },
+  circle: {
+    position: "absolute", left: 14, top: 14, width: 300, height: 300, borderRadius: "50%", overflow: "hidden",
+    boxShadow: "inset 0 0 0 2px rgba(255,255,255,0.16)", background: "#111",
+  },
+  video: { width: "100%", height: "100%", objectFit: "cover", transform: "scaleX(-1)" },
+  texts: { marginTop: "auto", textAlign: "center", display: "flex", flexDirection: "column", gap: 8 },
+  title: { fontSize: 20, fontWeight: 700, letterSpacing: "-0.02em" },
+  hint: { fontSize: 13, fontWeight: 500, minHeight: 34, lineHeight: 1.35 },
+  slots: { marginTop: "auto", display: "flex", gap: 12 },
+  slot: { display: "flex", flexDirection: "column", alignItems: "center", gap: 6 },
+  slotBox: { width: 64, height: 64, borderRadius: 12, overflow: "hidden", background: "rgba(255,255,255,0.12)" },
+  slotImg: { width: "100%", height: "100%", objectFit: "cover", display: "block" },
+  slotLabel: { fontSize: 11, fontWeight: 600 },
+  controls: { alignSelf: "stretch", display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 20 },
+  shutter: { position: "relative", width: 74, height: 74, border: "none", background: "transparent", padding: 0, cursor: "pointer" },
+  shutterRing: { position: "absolute", inset: 0, borderRadius: "50%", border: "4px solid #fff", boxSizing: "border-box" },
+  shutterDot: { position: "absolute", left: 7, top: 7, width: 60, height: 60, borderRadius: "50%", background: "#fff" },
+  next: {
+    height: 40, padding: "0 14px", borderRadius: 999, border: "none", background: "#e6403c", color: "#fff",
+    fontSize: 15, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap",
+  },
+};
+
 /* ---------- 프로필 화면에 넣는 관리 카드 ---------- */
 export function FaceProfileCard({ meta, onEdit, onDeleted }) {
   const [previews, setPreviews] = useState([]);
@@ -372,8 +514,8 @@ export function FaceProfileCard({ meta, onEdit, onDeleted }) {
             {meta.stale && " · 안내가 바뀌어 다시 등록이 필요해요"}
           </div>
           <div style={S.row}>
-            <button style={S.ghost} onClick={onEdit}>다시 등록</button>
-            <button style={S.danger} onClick={async () => { await deleteProfile(); onDeleted && onDeleted(); }}>
+            <button style={{ ...S.cardBtn, flex: 1 }} onClick={onEdit}>다시 등록</button>
+            <button style={{ ...S.cardBtn, width: "auto", padding: "0 18px", color: "#e6403c" }} onClick={async () => { await deleteProfile(); onDeleted && onDeleted(); }}>
               삭제
             </button>
           </div>
@@ -384,7 +526,7 @@ export function FaceProfileCard({ meta, onEdit, onDeleted }) {
             사진 1~3장으로 내 기준 사진을 만들어두면 매번 사진을 올리지 않아도 돼요.
             기준 사진은 이 폰에만 저장돼요.
           </div>
-          <button style={S.primary} onClick={onEdit}>앱에서 사용할 사진 만들기</button>
+          <button style={S.cardBtn} onClick={onEdit}>앱에서 사용할 사진 만들기</button>
         </>
       )}
     </div>
@@ -392,28 +534,27 @@ export function FaceProfileCard({ meta, onEdit, onDeleted }) {
 }
 
 const S = {
+  // 2.0: 앱처럼 전체 화면(fullScreenCover) — 바탕 #FBF8F3, 왼쪽 위 "닫기", 제목 22/700
   backdrop: {
-    position: "fixed", inset: 0, zIndex: 420,
-    background: "rgba(20,16,14,0.55)", backdropFilter: "blur(3px)",
-    display: "flex", alignItems: "flex-end", justifyContent: "center",
+    position: "fixed", inset: 0, zIndex: 420, background: "#FBF8F3",
+    display: "flex", justifyContent: "center",
   },
   sheet: {
-    width: "100%", maxWidth: 440, background: "#fffdf9",
-    borderRadius: "22px 22px 0 0",
-    padding: "22px 20px calc(env(safe-area-inset-bottom, 0px) + 18px)",
-    maxHeight: "92vh", overflowY: "auto", position: "relative",
-    boxShadow: "0 -8px 40px rgba(0,0,0,0.18)",
+    width: "100%", maxWidth: 440, background: "#FBF8F3",
+    padding: "calc(env(safe-area-inset-top, 0px) + 56px) 16px calc(env(safe-area-inset-bottom, 0px) + 24px)",
+    overflowY: "auto", position: "relative",
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif',
   },
   close: {
-    position: "absolute", top: 12, right: 12, width: 32, height: 32, borderRadius: 16,
-    border: "none", background: "rgba(0,0,0,0.05)", fontSize: 15, color: "#6b6360", cursor: "pointer",
+    position: "absolute", top: "calc(env(safe-area-inset-top, 0px) + 14px)", left: 16,
+    border: "none", background: "none", fontSize: 17, color: INK, cursor: "pointer", padding: 0,
   },
   emoji: { fontSize: 32, textAlign: "center", marginBottom: 6 },
-  title: { fontSize: 20, fontWeight: 800, textAlign: "center", margin: "0 0 10px", color: INK },
-  lead: { fontSize: 13.5, lineHeight: 1.6, color: "#6b6360", textAlign: "center", margin: "0 0 14px" },
-  noteBox: { background: "rgba(0,0,0,0.04)", borderRadius: 12, padding: "11px 13px", marginBottom: 10 },
-  noteHead: { fontSize: 13, fontWeight: 800, marginBottom: 3, color: INK },
-  noteBody: { fontSize: 12.5, lineHeight: 1.55, color: "#6b6360" },
+  title: { fontSize: 22, fontWeight: 700, letterSpacing: "-0.015em", textAlign: "center", margin: "0 0 10px", color: INK },
+  lead: { fontSize: 13, fontWeight: 500, lineHeight: 1.5, color: "rgba(35,31,32,0.55)", textAlign: "center", margin: "0 0 16px" },
+  noteBox: { background: "#fff", borderRadius: 14, padding: "12px 14px", marginBottom: 10 },
+  noteHead: { fontSize: 15, fontWeight: 600, marginBottom: 3, color: INK },
+  noteBody: { fontSize: 13, lineHeight: 1.5, color: "rgba(35,31,32,0.55)" },
   grid: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 14 },
   slot: { display: "flex", flexDirection: "column", gap: 4 },
   slotBox: {
@@ -474,24 +615,27 @@ const S = {
     padding: "9px 12px", fontSize: 12.5, margin: "8px 0",
   },
   row: { display: "flex", gap: 8, marginTop: 12 },
+  // 앱 PrimaryButton / SecondaryButton
   primary: {
-    width: "100%", padding: "13px 18px", borderRadius: 14, border: "none",
-    background: INK, color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer",
+    width: "100%", minHeight: 50, padding: "0 18px", borderRadius: 12, border: "none",
+    background: "#e6403c", color: "#fff", fontSize: 17, fontWeight: 600, cursor: "pointer",
   },
   ghost: {
-    flex: "0 0 auto", padding: "13px 18px", borderRadius: 14,
-    border: "1px solid rgba(0,0,0,0.12)", background: "transparent",
-    fontSize: 14.5, fontWeight: 600, color: "#3d3735", cursor: "pointer",
+    flex: "0 0 auto", minHeight: 50, padding: "0 18px", borderRadius: 12,
+    border: "none", background: "#F1ECE4",
+    fontSize: 15, fontWeight: 600, color: INK, cursor: "pointer",
   },
   danger: {
     flex: "0 0 auto", padding: "13px 18px", borderRadius: 14,
     border: "1px solid rgba(192,57,43,0.3)", background: "transparent",
     fontSize: 14.5, fontWeight: 700, color: "#c0392b", cursor: "pointer",
   },
-  card: {
-    background: "#fff", border: "1px solid " + INK + "10", borderRadius: 18,
-    padding: 16, marginBottom: 12, boxShadow: "0 8px 20px -12px rgba(35,31,32,0.18)",
+  // 2.0 프로필 카드 — 흰 카드·그림자 없음, 제목 17/600, 버튼은 회색 채움(앱 SecondaryButton)
+  card: { background: "#fff", borderRadius: 14, padding: 16, marginTop: 16 },
+  cardHead: { fontSize: 17, fontWeight: 600, letterSpacing: "-0.01em", color: INK, marginBottom: 6 },
+  cardNote: { fontSize: 13, fontWeight: 500, lineHeight: 1.45, color: "rgba(35,31,32,0.55)", marginBottom: 12 },
+  cardBtn: {
+    width: "100%", height: 44, borderRadius: 12, border: "none", background: "#F1ECE4",
+    color: INK, fontSize: 15, fontWeight: 600, cursor: "pointer",
   },
-  cardHead: { fontSize: 15, fontWeight: 800, color: INK, marginBottom: 8 },
-  cardNote: { fontSize: 12.5, lineHeight: 1.6, color: "#6b6360", marginBottom: 10 },
 };

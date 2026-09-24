@@ -154,9 +154,23 @@
   ]
 }
     </script>
+    <!-- 앱 안 편집기(?tool=)에서는 크롤러용 정적 본문이 잠깐이라도 비치지 않게 -->
+    <script>if (/[?&]tool=/.test(location.search)) document.documentElement.className += " tool";</script>
+    <style>.tool #root > main { display: none; }</style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"><!-- 크롤러용 정적 본문(JS 를 안 돌리는 AI 검색·링크 미리보기용). React 가 마운트하면 통째로 교체된다. -->
+      <main style="max-width:640px;margin:0 auto;padding:24px 16px;font-family:-apple-system,system-ui,sans-serif;color:#231F20;background:#FBF8F3">
+        <h1>rimikimi — 셀카 한 장으로 만드는 AI 사진관</h1>
+        <p>셀카 한 장을 올리고 컨셉을 고르면 몇 분 안에 AI 사진이 나옵니다. 증명사진·프로필 사진부터 인생네컷·커플 화보·웨딩·여행 컨셉까지 464가지가 있고, 매일 저녁 8시(KST)에 새 컨셉이 추가됩니다.</p>
+        <ul>
+          <li>가입하면 하루 1장 무료, 그 이상은 크레딧으로 만들 수 있어요.</li>
+          <li>올린 사진은 만들 때만 잠깐 전송되고 서버에 저장되지 않아요. 만든 사진은 24시간 보관돼요.</li>
+          <li>iOS·Android 앱과 웹에서 쓸 수 있어요.</li>
+        </ul>
+        <p>컨셉 둘러보기: <a href="/c/studio">스튜디오 프로필</a> · <a href="/c/id-photo">증명사진</a> · <a href="/c/fourcut">인생네컷</a> · <a href="/c/couple">커플</a> · <a href="/c/wedding">웨딩</a> · <a href="/c/travel">여행</a> · <a href="/c/art">아트</a> · <a href="/download">앱 다운로드</a> · <a href="/?lang=en">English</a></p>
+      </main>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
     <script>
       // 서비스 워커: 로컬 개발 환경(localhost / 127.0.0.1)에서는

@@ -20,6 +20,9 @@ import {
 import { t, useLang } from "./i18n";
 import { isNative } from "./nativeBridge";
 
+// 2.0: 시스템 글꼴(v2/SPEC.md §0)
+const FONT = '-apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", Roboto, "Segoe UI", sans-serif';
+
 // 네이티브 앱 OAuth 복귀용 딥링크 (iOS/Android URL scheme + Supabase Redirect URL 에 등록)
 const NATIVE_REDIRECT = "com.rimikimi.app://login-callback";
 
@@ -450,7 +453,7 @@ const S = {
     // 노치/홈바 안전영역 반영 (기종 자동 대응)
     padding: "calc(env(safe-area-inset-top, 0px) + 48px) 24px calc(env(safe-area-inset-bottom, 0px) + 40px)",
     display: "flex", flexDirection: "column", alignItems: "center",
-    fontFamily: "'Quicksand', sans-serif",
+    fontFamily: FONT,
     // 내용(이메일 폼 펼침 등)이 길어지면 화면 안에서만 스크롤, 문서 바운스 없음
     overflowY: "auto", overflowX: "hidden", overscrollBehavior: "contain",
     WebkitOverflowScrolling: "touch",
@@ -461,7 +464,7 @@ const S = {
     boxSizing: "border-box", color: INK,
     padding: "4px 4px 2px",
     display: "flex", flexDirection: "column", alignItems: "center",
-    fontFamily: "'Quicksand', sans-serif", position: "relative",
+    fontFamily: FONT, position: "relative",
   },
   embeddedClose: {
     position: "absolute", top: -4, right: -4, width: 32, height: 32,
@@ -471,16 +474,16 @@ const S = {
   },
   embeddedLogoBox: { marginTop: 4, marginBottom: 10 },
   embeddedTagline: {
-    fontFamily: "'Jua', sans-serif",
+    fontFamily: FONT,
     fontSize: 15, color: INK, opacity: 0.75,
     margin: "0 0 22px", letterSpacing: "-0.005em", textAlign: "center",
   },
   logoBox: { marginTop: 48, marginBottom: 18 },
   fallback: {
-    fontFamily: "'Jua', sans-serif", fontSize: 36, color: INK,
+    fontFamily: FONT, fontSize: 36, color: INK,
   },
   tagline: {
-    fontFamily: "'Jua', sans-serif",
+    fontFamily: FONT,
     fontSize: 17, color: INK, opacity: 0.7,
     margin: "0 0 56px", letterSpacing: "-0.005em",
   },
@@ -490,7 +493,7 @@ const S = {
   btnBase: {
     width: "100%", border: "none", borderRadius: 14,
     padding: "15px 18px", fontSize: 15, fontWeight: 700,
-    fontFamily: "'Quicksand', sans-serif",
+    fontFamily: FONT,
     cursor: "pointer", display: "flex", alignItems: "center",
     justifyContent: "center", gap: 10,
     transition: "transform .1s ease-out, opacity .12s ease-out",
@@ -498,7 +501,7 @@ const S = {
   btnApple: {
     width: "100%", border: "none", borderRadius: 14,
     padding: "15px 18px", fontSize: 15, fontWeight: 700,
-    fontFamily: "'Quicksand', sans-serif",
+    fontFamily: FONT,
     cursor: "pointer", display: "flex", alignItems: "center",
     justifyContent: "center", gap: 10,
     background: "#000", color: "#fff",
@@ -506,7 +509,7 @@ const S = {
   btnKakao: {
     width: "100%", border: "none", borderRadius: 14,
     padding: "15px 18px", fontSize: 15, fontWeight: 700,
-    fontFamily: "'Quicksand', sans-serif",
+    fontFamily: FONT,
     cursor: "pointer", display: "flex", alignItems: "center",
     justifyContent: "center", gap: 10,
     background: "#FEE500", color: "#191919",
@@ -514,7 +517,7 @@ const S = {
   btnNaver: {
     width: "100%", border: "none", borderRadius: 14,
     padding: "15px 18px", fontSize: 15, fontWeight: 700,
-    fontFamily: "'Quicksand', sans-serif",
+    fontFamily: FONT,
     cursor: "pointer", display: "flex", alignItems: "center",
     justifyContent: "center", gap: 10,
     background: "#03C75A", color: "#fff",
@@ -522,7 +525,7 @@ const S = {
   btnGoogle: {
     width: "100%", border: "1.5px solid rgba(35,31,32,0.18)",
     borderRadius: 14, padding: "14px 18px", fontSize: 15, fontWeight: 700,
-    fontFamily: "'Quicksand', sans-serif",
+    fontFamily: FONT,
     cursor: "pointer", display: "flex", alignItems: "center",
     justifyContent: "center", gap: 10,
     background: "#fff", color: INK,
@@ -537,7 +540,7 @@ const S = {
     marginTop: 20, padding: "16px 18px",
     background: "#fef9c3", color: "#713f12",
     border: "1.5px solid #facc15", borderRadius: 14,
-    fontFamily: "'Quicksand', sans-serif",
+    fontFamily: FONT,
   },
   noticeTitle: {
     fontSize: 13.5, fontWeight: 700, lineHeight: 1.45, marginBottom: 8,
@@ -551,12 +554,12 @@ const S = {
     width: "100%", background: "#713f12", color: "#fff",
     border: "none", borderRadius: 10, padding: "11px 14px",
     fontSize: 13, fontWeight: 700, cursor: "pointer", marginBottom: 8,
-    fontFamily: "'Quicksand', sans-serif",
+    fontFamily: FONT,
   },
   noticeClose: {
     width: "100%", background: "transparent", color: "#713f12",
     border: "none", padding: "8px", fontSize: 12, fontWeight: 600,
-    cursor: "pointer", fontFamily: "'Quicksand', sans-serif",
+    cursor: "pointer", fontFamily: FONT,
     opacity: 0.7,
   },
   legal: {
@@ -567,7 +570,7 @@ const S = {
     marginTop: 18, background: "transparent", border: "none",
     color: INK, opacity: 0.6, fontSize: 13, fontWeight: 600,
     cursor: "pointer", textDecoration: "underline",
-    fontFamily: "'Quicksand', sans-serif",
+    fontFamily: FONT,
   },
   emailForm: {
     width: "100%", display: "flex", flexDirection: "column", gap: 10,
@@ -586,19 +589,19 @@ const S = {
     width: "100%", boxSizing: "border-box",
     border: "1.5px solid rgba(35,31,32,0.18)", borderRadius: 12,
     padding: "13px 15px", fontSize: 15,
-    fontFamily: "'Quicksand', sans-serif", background: "#fff", color: INK,
+    fontFamily: FONT, background: "#fff", color: INK,
     outline: "none",
   },
   emailSubmit: {
     width: "100%", border: "none", borderRadius: 14,
     padding: "15px 18px", fontSize: 15, fontWeight: 700,
-    fontFamily: "'Quicksand', sans-serif", cursor: "pointer",
+    fontFamily: FONT, cursor: "pointer",
     background: ACCENT, color: "#fff", marginTop: 2,
   },
   emailSwitch: {
     background: "transparent", border: "none", color: INK, opacity: 0.6,
     fontSize: 12.5, fontWeight: 600, cursor: "pointer", padding: "6px",
-    fontFamily: "'Quicksand', sans-serif",
+    fontFamily: FONT,
   },
   successNotice: {
     marginTop: 16, fontSize: 12.5, color: "#166534",

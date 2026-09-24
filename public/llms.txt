@@ -39,3 +39,26 @@ keeping the person's face recognizable while changing only styling and setting.
 
 - App Store: https://apps.apple.com/kr/app/id6782776518
 - Google Play: https://play.google.com/store/apps/details?id=com.rimikimi.app
+
+## In English
+
+English versions of the 15 category landing pages, aimed at global/US searchers. Same
+facts as the Korean pages (464 concepts, free 1 photo/day after signup, credits for more,
+generated photos auto-deleted after 24 hours, results are AI-generated images, not real
+photos). Each page links back to its Korean original via hreflang.
+
+- [Studio Headshots](https://rimikimi-app.vercel.app/en/c/studio): AI studio-style headshots from one selfie, 66 concepts.
+- [ID Photo](https://rimikimi-app.vercel.app/en/c/id-photo): AI ID-style photo for resumes/documents — not recommended for passports or visas.
+- [Photo Booth Strip](https://rimikimi-app.vercel.app/en/c/fourcut): AI version of a Korean 4-cut photo-booth strip (2–8 frames), 9 concepts.
+- [Couple](https://rimikimi-app.vercel.app/en/c/couple): AI couple photos from two separate selfies, 101 concepts.
+- [Wedding / Bridal](https://rimikimi-app.vercel.app/en/c/wedding): Preview wedding dress/tuxedo looks with AI, 81 concepts.
+- [Men](https://rimikimi-app.vercel.app/en/c/men): AI headshot concepts for men, 97 concepts.
+- [Everyday Snap](https://rimikimi-app.vercel.app/en/c/daily): Casual, natural-looking AI photos for everyday settings, 159 concepts.
+- [High Fashion / Editorial](https://rimikimi-app.vercel.app/en/c/fashion): Magazine-style AI editorial photos, 133 concepts.
+- [World Travel](https://rimikimi-app.vercel.app/en/c/travel): AI photos with the mood of cities worldwide, without traveling, 106 concepts.
+- [Art / Classic](https://rimikimi-app.vercel.app/en/c/art): Turn a photo into an oil/watercolor/pencil-style portrait, 66 concepts.
+- [Fantasy / Costume](https://rimikimi-app.vercel.app/en/c/fantasy): Non-realistic costume and character-style AI concepts, 45 concepts.
+- [Beach / Resort](https://rimikimi-app.vercel.app/en/c/beach): Bright beach and resort AI photo concepts, 45 concepts.
+- [Street Fashion](https://rimikimi-app.vercel.app/en/c/street): Urban street-style AI fashion photos, 37 concepts.
+- [Party / Event](https://rimikimi-app.vercel.app/en/c/party): Birthday, holiday, and celebration-mood AI photos, 31 concepts.
+- [Magic Booth](https://rimikimi-app.vercel.app/en/c/magic): AI photo restoration and virtual try-on (Dressing Room) tools, 21 concepts.

@@ -1,5 +1,6 @@
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
+import enIndex from "./scripts/vite-en-index.mjs";
 import { readdirSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -79,6 +80,6 @@ export default defineConfig(({ mode }) => {
   // .env, .env.local 등을 모두 읽음 ("" 접두사 = 모든 변수)
   const env = loadEnv(mode, process.cwd(), "");
   return {
-    plugins: [react(), vercelApiMiddleware(env)],
+    plugins: [react(), vercelApiMiddleware(env), enIndex()],
   };
 });
