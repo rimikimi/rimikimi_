@@ -335,7 +335,8 @@ async function getVertexToken(sa) {
 // 생성 완료 알림. 서버리스는 응답을 보내고 나면 얼어붙을 수 있어서
 // fire-and-forget 이 아니라 응답 전에 await 한다(FCM 왕복 ~200ms).
 // 실패해도 생성 결과와는 무관하므로 삼킨다.
-async function notifyDone(pushToken, count, conceptTitle, galleryId) {
+// lang: 앱이 보낸 표시 언어("en" 이면 영어 알림). 구버전 앱은 안 보내므로 한국어 그대로.
+async function notifyDone(pushToken, count, conceptTitle, galleryId, lang, conceptId) {
   // 발송 결과를 반드시 남긴다. 이게 없어서 "완료 알림이 원격(FCM→APNs)으로 가는지,
   // 로컬 예비 경로로 뜨는지"를 신고를 받고도 판별할 수 없었다 (2026-08-25).
   //   · pushToken 없음  → 앱이 FCM 토큰을 못 얻었다는 뜻 (initPush 실패/행)
@@ -346,15 +347,23 @@ async function notifyDone(pushToken, count, conceptTitle, galleryId) {
   }
   try {
     const { sendToToken } = await import("./_lib/push.js");
-    const r = await sendToToken(pushToken, {
+    const en = lang === "en";
+    const titleEn = en && conceptId != null
+      ? (ALL_CONCEPTS.find((c) => String(c.id) === String(conceptId))?.title_en || "") : "";
+    const withData = (msg, data) => ({ ...msg, data });
+    const r = await sendToToken(pushToken, withData(en ? {
+      title: "Your photo is ready ✨",
+      body: titleEn
+        ? `'${titleEn}' ${count > 1 ? `(${count} photos) ` : ""}is ready to view`
+        : "Open the app to see it",
+    } : {
       title: "사진이 완성됐어요 ✨",
       body: conceptTitle
         ? `'${conceptTitle}' ${count > 1 ? count + "장 " : ""}확인해 보세요`
         : "앱을 열어 확인해 보세요",
       // galleryId 추가 — 구버전 앱은 모르는 필드라 무시한다. 새 앱은 "방금 그거"를
       // 갤러리 최신 항목 추정 대신 정확히 이 항목으로 바로 연다.
-      data: galleryId ? { kind: "genDone", count, galleryId: String(galleryId) } : { kind: "genDone", count },
-    });
+    }, galleryId ? { kind: "genDone", count, galleryId: String(galleryId) } : { kind: "genDone", count }));
     if (r?.ok) console.log("[push] genDone 발송 ok:", r.name || "");
     else console.error("[push] genDone 실패:", r?.status || "", String(r?.error || "").slice(0, 200));
   } catch (e) { console.error("[push] genDone 예외:", e?.message || e); }
@@ -914,6 +923,8 @@ export default async function handler(req, res) {
     // 이 기기의 FCM 토큰(네이티브만). 생성이 끝나면 여기로 "완성됐어요"를 쏜다.
     // 앱이 완전히 종료돼도 도착한다 — 로컬 알림으로는 안 되던 부분.
     pushToken,
+    // 앱 표시 언어("ko"|"en") — 완료 알림 문구 언어. 없으면 한국어(구버전 앱).
+    lang,
     // 페이스 프로필 v1.1 — 같은 사람의 얼굴을 여러 각도로 담은 참조 사진 3~5장.
     // [{ mimeType, base64, angle }] 형태이며 angle 은 로깅·정렬용 메타다.
     //
@@ -1664,7 +1675,7 @@ export default async function handler(req, res) {
     if (images.length > 0) {
       admin.from("usage_log").insert({ user_id: user.id }).then(() => {}).catch(() => {});
     }
-    await notifyDone(pushToken, images.length, conceptTitle, images[0]?.galleryId);
+    await notifyDone(pushToken, images.length, conceptTitle, images[0]?.galleryId, lang, conceptId);
     return res.status(200).json({
       images,
       requested: batchCount,
@@ -1873,7 +1884,7 @@ export default async function handler(req, res) {
     proSampleAvailable = !(await getProSampleUsed(admin, user.id));
   }
 
-  await notifyDone(pushToken, 1, conceptTitle, galleryId);
+  await notifyDone(pushToken, 1, conceptTitle, galleryId, lang, conceptId);
   return res.status(200).json({
     mimeType: outMime,
     base64: outData,

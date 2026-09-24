@@ -80,9 +80,17 @@ export async function notifyConceptDrop(req, res) {
     ? `오늘의 새 컨셉 ${fresh.length}종 · ${shown}`
     : `오늘의 새 컨셉 ${fresh.length}종이 올라왔어요`;
 
+  // 영어 사용자: 앱이 기기 언어가 한국어가 아니면 "<토픽>_en" 을 대신 구독한다(2.0.2+).
+  const titlesEn = fresh.map((c) => c.title_en || c.title).filter(Boolean);
+  const shownEn = titlesEn.slice(0, 3).join(", ");
+  const n = fresh.length;
+  const bodyEn = shownEn
+    ? `${n} new concept${n > 1 ? "s" : ""} today · ${shownEn}`
+    : `${n} new concept${n > 1 ? "s" : ""} just dropped`;
+
   // dry=1 이면 실제로 쏘지 않고 무엇이 나갈지만 확인한다 (수동 점검용)
   if (req.query?.dry) {
-    return res.status(200).json({ ok: true, sent: false, dry: true, body, ...info });
+    return res.status(200).json({ ok: true, sent: false, dry: true, body, bodyEn, ...info });
   }
 
   const results = [];
@@ -93,7 +101,13 @@ export async function notifyConceptDrop(req, res) {
       data: { kind: "drop", count: fresh.length, firstId: fresh[0]?.id ?? "" },
     });
     results.push({ topic, ok: r.ok, error: r.error });
+    const rEn = await sendToTopic(`${topic}_en`, {
+      title: "New concepts are here ✨",
+      body: bodyEn,
+      data: { kind: "drop", count: fresh.length, firstId: fresh[0]?.id ?? "" },
+    });
+    results.push({ topic: `${topic}_en`, ok: rEn.ok, error: rEn.error });
   }
   const ok = results.every((r) => r.ok);
-  return res.status(ok ? 200 : 502).json({ ok, sent: ok, results, body, ...info });
+  return res.status(ok ? 200 : 502).json({ ok, sent: ok, results, body, bodyEn, ...info });
 }

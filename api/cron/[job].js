@@ -31,6 +31,10 @@ async function announce(req, res) {
     return res.status(200).json({ ok: true, sent: false, dry: true, topic, title, body });
   }
   const r = await sendToTopic(topic, { title, body, data: { kind: "announce" } });
+  // 영어 사용자 토픽(<topic>_en): title_en·body_en 을 줬을 때만 보낸다(한국어 공지를 영어 사용자에게 보내지 않게).
+  const titleEn = String(req.query?.title_en || "").slice(0, 120);
+  const bodyEn = String(req.query?.body_en || "").slice(0, 300);
+  if (titleEn && bodyEn) await sendToTopic(`${topic}_en`, { title: titleEn, body: bodyEn, data: { kind: "announce" } });
   return res.status(r?.ok ? 200 : 502).json({
     ok: !!r?.ok, sent: !!r?.ok, topic, title, body,
     error: r?.ok ? undefined : String(r?.error || "").slice(0, 200),
