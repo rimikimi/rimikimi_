@@ -227,8 +227,11 @@ AI프로필,프로필사진,증명사진,인생네컷,AI사진,셀카,사진편�
 > (rimikimi, photobooth, ai, photo, concept, daily)는 이미 색인되니 키워드에서 빼고 검색량 있는 말로 채운다.
 > **다음 버전 제출 때 en-US 키워드를 아래로 교체**(라이브 버전은 키워드 수정 불가):
 ```
-headshot,profile picture,portrait,selfie,id photo,passport,couple,wedding,avatar,4cut,booth,linkedin
+selfie,portrait,4cut,couple,dressing room,restore,old photo,avatar,ai art,oil painting,watercolor
 ```
+> ⛔ 2026-09-25: 처음엔 headshot·id photo·passport·wedding·linkedin 을 넣었다가 제출 전 점검에서 걸렸다 —
+> 8/28 4.3(a) 스팸 반려 후 **형제앱(브루클린·클레어) 영역 단어를 rimikimi 메타에서 빼기로 한 결정**
+> (scripts/asc-meta-rimikimi.mjs BANNED)을 되돌리는 것이었다. 영어 메타에도 BANNED 단어 금지. 2.0.2 에 위 목록으로 반영.
 > 한국어도 라이브 값 확인 필요(2026-09-24 라이브: 리미키미,컨셉,화보,AI화보,매일,드롭,네컷,인생네컷,커플,드레스룸,AI아트,유화,수채화,아바타,초상화,셀카,즉석사진).
 
 ---
