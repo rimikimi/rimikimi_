@@ -4,9 +4,10 @@ import { router } from "expo-router";
 import { Image } from "expo-image";
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { Text } from "./Text";
-import { thumbUrl, type Concept } from "@/lib/concepts";
+import { conceptTitle, thumbUrl, type Concept } from "@/lib/concepts";
 import { color, radius, space, themedStyles } from "@/theme/tokens";
 import { CARD_PRESS_SCALE, duration, ease } from "@/theme/motion";
+import { copy } from "@/lib/copy";
 
 // 컨셉 카드 — 3:4 썸네일 + 제목. 누름 0.985. 탭 = 옵션 화면 푸시(slide_from_right).
 
@@ -18,7 +19,7 @@ export function ConceptCard({ concept, width, onPress }: { concept: Concept; wid
     <Animated.View style={[{ width }, animated]}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={concept.title}
+        accessibilityLabel={conceptTitle(concept)}
         onPressIn={() => { scale.value = withTiming(CARD_PRESS_SCALE, { duration: duration.press, easing: ease.out }); }}
         onPressOut={() => { scale.value = withTiming(1, { duration: duration.pressRelease, easing: ease.out }); }}
         onPress={onPress ?? (() => router.push({ pathname: "/concept/[id]", params: { id: String(concept.id) } }))}
@@ -31,7 +32,7 @@ export function ConceptCard({ concept, width, onPress }: { concept: Concept; wid
           transition={duration.enter}
           cachePolicy="disk"
         />
-        <Text size="footnote" numberOfLines={1}>{concept.title}</Text>
+        <Text size="footnote" numberOfLines={1}>{conceptTitle(concept)}</Text>
       </Pressable>
     </Animated.View>
   );
@@ -47,7 +48,7 @@ export function ConceptRail({ title, items, big, onMore }: { title: string; item
         <Text size="headline">{title}</Text>
         {onMore ? (
           <Pressable accessibilityRole="button" onPress={onMore} hitSlop={8}>
-            <Text size="footnote" tone="muted">더보기</Text>
+            <Text size="footnote" tone="muted">{copy.home.more}</Text>
           </Pressable>
         ) : null}
       </View>

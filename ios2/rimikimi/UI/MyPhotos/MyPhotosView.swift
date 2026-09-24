@@ -15,7 +15,7 @@ struct MyPhotosView: View {
             LazyVStack(spacing: Spacing.s4) {
                 ProgressCard()
                 if !app.auth.isSignedIn {
-                    EmptyState(message: "로그인하면 내가 만든 이미지를 볼 수 있어요", actionTitle: "로그인") {
+                    EmptyState(message: Copy.mineLoginPrompt, actionTitle: Copy.signIn) {
                         app.loginMessage = nil
                         app.loginSheet = true
                     }
@@ -25,9 +25,9 @@ struct MyPhotosView: View {
                     }
                     .padding(.horizontal, Spacing.page)
                 } else if items.isEmpty {
-                    EmptyState(message: error ?? "아직 생성한 이미지가 없어요", actionTitle: "컨셉 선택하러 가기") { app.tab = .gallery }
+                    EmptyState(message: error ?? Copy.mineEmpty, actionTitle: Copy.mineEmptyCta) { app.tab = .gallery }
                 } else {
-                    Text("생성된 이미지는 24시간만 보관돼요. 오래 보관하려면 앨범에 저장해 주세요.")
+                    Text(Copy.mineNotice)
                         .font(AppFont.footnote).foregroundStyle(Color.ink2)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, Spacing.page)
@@ -61,7 +61,7 @@ struct MyPhotosView: View {
         }
         .scrollIndicators(.hidden)
         .background(Color.bg)
-        .inlineTitle("내 사진")
+        .inlineTitle(Copy.tabMyPhotos)
         .task(id: app.auth.session?.userID) { await reload() }
         .onChange(of: app.generation.doneTick) { _, _ in
             Task { await reload() }
@@ -107,7 +107,7 @@ struct MyPhotosView: View {
             })
             error = nil
         } catch {
-            self.error = "갤러리를 불러오지 못했어요. 잠시 후 다시 시도해 주세요."
+            self.error = Copy.mineLoadFailed
         }
     }
 }
@@ -137,11 +137,11 @@ struct ProgressCard: View {
                 HStack(spacing: Spacing.s3) {
                     ProgressView().tint(Color.accent)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("이미지를 만들고 있어요").font(AppFont.headline)
-                        Text(waiting ? "연결이 잠시 끊겼지만 서버는 계속 만들고 있어요.\n결과를 기다리는 중이에요..."
-                             : (job.count > 1 ? "\(job.count)장을 만드는 중이라 몇 분까지 걸릴 수 있어요" : "최대 몇 분까지 걸릴 수 있어요"))
+                        Text(Copy.genRunning).font(AppFont.headline)
+                        Text(waiting ? Copy.genWaiting
+                             : (job.count > 1 ? Copy.genBatchHint(job.count) : Copy.genHint))
                             .font(AppFont.footnote).foregroundStyle(Color.ink2)
-                        Text(job.conceptTitle).font(AppFont.caption).foregroundStyle(Color.ink3)
+                        Text(app.concepts.displayTitle(id: job.conceptId, fallback: job.conceptTitle)).font(AppFont.caption).foregroundStyle(Color.ink3)
                     }
                     Spacer()
                 }
@@ -157,11 +157,11 @@ struct ProgressCard: View {
                                 ResultThumb(item: first)
                             }
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("완성!").font(AppFont.headline)
-                                Text(job.conceptTitle).font(AppFont.footnote).foregroundStyle(Color.ink2)
+                                Text(Copy.genDone).font(AppFont.headline)
+                                Text(app.concepts.displayTitle(id: job.conceptId, fallback: job.conceptTitle)).font(AppFont.footnote).foregroundStyle(Color.ink2)
                             }
                             Spacer()
-                            Text("보기").font(AppFont.calloutEmphasis).foregroundStyle(Color.accent)
+                            Text(Copy.genView).font(AppFont.calloutEmphasis).foregroundStyle(Color.accent)
                         }
                         .contentShape(Rectangle())
                     }
@@ -170,7 +170,7 @@ struct ProgressCard: View {
                         Image(systemName: "xmark").font(.system(size: 12, weight: .bold)).foregroundStyle(Color.ink2)
                             .frame(width: 28, height: 28).background(Color.fill, in: Circle())
                     }
-                    .buttonStyle(.plain).accessibilityLabel("닫기")
+                    .buttonStyle(.plain).accessibilityLabel(Copy.close)
                 }
             }
         case .failed(let message):
@@ -178,11 +178,11 @@ struct ProgressCard: View {
                 HStack(alignment: .top, spacing: Spacing.s3) {
                     Image(systemName: "exclamationmark.circle").foregroundStyle(Color.accent).font(.system(size: 20))
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("생성 실패").font(AppFont.headline)
+                        Text(Copy.genFailed).font(AppFont.headline)
                         Text(message).font(AppFont.footnote).foregroundStyle(Color.ink2).lineLimit(4)
-                        Text(job.conceptTitle).font(AppFont.caption).foregroundStyle(Color.ink3)
+                        Text(app.concepts.displayTitle(id: job.conceptId, fallback: job.conceptTitle)).font(AppFont.caption).foregroundStyle(Color.ink3)
                         if app.generation.quotaExceeded {
-                            Button("크레딧 충전") { app.creditsSheet = true }
+                            Button(Copy.getCredits) { app.creditsSheet = true }
                                 .buttonStyle(SecondaryButtonStyle(small: true, fullWidth: false)).padding(.top, 4)
                         }
                     }
@@ -191,7 +191,7 @@ struct ProgressCard: View {
                         Image(systemName: "xmark").font(.system(size: 12, weight: .bold)).foregroundStyle(Color.ink2)
                             .frame(width: 28, height: 28).background(Color.fill, in: Circle())
                     }
-                    .buttonStyle(.plain).accessibilityLabel("닫기")
+                    .buttonStyle(.plain).accessibilityLabel(Copy.close)
                 }
             }
         }

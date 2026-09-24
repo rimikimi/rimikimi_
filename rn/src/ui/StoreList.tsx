@@ -5,7 +5,7 @@ import { Text } from "./Text";
 import { Button } from "./Button";
 import { Spinner } from "./Spinner";
 import { IconHeart } from "./icons";
-import { CREDIT_PACKS, SUB_PLANS, packDiscountPercent, perUnitKrw, won } from "@/lib/packs";
+import { CREDIT_PACKS, SUB_PLANS, packDiscountPercent, perUnitKrw, planBadge, planLabel, won } from "@/lib/packs";
 import type { StoreFlow } from "@/lib/storeFlow";
 import { copy } from "@/lib/copy";
 import { color, radius, space, themedStyles } from "@/theme/tokens";
@@ -38,7 +38,7 @@ export function PackRows({ flow, limit, onBought }: { flow: StoreFlow; limit?: n
                     {p.badge ? <View style={styles.badge}><Text size="caption" tone="onAccent">{copy.store.badge[p.badge]}</Text></View> : null}
                   </View>
                   <Text size="footnote" tone="muted">
-                    {copy.store.per(won(perUnitKrw(p)))}{discount != null ? ` · ${discount}% 할인` : ""}
+                    {copy.store.per(won(perUnitKrw(p)))}{discount != null ? copy.ui.discount(discount) : ""}
                   </Text>
                 </View>
               </View>
@@ -78,10 +78,10 @@ export function SubRows({ flow, only, onBought }: { flow: StoreFlow; only?: stri
             >
               <View style={{ gap: 2 }}>
                 <View style={styles.titleRow}>
-                  <Text size="headline">{s.label}</Text>
-                  {s.badge ? <View style={styles.badge}><Text size="caption" tone="onAccent">{s.badge}</Text></View> : null}
+                  <Text size="headline">{planLabel(s)}</Text>
+                  {s.badge ? <View style={styles.badge}><Text size="caption" tone="onAccent">{planBadge(s)}</Text></View> : null}
                 </View>
-                <Text size="footnote" tone="muted">{`크레딧 ${s.credits}장 / ${s.period === "week" ? "주" : s.period === "month" ? "월" : "년"}`}</Text>
+                <Text size="footnote" tone="muted">{copy.ui.subCredits(s.credits, s.period)}</Text>
               </View>
               <View style={styles.trail}>
                 {busy ? <Spinner size={20} color={color.accent} /> : <Text size="callout" weight="semibold" tabular>{rc?.priceString || won(s.krw)}</Text>}

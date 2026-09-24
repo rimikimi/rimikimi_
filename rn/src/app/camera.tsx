@@ -171,7 +171,7 @@ export default function CameraScreen() {
     }
     if (Platform.OS === "android") {
       ToastAndroid.show(
-        saved === shots.length ? `${saved}장을 앨범에 저장했어요` : "앨범 저장 권한이 없어요",
+        saved === shots.length ? copy.shoot.savedN(saved) : copy.shoot.noAlbumPerm,
         ToastAndroid.SHORT,
       );
     }
@@ -232,9 +232,9 @@ export default function CameraScreen() {
     return (
       <View style={[styles.blank, { paddingHorizontal: space.screen }]}>
         <IconCamera size={32} color="rgba(255,255,255,0.6)" />
-        <Text size="headline" style={styles.onDarkTitle}>카메라 권한이 필요해요</Text>
+        <Text size="headline" style={styles.onDarkTitle}>{copy.shoot.permTitle}</Text>
         <Text size="footnote" style={styles.onDarkBody}>
-          카메라를 켜면 여러 장을 찍어 한 번에 필터를 입힐 수 있어요.
+          {copy.shoot.permDesc}
         </Text>
         <Pressable
           accessibilityRole="button"
@@ -246,11 +246,11 @@ export default function CameraScreen() {
           style={styles.settingsBtn}
         >
           <Text size="callout" style={styles.settingsLabel}>
-            {permission.canAskAgain ? "권한 허용" : "설정 열기"}
+            {permission.canAskAgain ? copy.ui.allowPermission : copy.ui.openSettings}
           </Text>
         </Pressable>
         <Pressable accessibilityRole="button" onPress={() => router.back()} hitSlop={10}>
-          <Text size="footnote" style={styles.onDarkBody}>닫기</Text>
+          <Text size="footnote" style={styles.onDarkBody}>{copy.common.close}</Text>
         </Pressable>
       </View>
     );
@@ -283,19 +283,19 @@ export default function CameraScreen() {
       >
         {/* 아래 두 줄과 사이 여백까지 전부 터치를 통과시킨다 — 안 그러면 화면 위아래에서 핀치가 죽는다. */}
         <View pointerEvents="box-none" style={styles.topRow}>
-          <GlassButton label="닫기" onPress={() => router.back()}>
+          <GlassButton label={copy.common.close} onPress={() => router.back()}>
             <IconClose size={20} color="#FFFFFF" />
           </GlassButton>
           <View pointerEvents="none" style={styles.grow}>
             {zoom > 0.01 ? (
               <View style={styles.zoomPill}>
                 {/* 기기 최대 배율을 못 받아오므로 "몇 배"가 아니라 **최대 대비 얼마나** 당겼는지를 보인다. */}
-                <Text size="footnote" style={styles.onPhoto}>{`줌 ${Math.round(zoom * 100)}%`}</Text>
+                <Text size="footnote" style={styles.onPhoto}>{copy.shoot.zoom(Math.round(zoom * 100))}</Text>
               </View>
             ) : null}
           </View>
           {facing === "back" ? (
-            <GlassButton label={flashOn ? "플래시 끄기" : "플래시 켜기"} onPress={() => setFlashOn((v) => !v)}>
+            <GlassButton label={flashOn ? copy.shoot.flashOff : copy.shoot.flashOn} onPress={() => setFlashOn((v) => !v)}>
               <IconFlash size={20} color={flashOn ? "#F5B301" : "#FFFFFF"} off={!flashOn} />
             </GlassButton>
           ) : (
@@ -317,7 +317,7 @@ export default function CameraScreen() {
               <Pressable
                 key={s.uri}
                 accessibilityRole="button"
-                accessibilityLabel={`${i + 1}번째 사진 지우기`}
+                accessibilityLabel={copy.shoot.removeNth(i + 1)}
                 onPress={() => remove(i)}
                 style={styles.stripCell}
               >
@@ -338,19 +338,19 @@ export default function CameraScreen() {
         ) : null}
 
         <Text pointerEvents="none" size="footnote" style={styles.hint}>
-          {full ? "10장을 다 찍었어요 · 완료를 눌러 주세요" : "여러 장 찍고 한 번에 필터를 입혀요 · 최대 10장"}
+          {full ? copy.shoot.full : copy.shoot.hint}
         </Text>
 
         <View pointerEvents="box-none" style={styles.bottomRow}>
           <View pointerEvents="box-none" style={styles.side}>
-            <GlassButton label="전후면 전환" onPress={flip}>
+            <GlassButton label={copy.shoot.flip} onPress={flip}>
               <IconCameraFlip size={20} color="#FFFFFF" />
             </GlassButton>
           </View>
 
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="촬영"
+            accessibilityLabel={copy.shoot.shutter}
             onPress={capture}
             disabled={full || working}
             style={[styles.shutterRing, (full || working) && styles.shutterOff]}
@@ -363,7 +363,7 @@ export default function CameraScreen() {
             {shots.length ? (
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={`완료 ${shots.length}장`}
+                accessibilityLabel={copy.shoot.doneA11y(shots.length)}
                 onPress={finish}
                 disabled={working}
                 style={({ pressed }) => [styles.done, pressed && { opacity: 0.9 }]}
@@ -371,7 +371,7 @@ export default function CameraScreen() {
                 {working ? (
                   <Spinner size={16} color={color.accentOn} />
                 ) : (
-                  <Text size="callout" style={styles.doneLabel}>{`완료 ${shots.length}`}</Text>
+                  <Text size="callout" style={styles.doneLabel}>{copy.shoot.done(shots.length)}</Text>
                 )}
               </Pressable>
             ) : null}

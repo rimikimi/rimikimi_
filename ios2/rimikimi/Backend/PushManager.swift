@@ -37,6 +37,13 @@ final class PushManager: NSObject {
         UNUserNotificationCenter.current().delegate = self
         configured = true
         Task { await refreshAuthorization() }
+        // 알림을 켜 둔 사용자는 기기 언어에 맞는 드롭 토픽으로 맞춘다(언어를 바꿨거나 2.0.1 에서 올라온 영어 사용자).
+        if newConceptAlerts {
+            Task {
+                try? await Messaging.messaging().subscribe(toTopic: Self.dropTopic)
+                try? await Messaging.messaging().unsubscribe(fromTopic: Self.topic(ko: !L.ko))
+            }
+        }
     }
 
     func refreshAuthorization() async {
@@ -54,18 +61,22 @@ final class PushManager: NSObject {
             guard granted else { newConceptAlerts = false; UserDefaults.standard.set(false, forKey: "push.newConcept.v1"); return }
             UIApplication.shared.registerForRemoteNotifications()
             try? await Messaging.messaging().subscribe(toTopic: Self.dropTopic)
+            // 기기 언어를 바꿨으면 반대 언어 토픽은 끊는다(두 번 받지 않게)
+            try? await Messaging.messaging().unsubscribe(fromTopic: Self.topic(ko: !L.ko))
         } else {
-            try? await Messaging.messaging().unsubscribe(fromTopic: Self.dropTopic)
+            try? await Messaging.messaging().unsubscribe(fromTopic: Self.topic(ko: true))
+            try? await Messaging.messaging().unsubscribe(fromTopic: Self.topic(ko: false))
         }
         newConceptAlerts = on
         UserDefaults.standard.set(on, forKey: "push.newConcept.v1")
         HapticPlayer.selection()
     }
 
-    /// `drop_p540` = UTC+9. 서버 규칙과 동일.
-    static var dropTopic: String {
+    /// `drop_p540` = UTC+9. 서버 규칙과 동일. 영어 기기는 `drop_p540_en`(서버가 영어 문구로 보냄).
+    static var dropTopic: String { topic(ko: L.ko) }
+    static func topic(ko: Bool) -> String {
         let off = TimeZone.current.secondsFromGMT() / 60
-        return "drop_\(off < 0 ? "m" : "p")\(abs(off))"
+        return "drop_\(off < 0 ? "m" : "p")\(abs(off))\(ko ? "" : "_en")"
     }
 
     func clearBadge() {

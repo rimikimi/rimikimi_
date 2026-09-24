@@ -18,20 +18,20 @@ final class StoreManager {
         let isSubscription: Bool
         let period: String?       // week/month/year
         var priceString: String?  // 스토어가 준 실제 가격(없으면 KRW 폴백)
-        var displayPrice: String { priceString ?? "\(krw.formatted())원" }
+        var displayPrice: String { priceString ?? Copy.krw(krw) }
     }
 
     /// `src/PortraitStudio.jsx` CREDIT_PACKS / SUB_PLANS.
     static let packs: [Pack] = [
-        .init(id: "rimikimi.pack.intro", credits: 6, krw: 3900, label: "인트로", badge: "첫 구매", isSubscription: false, period: nil),
-        .init(id: "rimikimi.pack.mini", credits: 12, krw: 7900, label: "미니", badge: nil, isSubscription: false, period: nil),
-        .init(id: "rimikimi.pack.standard", credits: 24, krw: 14900, label: "스탠다드", badge: "베스트 가치", isSubscription: false, period: nil),
-        .init(id: "rimikimi.pack.pro", credits: 45, krw: 27000, label: "프로", badge: "장당 최저", isSubscription: false, period: nil),
+        .init(id: "rimikimi.pack.intro", credits: 6, krw: 3900, label: Copy.packIntro, badge: Copy.badgeFirst, isSubscription: false, period: nil),
+        .init(id: "rimikimi.pack.mini", credits: 12, krw: 7900, label: Copy.packMini, badge: nil, isSubscription: false, period: nil),
+        .init(id: "rimikimi.pack.standard", credits: 24, krw: 14900, label: Copy.packStandard, badge: Copy.badgeBest, isSubscription: false, period: nil),
+        .init(id: "rimikimi.pack.pro", credits: 45, krw: 27000, label: Copy.packPro, badge: Copy.badgeCheapest, isSubscription: false, period: nil),
     ]
     static let subs: [Pack] = [
-        .init(id: "rimikimi.sub.plus.weekly", credits: 8, krw: 6900, label: "위클리", badge: nil, isSubscription: true, period: "주"),
-        .init(id: "rimikimi.sub.plus.monthly", credits: 30, krw: 12900, label: "먼슬리", badge: nil, isSubscription: true, period: "월"),
-        .init(id: "rimikimi.sub.plus.annual", credits: 240, krw: 109000, label: "애뉴얼", badge: "가장 저렴", isSubscription: true, period: "년"),
+        .init(id: "rimikimi.sub.plus.weekly", credits: 8, krw: 6900, label: Copy.subWeekly, badge: nil, isSubscription: true, period: "주"),
+        .init(id: "rimikimi.sub.plus.monthly", credits: 30, krw: 12900, label: Copy.subMonthly, badge: nil, isSubscription: true, period: "월"),
+        .init(id: "rimikimi.sub.plus.annual", credits: 240, krw: 109000, label: Copy.subAnnual, badge: Copy.badgeLowest, isSubscription: true, period: "년"),
     ]
     static var allIDs: [String] { (packs + subs).map(\.id) }
 
@@ -75,14 +75,14 @@ final class StoreManager {
     // MARK: 상품
 
     func loadProducts() async {
-        guard available else { lastError = "결제가 아직 준비되지 않았어요."; return }
+        guard available else { lastError = Copy.payNotReady; return }
         if !configured { configure(userID: nil) }
         isLoading = true
         defer { isLoading = false }
         let products = await Purchases.shared.products(Self.allIDs)
         for p in products { storeProducts[p.productIdentifier] = p }
         if products.isEmpty {
-            lastError = "스토어가 상품 0개를 반환했어요. 잠시 후 다시 시도해 주세요."
+            lastError = Copy.storeNoProducts
         } else {
             lastError = nil
         }
@@ -94,10 +94,10 @@ final class StoreManager {
 
     /// 구매 → 서버 지급. 성공하면 지급된 크레딧 수(서버 값). 취소면 nil, 실패면 throw.
     func purchase(_ pack: Pack, token: String) async throws -> Int? {
-        guard available else { throw APIError(message: "결제가 아직 준비되지 않았어요.") }
+        guard available else { throw APIError(message: Copy.payNotReady) }
         guard purchasing == nil else { return nil }
         if storeProducts[pack.id] == nil { await loadProducts() }
-        guard let product = storeProducts[pack.id] else { throw APIError(message: "스토어에서 상품을 찾지 못했어요.") }
+        guard let product = storeProducts[pack.id] else { throw APIError(message: Copy.storeProductMissing) }
         purchasing = pack.id
         defer { purchasing = nil }
         let result = try await Purchases.shared.purchase(product: product)

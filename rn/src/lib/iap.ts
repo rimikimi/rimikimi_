@@ -3,6 +3,7 @@ import Purchases, { PRODUCT_CATEGORY, PURCHASES_ERROR_CODE, type CustomerInfo, t
 import { getRcApiKey } from "./env";
 import { iapGrant, ApiError } from "./api";
 import { IAP_PRODUCTS, PRODUCT_IDS, baseProductId, isSubscription } from "./packs";
+import { copy } from "./copy";
 
 // ============================================================================
 // IAP — RevenueCat (react-native-purchases). 1.x src/iap.js 흐름 그대로:
@@ -39,7 +40,7 @@ function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
   return Promise.race([
     p,
     new Promise<T>((_, rej) =>
-      setTimeout(() => rej(Object.assign(new Error(`${label} 응답이 없어요. 네트워크 확인 후 다시 시도해 주세요.`), { code: "TIMEOUT" })), ms)
+      setTimeout(() => rej(Object.assign(new Error(copy.errors.timeout(label)), { code: "TIMEOUT" })), ms)
     ),
   ]);
 }
@@ -71,7 +72,7 @@ export async function loginIap(userId: string): Promise<void> {
   if (!iapAvailable() || !userId) return;
   try {
     if (!_configured) await initIap(userId);
-    await withTimeout(Purchases.logIn(String(userId)), 15000, "결제 로그인");
+    await withTimeout(Purchases.logIn(String(userId)), 15000, copy.errors.payLogin);
   } catch (e) {
     setDiag("logIn", e);
   }
@@ -92,7 +93,7 @@ async function fetchAllProducts(): Promise<PurchasesStoreProduct[]> {
   if (oneTimeIds.length) calls.push({ ids: oneTimeIds, type: PRODUCT_CATEGORY.NON_SUBSCRIPTION });
   const results = await Promise.all(
     calls.map((c) =>
-      withTimeout(Purchases.getProducts(c.ids, c.type), 15000, "상품 조회")
+      withTimeout(Purchases.getProducts(c.ids, c.type), 15000, copy.errors.productQuery)
         .then((r) => r || [])
         .catch((e) => { setDiag(`getProducts(${c.type})`, e); return [] as PurchasesStoreProduct[]; })
     )
@@ -114,7 +115,7 @@ export async function getIapPacks(): Promise<IapPack[]> {
       .filter(({ base }) => base in IAP_PRODUCTS)
       .map(({ pr, base }) => ({ id: base, count: IAP_PRODUCTS[base], priceString: pr.priceString || "", isSub: isSubscription(base), _product: pr }));
     if (mapped.length) _lastError = null;
-    else if (!_lastError) setDiag("getProducts", new Error("스토어가 상품 0개를 반환"));
+    else if (!_lastError) setDiag("getProducts", new Error(copy.errors.noProducts));
     return mapped.slice().sort((a, b) => a.count - b.count);
   } catch (e) {
     setDiag("getProducts", e);
@@ -128,14 +129,14 @@ let purchaseLock = false;
 export type PurchaseResult = { cancelled: true } | { cancelled?: false; transactionId: string | null; productId: string };
 
 export async function purchaseIap(pack: IapPack): Promise<PurchaseResult> {
-  if (!iapAvailable()) throw Object.assign(new Error("결제를 사용할 수 없어요."), { code: "UNAVAILABLE" });
+  if (!iapAvailable()) throw Object.assign(new Error(copy.store.unavailable), { code: "UNAVAILABLE" });
   if (!pack._product) {
-    throw Object.assign(new Error("상품 정보를 불러오지 못했어요. 네트워크 확인 후 다시 시도해 주세요." + (_lastError ? ` (${_lastError})` : "")), { code: "NO_PRODUCT" });
+    throw Object.assign(new Error(copy.errors.noProductDetail + (_lastError ? ` (${_lastError})` : "")), { code: "NO_PRODUCT" });
   }
   if (purchaseLock) return { cancelled: true };
   purchaseLock = true;
   try {
-    const r = await withTimeout(Purchases.purchaseStoreProduct(pack._product), 180000, "결제");
+    const r = await withTimeout(Purchases.purchaseStoreProduct(pack._product), 180000, copy.errors.pay);
     const txId = latestTxId(r.customerInfo, pack.id) ?? txIdFromTransaction(r.transaction);
     return { transactionId: txId, productId: pack.id };
   } catch (e) {
@@ -154,7 +155,7 @@ export async function restoreIap(): Promise<{ restored: boolean; customerInfo?: 
   if (!iapAvailable()) return { restored: false };
   try {
     if (!_configured) await initIap();
-    const customerInfo = await withTimeout(Purchases.restorePurchases(), 30000, "구매 복원");
+    const customerInfo = await withTimeout(Purchases.restorePurchases(), 30000, copy.store.restore);
     return { restored: true, customerInfo };
   } catch (e) {
     return { restored: false, error: (e as Error)?.message || String(e) };
@@ -188,5 +189,5 @@ export async function grantWithRetry(token: string, productId: string, transacti
     if (r === "pending") { await new Promise((res) => setTimeout(res, 1800)); continue; }
     return;
   }
-  throw new ApiError("구매 반영이 조금 늦어지고 있어요. 잠시 후 자동으로 들어와요.", 202);
+  throw new ApiError(copy.store.grantLate, 202);
 }

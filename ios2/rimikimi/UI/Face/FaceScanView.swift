@@ -75,7 +75,7 @@ struct FaceScanView: View {
     private var scanning: some View {
         VStack(spacing: 0) {
             HStack {
-                Button("닫기") { dismiss() }
+                Button(Copy.close) { dismiss() }
                     .foregroundStyle(fg)
                 Spacer()
             }
@@ -127,9 +127,9 @@ struct FaceScanView: View {
     private var confirm: some View {
         VStack(spacing: Spacing.s4) {
             Spacer()
-            Text("이 얼굴을 사용할까요?")
+            Text(Copy.faceUseThis)
                 .font(AppFont.title2).foregroundStyle(fg)
-            Text("이 사진들은 이 아이폰 안에만 저장돼요.\n사진을 만들 때만 참조로 쓰이고 서버에 보관하지 않아요.")
+            Text(Copy.faceStoredOnDevice)
                 .font(AppFont.footnote).foregroundStyle(fg.opacity(0.7))
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, Spacing.page)
@@ -141,12 +141,12 @@ struct FaceScanView: View {
             }
             Spacer()
             VStack(spacing: Spacing.s2) {
-                Button("이 얼굴로 시작하기") {
+                Button(Copy.faceStart) {
                     app.saveFaceProfile(model.captured)
                     dismiss()
                 }
                 .buttonStyle(PrimaryButtonStyle(isDisabled: false))
-                Button("다시 찍기") { model.reset() }
+                Button(Copy.faceRetake) { model.reset() }
                     .buttonStyle(TextButtonStyle(color: fg))
             }
             .padding(.horizontal, Spacing.page)

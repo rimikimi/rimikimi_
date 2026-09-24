@@ -12,6 +12,8 @@ import { useAuth } from "@/lib/auth";
 import { useGeneration } from "@/lib/generation";
 import { deleteGalleryItem, fetchGallery, type GalleryItem } from "@/lib/api";
 import { copy } from "@/lib/copy";
+import { useStore } from "@/lib/store";
+import { conceptTitle } from "@/lib/concepts";
 import { color, radius, space, themedStyles } from "@/theme/tokens";
 import { duration } from "@/theme/motion";
 
@@ -21,6 +23,10 @@ export default function PhotosTab() {
   const { session, requireLogin } = useAuth();
   const token = session?.access_token;
   const { jobs } = useGeneration();
+  const { byId } = useStore();
+  // 제목은 컨셉 목록에서 찾아 언어에 맞게(영어면 title_en). 목록에 없으면 서버가 준 제목.
+  const titleOf = (it: { conceptId?: string | number | null; conceptTitle?: string | null }) =>
+    conceptTitle(byId(it.conceptId ?? undefined)) || it.conceptTitle || "";
   const [items, setItems] = useState<GalleryItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -89,8 +95,8 @@ export default function PhotosTab() {
               <Pressable
                 key={it.id}
                 accessibilityRole="button"
-                accessibilityLabel={it.conceptTitle || "사진"}
-                onPress={() => router.push({ pathname: "/result/[jobId]", params: { jobId: `gallery:${it.id}`, url: it.url ?? "", conceptId: String(it.conceptId ?? ""), title: it.conceptTitle ?? "" } })}
+                accessibilityLabel={titleOf(it) || copy.ui.photo}
+                onPress={() => router.push({ pathname: "/result/[jobId]", params: { jobId: `gallery:${it.id}`, url: it.url ?? "", conceptId: String(it.conceptId ?? ""), title: titleOf(it) } })}
                 onLongPress={() => onDelete(it)}
                 style={({ pressed }) => [{ width: w, height: Math.round((w * 4) / 3) }, pressed && { opacity: 0.85 }]}
               >

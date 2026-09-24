@@ -11,7 +11,9 @@ import { Text } from "@/ui/Text";
 import { Thumb, photoHeight } from "@/ui/Thumb";
 import { FavoriteStarButton } from "@/ui/FavoriteBits";
 import { useStore } from "@/lib/store";
-import { conceptsIn, thumbUrl, type Concept } from "@/lib/concepts";
+import { conceptTitle, conceptsIn, thumbUrl, type Concept } from "@/lib/concepts";
+import { categoryLabel } from "@/lib/locale";
+import { copy } from "@/lib/copy";
 import { color, radius, space } from "@/theme/tokens";
 import { ease } from "@/theme/motion";
 
@@ -193,7 +195,7 @@ export default function BrowseScreen() {
       scrollModel="fixed"
       header={
         <AppHeader
-          title={name ?? ""}
+          title={categoryLabel(name ?? "")}
           back
           right={
             current ? (
@@ -232,7 +234,7 @@ export default function BrowseScreen() {
 
           {current ? (
             <Text size="headline" numberOfLines={1} style={styles.title}>
-              {current.title}
+              {conceptTitle(current)}
             </Text>
           ) : null}
 
@@ -259,7 +261,7 @@ export default function BrowseScreen() {
             onScrollToIndexFailed={() => {}}
             style={styles.strip}
             renderItem={({ item, index: i }) => (
-              <Pressable accessibilityRole="button" accessibilityLabel={item.title} onPress={() => jump(i)}>
+              <Pressable accessibilityRole="button" accessibilityLabel={conceptTitle(item)} onPress={() => jump(i)}>
                 <View style={{ marginRight: STRIP_GAP }}>
                   {/* 필름스트립 칸도 3:4 (오너 지시). 안 고른 칸을 흐리게 하지 않는다 — 사진 앱도 안 한다. */}
                   <Thumb uri={thumbUrl(item.id)} width={STRIP_W} rounded={radius.thumb - 2} />
@@ -275,7 +277,7 @@ export default function BrowseScreen() {
           {current ? (
             <View style={styles.cta}>
               <Button
-                label="이 컨셉으로 만들기"
+                label={copy.ui.makeThis}
                 full
                 onPress={() => router.push({ pathname: "/concept/[id]", params: { id: String(current.id) } })}
               />

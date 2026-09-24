@@ -5,6 +5,7 @@ import * as Haptics from "expo-haptics";
 import { Text } from "./Text";
 import { IconCheck, IconStar } from "./icons";
 import { color } from "@/theme/tokens";
+import { copy } from "@/lib/copy";
 
 // 즐겨찾기 별 · "이미 만든 컨셉" 표시 — iOS 2.0 과 같은 모양(오너 지시 2026-09-22).
 
@@ -13,7 +14,7 @@ export function FavoriteStarButton({ on, onPress }: { on: boolean; onPress: () =
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={on ? "즐겨찾기 해제" : "즐겨찾기"}
+      accessibilityLabel={on ? copy.ui.unfavorite : copy.ui.favorite}
       hitSlop={12}
       onPress={() => {
         Haptics.selectionAsync().catch(() => {});
@@ -30,7 +31,7 @@ export function FavoriteStarButton({ on, onPress }: { on: boolean; onPress: () =
 export function FavoriteBadge({ size = 22 }: { size?: number }) {
   return (
     <View
-      accessibilityLabel="즐겨찾기"
+      accessibilityLabel={copy.ui.favorite}
       style={[styles.badge, { width: size, height: size, borderRadius: size / 2 }]}
     >
       <IconStar size={16} color={STAR} filled />
@@ -44,7 +45,7 @@ export function FavoriteBadge({ size = 22 }: { size?: number }) {
  */
 export function GeneratedScrim({ compact }: { compact?: boolean }) {
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="none" accessibilityLabel="이미 만든 컨셉">
+    <View style={StyleSheet.absoluteFill} pointerEvents="none" accessibilityLabel={copy.ui.generated}>
       <Svg style={StyleSheet.absoluteFill}>
         <Defs>
           <LinearGradient id="genScrim" x1="0" y1="0.45" x2="0" y2="1">
@@ -61,7 +62,7 @@ export function GeneratedScrim({ compact }: { compact?: boolean }) {
       ) : (
         <View style={styles.genLabel}>
           <IconCheck size={16} color="#FFFFFF" />
-          <Text size="footnote" style={styles.genText}>만든 컨셉</Text>
+          <Text size="footnote" style={styles.genText}>{copy.ui.generatedShort}</Text>
         </View>
       )}
     </View>

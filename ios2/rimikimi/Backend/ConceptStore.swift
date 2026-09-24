@@ -133,6 +133,12 @@ final class ConceptStore {
 
     func concept(id: String) -> Concept? { concepts.first { $0.id == id } }
 
+    /// 화면용 컨셉 이름 — 서버·기기에 저장된 이름(한국어)은 id 로 컨셉을 찾아 언어에 맞게 바꾼다.
+    func displayTitle(id: String?, fallback: String) -> String {
+        guard let id, let c = concept(id: id) else { return fallback }
+        return c.displayTitle
+    }
+
     /// "비슷한 컨셉" — 같은 카테고리에서 본인 제외, 최신 10개.
     func similar(to c: Concept) -> [Concept] {
         guard let cat = c.categories.first else { return [] }

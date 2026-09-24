@@ -1,4 +1,5 @@
 import { Platform } from "react-native";
+import { isKo } from "./locale";
 import { fetchDrops, type Drop } from "./api";
 import { copy } from "./copy";
 import { NOTIFY_ON_KEY, getFlag, setFlag } from "./prefs";
@@ -71,9 +72,10 @@ export function getPushToken(): string | null {
 }
 
 // 서버 api/_lib/dropNotice.js 의 dropTopicFor 와 규칙이 같아야 한다 (drop_p540 = UTC+9).
-export function dropTopicFor(): string {
+// 영어 기기는 "_en" 토픽(영어 문구)을 구독한다 — 서버가 두 토픽에 각 언어로 보낸다.
+export function dropTopicFor(ko: boolean = isKo): string {
   const off = -new Date().getTimezoneOffset();
-  return `drop_${off < 0 ? "m" : "p"}${Math.abs(off)}`;
+  return `drop_${off < 0 ? "m" : "p"}${Math.abs(off)}${ko ? "" : "_en"}`;
 }
 
 export type PermState = "granted" | "denied" | "prompt" | "unknown";
@@ -102,7 +104,7 @@ export function installPushHandlers(): () => void {
     handleNotification: async () => ({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: false, shouldSetBadge: false }),
   });
   if (Platform.OS === "android") {
-    N.setNotificationChannelAsync("default", { name: "알림", importance: N.AndroidImportance.DEFAULT }).catch(() => undefined);
+    N.setNotificationChannelAsync("default", { name: copy.ui.notifChannel, importance: N.AndroidImportance.DEFAULT }).catch(() => undefined);
   }
   N.dismissAllNotificationsAsync().catch(() => undefined);
   return () => undefined;
@@ -132,6 +134,8 @@ export async function initPush({ ask = false }: { ask?: boolean } = {}): Promise
     const m = messaging();
     if (m && fcmToken) {
       withTimeout(m.subscribeToTopic(dropTopicFor()), 8000).catch(() => undefined);
+      // 기기 언어를 바꿨으면 반대 언어 토픽은 끊는다(두 번 받지 않게)
+      m.unsubscribeFromTopic(dropTopicFor(!isKo)).catch(() => undefined);
       m.onTokenRefresh((t) => { if (t) fcmToken = t; });
     }
     inited = true;
@@ -210,7 +214,10 @@ export async function disableNotifications(): Promise<void> {
     } catch { /* 무시 */ }
   }
   const m = messaging();
-  if (m) m.unsubscribeFromTopic(dropTopicFor()).catch(() => undefined);
+  if (m) {
+    m.unsubscribeFromTopic(dropTopicFor(true)).catch(() => undefined);
+    m.unsubscribeFromTopic(dropTopicFor(false)).catch(() => undefined);
+  }
   fcmToken = null;
   inited = false;
 }

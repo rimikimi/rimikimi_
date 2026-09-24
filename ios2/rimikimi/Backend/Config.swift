@@ -38,9 +38,8 @@ enum Config {
     /// 웹뷰 도구에 넘길 언어. 웹뷰의 localStorage 는 앱과 별개 저장소이고 웹은
     /// navigator.language 로 언어를 정한다. 안 넘기면 **껍데기는 한국어인데 안쪽
     /// 편집기·카메라만 기기 언어(영어)** 로 뜬다(영어 시뮬에서 실측).
-    /// 지금 이 앱의 문구는 한국어 전용이라 웹뷰도 한국어로 고정한다.
-    /// ⚠️ 앱에 영어 문구를 붙이는 날 여기도 같이 바꿀 것.
-    static let webToolLang = "ko"
+    /// 앱 문구와 같은 언어(`L` — 기기 첫 언어가 한국어면 ko, 아니면 en)로 맞춘다.
+    static var webToolLang: String { L.code }
     /// mode: "pick"(필터 프리셋 → 사진 최대 10장 → 편집기) · "edit"(결과 화면 "다듬기", 사진 1장 바로 편집).
     static func filterToolURL(mode: String, presetKey: String? = nil) -> URL {
         var c = URLComponents(url: webToolBase, resolvingAgainstBaseURL: false)!

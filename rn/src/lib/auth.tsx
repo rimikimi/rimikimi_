@@ -8,6 +8,7 @@ import { NATIVE_REDIRECT, getEnv } from "./env";
 import { loginIap, logoutIap } from "./iap";
 import { clearRegisteredPhoto } from "./photo";
 import { deleteProfile } from "./faceProfile";
+import { copy } from "./copy";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -166,13 +167,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const result = await WebBrowser.openAuthSessionAsync(startUrl, NATIVE_REDIRECT);
       if (result.type !== "success") return; // 취소 — 에러 아님
       const ok = await consumeCallbackUrl(result.url);
-      if (!ok) setError("로그인 응답을 이해하지 못했어요.");
+      if (!ok) setError(copy.errors.loginParse);
     } catch (err) {
       const msg = (err as Error)?.message ?? "";
       if (/exist|already|registered|duplicate|database error|saving new user/i.test(msg)) {
-        setError("이 이메일은 이미 다른 방법(구글·카카오·네이버·애플 중 하나)으로 가입돼 있어요.\n처음 가입할 때 쓴 방법으로 로그인해 주세요 🙂");
+        setError(copy.errors.emailExists);
       } else if (!/access_denied|cancel/i.test(msg)) {
-        setError(msg || "로그인에 실패했어요. 다시 시도해 주세요.");
+        setError(msg || copy.login.fail);
       }
     } finally {
       setBusy(null);

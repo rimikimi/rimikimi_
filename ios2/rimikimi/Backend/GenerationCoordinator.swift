@@ -204,7 +204,7 @@ final class GenerationCoordinator {
     private func finishWaiting(_ job: Job) -> Bool {
         guard isLive(job.id) else { return false }   // 로그아웃 뒤면 실패 카드도 띄우지 않는다
         removeMarker(job.id)
-        setPhase(job.id, .failed("결과를 받지 못했어요. 내 사진에서 다시 확인해 주세요."))
+        setPhase(job.id, .failed(Copy.genNoResult))
         failedTick &+= 1
         return false
     }

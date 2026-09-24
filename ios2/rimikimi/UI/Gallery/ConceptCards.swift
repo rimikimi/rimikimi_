@@ -17,7 +17,7 @@ struct ConceptRail: View {
                     Spacer()
                     if let more {
                         NavigationLink(value: more) {
-                            Text("더보기").font(AppFont.calloutEmphasis).foregroundStyle(Color.accent)
+                            Text(Copy.more).font(AppFont.calloutEmphasis).foregroundStyle(Color.accent)
                         }
                         .buttonStyle(TextButtonStyle(color: .accent))
                     }
@@ -54,7 +54,7 @@ struct NewBadge: View {
             .padding(.horizontal, 6).padding(.vertical, 2)
             .background(Color.accent, in: RoundedRectangle(cornerRadius: 5, style: .continuous))
             .offset(y: -2)
-            .accessibilityLabel("새로 나옴")
+            .accessibilityLabel(Copy.a11yNew)
     }
 }
 
@@ -75,7 +75,7 @@ struct ConceptCard: View {
                             FavoriteBadge().padding(Spacing.s2)
                         }
                     }
-                Text(concept.title)
+                Text(concept.displayTitle)
                     .font(AppFont.cardTitle)
                     .foregroundStyle(Color.ink)
                     .lineLimit(1)
@@ -112,8 +112,8 @@ struct AlbumGridTile: View {
                             FavoriteBadge().padding(Spacing.s2)
                         }
                     }
-                Text(tile.name).font(AppFont.cardTitle).foregroundStyle(Color.ink).lineLimit(1)
-                Text("\(tile.count)장").font(AppFont.footnote).foregroundStyle(Color.ink3)
+                Text(Copy.category(tile.name)).font(AppFont.cardTitle).foregroundStyle(Color.ink).lineLimit(1)
+                Text(Copy.albumCount(tile.count)).font(AppFont.footnote).foregroundStyle(Color.ink3)
             }
         }
         .buttonStyle(PressScaleButtonStyle())
@@ -130,7 +130,7 @@ struct FavoriteToolbarButton: View {
                 .foregroundStyle(isOn ? Color.favoriteStar : Color.ink)
                 .contentTransition(.symbolEffect(.replace))
         }
-        .accessibilityLabel(isOn ? "즐겨찾기 해제" : "즐겨찾기")
+        .accessibilityLabel(isOn ? Copy.favoriteRemove : Copy.favoriteAdd)
     }
 }
 
@@ -143,7 +143,7 @@ struct FavoriteBadge: View {
             .foregroundStyle(Color.favoriteStar)
             .frame(width: size, height: size)
             .background(.black.opacity(0.35), in: Circle())
-            .accessibilityLabel("즐겨찾기")
+            .accessibilityLabel(Copy.favoriteBadge)
     }
 }
 
@@ -155,13 +155,13 @@ struct GeneratedScrim: View {
             LinearGradient(colors: [.clear, .black.opacity(0.55)], startPoint: .center, endPoint: .bottom)
             HStack(spacing: 3) {
                 Image(systemName: "checkmark.circle.fill").font(.system(size: 11, weight: .bold))
-                Text("만든 컨셉").font(.system(size: 10, weight: .semibold))
+                Text(Copy.madeBadge).font(.system(size: 10, weight: .semibold))
             }
             .foregroundStyle(.white)
             .padding(.horizontal, 6).padding(.vertical, 5)
         }
         .allowsHitTesting(false)
-        .accessibilityLabel("이미 만든 컨셉")
+        .accessibilityLabel(Copy.a11yAlreadyMade)
     }
 }
 
@@ -174,7 +174,7 @@ struct AlbumsGrid: View {
     var body: some View {
         if !tiles.isEmpty {
             VStack(alignment: .leading, spacing: 0) {
-                Text("카테고리").font(AppFont.sectionTitle).tracking(Tracking.sectionTitle)
+                Text(Copy.categoriesHeader).font(AppFont.sectionTitle).tracking(Tracking.sectionTitle)
                     .padding(.horizontal, Spacing.page)
                     .padding(.top, Spacing.s1)
                     .padding(.bottom, Spacing.s3 - 2)
@@ -307,7 +307,7 @@ struct DensePhotoGrid: View {
 
     var body: some View {
         if concepts.isEmpty {
-            EmptyState(message: "검색 결과가 없어요")
+            EmptyState(message: Copy.noResults)
         } else {
             grid(columnCount)
                 // 전환하는 동안만, 옛 배치를 그대로 위에 얹어 흐린다. 자리를 차지하지 않게

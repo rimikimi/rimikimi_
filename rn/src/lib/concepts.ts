@@ -1,5 +1,7 @@
 import { getEnv } from "./env";
 import { FAVORITES_ALBUM } from "./favorites";
+import { copy } from "./copy";
+import { pick } from "./locale";
 
 // ============================================================================
 // 컨셉 목록 — 원격 우선(https://rimikimi-app.vercel.app/concepts.json), 실패하면 번들 폴백.
@@ -9,6 +11,8 @@ import { FAVORITES_ALBUM } from "./favorites";
 export interface FourcutStyle {
   key: string;
   label: string;
+  /** 영어 표시 이름(번들 폴백에만 있다 — 서버 항목은 label 만 덮어써서 이 값은 살아남는다). */
+  label_en?: string;
   emoji?: string;
 }
 
@@ -32,35 +36,47 @@ export const FOURCUT_COUNTS = [2, 3, 4, 6] as const;
 
 // 번들 폴백 스타일(웹 src/fourcut.js). 서버 concepts.json 의 인생네컷 컨셉 `fourcutStyles` 가 우선.
 export const FOURCUT_STYLES: FourcutStyle[] = [
-  { key: "cute", label: "큐티", emoji: "🎀" },
-  { key: "luxury", label: "럭셔리", emoji: "🖤" },
-  { key: "funky", label: "펑키", emoji: "⚡" },
-  { key: "playful", label: "플레이풀", emoji: "🎉" },
-  { key: "birthday", label: "버스데이", emoji: "🎂" },
-  { key: "film", label: "필름", emoji: "🎞" },
-  { key: "summer", label: "썸머", emoji: "🌊" },
-  { key: "mono", label: "모노", emoji: "◻️" },
-  { key: "school", label: "교복", emoji: "🎒" },
-  { key: "couple", label: "커플", emoji: "💑" },
-  { key: "wedding", label: "웨딩", emoji: "💍" },
-  { key: "party", label: "파티", emoji: "🥂" },
-  { key: "beach", label: "여름", emoji: "🏖" },
-  { key: "vintage", label: "빈티지", emoji: "📻" },
-  { key: "christmas", label: "크리스마스", emoji: "🎄" },
-  { key: "newtro", label: "뉴트로", emoji: "🕹" },
-  { key: "editorial", label: "화보", emoji: "📷" },
+  { key: "cute", label: "큐티", label_en: "Cute", emoji: "🎀" },
+  { key: "luxury", label: "럭셔리", label_en: "Luxury", emoji: "🖤" },
+  { key: "funky", label: "펑키", label_en: "Funky", emoji: "⚡" },
+  { key: "playful", label: "플레이풀", label_en: "Playful", emoji: "🎉" },
+  { key: "birthday", label: "버스데이", label_en: "Birthday", emoji: "🎂" },
+  { key: "film", label: "필름", label_en: "Film", emoji: "🎞" },
+  { key: "summer", label: "썸머", label_en: "Summer", emoji: "🌊" },
+  { key: "mono", label: "모노", label_en: "Mono", emoji: "◻️" },
+  { key: "school", label: "교복", label_en: "School Uniform", emoji: "🎒" },
+  { key: "couple", label: "커플", label_en: "Couple", emoji: "💑" },
+  { key: "wedding", label: "웨딩", label_en: "Wedding", emoji: "💍" },
+  { key: "party", label: "파티", label_en: "Party", emoji: "🥂" },
+  { key: "beach", label: "여름", label_en: "Beach", emoji: "🏖" },
+  { key: "vintage", label: "빈티지", label_en: "Vintage", emoji: "📻" },
+  { key: "christmas", label: "크리스마스", label_en: "Christmas", emoji: "🎄" },
+  { key: "newtro", label: "뉴트로", label_en: "Newtro", emoji: "🕹" },
+  { key: "editorial", label: "화보", label_en: "Editorial", emoji: "📷" },
 ];
 
 export function resolveFourcutStyles(remote: unknown): FourcutStyle[] {
   if (!Array.isArray(remote)) return FOURCUT_STYLES;
   const list = (remote as Partial<FourcutStyle>[])
     .filter((s) => s && typeof s.key === "string" && s.key && typeof s.label === "string" && s.label)
-    .map((s) => ({ ...(FOURCUT_STYLES.find((b) => b.key === s.key) || FOURCUT_STYLES[0]), ...s }) as FourcutStyle);
+    // 모르는 키는 첫 스타일의 색 등을 빌리되 영어 이름(label_en)은 빌리지 않는다 — 엉뚱한 이름이 붙는다.
+    .map((s) => ({ ...(FOURCUT_STYLES.find((b) => b.key === s.key) || { ...FOURCUT_STYLES[0], label_en: undefined }), ...s }) as FourcutStyle);
   return list.length ? list : FOURCUT_STYLES;
 }
 
 export const ART_CATEGORY = "🪄 매직 부스";
 export const COUPLE_CATEGORY = "커플";
+
+/** 화면에 보일 컨셉 제목 — 영어 UI 이고 title_en 이 있으면 그것, 아니면 title.
+ *  (판정·서버 전송에는 원래 title 을 쓴다 — 이 함수는 표시 전용.) */
+export function conceptTitle(c?: Pick<Concept, "title" | "title_en"> | null): string {
+  if (!c) return "";
+  return pick(c.title || "", c.title_en);
+}
+/** 인생네컷 스타일·증명사진 정장 같은 옵션 라벨 — 영어 UI 면 label_en. */
+export function optionLabel(o: { label: string; label_en?: string }): string {
+  return pick(o.label, o.label_en);
+}
 
 export function categoriesOf(c: Concept): string[] {
   return c.categories || (c.category ? [c.category] : []);
@@ -76,12 +92,12 @@ export function isIdPhoto(c?: Concept | null): boolean { return !!c && (c.mode =
 
 // 증명사진 옵션 — 웹 src/PortraitStudio.jsx 의 ID_SUITS/ID_BGS/ID_DISCLAIMER 를 그대로 옮긴 것.
 // 실제 정장·배경 스와치 색이라 UI 테마 토큰이 아니다(라이트/다크 무관, 웹과 동일한 값 고정).
-export interface IdSuit { key: string; label: string; css: string }
+export interface IdSuit { key: string; label: string; label_en: string; css: string }
 export const ID_SUITS: IdSuit[] = [
-  { key: "dark navy", label: "다크 네이비", css: "#1f2a44" },
-  { key: "charcoal dark grey", label: "다크 그레이", css: "#3b3e44" },
-  { key: "light grey", label: "라이트 그레이", css: "#b7bcc4" },
-  { key: "black", label: "블랙", css: "#15171a" },
+  { key: "dark navy", label: "다크 네이비", label_en: "Dark Navy", css: "#1f2a44" },
+  { key: "charcoal dark grey", label: "다크 그레이", label_en: "Dark Gray", css: "#3b3e44" },
+  { key: "light grey", label: "라이트 그레이", label_en: "Light Gray", css: "#b7bcc4" },
+  { key: "black", label: "블랙", label_en: "Black", css: "#15171a" },
 ];
 export interface IdBg { hex: string; name: string }
 export const ID_BGS: IdBg[] = [
@@ -112,8 +128,7 @@ export function buildIdPhotoPrompt(suitKey: string, bgHex: string, bgName: strin
   );
 }
 
-export const ID_DISCLAIMER =
-  "AI로 생성된 증명사진이에요. 공공기관·여권·비자 심사 등 공식 제출용으로는 규격 불일치로 거절될 수 있으니 참고용으로 사용해 주세요.";
+export const ID_DISCLAIMER = copy.options.idphoto.disclaimer;
 export function isFourcut(c?: Concept | null): boolean { return !!c && (c.mode === "fourcut" || /인생네컷/.test(c.title || "")); }
 export function isRestoreConcept(c?: Concept | null): boolean { return !!c && (Number(c.id) === 408 || /복원|restor/i.test(c.title || "")); }
 export function isFeatureConcept(c: Concept): boolean { return isArtConcept(c) || isIdPhoto(c) || isFourcut(c); }

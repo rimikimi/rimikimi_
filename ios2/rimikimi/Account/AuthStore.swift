@@ -19,10 +19,10 @@ final class AuthStore {
         var id: String { rawValue }
         var title: String {
             switch self {
-            case .apple: return "Apple로 시작하기"
-            case .kakao: return "카카오로 시작하기"
-            case .naver: return "네이버로 시작하기"
-            case .google: return "Google로 시작하기"
+            case .apple: return Copy.loginApple
+            case .kakao: return Copy.loginKakao
+            case .naver: return Copy.loginNaver
+            case .google: return Copy.loginGoogle
             }
         }
     }
@@ -52,10 +52,10 @@ final class AuthStore {
     #endif
 
     var displayLabel: String {
-        guard let s = session else { return "로그인 안 함" }
+        guard let s = session else { return Copy.signedOut }
         if let n = s.displayName, !n.isEmpty { return n }
         if let e = s.email, !e.isEmpty { return e }
-        return "로그인됨"
+        return Copy.signedIn
     }
 
     // MARK: 토큰
@@ -142,11 +142,11 @@ final class AuthStore {
         switch result {
         case .failure(let error):
             if (error as? ASAuthorizationError)?.code == .canceled { return }
-            lastError = "로그인을 마치지 못했어요. 잠시 후 다시 시도해 주세요"
+            lastError = Copy.loginNotFinished
         case .success(let auth):
             guard let cred = auth.credential as? ASAuthorizationAppleIDCredential,
                   let data = cred.identityToken, let idToken = String(data: data, encoding: .utf8) else {
-                lastError = "로그인 정보를 읽지 못했어요"; return
+                lastError = Copy.loginInfoUnreadable; return
             }
             busy = .apple
             defer { busy = nil }
@@ -252,9 +252,9 @@ final class AuthStore {
     private static func friendly(_ error: Error) -> String {
         let blob = error.localizedDescription.lowercased()
         if blob.range(of: "exist|already|registered|duplicate|server_error|database error|saving new user", options: .regularExpression) != nil {
-            return "이 이메일은 이미 다른 방법(구글·카카오·네이버·애플 중 하나)으로 가입돼 있어요.\n처음 가입할 때 쓴 방법으로 로그인해 주세요 🙂"
+            return Copy.loginEmailTaken
         }
-        return error.localizedDescription.isEmpty ? "로그인에 실패했어요. 다시 시도해 주세요." : error.localizedDescription
+        return error.localizedDescription.isEmpty ? Copy.loginFailedRetry : error.localizedDescription
     }
 }
 
@@ -276,7 +276,7 @@ enum SupabaseAuthAPI {
         let (data, resp) = try await URLSession.shared.data(for: req)
         let json = (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
         guard let http = resp as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            let msg = (json["error_description"] as? String) ?? (json["msg"] as? String) ?? (json["error"] as? String) ?? "로그인에 실패했어요."
+            let msg = (json["error_description"] as? String) ?? (json["msg"] as? String) ?? (json["error"] as? String) ?? Copy.loginFailed
             throw Failure(message: msg, status: (resp as? HTTPURLResponse)?.statusCode ?? 0)
         }
         return json

@@ -20,14 +20,14 @@ enum WebAuth {
                     else { cont.resume(throwing: Failure.failed(error.localizedDescription)) }
                     return
                 }
-                guard let callback else { cont.resume(throwing: Failure.failed("응답이 없어요")); return }
+                guard let callback else { cont.resume(throwing: Failure.failed(Copy.loginNoResponse)); return }
                 cont.resume(returning: callback)
             }
             session.presentationContextProvider = context
             // 카카오·구글 쿠키를 같이 쓰게 둔다 — 매번 비밀번호를 다시 치게 하지 않는다.
             session.prefersEphemeralWebBrowserSession = false
             current = session
-            if !session.start() { cont.resume(throwing: Failure.failed("로그인 시작에 실패했어요.")) }
+            if !session.start() { cont.resume(throwing: Failure.failed(Copy.loginStartFailed)) }
         }
     }
 

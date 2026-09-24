@@ -60,21 +60,21 @@ final class FaceScanModel {
     }
 
     var title: String {
-        if isWarmingUp && step == .front { return "준비하세요" }
+        if isWarmingUp && step == .front { return Copy.faceGetReady }
         switch step {
-        case .front: return "정면을 봐주세요"
-        case .side1: return "고개를 한쪽으로 천천히"
-        case .side2: return "이제 반대쪽으로"
-        case .done: return "다 됐어요"
+        case .front: return Copy.faceLookFront
+        case .side1: return Copy.faceTurnSide
+        case .side2: return Copy.faceOtherSide
+        case .done: return Copy.faceDone
         }
     }
     var hint: String {
-        if isWarmingUp && step == .front { return "얼굴을 원 안에 맞춰 주세요 · 곧 시작해요" }
+        if isWarmingUp && step == .front { return Copy.faceHintWarmup }
         if let lastQualityFail { return lastQualityFail }
-        if holdProgress > 0 { return "그대로 멈춰 주세요" }
+        if holdProgress > 0 { return Copy.faceHoldStill }
         switch step {
-        case .front: return "얼굴을 원 안에 꽉 채워 주세요"
-        case .side1, .side2: return "45도쯤에서 잠깐 멈추면 자동으로 찍혀요"
+        case .front: return Copy.faceFillCircle
+        case .side1, .side2: return Copy.faceSidePause
         case .done: return ""
         }
     }
@@ -168,27 +168,27 @@ final class FaceScanModel {
         faces.revision = VNDetectFaceRectanglesRequestRevision3   // yaw/roll/pitch 를 준다
         try? handler.perform([faces])
         guard let observations = faces.results, !observations.isEmpty else {
-            fail("얼굴이 안 보여요")
+            fail(Copy.faceNotVisible)
             return
         }
         guard observations.count == 1, let face = observations.first else {
-            fail("한 사람만 나오게 해주세요")
+            fail(Copy.faceOnlyOne)
             return
         }
         guard face.boundingBox.width >= Self.minFaceWidth else {
-            fail("조금 더 가까이 와주세요")
+            fail(Copy.faceCloser)
             return
         }
 
         let yaw = (face.yaw?.doubleValue ?? 0) * 180 / .pi
         switch step {
         case .front:
-            guard abs(yaw) <= Self.frontYaw else { fail("정면을 봐주세요"); return }
+            guard abs(yaw) <= Self.frontYaw else { fail(Copy.faceLookFront); return }
         case .side1:
             guard abs(yaw) >= Self.sideYaw else { fail(nil); return }
         case .side2:
             guard abs(yaw) >= Self.sideYaw else { fail(nil); return }
-            guard yaw * firstSideSign < 0 else { fail("아까와 반대쪽으로 돌려주세요"); return }
+            guard yaw * firstSideSign < 0 else { fail(Copy.faceOppositeSide); return }
         case .done:
             return
         }
@@ -198,7 +198,7 @@ final class FaceScanModel {
         try? handler.perform([quality])
         let score = (quality.results?.first as? VNFaceObservation)?.faceCaptureQuality ?? 0
         guard score >= Self.minQuality else {
-            fail("조금 더 밝은 곳에서, 잠깐 멈춰 주세요")
+            fail(Copy.faceBrighter)
             return
         }
 

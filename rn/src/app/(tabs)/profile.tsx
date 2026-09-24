@@ -126,7 +126,7 @@ export default function ProfileTab() {
         setNotifyOn(ok);
         if (!ok) {
           const perm = await getPermissionState();
-          if (perm === "denied") Alert.alert(copy.notify.denied, undefined, [{ text: copy.photos.cancel }, { text: "설정 열기", onPress: () => { void Linking.openSettings(); } }]);
+          if (perm === "denied") Alert.alert(copy.notify.denied, undefined, [{ text: copy.photos.cancel }, { text: copy.ui.openSettings, onPress: () => { void Linking.openSettings(); } }]);
         }
       } else {
         await disableNotifications();
@@ -228,16 +228,16 @@ export default function ProfileTab() {
 
       {/* 계정 */}
       <Card padded={false}>
-        <Row label={copy.options.myPhoto} value={photo ? "등록됨" : "없음"} />
+        <Row label={copy.options.myPhoto} value={photo ? copy.ui.registered : copy.ui.none} />
         <Sep />
         <Row
           label={copy.account.faceProfile}
-          value={scanN ? `${scanN}장 등록됨` : face ? "등록됨" : "없음"}
+          value={scanN ? copy.ui.registeredN(scanN) : face ? copy.ui.registered : copy.ui.none}
           trailing={
             <View style={styles.faceBtns}>
               {/* 스캔이 기본 경로다(아이폰과 같게). 셀카 1장 앵커는 스캔 전까지의 폴백으로만 남긴다. */}
               <Button
-                label={scanN ? "다시 스캔" : "얼굴 스캔"}
+                label={scanN ? copy.ui.rescan : copy.ui.faceScan}
                 variant={scanN || face ? "quiet" : "secondary"}
                 size="sm"
                 onPress={() => router.push("/face-scan")}
@@ -268,7 +268,7 @@ export default function ProfileTab() {
         <Sep />
         <Row label={copy.profile.privacy} onPress={() => { void Linking.openURL(`${base}/privacy.html`); }} />
         <Sep />
-        <Row label="환불 정책" onPress={() => { void Linking.openURL(`${base}/refund.html`); }} />
+        <Row label={copy.ui.refund} onPress={() => { void Linking.openURL(`${base}/refund.html`); }} />
       </Card>
     </Screen>
   );

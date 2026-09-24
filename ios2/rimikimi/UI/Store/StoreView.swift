@@ -10,7 +10,7 @@ struct StoreView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.s3) {
                 HStack {
-                    Text("현재 보유").font(AppFont.callout).foregroundStyle(Color.ink2)
+                    Text(Copy.storeBalance).font(AppFont.callout).foregroundStyle(Color.ink2)
                     Spacer()
                     Text(app.quota?.chipLabel ?? "–").font(AppFont.headline)
                 }
@@ -18,17 +18,17 @@ struct StoreView: View {
                 .background(Color.card, in: RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
                 .padding(.horizontal, Spacing.page)
 
-                Text("하루 무료 1장을 모두 사용했어요. 크레딧 1장으로 이미지 한 장을 만들 수 있어요.")
+                Text(Copy.storeIntro)
                     .font(AppFont.footnote).foregroundStyle(Color.ink2).padding(.horizontal, Spacing.page)
 
-                SectionHeader(title: "크레딧 팩")
+                SectionHeader(title: Copy.storePacks)
                 VStack(spacing: Spacing.s2) {
                     ForEach(app.store.packs) { p in PackRow(pack: p, busy: busyID == p.id) { buy(p) } }
                 }
                 .padding(.horizontal, Spacing.page)
 
-                SectionHeader(title: "rimikimi+ 구독")
-                Text("광고·워터마크 제거 + 크레딧 자동 충전").font(AppFont.footnote).foregroundStyle(Color.ink2)
+                SectionHeader(title: Copy.storeSubs)
+                Text(Copy.storeSubsDesc).font(AppFont.footnote).foregroundStyle(Color.ink2)
                     .padding(.horizontal, Spacing.page).padding(.top, -Spacing.s2)
                 VStack(spacing: Spacing.s2) {
                     ForEach(app.store.subs) { p in PackRow(pack: p, busy: busyID == p.id) { buy(p) } }
@@ -38,13 +38,13 @@ struct StoreView: View {
                 if let err = app.store.lastError {
                     Text(err).font(AppFont.footnote).foregroundStyle(Color.accent).padding(.horizontal, Spacing.page)
                 }
-                Button(restoring ? "복원 중…" : "구매 복원") {
+                Button(restoring ? Copy.restoring : Copy.restore) {
                     restoring = true
-                    Task { _ = await app.store.restore(); await app.refreshQuota(); restoring = false; app.showToast("구매 내역을 확인했어요.") }
+                    Task { _ = await app.store.restore(); await app.refreshQuota(); restoring = false; app.showToast(Copy.restoreDone) }
                 }
                 .buttonStyle(TextButtonStyle(color: .ink2))
                 .frame(maxWidth: .infinity).padding(.top, Spacing.s3)
-                Text("구매는 App Store 계정으로 안전하게 결제돼요. 구독은 기간 종료 24시간 전까지 해지하지 않으면 자동 갱신돼요.")
+                Text(Copy.storeLegal)
                     .font(AppFont.caption).foregroundStyle(Color.ink3).multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity).padding(.horizontal, Spacing.page)
                 LegalLinksRow()
@@ -55,7 +55,7 @@ struct StoreView: View {
         }
         .scrollIndicators(.hidden)
         .background(Color.bg)
-        .inlineTitle("스토어")
+        .inlineTitle(Copy.store)
         .toolbar(.hidden, for: .tabBar)
         .task { await app.store.loadProducts() }
     }
@@ -69,13 +69,13 @@ struct StoreView: View {
             do {
                 if let n = try await app.store.purchase(pack, token: token) {
                     // 0 = 테스트(샌드박스) 결제 — 서버가 실서비스 크레딧을 주지 않는다(efa4741).
-                    app.showToast(n > 0 ? "🎉 +\(n) 크레딧 충전 완료!" : "테스트 결제라 크레딧은 적립되지 않았어요.")
+                    app.showToast(n > 0 ? Copy.purchaseDone(n) : Copy.purchaseTestNoCredit)
                     await app.refreshAfterStorePurchase() // 스토어 탭 — 예약 이어가지 않음
                 }
             } catch {
                 // 202 = 결제는 됐고 적립 확인만 늦는 중 — "실패" 라고 말하면 안 된다.
                 if (error as? APIError)?.status == 202 { app.showToast(error.localizedDescription) }
-                else { app.showToast("결제 처리 실패: \(error.localizedDescription)") }
+                else { app.showToast(Copy.purchaseFailed(error.localizedDescription)) }
             }
         }
     }
@@ -92,18 +92,18 @@ struct PackRow: View {
             HStack(spacing: Spacing.s3) {
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
-                        Text(pack.isSubscription ? "rimikimi+ \(pack.label)" : "\(pack.credits)장").font(AppFont.headline)
+                        Text(pack.isSubscription ? "rimikimi+ \(pack.label)" : Copy.photos(pack.credits)).font(AppFont.headline)
                         if let b = pack.badge {
                             Text(b).font(AppFont.badge).foregroundStyle(.white)
                                 .padding(.horizontal, 6).padding(.vertical, 2)
                                 .background(Color.accent, in: RoundedRectangle(cornerRadius: 5, style: .continuous))
                         }
                     }
-                    Text(pack.isSubscription ? "매\(pack.period ?? "") \(pack.credits) 크레딧" : "장당 \((pack.krw / pack.credits).formatted())원")
+                    Text(pack.isSubscription ? Copy.subLine(period: pack.period, credits: pack.credits) : Copy.perImage(krw: pack.krw / pack.credits))
                         .font(AppFont.footnote).foregroundStyle(Color.ink2)
                 }
                 Spacer()
-                Text(busy ? "처리 중…" : pack.displayPrice)
+                Text(busy ? Copy.processing : pack.displayPrice)
                     .font(AppFont.calloutEmphasis)
                     .foregroundStyle(Color.onAccent)
                     .padding(.horizontal, Spacing.s3)
@@ -132,15 +132,15 @@ struct CreditsSheet: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.s3) {
                 HStack {
-                    Text("크레딧이 부족해요").font(AppFont.title2).tracking(Tracking.title2)
+                    Text(Copy.notEnoughCredits).font(AppFont.title2).tracking(Tracking.title2)
                     Spacer()
                     Button { dismiss() } label: {
                         Image(systemName: "xmark").font(.system(size: 13, weight: .bold)).foregroundStyle(Color.ink)
                             .frame(width: 30, height: 30).background(Color.fill, in: Circle())
                     }
-                    .buttonStyle(.plain).accessibilityLabel("닫기")
+                    .buttonStyle(.plain).accessibilityLabel(Copy.close)
                 }
-                Text(app.willContinueAfterPurchase ? "충전하면 하던 작업이 바로 이어져요." : "크레딧 1장으로 이미지 한 장을 만들 수 있어요.")
+                Text(app.willContinueAfterPurchase ? Copy.continueAfterTopUp : Copy.oneCreditOneImage)
                     .font(AppFont.callout).foregroundStyle(Color.ink2)
 
                 ForEach(packs) { p in PackRow(pack: p, busy: busyID == p.id) { buy(p) } }
@@ -150,7 +150,7 @@ struct CreditsSheet: View {
                     dismiss()
                     app.tab = .profile
                     app.profilePath = [.invite]
-                } label: { Label("친구 초대로 무료 3장", systemImage: "gift") }
+                } label: { Label(Copy.inviteForFree, systemImage: "gift") }
                     .buttonStyle(SecondaryButtonStyle())
                     .padding(.top, Spacing.s1)
 
@@ -159,7 +159,7 @@ struct CreditsSheet: View {
                 }
                 // 3.1.2 — 구독도 파는 화면이라 자동갱신 고지가 필요하다(컴플라이언스 리뷰로 발견:
                 // 이 시트에만 없고 StoreView 에는 있던 문구). 두 화면 문구를 동일하게 맞췄다.
-                Text("구매는 App Store 계정으로 안전하게 결제돼요. 구독은 기간 종료 24시간 전까지 해지하지 않으면 자동 갱신돼요.")
+                Text(Copy.storeLegal)
                     .font(AppFont.caption).foregroundStyle(Color.ink3).frame(maxWidth: .infinity)
                 LegalLinksRow()
                     .frame(maxWidth: .infinity)
@@ -183,13 +183,13 @@ struct CreditsSheet: View {
             do {
                 if let n = try await app.store.purchase(pack, token: token) {
                     // 0 = 테스트(샌드박스) 결제 — 서버가 실서비스 크레딧을 주지 않는다(efa4741).
-                    app.showToast(n > 0 ? "🎉 +\(n) 크레딧 충전 완료!" : "테스트 결제라 크레딧은 적립되지 않았어요.")
+                    app.showToast(n > 0 ? Copy.purchaseDone(n) : Copy.purchaseTestNoCredit)
                     await app.continueAfterPurchase()
                 }
             } catch {
                 // 202 = 결제는 됐고 적립 확인만 늦는 중 — "실패" 라고 말하면 안 된다.
                 if (error as? APIError)?.status == 202 { app.showToast(error.localizedDescription) }
-                else { app.showToast("결제 처리 실패: \(error.localizedDescription)") }
+                else { app.showToast(Copy.purchaseFailed(error.localizedDescription)) }
             }
         }
     }
@@ -205,9 +205,9 @@ private struct LegalLinksRow: View {
     @Environment(\.openURL) private var openURL
     var body: some View {
         HStack(spacing: Spacing.s3) {
-            Button("이용약관") { openURL(Config.termsURL) }
+            Button(Copy.terms) { openURL(Config.termsURL) }
             Text("·").foregroundStyle(Color.ink3)
-            Button("개인정보처리방침") { openURL(Config.privacyURL) }
+            Button(Copy.privacy) { openURL(Config.privacyURL) }
         }
         .font(AppFont.caption)
         .buttonStyle(.plain)

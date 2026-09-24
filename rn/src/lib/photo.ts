@@ -2,6 +2,7 @@ import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
 import { File, Paths } from "expo-file-system";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { copy } from "./copy";
 
 // ============================================================================
 // 사진 — 등록된 내 사진(기기 안에만 보관, 서버 전송 안 함) + 일회용 슬롯(상대·의상·변환).
@@ -93,6 +94,6 @@ export async function encodeForUpload(p: PhotoRef, max = 1024): Promise<EncodedP
     format: ImageManipulator.SaveFormat.JPEG,
     base64: true,
   });
-  if (!out.base64) throw new Error("사진 형식을 읽을 수 없어요.");
+  if (!out.base64) throw new Error(copy.errors.photoFormat);
   return { mimeType: "image/jpeg", base64: out.base64 };
 }

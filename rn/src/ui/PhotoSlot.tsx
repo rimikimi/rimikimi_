@@ -6,6 +6,7 @@ import { Text } from "./Text";
 import { IconClose, IconImage, IconPlus } from "./icons";
 import type { PhotoRef } from "@/lib/photo";
 import { color, radius, space, themedStyles } from "@/theme/tokens";
+import { copy } from "@/lib/copy";
 
 /** "내 사진: 등록된 사진 사용 · 변경" 한 줄 카드. 사진이 없으면 여기서 고른다. */
 export function PhotoRow({ label, hint, photo, actionLabel, onPress }: {
@@ -47,7 +48,7 @@ export function GarmentRow({ garments, max, onAdd, onRemove, addFirst, addMore }
       {garments.map((g, i) => (
         <View key={g.uri + i} style={styles.garment}>
           <Image source={{ uri: g.uri }} style={styles.garmentImg} contentFit="cover" />
-          <Pressable accessibilityRole="button" accessibilityLabel="의상 삭제" onPress={() => onRemove(i)} hitSlop={6} style={styles.remove}>
+          <Pressable accessibilityRole="button" accessibilityLabel={copy.ui.removeGarment} onPress={() => onRemove(i)} hitSlop={6} style={styles.remove}>
             <IconClose size={16} color={color.accentOn} />
           </Pressable>
         </View>

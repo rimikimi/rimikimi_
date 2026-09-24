@@ -8,6 +8,7 @@ import * as SplashScreen from "expo-splash-screen";
 import { AuthProvider } from "@/lib/auth";
 import { QuotaProvider } from "@/lib/quota";
 import { StoreProvider } from "@/lib/store";
+import { copy } from "@/lib/copy";
 import { GenerationProvider } from "@/lib/generation";
 import { CreditGateProvider } from "@/lib/creditGate";
 import { installPushHandlers, setupNotifications } from "@/lib/push";
@@ -74,8 +75,8 @@ export default function RootLayout() {
     return (
       <SafeAreaProvider>
         <View style={{ flex: 1, backgroundColor: color.bg, padding: space.s5, justifyContent: "center" }}>
-          <Text size="title2">앱 설정이 비어 있어요</Text>
-          <Text size="footnote" tone="muted" style={{ marginTop: space.s2 }}>이 빌드에는 서버 주소나 키가 들어가지 않았어요. 이대로는 로그인도 생성도 되지 않아요.</Text>
+          <Text size="title2">{copy.appError.title}</Text>
+          <Text size="footnote" tone="muted" style={{ marginTop: space.s2 }}>{copy.appError.desc}</Text>
           <Text size="caption" tone="subtle" style={{ marginTop: space.s4 }}>{problem}</Text>
         </View>
       </SafeAreaProvider>

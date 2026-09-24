@@ -8,6 +8,7 @@ import { useQuota } from "@/lib/quota";
 import { useAuth } from "@/lib/auth";
 import { color, radius, space, themedStyles } from "@/theme/tokens";
 import { transitions } from "@/theme/motion";
+import { copy } from "@/lib/copy";
 
 // 크레딧 칩 — 헤더 오른쪽. 누르면 프로필(스토어 자리). 숫자는 tabular + 고정 폭이라 헤더가 안 흔들린다.
 export function CreditChip() {
@@ -18,7 +19,7 @@ export function CreditChip() {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={known ? `크레딧 ${label}` : "크레딧"}
+      accessibilityLabel={known ? copy.ui.creditsA11y(label) : copy.profile.credits}
       accessibilityLiveRegion="polite"
       onPress={() => router.push("/(tabs)/profile")}
       hitSlop={10}

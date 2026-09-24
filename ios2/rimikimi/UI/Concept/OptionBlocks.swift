@@ -10,13 +10,13 @@ struct MyPhotoCard: View {
         HStack(spacing: Spacing.s3) {
             Thumb(image: app.userPhoto.image)
             VStack(alignment: .leading, spacing: 2) {
-                Text("내 사진").font(AppFont.headline)
-                Text(app.userPhoto.hasPhoto ? "등록된 사진 사용" : "얼굴이 잘 보이는 사진 한 장이면 충분해요")
+                Text(Copy.myPhoto).font(AppFont.headline)
+                Text(app.userPhoto.hasPhoto ? Copy.myPhotoInUse : Copy.myPhotoNone)
                     .font(AppFont.footnote).foregroundStyle(Color.ink2).lineLimit(2)
             }
             Spacer()
             PhotosPicker(selection: $pick, matching: .images, photoLibrary: .shared()) {
-                Text(app.userPhoto.hasPhoto ? "변경" : "고르기")
+                Text(app.userPhoto.hasPhoto ? Copy.change : Copy.choose)
             }
             .buttonStyle(SecondaryButtonStyle(small: true, fullWidth: false))
         }
@@ -46,11 +46,11 @@ struct PhotoSlotCard: View {
             Thumb(image: image)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(AppFont.headline)
-                Text(image == nil ? subtitle : "사진 준비됨 · 서버에 저장되지 않아요").font(AppFont.footnote).foregroundStyle(Color.ink2).lineLimit(2)
+                Text(image == nil ? subtitle : Copy.slotReady).font(AppFont.footnote).foregroundStyle(Color.ink2).lineLimit(2)
             }
             Spacer()
             PhotosPicker(selection: $pick, matching: .images, photoLibrary: .shared()) {
-                Text(image == nil ? "고르기" : "변경")
+                Text(image == nil ? Copy.choose : Copy.change)
             }
             .buttonStyle(SecondaryButtonStyle(small: true, fullWidth: false))
         }
@@ -75,7 +75,7 @@ struct GarmentsBlock: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s3) {
-            Text("입어볼 의상 (한 번에 5장까지 선택)").font(AppFont.headline).tracking(Tracking.headline)
+            Text(Copy.garmentsTitle).font(AppFont.headline).tracking(Tracking.headline)
             ScrollView(.horizontal) {
                 HStack(spacing: Spacing.s2) {
                     ForEach(Array(garments.enumerated()), id: \.offset) { i, g in
@@ -89,14 +89,14 @@ struct GarmentsBlock: View {
                                         .background(Color.ink.opacity(0.7), in: Circle())
                                 }
                                 .buttonStyle(.plain).padding(4)
-                                .accessibilityLabel("의상 \(i + 1) 삭제")
+                                .accessibilityLabel(Copy.garmentRemove(i + 1))
                             }
                     }
                     if garments.count < max {
                         PhotosPicker(selection: $picks, maxSelectionCount: max - garments.count, matching: .images, photoLibrary: .shared()) {
                             VStack(spacing: 4) {
                                 Image(systemName: "plus").font(.system(size: 18, weight: .semibold))
-                                Text(garments.isEmpty ? "의상 올리기" : "더 추가").font(AppFont.caption)
+                                Text(garments.isEmpty ? Copy.garmentAddFirst : Copy.garmentAddMore).font(AppFont.caption)
                             }
                             .foregroundStyle(Color.ink2)
                             .frame(width: 72, height: 96)
@@ -107,7 +107,7 @@ struct GarmentsBlock: View {
                 }
             }
             .scrollIndicators(.hidden)
-            Text("빠진 의상은 AI가 판단해서 생성해줘요.").font(AppFont.footnote).foregroundStyle(Color.ink2)
+            Text(Copy.garmentAutoNote).font(AppFont.footnote).foregroundStyle(Color.ink2)
         }
         .padding(Spacing.s4)
         .frame(maxWidth: .infinity, alignment: .leading)

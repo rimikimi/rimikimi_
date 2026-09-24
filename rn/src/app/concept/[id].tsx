@@ -15,7 +15,7 @@ import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { useGeneration } from "@/lib/generation";
 import { useCreditGate } from "@/lib/creditGate";
-import { FOURCUT_COUNTS, GARMENT_MAX, ID_BGS, ID_SUITS, isArtOnly, isCoupleConcept, isDressroom, isFourcut, isIdPhoto, thumbUrl } from "@/lib/concepts";
+import { FOURCUT_COUNTS, GARMENT_MAX, ID_BGS, ID_SUITS, conceptTitle, isArtOnly, optionLabel, isCoupleConcept, isDressroom, isFourcut, isIdPhoto, thumbUrl } from "@/lib/concepts";
 import { pickPhotos, registerPhoto, type PhotoRef } from "@/lib/photo";
 import { copy } from "@/lib/copy";
 import { color, radius, space, themedStyles } from "@/theme/tokens";
@@ -123,7 +123,7 @@ export default function ConceptOptions() {
 
   return (
     <View style={{ flex: 1 }}>
-      <Screen scrollModel="scroll" actionBar header={<AppHeader title={concept.title} back right={<View />} />} contentStyle={styles.content}>
+      <Screen scrollModel="scroll" actionBar header={<AppHeader title={conceptTitle(concept)} back right={<View />} />} contentStyle={styles.content}>
         <Image source={{ uri: thumbUrl(concept.id) }} style={{ width: previewW, height: previewH, borderRadius: radius.card, backgroundColor: color.mat }} contentFit="cover" transition={duration.enter} cachePolicy="disk" />
 
         {art ? (
@@ -156,11 +156,11 @@ export default function ConceptOptions() {
           <Card style={{ gap: space.s3 }}>
             <Text size="footnote" weight="semibold">{copy.options.fourcut.countLabel}</Text>
             <View style={styles.chips}>
-              {FOURCUT_COUNTS.map((n) => <Chip key={n} label={`${n}컷`} active={fourcutCount === n} onPress={() => setFourcutCount(n)} />)}
+              {FOURCUT_COUNTS.map((n) => <Chip key={n} label={copy.ui.cuts(n)} active={fourcutCount === n} onPress={() => setFourcutCount(n)} />)}
             </View>
             <Text size="footnote" weight="semibold" style={{ marginTop: space.s2 }}>{copy.options.fourcut.styleLabel}</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.s2 }} overScrollMode="never">
-              {fourcutStyles.map((s) => <Chip key={s.key} label={`${s.emoji ? s.emoji + " " : ""}${s.label}`} active={fourcutStyle === s.key} onPress={() => setFourcutStyle(s.key)} />)}
+              {fourcutStyles.map((s) => <Chip key={s.key} label={`${s.emoji ? s.emoji + " " : ""}${optionLabel(s)}`} active={fourcutStyle === s.key} onPress={() => setFourcutStyle(s.key)} />)}
             </ScrollView>
           </Card>
         ) : !art ? (
@@ -179,7 +179,7 @@ export default function ConceptOptions() {
               {ID_SUITS.map((s) => (
                 <Chip
                   key={s.key}
-                  label={s.label}
+                  label={optionLabel(s)}
                   active={idSuit === s.key}
                   onPress={() => setIdSuit(s.key)}
                 />

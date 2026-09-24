@@ -10,6 +10,7 @@ import { CreditChip } from "./CreditChip";
 import { IconArrowLeft, IconUser } from "./icons";
 import { useAuth } from "@/lib/auth";
 import { chrome, color, radius, space, themedStyles } from "@/theme/tokens";
+import { copy } from "@/lib/copy";
 
 // ============================================================================
 // Pinned top bar. Glass — chrome only (SPEC §0).
@@ -28,7 +29,7 @@ export function AppHeader({ title, back, right }: { title?: string; back?: boole
       <View style={styles.row}>
         <View style={styles.side}>
           {back ? (
-            <Pressable accessibilityRole="button" accessibilityLabel="뒤로" hitSlop={12} onPress={() => router.back()} style={styles.iconBtn}>
+            <Pressable accessibilityRole="button" accessibilityLabel={copy.common.back} hitSlop={12} onPress={() => router.back()} style={styles.iconBtn}>
               <IconArrowLeft size={24} color={color.ink} />
             </Pressable>
           ) : title ? null : (
@@ -42,7 +43,7 @@ export function AppHeader({ title, back, right }: { title?: string; back?: boole
           {right ?? (
             <>
               <CreditChip />
-              <Pressable accessibilityRole="button" accessibilityLabel="프로필" hitSlop={8} onPress={() => router.push("/(tabs)/profile")} style={styles.avatar}>
+              <Pressable accessibilityRole="button" accessibilityLabel={copy.tabs.profile} hitSlop={8} onPress={() => router.push("/(tabs)/profile")} style={styles.avatar}>
                 {avatar ? (
                   <Image source={{ uri: avatar }} style={styles.avatarImg} contentFit="cover" />
                 ) : (

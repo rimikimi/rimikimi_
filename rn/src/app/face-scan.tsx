@@ -13,6 +13,7 @@ import { Spinner } from "@/ui/Spinner";
 import { IconCamera, IconLight } from "@/ui/icons";
 import { color, radius, space } from "@/theme/tokens";
 import { ANGLES, saveScanShots, type FaceAngle } from "@/lib/faceProfile";
+import { copy } from "@/lib/copy";
 
 // ============================================================================
 // 얼굴 스캔 — 정면·옆①·옆② 3장을 모아 **이 기기에만** 둔다. 아이폰 `FaceScanView` 를 옮긴 것
@@ -47,18 +48,10 @@ interface Shot {
   height: number;
 }
 
-const LABEL: Record<FaceAngle, string> = { front: "정면", side1: "옆모습 ①", side2: "옆모습 ②" };
-const TITLE: Record<FaceAngle, string> = {
-  front: "정면을 봐주세요",
-  side1: "고개를 한쪽으로 천천히",
-  side2: "이제 반대쪽으로",
-};
-const HINT: Record<FaceAngle, string> = {
-  front: "얼굴을 원 안에 꽉 채워 주세요",
-  // 아이폰과 달리 자동으로 안 잡히므로 **누르라고** 말해 준다.
-  side1: "45도쯤 돌린 채로 셔터를 눌러 주세요",
-  side2: "아까와 반대쪽으로 돌리고 눌러 주세요",
-};
+const LABEL: Record<FaceAngle, string> = copy.faceScan.label;
+const TITLE: Record<FaceAngle, string> = copy.faceScan.title;
+// 아이폰과 달리 자동으로 안 잡히므로 옆모습 안내는 **누르라고** 말해 준다(copy.faceScan.hint).
+const HINT: Record<FaceAngle, string> = copy.faceScan.hint;
 
 export default function FaceScanScreen() {
   const insets = useSafeAreaInsets();
@@ -147,7 +140,7 @@ export default function FaceScanScreen() {
       // ⚠️ **하나도 못 만들었으면 닫지 않는다** — 닫아 버리면 "이 얼굴로 시작하기" 를 눌렀는데
       //    프로필은 "없음" 인 채로 돌아가고, 왜 그런지 알 길이 없다.
       if (!out.length) {
-        Alert.alert("사진을 저장하지 못했어요", "다시 찍어 주세요.");
+        Alert.alert(copy.faceScan.saveFail, copy.faceScan.saveFailBody);
         return;
       }
       await saveScanShots(out);
@@ -171,8 +164,8 @@ export default function FaceScanScreen() {
     return (
       <View style={[styles.blank, { paddingHorizontal: space.screen }]}>
         <IconCamera size={32} color="rgba(255,255,255,0.6)" />
-        <Text size="headline" style={styles.onDark}>카메라 권한이 필요해요</Text>
-        <Text size="footnote" style={styles.dim}>얼굴을 스캔하려면 카메라 접근을 허용해 주세요.</Text>
+        <Text size="headline" style={styles.onDark}>{copy.faceScan.permTitle}</Text>
+        <Text size="footnote" style={styles.dim}>{copy.faceScan.permDesc}</Text>
         <Pressable
           accessibilityRole="button"
           onPress={() => {
@@ -182,11 +175,11 @@ export default function FaceScanScreen() {
           style={styles.primary}
         >
           <Text size="callout" style={styles.primaryLabel}>
-            {permission.canAskAgain ? "권한 허용" : "설정 열기"}
+            {permission.canAskAgain ? copy.ui.allowPermission : copy.ui.openSettings}
           </Text>
         </Pressable>
         <Pressable accessibilityRole="button" onPress={() => router.back()} hitSlop={10}>
-          <Text size="footnote" style={styles.dim}>닫기</Text>
+          <Text size="footnote" style={styles.dim}>{copy.common.close}</Text>
         </Pressable>
       </View>
     );
@@ -203,9 +196,9 @@ export default function FaceScanScreen() {
         ]}
       >
         <View style={styles.grow} />
-        <Text size="title2" style={{ color: fg }}>이 얼굴을 사용할까요?</Text>
+        <Text size="title2" style={{ color: fg }}>{copy.faceScan.confirmTitle}</Text>
         <Text size="footnote" style={[styles.centered, { color: fgDim }]}>
-          {"이 사진들은 이 휴대폰 안에만 저장돼요.\n사진을 만들 때만 참조로 쓰이고 서버에 보관하지 않아요."}
+          {copy.faceScan.privacy}
         </Text>
         <View style={styles.slots}>
           {ANGLES.map((a) => (
@@ -214,10 +207,10 @@ export default function FaceScanScreen() {
         </View>
         <View style={styles.grow} />
         <Pressable accessibilityRole="button" onPress={confirm} disabled={saving} style={styles.primaryWide}>
-          {saving ? <Spinner size={18} color={color.accentOn} /> : <Text size="callout" style={styles.primaryLabel}>이 얼굴로 시작하기</Text>}
+          {saving ? <Spinner size={18} color={color.accentOn} /> : <Text size="callout" style={styles.primaryLabel}>{copy.faceScan.start}</Text>}
         </Pressable>
         <Pressable accessibilityRole="button" onPress={reset} hitSlop={10} style={styles.textBtn}>
-          <Text size="footnote" style={{ color: fg }}>다시 찍기</Text>
+          <Text size="footnote" style={{ color: fg }}>{copy.faceScan.retake}</Text>
         </Pressable>
       </View>
     );
@@ -236,19 +229,19 @@ export default function FaceScanScreen() {
     >
       <View style={styles.topRow}>
         <Pressable accessibilityRole="button" onPress={() => router.back()} hitSlop={10}>
-          <Text size="callout" style={{ color: fg }}>닫기</Text>
+          <Text size="callout" style={{ color: fg }}>{copy.common.close}</Text>
         </Pressable>
         {/* 어두운 데서 얼굴이 안 잡힐 때 화면을 조명판으로 쓴다. 아이폰은 자동, 여긴 수동. */}
         <Pressable
           accessibilityRole="switch"
           accessibilityState={{ checked: light }}
-          accessibilityLabel="화면 조명"
+          accessibilityLabel={copy.faceScan.lightA11y}
           onPress={() => setLight((v) => !v)}
           hitSlop={10}
           style={[styles.lightBtn, { borderColor: fgFaint }]}
         >
           <IconLight size={20} color={fg} on={light} />
-          <Text size="footnote" style={{ color: fg }}>조명</Text>
+          <Text size="footnote" style={{ color: fg }}>{copy.faceScan.light}</Text>
         </Pressable>
       </View>
 
@@ -306,7 +299,7 @@ export default function FaceScanScreen() {
 
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="촬영"
+        accessibilityLabel={copy.shoot.shutter}
         onPress={capture}
         style={[styles.shutterRing, { borderColor: light ? "rgba(35,31,32,0.9)" : "rgba(255,255,255,0.9)" }]}
       >

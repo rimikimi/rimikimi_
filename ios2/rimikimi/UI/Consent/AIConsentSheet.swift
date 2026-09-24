@@ -21,27 +21,27 @@ struct AIConsentSheet: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.s4) {
-                Text("사진은 이렇게 쓰여요")
+                Text(Copy.consentTitle)
                     .font(AppFont.title2).tracking(Tracking.title2)
 
                 VStack(alignment: .leading, spacing: Spacing.s3) {
-                    ConsentRow(icon: "sparkles", text: "이 서비스는 인공지능(Google Gemini API)으로 이미지를 생성해요.")
-                    ConsentRow(icon: "arrow.up.right.circle", text: "업로드한 사진은 이미지를 생성할 때만 Google로 전송되고, 서버에 저장하지 않아요 — 처리 후 즉시 폐기돼요.")
-                    ConsentRow(icon: "iphone", text: "등록해 둔 얼굴 참조사진은 이용자 기기에만 저장돼요. 생성할 때만 함께 전송돼요.")
+                    ConsentRow(icon: "sparkles", text: Copy.consentAI)
+                    ConsentRow(icon: "arrow.up.right.circle", text: Copy.consentUpload)
+                    ConsentRow(icon: "iphone", text: Copy.consentDevice)
                 }
 
                 Button {
                     openURL(Config.privacyURL)
                 } label: {
-                    Text("개인정보처리방침에서 자세히 보기")
+                    Text(Copy.consentPrivacyLink)
                         .font(AppFont.footnote).foregroundStyle(Color.accent)
                 }
                 .buttonStyle(.plain)
 
                 VStack(spacing: Spacing.s2) {
-                    Button("동의하고 계속", action: onAgree)
+                    Button(Copy.consentAgree, action: onAgree)
                         .buttonStyle(PrimaryButtonStyle(isDisabled: false))
-                    Button("다음에", action: onCancel)
+                    Button(Copy.consentLater, action: onCancel)
                         .buttonStyle(TextButtonStyle(color: .ink2))
                 }
                 .padding(.top, Spacing.s2)

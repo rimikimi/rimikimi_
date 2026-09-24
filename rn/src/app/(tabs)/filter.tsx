@@ -10,6 +10,7 @@ import { IconCamera, IconChevron } from "@/ui/icons";
 import { useAuth } from "@/lib/auth";
 import { getEnv } from "@/lib/env";
 import { copy } from "@/lib/copy";
+import { isKo } from "@/lib/locale";
 import { groupedPresets, type Preset } from "@/filters";
 import { color, radius, space, themedStyles } from "@/theme/tokens";
 
@@ -29,8 +30,10 @@ const GROUP_LABEL: Record<string, string> = {
   film: copy.filter.groups.film,
   camera: copy.filter.groups.camera,
   fun: copy.filter.groups.fun,
-  etc: "기타",
+  etc: copy.filterTab.etc,
 };
+/** 프리셋 표시 이름 — 한국어 UI 는 ko, 아니면 en(filters.ts 데이터에 둘 다 있다). */
+const presetName = (p: Preset) => (isKo ? p.ko : p.en);
 
 function presetThumb(key: string): string {
   return `${getEnv().apiBase}/thumbs/fs_${key}.webp`;
@@ -64,7 +67,7 @@ export default function FilterTab() {
       {today ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`오늘의 필터 ${today.preset.ko}`}
+          accessibilityLabel={copy.filterTab.todayA11y(presetName(today.preset))}
           onPress={() => open(today.preset.key)}
           style={styles.hero}
         >
@@ -82,19 +85,19 @@ export default function FilterTab() {
 
           {/* `fs_*` 이미지는 **왼쪽 원본 / 오른쪽 필터** 세로 분할이다 — 그 점을 알약으로 짚어 준다. */}
           <View style={styles.pillsTop}>
-            <View style={styles.pillHalf}><Pill text="원본" /></View>
-            <View style={styles.pillHalf}><Pill text={today.preset.ko} /></View>
+            <View style={styles.pillHalf}><Pill text={copy.filterTab.original} /></View>
+            <View style={styles.pillHalf}><Pill text={presetName(today.preset)} /></View>
           </View>
 
           <View style={styles.heroCaption}>
             <View style={styles.heroCaptionText}>
-              <Text size="footnote" style={styles.onPhotoDim}>{`오늘의 필터 · ${today.group}`}</Text>
-              <Text size="headline" style={styles.onPhoto}>{today.preset.ko}</Text>
-              <Text size="footnote" style={styles.onPhotoDim}>탭하면 이 필터로 바로 시작</Text>
+              <Text size="footnote" style={styles.onPhotoDim}>{copy.filterTab.today(today.group)}</Text>
+              <Text size="headline" style={styles.onPhoto}>{presetName(today.preset)}</Text>
+              <Text size="footnote" style={styles.onPhotoDim}>{copy.filterTab.tapToStart}</Text>
             </View>
             <View style={styles.heroPills}>
-              <Pill text="한 번에 10장까지" />
-              <Pill text="전부 무료" />
+              <Pill text={copy.filterTab.upTo10} />
+              <Pill text={copy.filterTab.free} />
             </View>
           </View>
         </Pressable>
@@ -109,7 +112,7 @@ export default function FilterTab() {
         <IconCamera size={20} color={color.accentOn} />
         <Text size="headline" style={styles.shootLabel}>{copy.filter.shoot}</Text>
         {/* 문구는 실제 동작과 같아야 한다 — 다르면 심사(2.3.1)에서 걸린다. */}
-        <Text size="footnote" style={styles.shootHint}>· 여러 장 찍고 한 번에 필터</Text>
+        <Text size="footnote" style={styles.shootHint}>{copy.filterTab.shootHint}</Text>
         <View style={styles.grow} />
         <IconChevron size={16} color={color.accentOn} />
       </Pressable>
@@ -125,13 +128,13 @@ export default function FilterTab() {
               <Pressable
                 key={p.key}
                 accessibilityRole="button"
-                accessibilityLabel={p.ko}
+                accessibilityLabel={presetName(p)}
                 onPress={() => open(p.key)}
                 style={{ width: tileW }}
               >
                 {/* 미리보기는 무조건 3:4 (오너 지시). */}
                 <Thumb uri={presetThumb(p.key)} width={tileW} rounded={radius.card - 2} />
-                <Text size="footnote" numberOfLines={1} style={styles.tileLabel}>{p.ko}</Text>
+                <Text size="footnote" numberOfLines={1} style={styles.tileLabel}>{presetName(p)}</Text>
               </Pressable>
             ))}
           </View>

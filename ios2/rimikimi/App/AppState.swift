@@ -199,7 +199,7 @@ final class AppState {
     func saveFaceProfile(_ shots: [FaceProfileStore.Angle: UIImage]) {
         faceProfile.save(shots)
         if let front = shots[.front] { userPhoto.set(front) }
-        toast = "얼굴 프로필을 저장했어요"
+        toast = Copy.faceProfileSaved
     }
 
     // MARK: 로그인 게이트
@@ -270,7 +270,7 @@ final class AppState {
             // 기본 카메라는 한 장 찍으면 바로 앱으로 돌아와 연속 촬영이 불가능하다(`BurstCameraView` 주석).
             if Self.useBurstCamera { showBurstCamera = true }
             else if Self.useSystemCamera { showSystemCamera = true }
-            else { webTool = WebTool(url: Config.cameraToolURL, title: "카메라", chromeless: true) }
+            else { webTool = WebTool(url: Config.cameraToolURL, title: Copy.camera, chromeless: true) }
         }
     }
 
@@ -285,7 +285,7 @@ final class AppState {
         Task {
             var saved = 0
             for img in images where await CameraAlbum.save(img) { saved += 1 }
-            showToast(saved == images.count ? "\(saved)장을 앨범에 저장했어요" : "앨범 저장 권한이 없어요")
+            showToast(saved == images.count ? Copy.savedNToAlbum(saved) : Copy.noAlbumPermission)
         }
         handlePickedPhotos(images)
     }
@@ -294,7 +294,7 @@ final class AppState {
         showSystemCamera = false
         Task {
             let saved = await CameraAlbum.save(image)
-            showToast(saved ? "앨범에 저장했어요" : "앨범 저장 권한이 없어요")
+            showToast(saved ? Copy.savedToAlbum : Copy.noAlbumPermission)
             openEditor(image: image)
         }
     }
@@ -313,7 +313,7 @@ final class AppState {
             return "data:image/jpeg;base64,\(d.base64EncodedString())"
         }
         guard !srcs.isEmpty else { return }
-        webTool = WebTool(url: Config.filterToolURL(mode: "edit", presetKey: preset), title: "꾸미기",
+        webTool = WebTool(url: Config.filterToolURL(mode: "edit", presetKey: preset), title: Copy.decorate,
                           initialPayload: ["mode": "edit", "srcs": srcs])
     }
 
@@ -321,7 +321,7 @@ final class AppState {
     func openEditor(image: UIImage) {
         let data = image.jpegData(compressionQuality: 0.92) ?? Data()
         let dataUrl = "data:image/jpeg;base64,\(data.base64EncodedString())"
-        webTool = WebTool(url: Config.filterToolURL(mode: "edit"), title: "다듬기",
+        webTool = WebTool(url: Config.filterToolURL(mode: "edit"), title: Copy.edit,
                            initialPayload: ["mode": "edit", "src": dataUrl])
     }
 
@@ -412,7 +412,7 @@ final class AppState {
     ///    iOS 는 "프레젠터당 모달 1개" 라 조용히 무시한다 — 무반응인 데다, 남은 예약
     ///    (pendingOutpaintPhoto)이 나중에 스토어에서 살 때 **보이지 않게 채워 맞춤을 돌려
     ///    1크레딧을 썼다**(2026-09-23 스윕). 그래서 FitSheet 안에 이유를 보여 주고 끝낸다.
-    static let outpaintNeedCredit = "채워 맞춤은 1크레딧이 필요해요. 프로필 › 크레딧 충전 뒤 다시 눌러 주세요."
+    static var outpaintNeedCredit: String { Copy.outpaintNeedCredit }
 
     private func runOutpaint(_ image: UIImage) async {
         guard let token = await auth.validAccessToken() else { handleNoToken(); return }
@@ -440,7 +440,7 @@ final class AppState {
             }
             outpaintPhase = .error(error.message)
         } catch {
-            outpaintPhase = .error("채워 맞춤에 실패했어요. 잠시 후 다시 시도해 주세요.")
+            outpaintPhase = .error(Copy.outpaintFailed)
         }
     }
 
@@ -481,7 +481,7 @@ final class AppState {
     /// 프로필은 로그인 상태인데 로그인하라는 시트가 뜨고, 하던 요청은 사라졌다(스윕 H1).
     func handleNoToken() {
         if auth.session == nil { loginSheet = true }
-        else { showToast("인터넷 연결을 확인한 뒤 다시 시도해 주세요.") }
+        else { showToast(Copy.retryNetwork) }
     }
 
     // MARK: 결과 화면

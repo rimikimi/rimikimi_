@@ -24,9 +24,9 @@ struct ConceptOptionsView: View {
     private var mainPhoto: UIImage? { concept.isArtTransform ? artPhoto : app.userPhoto.image }
 
     private var missingReason: String? {
-        if mainPhoto == nil { return concept.isArtTransform ? "변환할 사진을 골라주세요" : "먼저 내 사진을 등록해 주세요" }
-        if concept.isCouple && partnerPhoto == nil { return "상대 사진도 올려주세요 🙂" }
-        if concept.isDressroom && garments.isEmpty { return "입어볼 의상 사진을 먼저 올려주세요 🙂" }
+        if mainPhoto == nil { return concept.isArtTransform ? Copy.needArt : Copy.needMain }
+        if concept.isCouple && partnerPhoto == nil { return Copy.needPartner }
+        if concept.isDressroom && garments.isEmpty { return Copy.needGarment }
         return nil
     }
 
@@ -42,42 +42,42 @@ struct ConceptOptionsView: View {
                     .padding(.top, Spacing.s2)
 
                 if concept.isArtTransform {
-                    PhotoSlotCard(title: "변환할 사진", subtitle: "인물, 풍경, 동물, 정물 무엇이든 좋아요", image: artPhoto) { artPhoto = $0 }
+                    PhotoSlotCard(title: Copy.artTitle, subtitle: Copy.artSub, image: artPhoto) { artPhoto = $0 }
                 } else {
                     MyPhotoCard()
                 }
                 if concept.isCouple {
-                    PhotoSlotCard(title: "상대 사진", subtitle: "얼굴이 잘 보이는 사진이면 좋아요", image: partnerPhoto) { partnerPhoto = $0 }
+                    PhotoSlotCard(title: Copy.partnerTitle, subtitle: Copy.partnerSub, image: partnerPhoto) { partnerPhoto = $0 }
                 }
                 if concept.isDressroom {
                     GarmentsBlock(garments: $garments)
-                    OptionBlock(title: "어떤 컷으로 만들까요?") {
-                        SegmentedPair(options: [("mirror", "거울셀카"), ("model", "일상컷")], selection: $dressStyle)
+                    OptionBlock(title: Copy.dressStyleQuestion) {
+                        SegmentedPair(options: [("mirror", Copy.dressMirror), ("model", Copy.dressModel)], selection: $dressStyle)
                     }
                 }
                 if concept.isFourcut {
-                    OptionBlock(title: "컷 수") {
+                    OptionBlock(title: Copy.cutsTitle) {
                         HStack(spacing: Spacing.s2) {
                             ForEach(FourcutDefaults.counts, id: \.self) { n in
-                                OptionChip(title: "\(n)컷", isActive: fourcutCount == n) { choose { fourcutCount = n } }
+                                OptionChip(title: Copy.cuts(n), isActive: fourcutCount == n) { choose { fourcutCount = n } }
                             }
                         }
                     }
-                    OptionBlock(title: "스타일") {
+                    OptionBlock(title: Copy.styleTitle) {
                         FlowChips(styles: styles, selection: $fourcutStyleKey)
                     }
                 }
                 if !concept.isFourcut && !concept.isArtTransform {
-                    OptionBlock(title: "한 번에 만들기", note: app.quota.map { "크레딧 \($0.creditsAvailable)개 보유" }) {
+                    OptionBlock(title: Copy.batchTitle, note: app.quota.map { Copy.creditsHeld($0.creditsAvailable) }) {
                         HStack(spacing: Spacing.s2) {
                             ForEach(BatchOption.all, id: \.count) { b in
-                                OptionChip(title: b.label, subtitle: app.quota?.unlimited == true ? "무제한" : "\(b.cost) 크레딧",
+                                OptionChip(title: b.label, subtitle: app.quota?.unlimited == true ? Copy.unlimited : Copy.credits(b.cost),
                                            badge: b.badge, isActive: batchCount == b.count) { choose { batchCount = b.count } }
                             }
                         }
                     }
                 }
-                Text(concept.isArtTransform ? "업로드하신 사진을 선택한 컨셉으로 변환해 드려요." : "선택한 컨셉으로 내 얼굴 특징을 살린 이미지를 만들어 드려요.")
+                Text(concept.isArtTransform ? Copy.footArt : Copy.footFace)
                     .font(AppFont.footnote).foregroundStyle(Color.ink2)
                     .padding(.horizontal, Spacing.page)
             }
@@ -85,7 +85,7 @@ struct ConceptOptionsView: View {
         }
         .scrollIndicators(.hidden)
         .background(Color.bg)
-        .inlineTitle(concept.title)
+        .inlineTitle(concept.displayTitle)
         .toolbar(.hidden, for: .tabBar)
         .zoomDestination("concept:" + concept.id, in: zoomNS)
         .toolbar {
@@ -104,7 +104,7 @@ struct ConceptOptionsView: View {
                     .opacity(missingReason == nil ? 0 : 1)
                     .animation(.easeOut(duration: 0.18), value: missingReason)
                 Button(action: generate) {
-                    Text("만들기 · \(cost) 크레딧")
+                    Text(Copy.makeCost(cost))
                 }
                 .buttonStyle(PrimaryButtonStyle(isDisabled: missingReason != nil))
                 .disabled(missingReason != nil)
@@ -133,7 +133,7 @@ struct ConceptOptionsView: View {
         req.dressStyle = dressStyle
         req.count = (concept.isFourcut || concept.isArtTransform) ? 1 : batchCount
         if concept.isFourcut { req.cutCount = fourcutCount; req.fourcutStyle = fourcutStyleKey }
-        app.requireLogin(.generate(req), message: "생성된 이미지 저장을 위해 로그인이 필요합니다")
+        app.requireLogin(.generate(req), message: Copy.loginToSave)
     }
 }
 
@@ -167,7 +167,7 @@ struct FlowChips: View {
             ForEach(0..<2, id: \.self) { r in
                 HStack(spacing: Spacing.s2) {
                     ForEach(rows.compactMap { $0.count > r ? $0[r] : nil }, id: \.key) { s in
-                        OptionChip(title: [s.emoji, s.label].compactMap { $0 }.joined(separator: " "), isActive: selection == s.key) {
+                        OptionChip(title: [s.emoji, Copy.fourcutStyle(key: s.key, fallback: s.label)].compactMap { $0 }.joined(separator: " "), isActive: selection == s.key) {
                             guard selection != s.key else { return }
                             selection = s.key
                             HapticPlayer.selection()

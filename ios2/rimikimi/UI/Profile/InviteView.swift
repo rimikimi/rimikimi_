@@ -13,25 +13,25 @@ struct InviteView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.s4) {
                 VStack(alignment: .leading, spacing: Spacing.s2) {
-                    Text("🎟 친구 초대하면 크레딧 3개").font(AppFont.headline)
-                    Text("친구 1명 초대할 때마다 크레딧 3개! (현재 \(app.quota?.referralCount ?? 0)명 초대)")
+                    Text(Copy.inviteHeadline).font(AppFont.headline)
+                    Text(Copy.inviteDesc(app.quota?.referralCount ?? 0))
                         .font(AppFont.footnote).foregroundStyle(Color.ink2)
                 }
                 .padding(Spacing.s4).frame(maxWidth: .infinity, alignment: .leading)
                 .background(Color.card, in: RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
 
                 VStack(alignment: .leading, spacing: Spacing.s2) {
-                    Text("내 초대 코드").font(AppFont.footnote).foregroundStyle(Color.ink2)
+                    Text(Copy.inviteMyCode).font(AppFont.footnote).foregroundStyle(Color.ink2)
                     Button {
                         guard let c = myCode else { return }
                         UIPasteboard.general.string = c
                         HapticPlayer.success()
-                        app.showToast("초대 코드를 복사했어요")
+                        app.showToast(Copy.inviteCodeCopied)
                     } label: {
                         HStack {
                             Text(myCode ?? "–").font(.system(size: 28, weight: .bold, design: .rounded)).tracking(2)
                             Spacer()
-                            Text("탭해서 복사").font(AppFont.footnote).foregroundStyle(Color.ink2)
+                            Text(Copy.inviteTapToCopy).font(AppFont.footnote).foregroundStyle(Color.ink2)
                         }
                         .padding(Spacing.s4)
                         .background(Color.fill, in: RoundedRectangle(cornerRadius: Radius.button, style: .continuous))
@@ -40,8 +40,8 @@ struct InviteView: View {
                     .buttonStyle(PressScaleButtonStyle(scale: 0.985))
                     if let c = myCode {
                         ShareLink(item: Config.inviteURL(code: c),
-                                  message: Text("내 얼굴로 인생 프로필 만들기 ✨ rimikimi 같이 해요! 이 링크로 시작하면 저도 크레딧을 받아요 🙌")) {
-                            Label("공유하기", systemImage: "square.and.arrow.up")
+                                  message: Text(Copy.inviteShareText)) {
+                            Label(Copy.shareAction, systemImage: "square.and.arrow.up")
                         }
                         .buttonStyle(PrimaryButtonStyle())
                     }
@@ -50,20 +50,20 @@ struct InviteView: View {
                 .background(Color.card, in: RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
 
                 VStack(alignment: .leading, spacing: Spacing.s2) {
-                    Text("친구 초대 코드 입력").font(AppFont.footnote).foregroundStyle(Color.ink2)
+                    Text(Copy.inviteEnterCode).font(AppFont.footnote).foregroundStyle(Color.ink2)
                     HStack(spacing: Spacing.s2) {
-                        TextField("6자 코드", text: $friendCode)
+                        TextField(Copy.inviteCodePlaceholder, text: $friendCode)
                             .textInputAutocapitalization(.characters)
                             .autocorrectionDisabled()
                             .font(AppFont.body)
                             .padding(.horizontal, Spacing.s3)
                             .frame(height: ControlHeight.button)
                             .background(Color.fill, in: RoundedRectangle(cornerRadius: Radius.button, style: .continuous))
-                        Button(claiming ? "…" : "등록") { claim() }
+                        Button(claiming ? "…" : Copy.inviteApply) { claim() }
                             .buttonStyle(SecondaryButtonStyle(fullWidth: false))
                             .disabled(claiming || friendCode.trimmingCharacters(in: .whitespaces).isEmpty)
                     }
-                    Text("설치 경로에서 링크가 끊겼을 때 친구의 코드를 직접 넣어요.").font(AppFont.caption).foregroundStyle(Color.ink3)
+                    Text(Copy.inviteCodeHelp).font(AppFont.caption).foregroundStyle(Color.ink3)
                 }
                 .padding(Spacing.s4)
                 .background(Color.card, in: RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
@@ -74,7 +74,7 @@ struct InviteView: View {
         }
         .scrollIndicators(.hidden)
         .background(Color.bg)
-        .inlineTitle("친구 초대")
+        .inlineTitle(Copy.inviteFriends)
         .toolbar(.hidden, for: .tabBar)
         .task { if app.quota == nil { await app.refreshQuota() } }
     }
@@ -90,7 +90,7 @@ struct InviteView: View {
                 let r = try await RimikimiAPI.shared.referralClaim(code: code, token: token)
                 if r.ok {
                     HapticPlayer.success()
-                    app.showToast("초대가 등록됐어요! 친구에게 크레딧 3개가 쌓였어요 🎉")
+                    app.showToast(Copy.inviteOk)
                     friendCode = ""
                 } else {
                     app.showToast(Self.failMessage(r.reason))
@@ -104,11 +104,11 @@ struct InviteView: View {
     /// `invite.codeFail.*` (i18nStrings ko)
     static func failMessage(_ reason: String?) -> String {
         switch reason {
-        case "invalid_code", "invalid_ref": return "코드를 다시 확인해 주세요"
-        case "code_not_found", "ref_not_found": return "없는 코드예요"
-        case "self_referral": return "내 코드는 등록할 수 없어요"
-        case "already_referred": return "이미 초대 코드를 등록했어요"
-        default: return "잠시 후 다시 시도해 주세요"
+        case "invalid_code", "invalid_ref": return Copy.inviteErrInvalid
+        case "code_not_found", "ref_not_found": return Copy.inviteErrNotFound
+        case "self_referral": return Copy.inviteErrSelf
+        case "already_referred": return Copy.inviteErrAlready
+        default: return Copy.inviteErrRetry
         }
     }
 }
@@ -121,11 +121,11 @@ struct InviteCard: View {
     var body: some View {
         HStack(spacing: Spacing.s3) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("🎟 친구 초대하면 크레딧 3개").font(AppFont.headline)
-                Text("친구 1명 초대할 때마다 크레딧 3개!").font(AppFont.footnote).foregroundStyle(Color.ink2)
+                Text(Copy.inviteHeadline).font(AppFont.headline)
+                Text(Copy.inviteDescShort).font(AppFont.footnote).foregroundStyle(Color.ink2)
             }
             Spacer()
-            Button("공유하기") {
+            Button(Copy.shareAction) {
                 app.tab = .profile
                 app.profilePath = [.invite]
             }
@@ -134,7 +134,7 @@ struct InviteCard: View {
                 Image(systemName: "xmark").font(.system(size: 11, weight: .bold)).foregroundStyle(Color.ink2)
                     .frame(width: 24, height: 24).background(Color.fill, in: Circle())
             }
-            .buttonStyle(.plain).accessibilityLabel("닫기")
+            .buttonStyle(.plain).accessibilityLabel(Copy.close)
         }
         .padding(Spacing.s3 + 2)
         .background(Color.card, in: RoundedRectangle(cornerRadius: Radius.card, style: .continuous))

@@ -1,4 +1,5 @@
 import Constants from "expo-constants";
+import { copy } from "./copy";
 
 // Boot-time env. FAIL LOUDLY — 설정이 비어 있는 빌드는 빈 화면이 아니라 안내 화면을 띄운다.
 // 값은 app.config.ts `extra` (또는 EXPO_PUBLIC_*) 에서 온다.
@@ -43,7 +44,7 @@ export function envProblem(): string | null {
     getEnv();
     return null;
   } catch (err) {
-    return err instanceof MissingEnvError ? err.message : "환경 설정을 읽지 못했어요.";
+    return err instanceof MissingEnvError ? err.message : copy.appError.envFail;
   }
 }
 

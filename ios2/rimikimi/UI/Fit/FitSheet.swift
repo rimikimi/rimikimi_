@@ -14,15 +14,15 @@ struct FitSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s4) {
             HStack {
-                Text("정방향 맞춤").font(AppFont.title2).tracking(Tracking.title2)
+                Text(Copy.fitTitle).font(AppFont.title2).tracking(Tracking.title2)
                 Spacer()
                 Button { dismiss() } label: {
                     Image(systemName: "xmark").font(.system(size: 13, weight: .bold)).foregroundStyle(Color.ink)
                         .frame(width: 30, height: 30).background(Color.fill, in: Circle())
                 }
-                .buttonStyle(.plain).accessibilityLabel("닫기")
+                .buttonStyle(.plain).accessibilityLabel(Copy.close)
             }
-            Text("이 사진은 3:4 가 아니에요. 얼굴 기준으로 잘라 맞추거나, 바깥을 채워 맞출 수 있어요.")
+            Text(Copy.fitDesc)
                 .font(AppFont.callout).foregroundStyle(Color.ink2)
 
             HStack(spacing: Spacing.s3) {
@@ -30,7 +30,7 @@ struct FitSheet: View {
                     Image(uiImage: image).resizable().scaledToFit()
                         .frame(height: 180)
                         .clipShape(RoundedRectangle(cornerRadius: Radius.thumb, style: .continuous))
-                    Text("원본 \(Int(image.size.width))×\(Int(image.size.height))").font(AppFont.caption).foregroundStyle(Color.ink2)
+                    Text(Copy.fitOriginal(Int(image.size.width), Int(image.size.height))).font(AppFont.caption).foregroundStyle(Color.ink2)
                 }
                 .frame(maxWidth: .infinity)
                 VStack(spacing: 6) {
@@ -42,7 +42,7 @@ struct FitSheet: View {
                     }
                     .frame(width: 135, height: 180)
                     .clipShape(RoundedRectangle(cornerRadius: Radius.thumb, style: .continuous))
-                    Text("잘라 맞춤 미리보기").font(AppFont.caption).foregroundStyle(Color.ink2)
+                    Text(Copy.fitCropPreview).font(AppFont.caption).foregroundStyle(Color.ink2)
                 }
                 .frame(maxWidth: .infinity)
             }
@@ -53,24 +53,24 @@ struct FitSheet: View {
                     HapticPlayer.commit()
                     onCropped(preview)
                     dismiss()
-                } label: { Label("잘라 맞춤 · 무료", systemImage: "crop") }
+                } label: { Label(Copy.fitCropFree, systemImage: "crop") }
                     .buttonStyle(PrimaryButtonStyle(isDisabled: preview == nil))
                     .disabled(preview == nil)
                 Button {
                     HapticPlayer.commit()
                     app.requestOutpaint(image) { out in
                         onCropped(out)
-                        app.showToast("채워 맞춤으로 3:4 를 만들었어요")
+                        app.showToast(Copy.fitFilledToast)
                         dismiss()
                     }
                 } label: {
                     if app.outpaintPhase == .running {
                         HStack(spacing: Spacing.s2) {
                             ProgressView().tint(Color.ink)
-                            Text("채워 맞추는 중…")
+                            Text(Copy.fitFilling)
                         }
                     } else {
-                        Label("채워 맞춤 · 1 크레딧", systemImage: "arrow.up.left.and.arrow.down.right")
+                        Label(Copy.fitFillCost, systemImage: "arrow.up.left.and.arrow.down.right")
                     }
                 }
                 .buttonStyle(SecondaryButtonStyle())
@@ -81,7 +81,7 @@ struct FitSheet: View {
                         .multilineTextAlignment(.leading).fixedSize(horizontal: false, vertical: true)
                 }
             }
-            Text("잘라 맞춤은 기기 안에서만 처리돼요. 채워 맞춤은 원본 픽셀을 유지하고 바깥만 채워요.")
+            Text(Copy.fitFootnote)
                 .font(AppFont.caption).foregroundStyle(Color.ink3)
             Spacer(minLength: 0)
         }

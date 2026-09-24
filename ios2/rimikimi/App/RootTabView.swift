@@ -13,13 +13,13 @@ struct RootTabView: View {
     var body: some View {
         @Bindable var app = app
         TabView(selection: $app.tab) {
-            Tab("갤러리", systemImage: "square.grid.2x2", value: .gallery) {
+            Tab(Copy.tabGallery, systemImage: "square.grid.2x2", value: .gallery) {
                 NavigationStack(path: $app.galleryPath) {
                     GalleryHomeView()
                         .navigationDestination(for: Route.self) { RouteDestination(route: $0) }
                 }
             }
-            Tab("필터", systemImage: "film", value: .filter) {
+            Tab(Copy.tabFilter, systemImage: "film", value: .filter) {
                 NavigationStack { FilterTabView() }
             }
             // 가운데 슬롯: 아이콘·라벨을 비워 두고(투명 이미지, 빈 문자열) 떠 있는 원만 보이게 한다.
@@ -28,13 +28,13 @@ struct RootTabView: View {
             } label: {
                 Label { Text("") } icon: { Image(uiImage: UIImage.clearTabIcon) }
             }
-            Tab("내 사진", systemImage: "photo.on.rectangle", value: .myPhotos) {
+            Tab(Copy.tabMyPhotos, systemImage: "photo.on.rectangle", value: .myPhotos) {
                 NavigationStack(path: $app.myPhotosPath) {
                     MyPhotosView()
                         .navigationDestination(for: Route.self) { RouteDestination(route: $0) }
                 }
             }
-            Tab("프로필", systemImage: "person.crop.circle", value: .profile) {
+            Tab(Copy.tabProfile, systemImage: "person.crop.circle", value: .profile) {
                 NavigationStack(path: $app.profilePath) {
                     ProfileView()
                         .navigationDestination(for: Route.self) { RouteDestination(route: $0) }
@@ -190,7 +190,7 @@ struct CameraTabButton: View {
                 .contentShape(Circle())
         }
         .buttonStyle(PressScaleButtonStyle(scale: 0.94))
-        .accessibilityLabel("카메라")
+        .accessibilityLabel(Copy.camera)
         .padding(.bottom, bottomPadding)
     }
 }

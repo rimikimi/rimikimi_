@@ -19,9 +19,9 @@ final class FaceProfileStore {
         case front, side1, side2
         var label: String {
             switch self {
-            case .front: return "정면"
-            case .side1: return "옆모습 ①"
-            case .side2: return "옆모습 ②"
+            case .front: return Copy.angleFront
+            case .side1: return Copy.angleSide1
+            case .side2: return Copy.angleSide2
             }
         }
     }

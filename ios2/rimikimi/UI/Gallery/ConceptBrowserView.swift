@@ -55,7 +55,7 @@ struct ConceptBrowserView: View {
             .scrollDisabled(zoomedIn)
 
             if let current {
-                Text(current.title)
+                Text(current.displayTitle)
                     .font(AppFont.headline)
                     .foregroundStyle(Color.ink)
                     .lineLimit(1)
@@ -68,7 +68,7 @@ struct ConceptBrowserView: View {
 
             if let current {
                 NavigationLink(value: Route.concept(current)) {
-                    Text("이 컨셉으로 만들기")
+                    Text(Copy.makeWithThisConcept)
                 }
                 .buttonStyle(PrimaryButtonStyle(isDisabled: false))
                 .padding(.horizontal, Spacing.page)
@@ -83,7 +83,7 @@ struct ConceptBrowserView: View {
         .background(Color.bg.opacity(1 - dismissProgress * 0.35).ignoresSafeArea())
         .animation(.interactiveSpring(response: 0.28, dampingFraction: 0.86), value: dragY)
         .simultaneousGesture(dismissDrag)
-        .inlineTitle(category)
+        .inlineTitle(Copy.category(category))
         .toolbar(.hidden, for: .tabBar)
         .toolbar {
             if let current {

@@ -46,7 +46,7 @@ struct SkeletonBlock: View {
                 guard !reduceMotion else { return }
                 withAnimation(.linear(duration: 1.2).repeatForever(autoreverses: false)) { phase = 1 }
             }
-            .accessibilityLabel("불러오는 중")
+            .accessibilityLabel(Copy.loading)
     }
 }
 

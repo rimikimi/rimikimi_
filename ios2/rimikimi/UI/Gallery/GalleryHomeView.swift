@@ -19,8 +19,8 @@ struct GalleryHomeView: View {
                         DensePhotoGrid(concepts: app.concepts.concepts(in: cat), category: cat)
                             .padding(.top, Spacing.s3)
                     } else {
-                        ConceptRail(title: "추천", concepts: app.concepts.featured)
-                        ConceptRail(title: "새로 나왔어요", concepts: app.concepts.newest, isNew: true)
+                        ConceptRail(title: Copy.featured, concepts: app.concepts.featured)
+                        ConceptRail(title: Copy.newArrivals, concepts: app.concepts.newest, isNew: true)
                         BrooklynBanner()
                         // 그 외 카테고리는 가로 줄 대신 앨범 그리드(네이티브 사진 앱 참고,
                         // 오너 지시 2026-09-19) — "추천"·"새로 나왔어요"는 위에서 이미 뺐다.
@@ -94,7 +94,7 @@ struct GalleryHeader: View {
                 if app.auth.isSignedIn, app.quota == nil {
                     SkeletonBlock(cornerRadius: 15).frame(width: 52, height: 30)
                 } else {
-                    Text(app.auth.isSignedIn ? (app.quota?.chipLabel ?? "🎟 –") : "로그인")
+                    Text(app.auth.isSignedIn ? (app.quota?.chipLabel ?? "🎟 –") : Copy.signIn)
                         .font(AppFont.footnote)
                         .foregroundStyle(Color.ink)
                         .padding(.horizontal, Spacing.s3)
@@ -103,10 +103,10 @@ struct GalleryHeader: View {
                 }
             }
             .buttonStyle(PressScaleButtonStyle())
-            .accessibilityLabel("크레딧")
+            .accessibilityLabel(Copy.creditsLabel)
             Button { app.tab = .profile } label: { Avatar(url: app.auth.session?.avatarURL, size: ControlHeight.avatar) }
                 .buttonStyle(PressScaleButtonStyle())
-                .accessibilityLabel("프로필")
+                .accessibilityLabel(Copy.tabProfile)
         }
         .padding(.horizontal, Spacing.page)
         .padding(.top, Spacing.s2)
@@ -139,9 +139,9 @@ struct CategoryChipsRow: View {
     var body: some View {
         ScrollView(.horizontal) {
             HStack(spacing: Spacing.s2) {
-                CategoryChip(title: "전체", isActive: active == nil, heartIndex: 0) { select(nil) }
+                CategoryChip(title: Copy.allCategories, isActive: active == nil, heartIndex: 0) { select(nil) }
                 ForEach(Array(categories.enumerated()), id: \.element.id) { i, cat in
-                    CategoryChip(title: cat.name, isActive: active == cat.name, heartIndex: i + 1) { select(cat.name) }
+                    CategoryChip(title: Copy.category(cat.name), isActive: active == cat.name, heartIndex: i + 1) { select(cat.name) }
                 }
             }
             .padding(.horizontal, Spacing.page)
@@ -179,12 +179,12 @@ struct BrooklynBanner: View {
                         .frame(width: 46, height: 46)
                         .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("증명사진이 필요하다면, Brooklyn").font(AppFont.calloutEmphasis).foregroundStyle(Color.ink)
-                        Text("여권·이력서·배우 프로필까지\n셀카 한 장이면 스튜디오급으로")
+                        Text(Copy.brooklynTitle).font(AppFont.calloutEmphasis).foregroundStyle(Color.ink)
+                        Text(Copy.brooklynDesc)
                             .font(AppFont.footnote).foregroundStyle(Color.ink2)
                     }
                     Spacer(minLength: 0)
-                    Text("받기")
+                    Text(Copy.brooklynGet)
                         .font(AppFont.calloutEmphasis)
                         .foregroundStyle(Color.accent)
                 }
@@ -210,7 +210,7 @@ struct CategoryListView: View {
                 .padding(.bottom, app.contentBottomPad)
         }
         .background(Color.bg)
-        .inlineTitle(name)
+        .inlineTitle(Copy.category(name))
         .toolbar {
             // 즐겨찾기 앨범 자체엔 별을 달지 않는다(자기 자신을 즐겨찾기 할 수 없다).
             if name != FavoritesStore.albumName {

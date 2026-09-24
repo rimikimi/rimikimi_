@@ -14,9 +14,9 @@ struct ProfileView: View {
                 header
                 if app.auth.isSignedIn {
                     CardGroup {
-                        SettingsRow(title: "크레딧", value: app.quota?.chipLabel ?? "–", systemImage: "ticket", chevron: false) {}
-                        SettingsRow(title: "스토어", value: "충전 · 구독", systemImage: "bag") { app.profilePath.append(.store) }
-                        SettingsRow(title: "친구 초대", value: app.quota?.referralCode, systemImage: "gift") { app.profilePath.append(.invite) }
+                        SettingsRow(title: Copy.creditsLabel, value: app.quota?.chipLabel ?? "–", systemImage: "ticket", chevron: false) {}
+                        SettingsRow(title: Copy.store, value: Copy.storeValue, systemImage: "bag") { app.profilePath.append(.store) }
+                        SettingsRow(title: Copy.inviteFriends, value: app.quota?.referralCode, systemImage: "gift") { app.profilePath.append(.invite) }
                     }
                     CardGroup {
                         NotificationToggleRow()
@@ -28,21 +28,21 @@ struct ProfileView: View {
                     CardGroup {
                         MyPhotoRow()
                         // 얼굴 스캔 — 각도 3장은 한 장보다 얼굴 재현이 정확하다(`_design/face-profile-v1.md`).
-                        SettingsRow(title: app.faceProfile.hasProfile ? "얼굴 다시 스캔하기" : "얼굴 스캔하기",
-                                    value: app.faceProfile.hasProfile ? "\(app.faceProfile.ordered.count)장 등록됨" : nil,
+                        SettingsRow(title: app.faceProfile.hasProfile ? Copy.faceRescan : Copy.faceScan,
+                                    value: app.faceProfile.hasProfile ? Copy.faceSavedCount(app.faceProfile.ordered.count) : nil,
                                     systemImage: "faceid") { app.showFaceScan = true }
                     }
                     CardGroup {
-                        SettingsRow(title: "계정", value: providerLabel, systemImage: "person.crop.circle", chevron: false) {}
-                        SettingsRow(title: "로그아웃", systemImage: "rectangle.portrait.and.arrow.right", chevron: false) { app.signOut() }
-                        SettingsRow(title: deleting ? "삭제 중…" : "계정 삭제", systemImage: "trash", chevron: false, destructive: true) { confirmDelete = true }
+                        SettingsRow(title: Copy.account, value: providerLabel, systemImage: "person.crop.circle", chevron: false) {}
+                        SettingsRow(title: Copy.signOut, systemImage: "rectangle.portrait.and.arrow.right", chevron: false) { app.signOut() }
+                        SettingsRow(title: deleting ? Copy.deleting : Copy.deleteAccount, systemImage: "trash", chevron: false, destructive: true) { confirmDelete = true }
                     }
                 } else {
                     VStack(spacing: Spacing.s3) {
-                        Text("로그인이 필요해요").font(AppFont.headline)
-                        Text("로그인하면 크레딧, 내 갤러리, 친구 초대를 이용할 수 있어요.")
+                        Text(Copy.guestTitle).font(AppFont.headline)
+                        Text(Copy.guestDesc)
                             .font(AppFont.callout).foregroundStyle(Color.ink2).multilineTextAlignment(.center)
-                        Button("로그인") { app.loginMessage = nil; app.loginSheet = true }
+                        Button(Copy.signIn) { app.loginMessage = nil; app.loginSheet = true }
                             .buttonStyle(PrimaryButtonStyle())
                     }
                     .padding(Spacing.s4)
@@ -51,14 +51,14 @@ struct ProfileView: View {
                     .padding(.horizontal, Spacing.page)
                 }
                 CardGroup {
-                    SettingsRow(title: "이용약관", systemImage: "doc.text") { open(Config.termsURL, "이용약관") }
-                    SettingsRow(title: "개인정보처리방침", systemImage: "hand.raised") { open(Config.privacyURL, "개인정보처리방침") }
-                    SettingsRow(title: "환불정책", systemImage: "arrow.uturn.backward") { open(Config.refundURL, "환불정책") }
+                    SettingsRow(title: Copy.terms, systemImage: "doc.text") { open(Config.termsURL, Copy.terms) }
+                    SettingsRow(title: Copy.privacy, systemImage: "hand.raised") { open(Config.privacyURL, Copy.privacy) }
+                    SettingsRow(title: Copy.refund, systemImage: "arrow.uturn.backward") { open(Config.refundURL, Copy.refund) }
                 }
                 VStack(spacing: 2) {
-                    Text("상호: 리미키미 · 사업자등록번호: 247-01-03603")
-                    Text("통신판매업신고: 2026-고양일산동-0326 · 경기 고양시 일산동구")
-                    Text("문의: enquiry@rimikimi.com · 050-6988-2464")
+                    Text(Copy.bizLine1)
+                    Text(Copy.bizLine2)
+                    Text(Copy.bizLine3)
                 }
                 .font(AppFont.caption).foregroundStyle(Color.ink3).multilineTextAlignment(.center)
                 .padding(.top, Spacing.s3)
@@ -69,13 +69,13 @@ struct ProfileView: View {
         }
         .scrollIndicators(.hidden)
         .background(Color.bg)
-        .inlineTitle("프로필")
+        .inlineTitle(Copy.tabProfile)
         .task(id: app.auth.session?.userID) { await app.refreshQuota() }
-        .confirmationDialog("정말 계정을 삭제할까요?", isPresented: $confirmDelete, titleVisibility: .visible) {
-            Button("계정 삭제", role: .destructive) { deleteAccount() }
-            Button("취소", role: .cancel) {}
+        .confirmationDialog(Copy.deleteConfirmTitle, isPresented: $confirmDelete, titleVisibility: .visible) {
+            Button(Copy.deleteAccount, role: .destructive) { deleteAccount() }
+            Button(Copy.cancel, role: .cancel) {}
         } message: {
-            Text("생성한 이미지·크레딧·모든 데이터가 영구 삭제되며 되돌릴 수 없어요.")
+            Text(Copy.deleteConfirmMessage)
         }
         #if DEBUG
         // 결함 #4 검증 캡처용 — `dev/devsignin` 처럼 로그인 상태가 늦게(launch argument 처리 시점) 바뀌면
@@ -108,10 +108,10 @@ struct ProfileView: View {
     private var providerLabel: String {
         switch app.auth.session?.provider {
         case "google": return "Google"
-        case "kakao": return "카카오"
+        case "kakao": return Copy.providerKakao
         case "apple": return "Apple"
-        case "email": return "이메일"
-        default: return app.auth.session?.email?.hasSuffix("naver.com") == true ? "네이버" : "이메일"
+        case "email": return Copy.providerEmail
+        default: return app.auth.session?.email?.hasSuffix("naver.com") == true ? Copy.providerNaver : Copy.providerEmail
         }
     }
 
@@ -124,14 +124,14 @@ struct ProfileView: View {
             defer { deleting = false }
             // 오프라인이면 토큰을 못 받는다 — 이제 로그아웃되지 않으므로 이유를 알려준다.
             guard let token = await app.auth.validAccessToken() else {
-                app.showToast("인터넷 연결을 확인한 뒤 다시 시도해 주세요.")
+                app.showToast(Copy.retryNetwork)
                 return
             }
             do {
                 try await RimikimiAPI.shared.deleteAccount(token: token)
                 app.signOut()
                 app.userPhoto.clear()
-                app.showToast("계정이 삭제됐어요. 그동안 이용해 주셔서 감사합니다.")
+                app.showToast(Copy.deleteDone)
             } catch {
                 app.showToast(error.localizedDescription)
             }
@@ -148,8 +148,8 @@ struct NotificationToggleRow: View {
         HStack(spacing: Spacing.s3) {
             Image(systemName: "bell").font(.system(size: 16, weight: .medium)).foregroundStyle(Color.ink2).frame(width: 24)
             VStack(alignment: .leading, spacing: 2) {
-                Text("새 컨셉 알림").font(AppFont.body)
-                Text(app.push.authorization == .denied ? "설정에서 알림이 꺼져 있어요" : "매일 저녁 8시 새 컨셉이 오면 알려드려요")
+                Text(Copy.pushTitle).font(AppFont.body)
+                Text(app.push.authorization == .denied ? Copy.pushDenied : Copy.pushDesc)
                     .font(AppFont.footnote).foregroundStyle(Color.ink2)
             }
             Spacer()
@@ -177,17 +177,17 @@ struct MyPhotoRow: View {
         HStack(spacing: Spacing.s3) {
             Thumb(image: app.userPhoto.image)
             VStack(alignment: .leading, spacing: 2) {
-                Text("내 사진").font(AppFont.body)
-                Text(app.userPhoto.hasPhoto ? "등록됨 · 생성 때 얼굴 참조로 함께 보내요" : "없음 · 컨셉을 만들 때 자동으로 등록돼요")
+                Text(Copy.myPhoto).font(AppFont.body)
+                Text(app.userPhoto.hasPhoto ? Copy.myPhotoSaved : Copy.myPhotoEmpty)
                     .font(AppFont.footnote).foregroundStyle(Color.ink2)
             }
             Spacer(minLength: Spacing.s2)
             if app.userPhoto.hasPhoto {
-                Button("삭제") { app.userPhoto.clear(); app.faceProfile.clear() }
+                Button(Copy.delete) { app.userPhoto.clear(); app.faceProfile.clear() }
                     .buttonStyle(TextButtonStyle(color: .accent))
             }
             PhotosPicker(selection: $pick, matching: .images, photoLibrary: .shared()) {
-                Text(app.userPhoto.hasPhoto ? "변경" : "고르기")
+                Text(app.userPhoto.hasPhoto ? Copy.change : Copy.choose)
             }
             .buttonStyle(SecondaryButtonStyle(small: true, fullWidth: false))
         }

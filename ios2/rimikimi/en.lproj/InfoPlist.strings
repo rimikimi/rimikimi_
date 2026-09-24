@@ -1,0 +1,5 @@
+/* Permission prompts (English). Korean lives in ko.lproj and in Info.plist as the fallback. */
+"NSCameraUsageDescription" = "rimikimi uses the camera so you can take photos to turn into concept photos.";
+"NSPhotoLibraryAddUsageDescription" = "rimikimi saves the photos you create and edit to your photo library.";
+"NSMicrophoneUsageDescription" = "iOS checks this when the filter camera opens. rimikimi never records sound.";
+"NSUserTrackingUsageDescription" = "This is used to show you personalized ads.";

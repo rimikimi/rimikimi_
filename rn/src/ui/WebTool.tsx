@@ -11,6 +11,7 @@ import { useQuota } from "@/lib/quota";
 import { getEnv } from "@/lib/env";
 import { saveDataUrlToAlbum, shareDataUrlOrUrl } from "@/lib/nativeMedia";
 import { chrome, color, space, themedStyles } from "@/theme/tokens";
+import { copy } from "@/lib/copy";
 
 // 1단계(2.0, SPEC §5): 편집기·카메라는 현재 웹(src/PhotoEditor.jsx · CameraStudio.jsx)을 웹뷰로 임베드.
 // 저장·공유·앨범·닫기·크레딧 갱신만 네이티브 브리지(3주차) — postMessage 규약.
@@ -125,7 +126,7 @@ export function WebTool({ title, tool, query, initialPayload }: {
         <View style={styles.side} />
         <Text size="headline">{title}</Text>
         <View style={[styles.side, { alignItems: "flex-end" }]}>
-          <Pressable accessibilityRole="button" accessibilityLabel="닫기" hitSlop={12} onPress={() => router.back()}>
+          <Pressable accessibilityRole="button" accessibilityLabel={copy.common.close} hitSlop={12} onPress={() => router.back()}>
             <IconClose size={24} color={color.ink} />
           </Pressable>
         </View>
@@ -137,7 +138,7 @@ export function WebTool({ title, tool, query, initialPayload }: {
         onLoadEnd={() => setLoading(false)}
         onMessage={onMessage}
         injectedJavaScriptBeforeContentLoaded={BRIDGE_JS}
-        onError={() => Alert.alert("불러오지 못했어요", "네트워크를 확인해 주세요.")}
+        onError={() => Alert.alert(copy.ui.loadFailTitle, copy.ui.checkNetwork)}
         allowsInlineMediaPlayback
         mediaPlaybackRequiresUserAction={false}
         javaScriptEnabled

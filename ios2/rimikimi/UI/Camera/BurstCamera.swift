@@ -65,8 +65,8 @@ struct BurstCameraView: View {
             if !model.shots.isEmpty { thumbnails }
 
             Text(model.shots.count >= BurstCameraModel.maxShots
-                 ? "10장을 다 찍었어요 · 완료를 눌러 주세요"
-                 : "여러 장 찍고 한 번에 필터를 입혀요 · 최대 10장")
+                 ? Copy.burstAllTaken
+                 : Copy.burstHint)
                 .font(AppFont.footnote)
                 .foregroundStyle(.white.opacity(0.75))
                 .padding(.bottom, Spacing.s3)
@@ -89,7 +89,7 @@ struct BurstCameraView: View {
                             app.finishBurstCamera(model.shots)
                             dismiss()
                         } label: {
-                            Text("완료 \(model.shots.count)")
+                            Text(Copy.burstDone(model.shots.count))
                                 .font(AppFont.calloutEmphasis)
                                 .foregroundStyle(Color.onAccent)
                                 .padding(.horizontal, Spacing.s3)
@@ -139,15 +139,15 @@ struct BurstCameraView: View {
     private var permissionNotice: some View {
         VStack(spacing: Spacing.s3) {
             Image(systemName: "camera.fill").font(.system(size: 34)).foregroundStyle(.white.opacity(0.6))
-            Text("카메라 권한이 필요해요").font(AppFont.headline).foregroundStyle(.white)
-            Text("설정에서 카메라를 켜면 여러 장을 찍어 한 번에 필터를 입힐 수 있어요.")
+            Text(Copy.cameraPermissionTitle).font(AppFont.headline).foregroundStyle(.white)
+            Text(Copy.cameraPermissionDesc)
                 .font(AppFont.footnote).foregroundStyle(.white.opacity(0.7))
                 .multilineTextAlignment(.center)
-            Button("설정 열기") {
+            Button(Copy.openSettings) {
                 if let u = URL(string: UIApplication.openSettingsURLString) { openURL(u) }
             }
             .buttonStyle(SecondaryButtonStyle(small: true, fullWidth: false))
-            Button("닫기") { dismiss() }.buttonStyle(TextButtonStyle(color: .white))
+            Button(Copy.close) { dismiss() }.buttonStyle(TextButtonStyle(color: .white))
         }
         .padding(Spacing.page)
     }
@@ -179,7 +179,7 @@ private struct ShutterButton: View {
         .simultaneousGesture(DragGesture(minimumDistance: 0)
             .onChanged { _ in withAnimation(.easeOut(duration: 0.08)) { pressed = true } }
             .onEnded { _ in withAnimation(.easeOut(duration: 0.12)) { pressed = false } })
-        .accessibilityLabel("촬영")
+        .accessibilityLabel(Copy.shutter)
     }
 }
 

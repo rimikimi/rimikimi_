@@ -12,6 +12,7 @@ import { InviteCard } from "@/ui/InviteCard";
 import { useStore } from "@/lib/store";
 import { byNewest, categoriesOf } from "@/lib/concepts";
 import { copy } from "@/lib/copy";
+import { categoryLabel } from "@/lib/locale";
 import { color, space, themedStyles } from "@/theme/tokens";
 import { transitions } from "@/theme/motion";
 
@@ -46,7 +47,7 @@ export default function GalleryTab() {
           const on = active === c.name;
           // 활성 칩 색 = 하트 4색 순환("전체" 는 첫 색). 0ms 로 바뀐다.
           const heart = color.hearts[i % color.hearts.length];
-          return <Chip key={c.name} label={c.name} active={on} activeColor={heart} onPress={() => setActive(c.name)} />;
+          return <Chip key={c.name} label={categoryLabel(c.name)} active={on} activeColor={heart} onPress={() => setActive(c.name)} />;
         })}
       </ScrollView>
 
@@ -66,7 +67,7 @@ export default function GalleryTab() {
           {home.rows.map((row) => (
             <ConceptRail
               key={row.name}
-              title={row.name}
+              title={categoryLabel(row.name)}
               items={row.items}
               onMore={row.count > row.items.length ? () => router.push({ pathname: "/category/[name]", params: { name: row.name } }) : undefined}
             />

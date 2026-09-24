@@ -14,7 +14,7 @@ import { FitSheet } from "@/ui/FitSheet";
 import { needsFit } from "@/lib/fit";
 import { useGeneration, type ResultImage } from "@/lib/generation";
 import { useStore } from "@/lib/store";
-import { similarConcepts } from "@/lib/concepts";
+import { conceptTitle, similarConcepts } from "@/lib/concepts";
 import { copy } from "@/lib/copy";
 import { color, radius, space, themedStyles } from "@/theme/tokens";
 import { duration } from "@/theme/motion";
@@ -106,7 +106,7 @@ export default function Result() {
   };
 
   return (
-    <Screen scrollModel="scroll" header={<AppHeader title={concept?.title ?? ""} back right={<View />} />} contentStyle={styles.content}>
+    <Screen scrollModel="scroll" header={<AppHeader title={conceptTitle(concept)} back right={<View />} />} contentStyle={styles.content}>
       {img ? (
         <Image source={{ uri: img.uri }} style={{ width: w, height: h, borderRadius: radius.card, backgroundColor: color.mat }} contentFit="cover" transition={duration.enter} />
       ) : (

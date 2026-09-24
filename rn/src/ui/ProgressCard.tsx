@@ -8,7 +8,7 @@ import { Text } from "./Text";
 import { Spinner } from "./Spinner";
 import { Button } from "./Button";
 import { IconClose } from "./icons";
-import { thumbUrl } from "@/lib/concepts";
+import { conceptTitle, thumbUrl } from "@/lib/concepts";
 import { useGeneration, type Job } from "@/lib/generation";
 import { copy } from "@/lib/copy";
 import { color, radius, space, themedStyles } from "@/theme/tokens";
@@ -42,9 +42,9 @@ function ProgressCard({ job }: { job: Job }) {
         <Pressable disabled={!done} onPress={open} style={styles.row} accessibilityRole={done ? "button" : undefined}>
           <Image source={{ uri: thumb }} style={styles.thumb} contentFit="cover" transition={transitions.canvasSwap.duration} />
           <View style={styles.body}>
-            <Text size="headline" numberOfLines={1}>{job.concept.title}</Text>
+            <Text size="headline" numberOfLines={1}>{conceptTitle(job.concept)}</Text>
             {done ? (
-              <Text size="footnote" tone="muted">{copy.progress.done}{job.count > 1 ? ` · ${job.images.length}장` : ""}</Text>
+              <Text size="footnote" tone="muted">{copy.progress.done}{job.count > 1 ? ` · ${copy.units.photos(job.images.length)}` : ""}</Text>
             ) : failed ? (
               <Text size="footnote" tone="danger" numberOfLines={3}>{job.error || copy.progress.fail}</Text>
             ) : (

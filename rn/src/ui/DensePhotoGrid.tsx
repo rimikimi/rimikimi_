@@ -6,7 +6,7 @@ import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { Thumb, photoHeight } from "./Thumb";
 import { FavoriteBadge, GeneratedScrim } from "./FavoriteBits";
-import { thumbUrl, type Concept } from "@/lib/concepts";
+import { conceptTitle, thumbUrl, type Concept } from "@/lib/concepts";
 import { useStore } from "@/lib/store";
 import { radius, space } from "@/theme/tokens";
 import { ease } from "@/theme/motion";
@@ -112,7 +112,7 @@ export function DensePhotoGrid({
           <Pressable
             key={String(c.id)}
             accessibilityRole="button"
-            accessibilityLabel={c.title}
+            accessibilityLabel={conceptTitle(c)}
             // ⚠️ 막는 시점이 **누를 때가 아니라 동작할 때**다. 손가락이 닿는 순간엔 이미 늦다 —
             //    그때 핀치가 시작될지 알 수 없기 때문이다(iOS 에서 같은 실수를 했다).
             onPress={() => {

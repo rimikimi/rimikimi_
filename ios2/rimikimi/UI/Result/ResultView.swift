@@ -16,6 +16,8 @@ struct ResultView: View {
     private var concept: Concept? { payload.conceptId.flatMap { app.concepts.concept(id: $0) } }
     private var current: GenerationCoordinator.ResultItem? { payload.items.indices.contains(page) ? payload.items[page] : nil }
     private var currentImage: UIImage? { current.flatMap { cropped[$0.id] ?? $0.image ?? loaded[$0.id] } }
+    /// 제목 — 컨셉을 찾으면 언어에 맞는 이름, 못 찾으면 저장된(서버가 준) 이름.
+    private var displayTitle: String { concept?.displayTitle ?? payload.conceptTitle }
     private var needsFit: Bool { currentImage.map(FaceCrop.needsFit) ?? false }
 
     var body: some View {
@@ -32,18 +34,18 @@ struct ResultView: View {
                 .padding(.top, Spacing.s2)
 
                 if payload.items.count > 1 {
-                    Text("\(payload.items.count)장 만들었어요 · \(page + 1) / \(payload.items.count)")
+                    Text(Copy.resultCount(payload.items.count, page: page + 1))
                         .font(AppFont.footnote).foregroundStyle(Color.ink2)
                 }
 
-                Text("내 사진에 저장됐어요 · 앨범에도 저장")
+                Text(Copy.resultSavedNotice)
                     .font(AppFont.callout).foregroundStyle(Color.ink2)
 
                 if needsFit, let img = currentImage {
                     Button { fitImage = img } label: {
                         HStack(spacing: Spacing.s2) {
                             Image(systemName: "aspectratio").foregroundStyle(Color.accent)
-                            Text("사진이 3:4 가 아니에요 · 정방향 맞춤").font(AppFont.calloutEmphasis)
+                            Text(Copy.resultNotThreeFour).font(AppFont.calloutEmphasis)
                             Spacer()
                             Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold)).foregroundStyle(Color.ink3)
                         }
@@ -57,29 +59,29 @@ struct ResultView: View {
 
                 VStack(spacing: Spacing.s2) {
                     Button(action: saveToAlbum) {
-                        Label(saving ? "저장 중…" : "앨범에 저장", systemImage: "square.and.arrow.down")
+                        Label(saving ? Copy.saving : Copy.saveToAlbum, systemImage: "square.and.arrow.down")
                     }
                     .buttonStyle(PrimaryButtonStyle(isDisabled: currentImage == nil || saving))
                     .disabled(currentImage == nil || saving)
 
                     HStack(spacing: Spacing.s2) {
                         Button { if let img = currentImage { app.openEditor(image: img) } } label: {
-                            Label("다듬기", systemImage: "slider.horizontal.3")
+                            Label(Copy.edit, systemImage: "slider.horizontal.3")
                         }
                         .buttonStyle(SecondaryButtonStyle())
                         .disabled(currentImage == nil)
                         if let img = currentImage {
                             ShareLink(item: Image(uiImage: img), preview: SharePreview("rimikimi", image: Image(uiImage: img))) {
-                                Label("공유", systemImage: "square.and.arrow.up")
+                                Label(Copy.share, systemImage: "square.and.arrow.up")
                             }
                             .buttonStyle(SecondaryButtonStyle())
                         } else {
-                            Button {} label: { Label("공유", systemImage: "square.and.arrow.up") }
+                            Button {} label: { Label(Copy.share, systemImage: "square.and.arrow.up") }
                                 .buttonStyle(SecondaryButtonStyle()).disabled(true)
                         }
                     }
                     if let concept {
-                        Button { oneMore(concept) } label: { Label("한 장 더", systemImage: "arrow.clockwise") }
+                        Button { oneMore(concept) } label: { Label(Copy.oneMore, systemImage: "arrow.clockwise") }
                             .buttonStyle(SecondaryButtonStyle())
                     }
                 }
@@ -91,21 +93,21 @@ struct ResultView: View {
                 // 때 빠졌던 것(`public/terms.html` 제7조는 "앱 내 신고 기능"이 있다고 이미 약속하고
                 // 있어, 이게 없으면 약관과 실제 동작이 어긋난다).
                 Button(action: reportIssue) {
-                    Text("🚩 부적절한 결과 신고")
+                    Text(Copy.reportResult)
                         .font(AppFont.footnote)
                         .foregroundStyle(Color.ink3)
                 }
                 .buttonStyle(.plain)
 
                 if let concept {
-                    ConceptRail(title: "비슷한 컨셉", concepts: app.concepts.similar(to: concept))
+                    ConceptRail(title: Copy.similarConcepts, concepts: app.concepts.similar(to: concept))
                 }
             }
             .padding(.bottom, TabBarMetrics.contentBottomPad)
         }
         .scrollIndicators(.hidden)
         .background(Color.bg)
-        .inlineTitle(payload.conceptTitle.isEmpty ? "결과" : payload.conceptTitle)
+        .inlineTitle(displayTitle.isEmpty ? Copy.resultTitle : displayTitle)
         .toolbar(.hidden, for: .tabBar)
         // ATT는 결과 화면이 실제로 보이는 이 시점에만 시도한다(`TrackingPrompt` 주석 참고) — 내비게이션
         // 전환 중(`RootTabView`의 onChange)에 부르면 앱이 아직 `.active`가 아닐 수 있어 팝업 없이
@@ -118,7 +120,7 @@ struct ResultView: View {
         .sheet(item: Binding(get: { fitImage.map { FitTarget(image: $0) } }, set: { fitImage = $0?.image })) { t in
             FitSheet(image: t.image) { out in
                 if let id = current?.id { cropped[id] = out }
-                app.showToast("3:4 로 맞췄어요")
+                app.showToast(Copy.fittedToast)
             }
             .presentationDetents([.large])
             .presentationCornerRadius(Radius.sheet)
@@ -133,14 +135,14 @@ struct ResultView: View {
 
     /// 웹 `src/PortraitStudio.jsx`의 `mailto:` 신고 링크와 같은 수신함·제목 규칙.
     private func reportIssue() {
-        let conceptLabel = concept.map { "\($0.title) (#\($0.id))" } ?? payload.conceptTitle
+        let conceptLabel = concept.map { "\($0.displayTitle) (#\($0.id))" } ?? payload.conceptTitle
         let itemId = current?.id ?? "-"
         var comps = URLComponents()
         comps.scheme = "mailto"
         comps.path = "enquiry@rimikimi.com"
         comps.queryItems = [
-            URLQueryItem(name: "subject", value: "[신고] 부적절한 생성 결과 #\(itemId)"),
-            URLQueryItem(name: "body", value: "신고 사유를 적어주세요.\n\n컨셉: \(conceptLabel)\n결과 ID: \(itemId)\n"),
+            URLQueryItem(name: "subject", value: Copy.reportSubject(itemId)),
+            URLQueryItem(name: "body", value: Copy.reportBody(concept: conceptLabel, itemId: itemId)),
         ]
         guard let url = comps.url else { return }
         UIApplication.shared.open(url)
@@ -156,9 +158,9 @@ struct ResultView: View {
                 // 앨범에 저장한 컨셉만 "만든 컨셉" 표시가 영구로 남는다(오너 지시 2026-09-22).
                 app.favorites.markSaved(payload.conceptId)
                 HapticPlayer.success()
-                app.showToast("사진첩에 저장됐어요")
+                app.showToast(Copy.savedToPhotos)
             } catch {
-                app.showToast("저장에 실패했어요. 잠시 후 다시 시도해 주세요.")
+                app.showToast(Copy.saveFailed)
             }
         }
     }

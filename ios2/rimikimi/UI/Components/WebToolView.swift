@@ -180,7 +180,7 @@ struct WebToolScreen: View {
             initialPayload: initialPayload,
             onClose: { dismiss() },
             onRefreshCredits: { Task { await app.refreshQuota() } },
-            onSaved: { HapticPlayer.success(); app.showToast("사진첩에 저장됐어요") }
+            onSaved: { HapticPlayer.success(); app.showToast(Copy.savedToPhotos) }
         )
     }
 
@@ -198,7 +198,7 @@ struct WebToolScreen: View {
                     .inlineTitle(title)
                     .toolbar {
                         ToolbarItem(placement: .topBarLeading) {
-                            Button("닫기") { dismiss() }
+                            Button(Copy.close) { dismiss() }
                         }
                     }
             }

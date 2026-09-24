@@ -77,7 +77,7 @@ export function FitSheet({ open, uri, onClose, onFitted }: { open: boolean; uri:
         <Pressable accessibilityRole="button" disabled={busy || outBusy} onPress={() => { void crop(); }} style={({ pressed }) => [styles.row, pressed && { backgroundColor: color.fill }]}>
           <View style={{ flex: 1, gap: 2 }}>
             <Text size="headline">{copy.fit.crop}</Text>
-            <Text size="footnote" tone="muted">{hasFaceDetector() ? copy.fit.cropHint : "가운데·위쪽 기준으로 3:4 크롭"}</Text>
+            <Text size="footnote" tone="muted">{hasFaceDetector() ? copy.fit.cropHint : copy.ui.cropHintCenter}</Text>
           </View>
           {busy ? <Spinner size={20} color={color.accent} /> : <IconChevron size={16} color={color.ink3} />}
         </Pressable>

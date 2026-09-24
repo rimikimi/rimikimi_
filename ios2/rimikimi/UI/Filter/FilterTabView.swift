@@ -8,31 +8,32 @@ import SwiftUI
 struct FilterTabView: View {
     @Environment(AppState.self) private var app
 
-    struct Preset: Identifiable { let key: String; let label: String; var id: String { key } }
+    struct Preset: Identifiable { let key: String; var label: String { Copy.filterName(key) }; var id: String { key } }
     struct Group: Identifiable { let key: String; let title: String; let emoji: String; let presets: [Preset]; var id: String { key } }
 
     static let groups: [Group] = [
         // 폰카 — 연도별 아이폰 색감. 이름은 모델 번호만(오너 지시 2026-09-23, "iPhone" 은 안 붙인다).
-        .init(key: "phone", title: "폰카", emoji: "📱", presets: [
-            .init(key: "ph16pro", label: "16 Pro"), .init(key: "ph15pro", label: "15 Pro"), .init(key: "ph14pro", label: "14 Pro"),
-            .init(key: "phxs", label: "XS"), .init(key: "ph7", label: "7"), .init(key: "ph6s", label: "6s"),
-            .init(key: "ph4s", label: "4s"), .init(key: "ph3gs", label: "3GS"),
+        // 이름(ko/en)은 `Copy.filterNames` — 여기는 key 만.
+        .init(key: "phone", title: Copy.filterGroupPhone, emoji: "📱", presets: [
+            .init(key: "ph16pro"), .init(key: "ph15pro"), .init(key: "ph14pro"),
+            .init(key: "phxs"), .init(key: "ph7"), .init(key: "ph6s"),
+            .init(key: "ph4s"), .init(key: "ph3gs"),
         ]),
-        .init(key: "film", title: "필름", emoji: "🎞️", presets: [
-            .init(key: "golden", label: "골든"), .init(key: "peach", label: "피치"), .init(key: "slide", label: "슬라이드"),
-            .init(key: "retro", label: "레트로"), .init(key: "vivid", label: "비비드"), .init(key: "green", label: "그린"),
-            .init(key: "pastel", label: "파스텔"), .init(key: "cine", label: "시네"), .init(key: "newtro", label: "뉴트로"),
-            .init(key: "softmono", label: "소프트 모노"),
+        .init(key: "film", title: Copy.filterGroupFilm, emoji: "🎞️", presets: [
+            .init(key: "golden"), .init(key: "peach"), .init(key: "slide"),
+            .init(key: "retro"), .init(key: "vivid"), .init(key: "green"),
+            .init(key: "pastel"), .init(key: "cine"), .init(key: "newtro"),
+            .init(key: "softmono"),
         ]),
-        .init(key: "camera", title: "카메라", emoji: "📷", presets: [
-            .init(key: "warm", label: "웜톤"), .init(key: "cool", label: "쿨톤"), .init(key: "vintage", label: "빈티지"),
-            .init(key: "docu", label: "다큐"), .init(key: "mono", label: "모노"), .init(key: "digicam", label: "디지캠"),
-            .init(key: "toy", label: "토이"), .init(key: "dispo", label: "일회용"), .init(key: "instant", label: "인스턴트"),
+        .init(key: "camera", title: Copy.filterGroupCamera, emoji: "📷", presets: [
+            .init(key: "warm"), .init(key: "cool"), .init(key: "vintage"),
+            .init(key: "docu"), .init(key: "mono"), .init(key: "digicam"),
+            .init(key: "toy"), .init(key: "dispo"), .init(key: "instant"),
         ]),
-        .init(key: "fun", title: "재미", emoji: "✨", presets: [
-            .init(key: "sepia", label: "세피아"), .init(key: "duopink", label: "듀오 핑크"), .init(key: "neon", label: "네온"),
-            .init(key: "thermal", label: "서모"), .init(key: "glitch", label: "글리치"), .init(key: "vhs", label: "VHS"),
-            .init(key: "pixelate", label: "모자이크"), .init(key: "sketch", label: "스케치"),
+        .init(key: "fun", title: Copy.filterGroupFun, emoji: "✨", presets: [
+            .init(key: "sepia"), .init(key: "duopink"), .init(key: "neon"),
+            .init(key: "thermal"), .init(key: "glitch"), .init(key: "vhs"),
+            .init(key: "pixelate"), .init(key: "sketch"),
         ]),
     ]
 
@@ -65,7 +66,7 @@ struct FilterTabView: View {
         }
         .scrollIndicators(.hidden)
         .background(Color.bg)
-        .inlineTitle("필터")
+        .inlineTitle(Copy.filterTitle)
     }
 
     // MARK: 히어로
@@ -96,7 +97,7 @@ struct FilterTabView: View {
     /// `fs_*` 이미지는 **왼쪽 원본 / 오른쪽 필터** 세로 분할이다 — 그 점을 알약으로 짚어 준다.
     private func beforeAfterPills(_ label: String) -> some View {
         HStack(spacing: 0) {
-            pill("원본").frame(maxWidth: .infinity)
+            pill(Copy.filterOriginal).frame(maxWidth: .infinity)
             pill(label).frame(maxWidth: .infinity)
         }
         .padding(.horizontal, Spacing.s4)
@@ -115,17 +116,17 @@ struct FilterTabView: View {
     private func heroCaption(_ t: (group: Group, preset: Preset)) -> some View {
         HStack(alignment: .bottom) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("오늘의 필터 · \(t.group.title)")
+                Text(Copy.todaysFilter(t.group.title))
                     .font(AppFont.caption).foregroundStyle(.white.opacity(0.85))
                 Text(t.preset.label)
                     .font(AppFont.sectionTitle).foregroundStyle(.white)
-                Text("탭하면 이 필터로 바로 시작")
+                Text(Copy.filterTapToStart)
                     .font(AppFont.footnote).foregroundStyle(.white.opacity(0.85))
             }
             Spacer(minLength: Spacing.s2)
             VStack(alignment: .trailing, spacing: 4) {
-                pill("한 번에 10장까지")
-                pill("전부 무료")
+                pill(Copy.filterUpTo10)
+                pill(Copy.filterAllFree)
             }
         }
         .padding(Spacing.s4)
@@ -142,10 +143,10 @@ struct FilterTabView: View {
                 Image(systemName: "camera.fill")
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(Color.onInk)
-                Text("카메라로 찍기").font(AppFont.bodyEmphasis).foregroundStyle(Color.onInk)
+                Text(Copy.filterShootCamera).font(AppFont.bodyEmphasis).foregroundStyle(Color.onInk)
                 // 문구 정정(2026-09-22): 아이폰 기본 카메라로 바뀌며 촬영 중 라이브 필터가 없어졌고,
                 // 지금은 연속 촬영(여러 장) → 한 번에 필터다. 실제 동작과 다른 문구는 심사(2.3.1)에서 걸린다.
-                Text("· 여러 장 찍고 한 번에 필터")
+                Text(Copy.filterShootCameraSub)
                     .font(AppFont.footnote).foregroundStyle(Color.onInk.opacity(0.7))
                 Spacer(minLength: 0)
                 Image(systemName: "chevron.right")

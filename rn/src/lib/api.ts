@@ -1,5 +1,7 @@
 import { getEnv } from "./env";
+import { isKo } from "./locale";
 import type { EncodedPhoto } from "./photo";
+import { copy } from "./copy";
 
 // ============================================================================
 // 서버 계약 — SPEC §4 "그대로". 요청 필드는 웹 src/PortraitStudio.jsx 의 generateImage() 와
@@ -65,10 +67,10 @@ export async function fetchGallery(token: string): Promise<GalleryItem[]> {
   try {
     r = await fetch(`${getEnv().apiBase}/api/gallery`, { headers: auth(token) });
   } catch {
-    throw new ApiError("네트워크 오류", 0, { networkFail: true });
+    throw new ApiError(copy.errors.network, 0, { networkFail: true });
   }
   const j = (await r.json().catch(() => ({}))) as { items?: GalleryItem[]; error?: string };
-  if (!r.ok || !j.items) throw new ApiError(j?.error || "불러오기 실패", r.status);
+  if (!r.ok || !j.items) throw new ApiError(j?.error || copy.errors.loadFail, r.status);
   return j.items;
 }
 
@@ -86,7 +88,7 @@ export async function iapGrant(token: string, productId: string, transactionId: 
   });
   if (r.status === 202) return "pending";
   const j = (await r.json().catch(() => ({}))) as { error?: string };
-  if (!r.ok) throw new ApiError(j?.error || "적립 실패", r.status);
+  if (!r.ok) throw new ApiError(j?.error || copy.errors.earnFail, r.status);
   return "ok";
 }
 
@@ -106,7 +108,7 @@ export async function referralClaim(token: string, ref: string): Promise<{ ok: b
 export async function accountDelete(token: string): Promise<void> {
   const r = await fetch(`${getEnv().apiBase}/api/account/delete`, { method: "POST", headers: auth(token) });
   const j = (await r.json().catch(() => ({}))) as { error?: string };
-  if (!r.ok) throw new ApiError(j?.error || "삭제 실패", r.status);
+  if (!r.ok) throw new ApiError(j?.error || copy.errors.deleteFail, r.status);
 }
 
 // ---- /api/drops (→ /api/concepts?drops=1) -----------------------------------
@@ -150,7 +152,7 @@ export async function requestFaceAnchor(token: string, shots: EncodedPhoto[]): P
     body: JSON.stringify({ faceAnchor: true, shots: shots.map((s, i) => ({ ...s, angle: "shot" + (i + 1) })) }),
   });
   const j = (await r.json().catch(() => null)) as { base64?: string; mimeType?: string; error?: string } | null;
-  if (!r.ok || !j?.base64) throw new ApiError(j?.error || "기준 사진을 만들지 못했어요. 잠시 뒤 다시 시도해 주세요.", r.status);
+  if (!r.ok || !j?.base64) throw new ApiError(j?.error || copy.account.faceFail, r.status);
   return { mimeType: j.mimeType || "image/jpeg", base64: j.base64 };
 }
 
@@ -169,7 +171,7 @@ export interface OutpaintResult {
  * 크레딧 부족(402/429)은 ApiError.quotaExceeded 로 구분해 기존 크레딧 시트로 넘긴다.
  */
 export async function outpaintImage(token: string, photo: EncodedPhoto): Promise<OutpaintResult> {
-  if (!token) throw new ApiError("로그인이 필요해요.", 401);
+  if (!token) throw new ApiError(copy.errors.needLogin, 401);
   let res: Response;
   try {
     res = await fetch(`${getEnv().apiBase}/api/generate`, {
@@ -178,16 +180,16 @@ export async function outpaintImage(token: string, photo: EncodedPhoto): Promise
       body: JSON.stringify({ mimeType: photo.mimeType, base64: photo.base64, fit: "outpaint" }),
     });
   } catch {
-    throw new ApiError("네트워크 요청에 실패했어요. 잠시 후 다시 시도해 주세요.", 0, { networkFail: true });
+    throw new ApiError(copy.progress.networkFail, 0, { networkFail: true });
   }
   let json: Record<string, unknown>;
   try {
     json = (await res.json()) as Record<string, unknown>;
   } catch {
-    throw new ApiError("서버 응답을 읽을 수 없어요 (오류 " + res.status + ")", res.status);
+    throw new ApiError(copy.errors.badResponse(res.status), res.status);
   }
   if (!res.ok) {
-    const msg = (json?.error as string) || "채워 맞춤 실패 (오류 " + res.status + ")";
+    const msg = (json?.error as string) || copy.errors.outpaintFail(res.status);
     throw new ApiError(msg, res.status, {
       quotaExceeded: res.status === 402 || res.status === 429,
       quotaUsed: typeof json?.quotaUsed === "number" ? json.quotaUsed : undefined,
@@ -195,7 +197,7 @@ export async function outpaintImage(token: string, photo: EncodedPhoto): Promise
     });
   }
   if (!json?.base64 || !json?.mimeType) {
-    throw new ApiError("채워 맞춤 결과를 받지 못했어요.", res.status);
+    throw new ApiError(copy.errors.outpaintNoResult, res.status);
   }
   return {
     imageDataUrl: "data:" + json.mimeType + ";base64," + json.base64,
@@ -225,7 +227,7 @@ export interface GenerateResult {
  * fetch 자체가 던지면 `networkFail` — 서버 판정을 못 받은 것이므로 호출부는 갤러리를 폴링한다.
  */
 export async function generateImage(token: string, photo: EncodedPhoto, promptText: string, meta: GenerateMeta): Promise<GenerateResult> {
-  if (!token) throw new ApiError("로그인이 필요해요.", 401);
+  if (!token) throw new ApiError(copy.errors.needLogin, 401);
   const garments = meta.garments && meta.garments.length ? meta.garments.slice(0, 5) : null;
   const body = {
     mimeType: photo.mimeType,
@@ -245,6 +247,7 @@ export async function generateImage(token: string, photo: EncodedPhoto, promptTe
     ...(garments ? { garments, dressStyle: meta.dressStyle } : {}),
     proSample: !!meta.proSample,
     ...(meta.pushToken ? { pushToken: meta.pushToken } : {}),
+    lang: isKo ? "ko" : "en", // 완료 알림 문구 언어
     ...(meta.faceRefs && meta.faceRefs.length ? { faceRefs: meta.faceRefs } : {}),
   };
 
@@ -256,19 +259,19 @@ export async function generateImage(token: string, photo: EncodedPhoto, promptTe
       body: JSON.stringify(body),
     });
   } catch {
-    throw new ApiError("네트워크 요청에 실패했어요. 잠시 후 다시 시도해 주세요.", 0, { networkFail: true });
+    throw new ApiError(copy.progress.networkFail, 0, { networkFail: true });
   }
 
   let json: Record<string, unknown>;
   try {
     json = (await res.json()) as Record<string, unknown>;
   } catch {
-    throw new ApiError("서버 응답을 읽을 수 없어요 (오류 " + res.status + ")", res.status);
+    throw new ApiError(copy.errors.badResponse(res.status), res.status);
   }
 
   if (!res.ok) {
-    const msg = (json?.error as string) || "이미지 생성 실패 (오류 " + res.status + ")";
-    const detail = json?.detail ? "\n\n[원문] " + String(json.detail).slice(0, 300) : "";
+    const msg = (json?.error as string) || copy.errors.genFailStatus(res.status);
+    const detail = json?.detail ? copy.errors.detailPrefix + String(json.detail).slice(0, 300) : "";
     throw new ApiError(msg + detail, res.status, {
       // 크레딧 부족 = 429(단건) 또는 402(묶음 3·6·12장). 402 를 놓쳐 충전 안내가 안 떴다(2026-09-23 스윕).
       quotaExceeded: res.status === 429 || res.status === 402,
@@ -278,7 +281,7 @@ export async function generateImage(token: string, photo: EncodedPhoto, promptTe
   }
 
   if (!json?.base64 || !json?.mimeType) {
-    throw new ApiError("이미지 응답을 받지 못했어요. 다른 컨셉으로 시도해 주세요.", res.status);
+    throw new ApiError(copy.errors.noImage, res.status);
   }
   const imageDataUrl = "data:" + json.mimeType + ";base64," + json.base64;
 

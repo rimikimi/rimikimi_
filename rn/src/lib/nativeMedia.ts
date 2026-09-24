@@ -8,6 +8,8 @@
 // 크래시난다 — 실제 기기(Android)에서 쓸 때만 필요하니 호출 시점에만 불러온다.
 // ============================================================================
 
+import { copy } from "./copy";
+
 async function toLocalFile(src: string, name: string) {
   const { File, Paths } = await import("expo-file-system");
   const f = new File(Paths.cache, name);
@@ -53,7 +55,7 @@ export async function saveDataUrlToAlbum(src: string, filename = "rimikimi"): Pr
 }
 
 /** 시스템 공유 시트 — src/nativeBridge.js nativeShareImage 와 같은 반환 모양({ok,reason?}). */
-export async function shareDataUrlOrUrl(src: string, filename = "rimikimi.png", dialogTitle = "공유하기"): Promise<{ ok: boolean; reason?: string }> {
+export async function shareDataUrlOrUrl(src: string, filename = "rimikimi.png", dialogTitle: string = copy.invite.share): Promise<{ ok: boolean; reason?: string }> {
   try {
     const Sharing = await import("expo-sharing");
     const f = await toLocalFile(src, filename);

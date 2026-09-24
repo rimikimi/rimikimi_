@@ -7,6 +7,7 @@ import Animated, { ReduceMotion, runOnJS, useAnimatedStyle, useSharedValue, with
 import { Text } from "@/ui/Text";
 import { color, radius, space, themedStyles } from "@/theme/tokens";
 import { ease, transitions } from "@/theme/motion";
+import { copy } from "@/lib/copy";
 
 const { height: SCREEN_H } = Dimensions.get("window");
 const CLOSE_RATIO = 0.45;
@@ -56,7 +57,7 @@ export function Sheet({ open, title, onClose, children }: { open: boolean; title
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents={open ? "auto" : "none"}>
       <Animated.View style={[StyleSheet.absoluteFill, styles.scrim, scrim]}>
-        <Pressable style={StyleSheet.absoluteFill} accessibilityLabel="닫기" onPress={onClose} />
+        <Pressable style={StyleSheet.absoluteFill} accessibilityLabel={copy.common.close} onPress={onClose} />
       </Animated.View>
       <GestureDetector gesture={pan}>
         <Animated.View

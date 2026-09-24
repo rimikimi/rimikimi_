@@ -28,9 +28,9 @@ struct QuotaInfo: Decodable {
     var freeLeft: Int { max(0, (limit ?? 1) - (used ?? 0)) }
     /// 헤더 크레딧 칩 문구.
     var chipLabel: String {
-        if unlimited == true { return "∞ 무제한" }
+        if unlimited == true { return Copy.chipUnlimited }
         if creditsAvailable > 0 { return "🎟 \(creditsAvailable)" }
-        return "무료 \(freeLeft)장"
+        return Copy.chipFree(freeLeft)
     }
 }
 
@@ -195,6 +195,7 @@ final class RimikimiAPI {
         }
         // 이 기기의 푸시 토큰 — 서버가 생성을 마치면 여기로 "완성됐어요"를 쏜다(1.x 와 동일).
         if let pushToken { body["pushToken"] = pushToken }
+        body["lang"] = L.ko ? "ko" : "en" // 완료 알림 문구 언어
         // 페이스 프로필(1.x `loadProfileRefs`): 등록 사진을 참조로 같이 보낸다. 서버는 참조로만 쓰고 저장하지 않는다.
         // 매직부스(얼굴 미유지)는 1.x 와 같이 보내지 않는다.
         if !r.skipFacePrecheck {
@@ -216,19 +217,19 @@ final class RimikimiAPI {
 
         let data: Data, resp: URLResponse
         do { (data, resp) = try await session.data(for: req) }
-        catch { throw APIError(message: "네트워크 요청에 실패했어요. 잠시 후 다시 시도해 주세요.", networkFail: true) }
+        catch { throw APIError(message: Copy.errNetwork, networkFail: true) }
 
         let status = (resp as? HTTPURLResponse)?.statusCode ?? 0
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            throw APIError(message: "서버 응답을 읽을 수 없어요 (오류 \(status))", status: status)
+            throw APIError(message: Copy.errUnreadable(status), status: status)
         }
         guard (200...299).contains(status) else {
-            var msg = json["error"] as? String ?? "이미지 생성 실패 (오류 \(status))"
-            if let detail = json["detail"] { msg += "\n\n[원문] " + String(describing: detail).prefix(300) }
+            var msg = json["error"] as? String ?? Copy.errGenerate(status)
+            if let detail = json["detail"] { msg += Copy.errDetailPrefix + String(describing: detail).prefix(300) }
             throw APIError(message: msg, status: status)
         }
         guard let b64 = json["base64"] as? String, let first = ImageUtil.decode(base64: b64) else {
-            throw APIError(message: "이미지 응답을 받지 못했어요. 다른 컨셉으로 시도해 주세요.", status: status)
+            throw APIError(message: Copy.errNoImage, status: status)
         }
         var items = [GenerateResult.Item(id: Self.str(json["galleryId"]) ?? UUID().uuidString, image: first,
                                          galleryId: Self.str(json["galleryId"]),
@@ -262,23 +263,23 @@ final class RimikimiAPI {
 
         let data: Data, resp: URLResponse
         do { (data, resp) = try await session.data(for: req) }
-        catch { throw APIError(message: "네트워크 요청에 실패했어요. 잠시 후 다시 시도해 주세요.", networkFail: true) }
+        catch { throw APIError(message: Copy.errNetwork, networkFail: true) }
 
         let status = (resp as? HTTPURLResponse)?.statusCode ?? 0
         // 상태코드·서버 원문은 로그로만 — 사용자 화면엔 절대 숫자를 띄우지 않는다(오너 지시, 4주차).
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             AppLog.ui.error("outpaint.badResponse status=\(status, privacy: .public)")
-            throw APIError(message: "채워 맞춤을 하지 못했어요. 잠시 후 다시 시도해 주세요 🙂", status: status)
+            throw APIError(message: Copy.errOutpaintRetry, status: status)
         }
         guard (200...299).contains(status) else {
             AppLog.ui.error("outpaint.failed status=\(status, privacy: .public) body=\(String(describing: json["error"]), privacy: .private)")
             // 부족한 크레딧(429·402)은 대개 클라이언트가 네트워크 전에 걸러낸다(AppState.perform) — 그래도
             // quota 가 낡았으면 여기로 올 수 있고, 그땐 APIError.quotaExceeded 가 시트를 띄운다.
-            throw APIError(message: "채워 맞춤을 하지 못했어요. 크레딧은 차감되지 않았어요 🙂", status: status)
+            throw APIError(message: Copy.errOutpaintNoCharge, status: status)
         }
         guard let b64 = json["base64"] as? String, let img = ImageUtil.decode(base64: b64) else {
             AppLog.ui.error("outpaint.emptyResult status=\(status, privacy: .public)")
-            throw APIError(message: "채워 맞춤 결과를 받지 못했어요. 잠시 후 다시 시도해 주세요 🙂", status: status)
+            throw APIError(message: Copy.errOutpaintNoResult, status: status)
         }
         return OutpaintResult(image: img, credits: json["credits"] as? Int,
                               quotaUsed: json["quotaUsed"] as? Int, quotaLimit: json["quotaLimit"] as? Int)
@@ -300,11 +301,11 @@ final class RimikimiAPI {
             let json = (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
             if status == 202 { try? await Task.sleep(nanoseconds: 2_000_000_000 * UInt64(attempt + 1)); continue }
             guard (200...299).contains(status) else {
-                throw APIError(message: json["error"] as? String ?? "결제 처리 실패 (오류 \(status))", status: status)
+                throw APIError(message: json["error"] as? String ?? Copy.errPayment(status), status: status)
             }
             return json["credits"] as? Int
         }
-        throw APIError(message: "구매 확인 중이에요. 잠시 후 크레딧을 확인해 주세요.", status: 202)
+        throw APIError(message: Copy.errPurchasePending, status: 202)
     }
 
     struct ReferralResult: Decodable { let ok: Bool; let reason: String? }
@@ -340,7 +341,7 @@ final class RimikimiAPI {
         guard let http = resp as? HTTPURLResponse else { return }
         guard (200...299).contains(http.statusCode) else {
             let msg = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["error"] as? String
-            throw APIError(message: msg ?? "요청에 실패했어요 (오류 \(http.statusCode))", status: http.statusCode)
+            throw APIError(message: msg ?? Copy.errRequest(http.statusCode), status: http.statusCode)
         }
     }
 

@@ -7,12 +7,13 @@ import { useAuth } from "./auth";
 import { useQuota } from "./quota";
 import { encodeForUpload, type EncodedPhoto, type PhotoRef } from "./photo";
 import { RESULT_W, RESULT_H, fitResultToRatio, fitResultToSize, fileRatio } from "./fitToSize";
-import { type Concept, ID_BGS, buildIdPhotoPrompt, isArtOnly, isIdPhoto, isRestoreConcept } from "./concepts";
+import { type Concept, ID_BGS, buildIdPhotoPrompt, conceptTitle, isArtOnly, isIdPhoto, isRestoreConcept } from "./concepts";
 import { getPushToken } from "./push";
 import { showInterstitial } from "./ads";
 import { loadProfileRefs } from "./faceProfile";
 import { clearLastDoneJob, setLastDoneJob } from "./lastJob";
 import { FIRST_GEN_DONE_KEY, INVITE_CARD_DUE_KEY, getFlag, setFlag } from "./prefs";
+import { copy } from "./copy";
 
 // ============================================================================
 // 생성 — SPEC §3: 만들기 → 홈으로 복귀 + 내 사진 진행 카드 → 완료 시 카드가 결과로 → 결과 화면.
@@ -288,8 +289,8 @@ export function GenerationProvider({ children }: { children: React.ReactNode }) 
 
     (async () => {
       const token = tokenRef.current;
-      if (!token) { patch(id, { status: "failed", error: "로그인이 필요해요." }); return; }
-      await writePendingGen({ jobId: id, startedAt, conceptId: concept.id, conceptTitle: concept.title, count });
+      if (!token) { patch(id, { status: "failed", error: copy.errors.needLogin }); return; }
+      await writePendingGen({ jobId: id, startedAt, conceptId: concept.id, conceptTitle: conceptTitle(concept), count });
       try {
         const photo = await encodeForUpload(input.photo, 1024);
         // 1.x 와 동일: 이 기기의 푸시 토큰(완료 알림용) + 페이스 프로필 앵커(있을 때만, 요청 1회용).
@@ -336,7 +337,7 @@ export function GenerationProvider({ children }: { children: React.ReactNode }) 
         patch(id, { status: "done", images });
         refreshQuota();
         void noteDone();
-        if (images[0]) void setLastDoneJob({ jobId: id, conceptId: String(concept.id), title: concept.title, url: images[0].uri });
+        if (images[0]) void setLastDoneJob({ jobId: id, conceptId: String(concept.id), title: conceptTitle(concept), url: images[0].uri });
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
         // 무료 사용자 → 생성이 끝난 뒤 전면광고 1회 (1.x src/PortraitStudio.jsx 와 같은 자리·같은 조건).
         // ⚠️ await 금지 — 광고가 늦거나 실패해도 이 흐름이 여기서 멈추면 안 된다.
@@ -347,7 +348,7 @@ export function GenerationProvider({ children }: { children: React.ReactNode }) 
         if (!recovered) {
           await clearPendingGen(id);
           if (!mine()) return;
-          patch(id, { status: "failed", error: e?.message || "이미지 생성에 실패했어요." });
+          patch(id, { status: "failed", error: e?.message || copy.errors.genFail });
           if (e?.quotaExceeded) refreshQuota();
         }
       }

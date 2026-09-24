@@ -64,6 +64,12 @@ struct Concept: Identifiable, Hashable, Decodable {
     /// 기능 컨셉(매직부스·증명사진·인생네컷)은 "새로 나왔어요" 에서 뺀다.
     var isFeature: Bool { isArt || isIdPhoto || isFourcut }
 
+    /// 화면에 보일 이름 — 영어 UI 면 `title_en`(비어 있으면 한국어 제목). 판정·서버 전송은 계속 `title`.
+    var displayTitle: String {
+        if !L.ko, let en = titleEn?.trimmingCharacters(in: .whitespacesAndNewlines), !en.isEmpty { return en }
+        return title
+    }
+
     var thumbURL: URL { Config.thumbURL(id) }
     /// 크게 깔리는 자리용 1200px 원본(없으면 `RemoteImage(fallback:)` 이 썸네일로 되돌아간다).
     var largeURL: URL { Config.largeURL(id) }
@@ -107,10 +113,10 @@ struct BatchOption: Hashable {
     let label: String
     let badge: String?
     static let all: [BatchOption] = [
-        .init(count: 1, cost: 1, label: "1장", badge: nil),
-        .init(count: 3, cost: 3, label: "3장", badge: nil),
-        .init(count: 6, cost: 5, label: "6장", badge: "17% 할인"),
-        .init(count: 12, cost: 9, label: "12장", badge: "25% 할인"),
+        .init(count: 1, cost: 1, label: Copy.photos(1), badge: nil),
+        .init(count: 3, cost: 3, label: Copy.photos(3), badge: nil),
+        .init(count: 6, cost: 5, label: Copy.photos(6), badge: Copy.percentOff(17)),
+        .init(count: 12, cost: 9, label: Copy.photos(12), badge: Copy.percentOff(25)),
     ]
     static func cost(for count: Int) -> Int { all.first { $0.count == count }?.cost ?? count }
 }

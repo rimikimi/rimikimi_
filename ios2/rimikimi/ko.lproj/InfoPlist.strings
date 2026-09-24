@@ -1,0 +1,5 @@
+/* 권한 안내 문구(한국어) — Info.plist 의 값과 같다. */
+"NSCameraUsageDescription" = "사진을 찍어 컨셉 사진을 만들기 위해 카메라를 사용합니다.";
+"NSPhotoLibraryAddUsageDescription" = "만든 사진과 편집한 사진을 앨범에 저장하기 위해 사용합니다.";
+"NSMicrophoneUsageDescription" = "필터 카메라를 열 때 iOS가 확인하는 항목이에요. 리미키미는 소리를 녹음하지 않아요.";
+"NSUserTrackingUsageDescription" = "맞춤형 광고를 제공하기 위해 사용돼요.";
