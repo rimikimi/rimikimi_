@@ -16,6 +16,7 @@ import { buildDressroom, expectedHem, checkHem } from "./_lib/dressroom.js";
 import { buildEditorialStrip } from "./_lib/fourcutEditorial.js";
 import { buildGlowStrip } from "./_lib/fourcutGlow.js";
 import { SPRITE_CONCEPT_IDS, describeForSprite } from "./_lib/sprite.js";
+import { inspectImage } from "./_lib/qa.js";
 // 컨셉 원본(프롬프트 포함). **서버가 프롬프트의 출처**여야 한다 — 아래 resolvePrompt 참고.
 import ALL_CONCEPTS from "./_data/concepts.json" with { type: "json" };
 
@@ -1278,6 +1279,22 @@ export default async function handler(req, res) {
     });
   }
   const isSprite = !!spriteDesc;
+
+  // 생성 불량 검사(api/_lib/qa.js) 설정 — 몇 명·몇 칸·그림체인지에 따라 기준이 다르다.
+  const qaOpts = {
+    people: hasSecond ? 2 : 1,
+    panels: isFourcut && fourcutStyle && cutCount && Number(cutCount) > 1 ? Number(cutCount) : 1,
+    art: !!skipFacePrecheck,
+  };
+  // 응답 본문은 뒤에서 다시 읽으므로 clone 으로 이미지 한 장만 꺼낸다.
+  async function qaInline(r) {
+    try {
+      const j = await r.upstream.clone().json();
+      const part = (j?.candidates?.[0]?.content?.parts || []).find((x) => x.inlineData || x.inline_data);
+      const inl = part && (part.inlineData || part.inline_data);
+      return inl ? { data: inl.data, mime: inl.mimeType || inl.mime_type || "image/png" } : null;
+    } catch (_) { return null; }
+  }
   const instruction = isSprite
     ? prompt + "\n\nSUBJECT DESCRIPTION: " + spriteDesc
     : (skipFacePrecheck ? conceptInstruction : PHOTOREALISM + conceptInstruction) + headTiltClause + faceClause;
@@ -1554,27 +1571,26 @@ export default async function handler(req, res) {
       return await callGemini(BASE_MODEL, false, budget(30000), shotIdx);
     }
 
-    // 드레스룸: 만든 그림의 밑단이 실측값과 두 칸 넘게 어긋나면 **한 번만** 다시 뽑는다.
-    // 오너 반려(2026-09-18) "옷을 바꾸지 좀 마" — 프롬프트에 수치를 박아도 3장 중 1장은
-    // 기장이 늘어났다. 확률을 프롬프트로 0 으로 만들 수 없으니 결과를 보고 되뽑는다.
-    // ⚠️ upstream 본문은 아래에서 한 번 더 읽는다 — 반드시 clone() 으로 검사할 것.
+    // 만든 그림을 검사해서 불량이면 **한 번만** 다시 뽑는다. 두 가지 검사를 함께 돌린다.
+    //  ① 드레스룸 기장 — 오너 반려(2026-09-18) "옷을 바꾸지 좀 마". 프롬프트에 수치를 박아도
+    //     3장 중 1장은 기장이 늘어났다. 확률을 프롬프트로 0 으로 만들 수 없으니 결과를 보고 되뽑는다.
+    //  ② 생성 불량(팔·손가락 개수, 뭉개진 얼굴, 인원수, 그림체에 섞인 실사) — 오너 지시 2026-09-24.
+    // ⚠️ upstream 본문은 아래에서 한 번 더 읽는다 — 반드시 clone() 으로 검사할 것(qaInline).
     // ⚠️ 검사가 불가능하면(판단 불가·타임아웃) 그대로 통과시킨다. 검사가 생성을 막으면 안 된다.
     async function oneShot(shotIdx = 0) {
       const r = await attemptShot(shotIdx);
-      if (!dressWantHem || isBusyFailure(r) || !r?.upstream?.ok) return r;
+      if (isBusyFailure(r) || !r?.upstream?.ok) return r;
       if (left() < 45000) return r;                   // 다시 뽑을 시간이 없다
-      let ok = null;
-      try {
-        const j = await r.upstream.clone().json();
-        const part = (j?.candidates?.[0]?.content?.parts || [])
-          .find((x) => x.inlineData || x.inline_data);
-        const inline = part && (part.inlineData || part.inline_data);
-        if (inline) {
-          ok = await checkHem(inline.data, inline.mimeType || inline.mime_type, dressWantHem, apiKey);
-        }
-      } catch (_) { ok = null; }
-      if (ok !== false) return r;
-      console.log(`[generate] 드레스룸 기장 어긋남(기대 ${dressWantHem}) → 재생성 shot=${shotIdx}`);
+      const inline = await qaInline(r);
+      if (!inline) return r;
+      const [hemOk, qa] = await Promise.all([
+        dressWantHem ? checkHem(inline.data, inline.mime, dressWantHem, apiKey).catch(() => null) : null,
+        inspectImage({ base64: inline.data, mimeType: inline.mime, apiKey, ...qaOpts,
+          timeoutMs: Math.max(5000, Math.min(20000, left() - 45000)) }),
+      ]);
+      if (hemOk !== false && qa.ok !== false) return r;
+      console.log(`[generate] 불량 → 재생성 shot=${shotIdx} concept=${conceptId}` +
+        (hemOk === false ? ` 기장(기대 ${dressWantHem})` : "") + (qa.ok === false ? ` qa="${qa.issue}"` : ""));
       const again = await attemptShot(shotIdx);
       return (!isBusyFailure(again) && again?.upstream?.ok) ? again : r;
     }
@@ -1692,6 +1708,27 @@ export default async function handler(req, res) {
     }
   } else {
     result = await baseThenLegacy(24000);
+  }
+
+  // 생성 불량 검사 → 불량이면 같은 경로로 **한 번만** 다시 뽑는다(묶음 경로의 oneShot 과 같은 규칙).
+  // 판단 불가·타임아웃·시간 부족이면 그대로 내보낸다 — 검사가 생성을 막으면 안 된다.
+  if (result?.upstream?.ok && !isBusyFailure(result) && left() > 50000) {
+    const inline = await qaInline(result);
+    const qa = inline
+      ? await inspectImage({ base64: inline.data, mimeType: inline.mime, apiKey, ...qaOpts,
+          timeoutMs: Math.max(5000, Math.min(20000, left() - 45000)) })
+      : { ok: null };
+    if (qa.ok === false) {
+      console.log(`[generate] 불량 → 재생성 concept=${conceptId} qa="${qa.issue}"`);
+      let again = null;
+      if (useProEngine && !busyFallback) {
+        if (vertexSA()) again = await callVertexBackoff(PRO_MODEL, true, budget(90000));
+        if (!again || isBusyFailure(again)) again = await proWithRetries(10000);
+      } else {
+        again = await baseThenLegacy(Math.max(6000, left() - 3000));
+      }
+      if (again && !isBusyFailure(again) && again.upstream?.ok) result = again;
+    }
   }
 
   // ⚠️ 여기까지 왔다는 건 폴백·재시도까지 전부 실패했다는 뜻이다.
