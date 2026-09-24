@@ -1266,10 +1266,17 @@ export default async function handler(req, res) {
   //   제외 이유: 그 모드는 "일러스트/회화 등 다른 매체로 재해석"이 목적이라 "반드시 실제 사진처럼
   //   보여야 한다(not an illustration, not a digital painting)"는 지시와 정면 충돌한다.
   // 픽셀 캐릭터(964): 사진을 글로 옮긴 뒤 **사진 없이** 그린다(api/_lib/sprite.js 주석 — 사진을 넣으면
-  // 원본이 새어 나온다). 설명을 못 얻으면 기존 매직 부스 경로로 폴백(덜 깨끗해도 결과는 나온다).
-  const spriteDesc = SPRITE_CONCEPT_IDS.has(String(conceptId))
-    ? await describeForSprite({ base64, mimeType, apiKey })
-    : null;
+  // 원본이 새어 나온다). 설명을 못 얻으면 **실패로 끝낸다** — 예전엔 사진 편집 경로로 폴백했는데,
+  // 그 경로가 바로 원본이 새는 불량(실사 배경 위 픽셀 머리)을 만든다(오너 지적 2026-09-24).
+  // 아직 아무것도 차감하지 않은 시점이라 크레딧·무료 횟수는 그대로다.
+  const wantsSprite = SPRITE_CONCEPT_IDS.has(String(conceptId));
+  const spriteDesc = wantsSprite ? await describeForSprite({ base64, mimeType, apiKey }) : null;
+  if (wantsSprite && !spriteDesc) {
+    return res.status(503).json({
+      busy: true,
+      error: "사진을 읽지 못했어요. 잠시 후 다시 시도해 주세요. 크레딧은 차감되지 않았어요 🙂",
+    });
+  }
   const isSprite = !!spriteDesc;
   const instruction = isSprite
     ? prompt + "\n\nSUBJECT DESCRIPTION: " + spriteDesc
