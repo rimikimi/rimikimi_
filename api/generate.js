@@ -9,7 +9,7 @@
 // ============================================================
 
 import { getAuthedUser, countTodayUsage, FREE_DAILY, dailyLimitFor, isUnlimited, isTester } from "./_lib/auth.js";
-import { precheckHasFace } from "./_lib/precheck.js";
+import { precheckHasFace, samePerson } from "./_lib/precheck.js";
 import { getCreditInfo, consumeCredit, consumeCredits, refundCredits, getProSampleUsed, markProSampleUsed } from "./_lib/credits.js";
 import { saveToGallery } from "./_lib/gallery.js";
 import { buildDressroom, expectedHem, checkHem } from "./_lib/dressroom.js";
@@ -983,10 +983,22 @@ export default async function handler(req, res) {
   if (!skipFacePrecheck) {
     // 커플이면 두 장 다 검사한다 — 한 장만 통과시키면 상대 얼굴이 없는 채로
     // 본 모델을 호출해 크레딧만 나간다.
-    const checks = await Promise.all([
-      precheckHasFace(apiKey, mimeType, base64),
-      hasSecond ? precheckHasFace(apiKey, mimeType2, base64_2) : Promise.resolve({ hasFace: true }),
+    // 얼굴 스캔(faceRefs)이 이번 사진과 다른 사람이면 스캔을 버린다(동시에 돌려 지연 없음).
+    // 정면 스캔 한 장과 비교. 판단 불가면 기존대로 스캔을 쓴다.
+    const refFront = faceRefList.find((r) => r.angle === "front") || faceRefList[0];
+    const [checks, same] = await Promise.all([
+      Promise.all([
+        precheckHasFace(apiKey, mimeType, base64),
+        hasSecond ? precheckHasFace(apiKey, mimeType2, base64_2) : Promise.resolve({ hasFace: true }),
+      ]),
+      refFront ? samePerson(apiKey, { mimeType, base64 }, refFront) : Promise.resolve("n/a"),
     ]);
+    if (same === "different") {
+      console.log(`[generate] faceProfile 불일치 → 스캔 ${faceRefList.length}장 무시, 이번 사진만 사용`);
+      faceRefList.length = 0;
+    } else if (refFront) {
+      console.log(`[generate] faceProfile 동일인 검사: ${same}`);
+    }
     const pre = checks.find((c) => !c.hasFace) || checks[0];
     if (!pre.hasFace) {
       return res.status(422).json({
