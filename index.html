@@ -155,7 +155,9 @@
 }
     </script>
     <!-- 앱 안 편집기(?tool=)에서는 크롤러용 정적 본문이 잠깐이라도 비치지 않게 -->
-    <script>if (/[?&]tool=/.test(location.search)) document.documentElement.className += " tool";</script>
+    <script>if (/[?&]tool=/.test(location.search)) document.documentElement.className += " tool";
+      // 네이버 검수 담당자 테스트 경로(?naver=1) — 앱이 주소를 정리하기 전에 기억해 둔다
+      try { if (/[?&]naver=1(&|$)/.test(location.search)) sessionStorage.setItem("rk_naver_review", "1"); } catch (_) {}</script>
     <style>.tool #root > main { display: none; }</style>
   </head>
   <body>

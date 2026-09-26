@@ -22,7 +22,9 @@ import { isNative } from "./nativeBridge";
 
 // 2.0: 시스템 글꼴(v2/SPEC.md §0)
 // 네이버 검수 기간: 주소에 ?naver=1 이 있으면(검수 담당자용 테스트 경로) 버튼을 보이고 서버도 통과시킨다.
-const NAVER_REVIEW = typeof window !== "undefined" && /[?&]naver=1\b/.test(window.location.search);
+const NAVER_REVIEW = typeof window !== "undefined" && (() => {
+  try { return /[?&]naver=1\b/.test(window.location.search) || sessionStorage.getItem("rk_naver_review") === "1"; } catch (_) { return false; }
+})();
 const NAVER_LOGIN_OPEN = false || NAVER_REVIEW;
 const FONT = '-apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", Roboto, "Segoe UI", sans-serif';
 
