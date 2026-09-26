@@ -21,6 +21,7 @@ import { t, useLang } from "./i18n";
 import { isNative } from "./nativeBridge";
 
 // 2.0: 시스템 글꼴(v2/SPEC.md §0)
+const NAVER_LOGIN_OPEN = false;
 const FONT = '-apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", Roboto, "Segoe UI", sans-serif';
 
 // 네이티브 앱 OAuth 복귀용 딥링크 (iOS/Android URL scheme + Supabase Redirect URL 에 등록)
@@ -266,6 +267,8 @@ export default function LoginGate({ Logo, embedded = false, message, onClose }) 
           <span>{busy === "kakao" ? t("login.loading") : t("login.with.kakao")}</span>
         </button>
 
+        {/* 네이버는 개발자센터 검수 전("개발 중")이라 일반 사용자는 로그인이 안 된다 — 검수 통과 후 true (api/auth/naver/start.js 와 함께) */}
+        {NAVER_LOGIN_OPEN && (
         <button
           style={{ ...S.btnNaver, opacity: busy && busy !== "naver" ? 0.5 : 1 }}
           disabled={!!busy}
@@ -274,6 +277,7 @@ export default function LoginGate({ Logo, embedded = false, message, onClose }) 
           <NaverIcon />
           <span>{busy === "naver" ? t("login.loading") : t("login.with.naver")}</span>
         </button>
+        )}
 
         <button
           style={{ ...S.btnGoogle, opacity: busy && busy !== "google" ? 0.5 : 1 }}
