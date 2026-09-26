@@ -21,7 +21,9 @@ import { t, useLang } from "./i18n";
 import { isNative } from "./nativeBridge";
 
 // 2.0: 시스템 글꼴(v2/SPEC.md §0)
-const NAVER_LOGIN_OPEN = false;
+// 네이버 검수 기간: 주소에 ?naver=1 이 있으면(검수 담당자용 테스트 경로) 버튼을 보이고 서버도 통과시킨다.
+const NAVER_REVIEW = typeof window !== "undefined" && /[?&]naver=1\b/.test(window.location.search);
+const NAVER_LOGIN_OPEN = false || NAVER_REVIEW;
 const FONT = '-apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", Roboto, "Segoe UI", sans-serif';
 
 // 네이티브 앱 OAuth 복귀용 딥링크 (iOS/Android URL scheme + Supabase Redirect URL 에 등록)
@@ -187,7 +189,7 @@ export default function LoginGate({ Logo, embedded = false, message, onClose }) 
     // 웹: 우리 백엔드가 처리. redirectTo 로 돌아갈 곳 알려줌.
     const back = window.location.origin + "/";
     window.location.href =
-      "/api/auth/naver/start?redirectTo=" + encodeURIComponent(back);
+      "/api/auth/naver/start?redirectTo=" + encodeURIComponent(back) + (NAVER_REVIEW ? "&review=1" : "");
   }
 
   async function handleEmailSubmit(e) {

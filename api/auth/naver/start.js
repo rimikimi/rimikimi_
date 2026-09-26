@@ -23,7 +23,9 @@ const NOTICE = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta
 <p style="margin-top:18px;font-size:13px">Naver login is coming soon. Please close this window and sign in with Apple, Google or Kakao.</p></div></body></html>`;
 
 export default function handler(req, res) {
-  if (!NAVER_LOGIN_OPEN) {
+  // 검수 담당자 테스트 경로(웹 ?naver=1 → review=1)는 통과시킨다
+  const reviewPass = /[?&]review=1\b/.test(req.url || "");
+  if (!NAVER_LOGIN_OPEN && !reviewPass) {
     res.statusCode = 200;
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.setHeader("Cache-Control", "no-store");
