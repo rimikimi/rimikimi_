@@ -1,0 +1,102 @@
+{
+ "a0c87a3a-8399-4bd8-b091-1a7d8bbd2929": {
+  "status": "held",
+  "reason": "The prompt opens with \"Edit the third reference image\", which is an existing couple campaign photo to edit. The app can only send the two face photos (woman first, man second), so it can't supply that",
+  "title": "천사와 악마"
+ },
+ "887f84ce-c3ba-4adc-8efd-4861d3ce51cd": {
+  "status": "staged",
+  "id": "995",
+  "title": "고딕 블랙 웨딩"
+ },
+ "9924b289-4d3e-4d4c-adc9-7e430f2e1202": {
+  "status": "staged",
+  "id": "996",
+  "title": "좀비 프롬 데이트"
+ },
+ "ed34a622-0804-4a2b-93ee-e106536e42e0": {
+  "status": "staged",
+  "id": "997",
+  "title": "밤의 백작"
+ },
+ "6d100cb0-372f-44c9-99e1-9f4f90217e86": {
+  "status": "staged",
+  "id": "998",
+  "title": "해골 분장 중"
+ },
+ "ed8addcc-1799-4489-bb77-508c3307803e": {
+  "status": "staged",
+  "id": "999",
+  "title": "빨간 망토 셀카"
+ },
+ "f8d9e65c-a163-4f93-a2a0-fb11f0da5780": {
+  "status": "staged",
+  "id": "1000",
+  "title": "블랙캣 데일리룩"
+ },
+ "d24ccaf8-2306-4058-9af0-f57665e14808": {
+  "status": "staged",
+  "id": "1001",
+  "title": "까마귀 쿠튀르"
+ },
+ "2911821a-c001-4c47-b6f1-a6f1827f8596": {
+  "status": "staged",
+  "id": "1002",
+  "title": "유령 신부의 서약"
+ },
+ "b838865d-a6b8-4947-8e9d-2cd093c9a2b2": {
+  "status": "staged",
+  "id": "1003",
+  "title": "마녀 홈파티"
+ },
+ "c7c36e26-2ca5-4e06-b023-b833c4802d87": {
+  "status": "staged",
+  "id": "1004",
+  "title": "펌킨 퀸"
+ },
+ "6c8dd72a-7403-47fd-9542-c0a4a876f0fd": {
+  "status": "staged",
+  "id": "1005",
+  "title": "호박밭 마녀"
+ },
+ "c2f6b844-2fc8-4551-99d1-e35abe439730": {
+  "status": "staged",
+  "id": "1006",
+  "title": "스켈레톤 파티 나잇"
+ },
+ "959bc632-66ad-4375-bbc7-c558c36b6cda": {
+  "status": "staged",
+  "id": "1007",
+  "title": "레드 데빌 라운지"
+ },
+ "1a5413f5-092f-4b45-b9f2-f5b0fe0dffbe": {
+  "status": "staged",
+  "id": "1008",
+  "title": "창가의 검은 고양이"
+ },
+ "77d1dc49-6ef1-4a07-8d33-40af6b0e7990": {
+  "status": "staged",
+  "id": "1009",
+  "title": "러블리 미라"
+ },
+ "4f97bb44-2c06-42fe-8e18-9e9e30c5da73": {
+  "status": "staged",
+  "id": "1010",
+  "title": "달빛 구미호"
+ },
+ "1f391623-f8ba-4cc9-9b19-7c9295bd1030": {
+  "status": "staged",
+  "id": "1011",
+  "title": "뱀파이어 백작부인"
+ },
+ "e234a06b-41bf-489d-9cca-e344ef5c6787": {
+  "status": "staged",
+  "id": "1012",
+  "title": "까마귀 여왕"
+ },
+ "d428b831-0114-49c1-8af8-acf0ee04a785": {
+  "status": "staged",
+  "id": "1013",
+  "title": "안개 골목 저승사자"
+ }
+}
