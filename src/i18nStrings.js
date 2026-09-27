@@ -857,6 +857,7 @@ export const STR = {
       "커플": "Couple",
       "남성": "Men",
       "🌕 추석 인사": "🌕 Chuseok Greetings",
+      "🎃 핼러윈": "🎃 Halloween",
       "🪄 매직 부스": "🪄 Magic Booth",
       "📸 인생네컷": "📸 Photo Booth",
       "🪪 증명사진": "🪪 ID Photo",
