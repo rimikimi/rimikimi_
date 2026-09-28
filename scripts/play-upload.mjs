@@ -3,7 +3,7 @@
 // Play 스토어에 AAB 업로드 (Google Play Developer API)
 //
 //   PLAY_SA_JSON=~/Downloads/rimikimi-....json \
-//   node scripts/play-upload.mjs --track production --notes "..." [--dry]
+//   node scripts/play-upload.mjs --track production --notes "..." [--notes-en "..."] [--dry]
 //
 // track: production | internal | alpha | beta  (기본 internal — 실수로 전체
 //        공개되는 걸 막으려고 안전한 쪽을 기본값으로 둔다)
@@ -29,6 +29,11 @@ const arg = (name, def) => {
 const DRY = argv.includes("--dry");
 const TRACK = arg("track", "internal");
 const NOTES = arg("notes", "");
+const NOTES_EN = arg("notes-en", "");   // 영문 릴리즈 노트(en-US) — 기기 언어가 영어인 사용자에게 보인다
+const RELEASE_NOTES = [
+  ...(NOTES ? [{ language: "ko-KR", text: NOTES }] : []),
+  ...(NOTES_EN ? [{ language: "en-US", text: NOTES_EN }] : []),
+];
 
 const keyPath = (process.env.PLAY_SA_JSON || "").replace(/^~/, homedir());
 if (!keyPath) {
@@ -114,7 +119,7 @@ await api("PUT", `${BASE}/edits/${edit.id}/tracks/${TRACK}`, {
     releases: [{
       versionCodes: [String(uploaded.versionCode)],
       status: "completed",
-      ...(NOTES ? { releaseNotes: [{ language: "ko-KR", text: NOTES }] } : {}),
+      ...(RELEASE_NOTES.length ? { releaseNotes: RELEASE_NOTES } : {}),
     }],
   },
 });

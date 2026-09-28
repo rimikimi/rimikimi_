@@ -1,0 +1,35 @@
+{
+  "listings": {
+    "en-US": {
+      "title": "rimikimi: Daily AI Photoshoot",
+      "shortDescription": "One selfie becomes a photoshoot in today's concept. 500+ concepts, 1 free daily.",
+      "fullDescription": "rimikimi — an AI photoshoot with a new concept every day\n\nUpload one selfie and rimikimi turns it into a photoshoot in today's concept, keeping your face clearly recognizable. Four new concepts arrive every evening, and your first photo each day is free.\n\n■ New concepts every day\n· 4 a day, delivered with a notification\n· 500+ concepts and counting — seasons, eras, travel, film moods, everyday snapshots\n· Missed one? Every past concept stays available\n\n■ Scan once, create many at a time\n· Scan your face from three angles once — no need to re-upload a photo for every concept\n· Queue several concepts at once and find each one in My Photos as it finishes\n\n■ Photo booth strips\n· Pick a concept and get a 2–8 frame strip as one image\n· 5 frame styles\n\n■ Couple shoots\n· Two people, two photos, one couple concept shot\n\n■ Dressing Room — will this look good on me?\n· Upload photos of a top, bottoms, outerwear, shoes or a bag (up to 5) and preview the whole outfit on you\n· Store screenshots and closet photos both work · mirror selfie or model shot\n· Magic Booth adds special concepts like instant photos\n\n■ Old photo restoration\n· Bring a faded or damaged photo back as a clean portrait\n\n■ Artistic transformations\n· Oil painting, watercolor, color pencil, clay and more\n· Touch up and save your results right in the app\n\n■ Privacy first\n· Your uploaded photo is never stored on our servers\n· Generated images are automatically deleted after 24 hours\n· Your personal data stays protected\n\nMake today's concept with rimikimi!\n\n— Subscription Info —\nrimikimi+ weekly, monthly and annual subscriptions remove ads and watermarks and add automatic credit top-ups. Payment is charged to your Google Play account. Subscriptions renew automatically unless canceled at least 24 hours before the end of the current period. Manage or cancel anytime in Google Play subscription settings.\nTerms of Use: https://rimikimi-app.vercel.app/terms\nPrivacy Policy: https://rimikimi-app.vercel.app/privacy"
+    },
+    "ko-KR": {
+      "title": "리미키미 - 매일 AI 화보 컨셉·인생네컷",
+      "shortDescription": "셀카 한 장으로 오늘의 컨셉 화보. 컨셉 500종+, 매일 저녁 8시 4종 추가, 하루 1장 무료",
+      "fullDescription": "rimikimi - 매일 새로운 컨셉으로 만드는 AI 화보\n\n셀카 한 장만 올리면, AI가 내 얼굴 특징을 살려 그날의 컨셉으로 화보를 만들어드려요. 컨셉은 매일 저녁 8시에 새로 4종씩 도착하고, 하루 첫 1장은 무료예요.\n\n■ 매일 새 컨셉\n· 하루 4종, 알림으로 받아보세요\n· 시즌·시대·여행·영화 무드·일상 스냅까지 500가지가 넘는 컨셉이 쌓여 있어요\n· 놓친 컨셉도 언제든 다시 골라 만들 수 있어요\n\n■ 한 번 스캔, 여러 장 한꺼번에\n· 정면·좌·우 세 방향을 한 번 찍어 두면 컨셉마다 사진을 다시 올릴 필요가 없어요\n· 여러 컨셉을 한 번에 걸어 두고, 완성되는 대로 내 사진에서 확인하세요\n\n■ 인생네컷\n· 컨셉을 고르면 2~8분할 네컷을 한 장으로 완성\n· 프레임 스타일 5종\n\n■ 커플 화보\n· 두 사람의 사진으로 한 장의 커플 컨셉 화보를\n\n■ 드레스룸 — 이 옷, 나한테 어울릴까?\n· 상의·하의·아우터·신발·가방 사진을 최대 5장 올리면 그 코디를 입은 내 모습을 보여드려요\n· 쇼핑몰 캡처도, 옷장 사진도 좋아요 · 거울셀카 / 모델컷\n· 매직 부스에서 즉석 사진 등 특별 컨셉도\n\n■ 옛날 사진 복원\n· 바래거나 상한 사진을 깨끗한 인물 사진으로 되살려요\n\n■ 예술적인 변환\n· 유화·수채화·색연필·클레이 등\n· 만든 사진은 앱 안에서 바로 다듬어 저장할 수 있어요\n\n■ 안심하세요\n· 업로드한 사진은 서버에 저장되지 않아요\n· 생성된 이미지는 24시간만 보관 후 자동 삭제\n· 개인정보는 안전하게 보호됩니다\n\n지금 rimikimi로 오늘의 컨셉을 만들어보세요!\n\n― 구독 안내 ―\nrimikimi+ 주간·월간·연간 구독은 광고와 워터마크를 없애고 크레딧을 자동으로 채워 드려요. 결제는 Google Play 계정으로 이루어지며, 기간 종료 24시간 전까지 해지하지 않으면 자동 갱신돼요. Google Play 구독 설정에서 언제든 관리·해지할 수 있어요.\n이용약관: https://rimikimi-app.vercel.app/terms\n개인정보처리방침: https://rimikimi-app.vercel.app/privacy"
+    }
+  },
+  "images": {
+    "en-US": {
+      "phoneScreenshots": [
+        "/Users/home/Documents/rimikimi_app/store_assets/screenshots_2.0/ios_v2_en/01-filter.png",
+        "/Users/home/Documents/rimikimi_app/store_assets/screenshots_2.0/ios_v2_en/02-daily-concepts.png",
+        "/Users/home/Documents/rimikimi_app/store_assets/screenshots_2.0/ios_v2_en/03-restore.png",
+        "/Users/home/Documents/rimikimi_app/store_assets/screenshots_2.0/ios_v2_en/04-dressroom.png",
+        "/Users/home/Documents/rimikimi_app/store_assets/screenshots_2.0/ios_v2_en/05-decorate.png",
+        "/Users/home/Documents/rimikimi_app/store_assets/screenshots_2.0/ios_v2_en/06-facescan.png",
+        "/Users/home/Documents/rimikimi_app/store_assets/screenshots_2.0/ios_v2_en/07-multi-generation.png"
+      ],
+      "featureGraphic": [
+        "/Users/home/Documents/rimikimi_app/store_assets/play-feature-graphic-en-1024x500.png"
+      ]
+    },
+    "ko-KR": {
+      "featureGraphic": [
+        "/Users/home/Documents/rimikimi_app/store_assets/play-feature-graphic-1024x500.png"
+      ]
+    }
+  }
+}

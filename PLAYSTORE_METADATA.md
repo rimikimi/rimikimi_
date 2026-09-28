@@ -52,6 +52,11 @@
 ---
 
 ## 3. Play 콘솔/API로 반영할 최종 문구 (EN/KO 완성본)
+> ⚠️ 2026-09-28 부터 **실제 반영본은 `store_assets/play-listing.json`** (제목·짧은 설명·자세한 설명 + 이미지 매핑) 이고
+> `node scripts/play-listing.mjs [--dry]` 로 올린다. 아래 §3-1·§3-2 는 1.x 시절 초안이라 낡았다("AI 사진관/프로필" 포지셔닝, 1시간 보관).
+> 2.0 기준으로 바뀐 것: 매일 컨셉 드롭·네컷·커플·드레스룸·복원·얼굴 스캔, 컨셉 500+, 보관 24시간, Google Play 결제 문단.
+> 제목엔 Play 정책상 free/new/best 같은 홍보 단어 금지 → en "rimikimi: Daily AI Photoshoot", ko "리미키미 - 매일 AI 화보 컨셉·인생네컷".
+> ko-KR 은 그래픽 이미지를 따로 갖고 있지 않으면 en-US 것을 빌려 쓴다 → 한국어 배너를 ko-KR 에도 직접 등록해 둠.
 > 아래 §3-1(간단한 설명)·§3-2(자세한 설명)는 Play Console 스토어 등록정보 또는
 > Google Play Developer API(`edits.listings`)에 그대로 반영 가능한 **최종본**.
 
