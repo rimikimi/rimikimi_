@@ -8,6 +8,8 @@ import cv2, numpy as np
 
 orig_p, edit_p, regions_p, prefix = sys.argv[1:5]
 levels = [int(x) for x in (sys.argv[5] if len(sys.argv) > 5 else "20,40,60,80,100").split(",")]
+# 눈금 배율 — 오너 기준(9/29): AI 결과를 그대로 다 입힌 것은 너무 세다. "100%" = AI 결과의 40%.
+SCALE = float(sys.argv[6]) if len(sys.argv) > 6 else 0.4
 
 O = cv2.imread(orig_p, cv2.IMREAD_COLOR)
 E = cv2.imread(edit_p, cv2.IMREAD_COLOR)
@@ -69,7 +71,7 @@ print(f"흐름: 영역 안 평균 {mag[alpha > 0.5].mean():.1f}px · 최대 {mag
 Y, X = np.mgrid[0:H, 0:W].astype(np.float32)
 outs = []
 for L in levels:
-    t = L / 100.0
+    t = L / 100.0 * SCALE
     Ot = cv2.remap(Of, X - t * F[..., 0], Y - t * F[..., 1], cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT)
     Et = cv2.remap(Ec, X + (1 - t) * F[..., 0], Y + (1 - t) * F[..., 1], cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT)
     It = (1 - t) * Ot + t * Et
