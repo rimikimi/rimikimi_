@@ -206,6 +206,10 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
   // 필터 강도 (오너 지시): %표시 없는 슬라이더, 기본 0.7 = 지금의 풀 프리셋 룩.
   // 1.0 까지 올리면 더 진하게(외삽), 0 이면 원본.
   const [strength, setStrength] = useState(0.7);
+  // 효과 세기 (오너 지시 2026-09-29: 필터 패널에 "색감"·"효과" 슬라이더 2개) — 프리셋에 딸린 효과
+  // (그레인·비네트·흐림·뽀샤시…)를 0~1 배로 줄인다. 1 = 프리셋 그대로, 0 = 색감만.
+  // strength(색감)는 applyLookWithStrength 가 색 보정에만 쓰고, 효과는 fx 값 자체를 이 배율로 바꿔 둔다.
+  const [fxAmt, setFxAmt] = useState(1);
   const [lens, setLens] = useState(0);
   // 정방향(기울기·세로·가로 원근) — 사진별. geoAuto = 자동 판정 결과(한 번만 돌린다).
   const ZERO_GEO = { tilt: 0, pv: 0, ph: 0 };
@@ -220,6 +224,7 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
     presetKey: initialPresetKey,
     fx: fxOf(presetByKey(initialPresetKey)),
     strength: 0.7,
+    fxAmt: 1,
     lens: 0,   // 렌즈 왜곡 보정 -1..1 (0 = 원본)
     geo: { tilt: 0, pv: 0, ph: 0 },
     geoAuto: null,
@@ -227,10 +232,11 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
   const [lookByIdx, setLookByIdx] = useState({});
   const lookOf = (i) => lookByIdx[i] || defaultLook();
   function updateLook(patch) {
-    const next = { presetKey, fx, strength, lens, geo, geoAuto, ...patch };
+    const next = { presetKey, fx, strength, fxAmt, lens, geo, geoAuto, ...patch };
     setPresetKey(next.presetKey);
     setFx(next.fx);
     setStrength(next.strength);
+    setFxAmt(next.fxAmt ?? 1);
     setLens(next.lens || 0);
     setGeo(next.geo || ZERO_GEO);
     setGeoAuto(next.geoAuto || null);
@@ -241,6 +247,7 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
     setPresetKey(lk.presetKey);
     setFx(lk.fx);
     setStrength(lk.strength);
+    setFxAmt(lk.fxAmt ?? 1);
     setLens(lk.lens || 0);
     setGeo(lk.geo || ZERO_GEO);
     setGeoAuto(lk.geoAuto || null);
@@ -251,7 +258,7 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
   }
   function applyLookToAll() {
     hap.tap();
-    const cur = { presetKey, fx, strength, lens };
+    const cur = { presetKey, fx, strength, fxAmt, lens };
     const all = {};
     // 정방향(기울기·원근)은 사진마다 다르다 — 전체 적용에서 옮기지 않고 각 사진 것을 둔다.
     for (let i = 0; i < sources.length; i++) {
@@ -1173,8 +1180,8 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
                   style={{ ...ES.filterChip, ...(presetKey === p.key ? ES.filterChipOn : null) }}
                   onClick={() => {
                     hap.tap();
-                    // 프리셋 기본 효과까지 원탭 적용, 강도는 기본값(0.7 = 표준 룩)으로 리셋
-                    updateLook({ presetKey: p.key, fx: fxOf(p), strength: 0.7 });
+                    // 프리셋 기본 효과까지 원탭 적용, 색감은 기본값(0.7 = 표준 룩)·효과는 1(프리셋 그대로)로 리셋
+                    updateLook({ presetKey: p.key, fx: fxOf(p), strength: 0.7, fxAmt: 1 });
                   }}
                 >
                   <canvas
@@ -1187,23 +1194,54 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
                 </button>
               ))}
             </div>
-            {/* 필터 강도 — %표시 없는 슬라이더 (기본 0.7 = 표준 룩, 끝까지 올리면 더 진하게) */}
-            {presetKey !== "none" && (
-              <div style={ES.strengthRow}>
-                <input
-                  className="pe-range"
-                  type="range" min="0" max="100"
-                  value={Math.round(strength * 100)}
-                  onChange={(e) => updateLook({ strength: Number(e.target.value) / 100 })}
-                  onPointerDown={beginDrag}
-                  onPointerUp={endDragSoon}
-                  onPointerCancel={endDragSoon}
-                  onTouchStart={beginDrag}
-                  onTouchEnd={endDragSoon}
-                  style={{ width: "100%" }}
-                />
-              </div>
-            )}
+            {/* 색감·효과 슬라이더 2개 (오너 지시 2026-09-29) — %표시 없음(오너 지시 2026-08-26 유지).
+                색감: 기본 0.7 = 표준 룩, 끝까지 올리면 더 진하게(색 보정만).
+                효과: 프리셋에 딸린 그레인·비네트·흐림·뽀샤시 등을 0~1 배로. 0 이면 색감만 남는다.
+                효과가 없는 프리셋(예: 16 Pro)은 효과 줄을 숨긴다. */}
+            {presetKey !== "none" && (() => {
+              const p = presetByKey(presetKey);
+              const fxKeys = Object.keys(p.fx || {}).filter((k) => p.fx[k]);
+              const dragProps = {
+                onPointerDown: beginDrag, onPointerUp: endDragSoon, onPointerCancel: endDragSoon,
+                onTouchStart: beginDrag, onTouchEnd: endDragSoon,
+              };
+              const ko = getLang() === "ko";
+              return (
+                <div style={ES.strengthCol}>
+                  <label style={ES.fxRow}>
+                    <span style={ES.strengthLabel}>{ko ? "색감" : "Color"}</span>
+                    <input
+                      className="pe-range"
+                      type="range" min="0" max="100"
+                      value={Math.round(strength * 100)}
+                      onChange={(e) => updateLook({ strength: Number(e.target.value) / 100 })}
+                      {...dragProps}
+                      style={ES.fxSlider}
+                    />
+                  </label>
+                  {fxKeys.length > 0 && (
+                    <label style={ES.fxRow}>
+                      <span style={ES.strengthLabel}>{ko ? "효과" : "Effect"}</span>
+                      <input
+                        className="pe-range"
+                        type="range" min="0" max="100"
+                        value={Math.round(fxAmt * 100)}
+                        onChange={(e) => {
+                          const amt = Number(e.target.value) / 100;
+                          const base = fxOf(p);
+                          // 이 프리셋의 효과만 배율로 — 사용자가 효과 탭에서 따로 켠 다른 효과는 그대로 둔다
+                          const nextFx = { ...fx };
+                          for (const k of fxKeys) nextFx[k] = base[k] * amt;
+                          updateLook({ fx: nextFx, fxAmt: amt });
+                        }}
+                        {...dragProps}
+                        style={ES.fxSlider}
+                      />
+                    </label>
+                  )}
+                </div>
+              );
+            })()}
           </>
         )}
 
@@ -1540,6 +1578,8 @@ const ES = {
   filterName: { fontSize: 10.5, fontWeight: 700, color: "rgba(255,255,255,.55)", whiteSpace: "nowrap" },
   filterNameOn: { color: "#fff" },
   strengthRow: { padding: "8px 18px 0" },
+  strengthCol: { display: "flex", flexDirection: "column", gap: 6, padding: "8px 18px 0" },
+  strengthLabel: { width: 34, fontSize: 12.5, fontWeight: 800, color: "rgba(255,255,255,.85)", flex: "0 0 auto" },
   fxCol: {
     display: "flex", flexDirection: "column", gap: 12, padding: "2px 18px",
     maxHeight: "34vh", overflowY: "auto", WebkitOverflowScrolling: "touch", // 슬라이더 6개+날짜 — 작은 화면 스크롤
