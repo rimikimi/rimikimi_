@@ -10,7 +10,7 @@
 // 새 버전 배포 시: 아래 VERSION 만 올리면 됨.
 // ============================================================
 
-const VERSION = "v146";
+const VERSION = "v147";
 const STATIC_CACHE = `rimikimi-static-${VERSION}`;
 const THUMB_CACHE = `rimikimi-thumbs-${VERSION}`;
 const DATA_CACHE = `rimikimi-data-${VERSION}`;
@@ -31,18 +31,29 @@ self.addEventListener("install", (event) => {
   );
 });
 
-// 활성화: 옛 버전 캐시 정리 + 모든 클라이언트 강제 새로고침
+// 활성화: 옛 버전 캐시 정리 + (업그레이드일 때만) 열린 탭 새로고침
+// ⚠️ 2026-09-29: 예전엔 **첫 설치 때도** 모든 창을 새로고침했다 — 처음 방문하거나 배포 직후 편집기를
+//    처음 열면 사진을 넣자마자 페이지가 리셋돼 "사진 선택" 화면으로 튕겼다(라이브에서 재현).
+//    · 첫 설치(예전 rimikimi 캐시가 없음)면 새로고침할 이유가 없다 — 이미 새 코드로 떠 있다.
+//    · 편집기·카메라(?tool=, 앱 웹뷰 포함)는 사진·편집 상태가 메모리에만 있어 새로고침하면 날아간다.
+//      JS/HTML 은 네트워크 우선이라 그 창도 이미 새 코드다 → 건드리지 않는다.
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     (async () => {
       const keys = await caches.keys();
-      await Promise.all(
-        keys.filter((k) => !k.endsWith(`-${VERSION}`)).map((k) => caches.delete(k))
-      );
+      const old = keys.filter((k) => !k.endsWith(`-${VERSION}`));
+      const isUpgrade = old.some((k) => k.startsWith("rimikimi-"));
+      await Promise.all(old.map((k) => caches.delete(k)));
       await self.clients.claim();
-      // 모든 열린 탭을 새로고침 (옛 썸네일 표시 방지)
+      if (!isUpgrade) return;
+      // 나머지 열린 탭은 새로고침 (옛 썸네일 표시 방지)
       const clients = await self.clients.matchAll({ type: "window" });
-      for (const c of clients) c.navigate(c.url);
+      for (const c of clients) {
+        let isTool = false;
+        try { isTool = new URL(c.url).searchParams.has("tool"); } catch (_) {}
+        if (isTool) continue;
+        c.navigate(c.url);
+      }
     })()
   );
 });
