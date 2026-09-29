@@ -1,15 +1,27 @@
 # 보정 세기 단계 — AI 결과 1장으로 20·40·60·80·100% 를 만든다.
-#   python3 levels.py <원본> <AI결과> <regions.json> <출력접두사> [20,40,60,80,100]
+#   python3 levels.py <원본> <AI결과> <regions.json> <출력접두사> [--levels 20,40,60,80,100]
+#          [--tone 0.4] [--detail 1.0] [--geo 0.4] [--sigma 0.04]
 # 단순 투명도 섞기는 얼굴선·눈이 두 겹으로 보인다(AI 가 턱선·눈매도 조금 바꾸므로).
-# 그래서 광학 흐름(DIS)으로 원본→결과의 픽셀 이동을 구하고, 세기 t 만큼 모양과 색을 같이 옮긴다(모핑).
+# 그래서 광학 흐름(DIS)으로 원본→결과의 픽셀 이동을 구하고, 세기만큼 모양을 옮긴다(모핑).
+# 그리고 주파수 분리로 AI 가 바꾼 것을 두 층으로 나눠 따로 세기를 준다:
+#   · 톤(저주파: 얼굴 전체가 하얘지고 밝아진 정도) — 오너 기준 "100% = AI 결과의 40%" (--tone 0.4)
+#   · 피부 보정(고주파: 잡티·붉은기·모공·다크서클) — 100% 에서 AI 결과 그대로 (--detail 1.0)
+#     (톤과 같이 40% 로 줄이면 잡티가 남는다 — 오너 "피부보정도 해야지", 9/29)
+#   · 모양(턱선·눈매 이동) — 톤과 같이 보수적으로 (--geo 0.4)
 # 요청 영역 밖은 원본 픽셀 그대로.
-import sys, json
+import sys, json, argparse
 import cv2, numpy as np
 
-orig_p, edit_p, regions_p, prefix = sys.argv[1:5]
-levels = [int(x) for x in (sys.argv[5] if len(sys.argv) > 5 else "20,40,60,80,100").split(",")]
-# 눈금 배율 — 오너 기준(9/29): AI 결과를 그대로 다 입힌 것은 너무 세다. "100%" = AI 결과의 40%.
-SCALE = float(sys.argv[6]) if len(sys.argv) > 6 else 0.4
+ap = argparse.ArgumentParser()
+ap.add_argument("orig"); ap.add_argument("edit"); ap.add_argument("regions"); ap.add_argument("prefix")
+ap.add_argument("--levels", default="20,40,60,80,100")
+ap.add_argument("--tone", type=float, default=0.4)
+ap.add_argument("--detail", type=float, default=1.0)
+ap.add_argument("--geo", type=float, default=0.4)
+ap.add_argument("--sigma", type=float, default=0.04, help="톤/디테일 경계(짧은 변 대비 블러 반경)")
+A = ap.parse_args()
+orig_p, edit_p, regions_p, prefix = A.orig, A.edit, A.regions, A.prefix
+levels = [int(x) for x in A.levels.split(",")]
 
 O = cv2.imread(orig_p, cv2.IMREAD_COLOR)
 E = cv2.imread(edit_p, cv2.IMREAD_COLOR)
@@ -69,12 +81,18 @@ mag = np.linalg.norm(F, axis=2)
 print(f"흐름: 영역 안 평균 {mag[alpha > 0.5].mean():.1f}px · 최대 {mag.max():.1f}px")
 
 Y, X = np.mgrid[0:H, 0:W].astype(np.float32)
+SIG = short * A.sigma
+lowpass = lambda im: cv2.GaussianBlur(im, (0, 0), SIG)
+print(f"세기 눈금: 톤 {A.tone:.0%} · 피부 보정 {A.detail:.0%} · 모양 {A.geo:.0%} (100% 기준) · 톤/디테일 경계 {SIG:.0f}px")
 outs = []
 for L in levels:
-    t = L / 100.0 * SCALE
-    Ot = cv2.remap(Of, X - t * F[..., 0], Y - t * F[..., 1], cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT)
-    Et = cv2.remap(Ec, X + (1 - t) * F[..., 0], Y + (1 - t) * F[..., 1], cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT)
-    It = (1 - t) * Ot + t * Et
+    s = L / 100.0
+    tg, tt, td = s * A.geo, s * A.tone, s * A.detail
+    # 모양은 tg 만큼 옮긴 같은 자리에서 두 장을 비교한다(그래야 층을 섞어도 두 겹이 안 생김)
+    Ot = cv2.remap(Of, X - tg * F[..., 0], Y - tg * F[..., 1], cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT)
+    Et = cv2.remap(Ec, X + (1 - tg) * F[..., 0], Y + (1 - tg) * F[..., 1], cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT)
+    lo, le = lowpass(Ot), lowpass(Et)
+    It = (lo + tt * (le - lo)) + ((Ot - lo) + td * ((Et - le) - (Ot - lo)))
     out = Of * (1 - alpha[..., None]) + It * alpha[..., None]
     out = np.where(alpha[..., None] > 0, np.clip(np.round(out), 0, 255), Of).astype(np.uint8)
     p = f"{prefix}-{L}.jpg"
@@ -82,9 +100,11 @@ for L in levels:
     outs.append((L, out))
     print(f"  {L}% → {p}")
 
-# 5) 한눈에 보기 — 얼굴 영역 크롭 2줄×3칸 (원본 + 단계들)
-ys, xs = np.where(alpha > 0.5)
-cy0, cy1, cx0, cx1 = ys.min(), ys.max(), xs.min(), xs.max()
+# 5) 한눈에 보기 — 얼굴 영역 크롭 2줄×3칸 (원본 + 단계들). 팔·손 같은 몸 영역은 크롭 계산에서 뺀다
+import re
+fb = [g["box_2d"] for g in R["regions"] if not re.search(r"arm|hand|chest|shoulder|body|leg", g["label"], re.I)] or [g["box_2d"] for g in R["regions"]]
+cy0, cx0 = int(min(b[0] for b in fb) / 1000 * H), int(min(b[1] for b in fb) / 1000 * W)
+cy1, cx1 = int(max(b[2] for b in fb) / 1000 * H), int(max(b[3] for b in fb) / 1000 * W)
 pad = int(short * 0.03)
 cy0, cy1, cx0, cx1 = max(0, cy0 - pad), min(H, cy1 + pad), max(0, cx0 - pad), min(W, cx1 + pad)
 tiles = []
