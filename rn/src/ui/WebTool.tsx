@@ -12,6 +12,7 @@ import { getEnv } from "@/lib/env";
 import { saveDataUrlToAlbum, shareDataUrlOrUrl } from "@/lib/nativeMedia";
 import { chrome, color, space, themedStyles } from "@/theme/tokens";
 import { copy } from "@/lib/copy";
+import { isKo } from "@/lib/locale";
 
 // 1단계(2.0, SPEC §5): 편집기·카메라는 현재 웹(src/PhotoEditor.jsx · CameraStudio.jsx)을 웹뷰로 임베드.
 // 저장·공유·앨범·닫기·크레딧 갱신만 네이티브 브리지(3주차) — postMessage 규약.
@@ -67,10 +68,9 @@ export function WebTool({ title, tool, query, initialPayload }: {
   const [loading, setLoading] = useState(true);
   const webRef = useRef<WebView>(null);
   // 웹뷰의 localStorage 는 앱과 별개 저장소이고 웹은 navigator.language 로 언어를 정한다.
-  // 안 넘기면 **껍데기는 한국어인데 안쪽 편집기·카메라만 기기 언어(영어)** 로 뜬다.
-  // 지금 이 앱의 문구(copy.ts)는 한국어 전용이라 웹뷰도 한국어로 고정한다.
-  // ⚠️ 앱에 영어 문구를 붙이는 날 여기도 같이 바꿀 것.
-  const params = new URLSearchParams({ tool, native: "1", lang: "ko", ...(query ?? {}) });
+  // 안 넘기면 껍데기와 안쪽 편집기·카메라의 언어가 어긋날 수 있어서 앱 언어(isKo)를 그대로 넘긴다.
+  // (2.0.2 영어 지원 때 여기가 "ko" 고정으로 남아 있었다 — 영어 기기에서 편집기만 한국어로 뜸)
+  const params = new URLSearchParams({ tool, native: "1", lang: isKo ? "ko" : "en", ...(query ?? {}) });
   const hash = session ? `#access_token=${encodeURIComponent(session.access_token)}&refresh_token=${encodeURIComponent(session.refresh_token)}` : "";
   const uri = `${getEnv().apiBase}/?${params.toString()}${hash}`;
 
