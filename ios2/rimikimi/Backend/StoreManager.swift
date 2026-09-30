@@ -18,28 +18,62 @@ final class StoreManager {
         let isSubscription: Bool
         let period: String?       // week/month/year
         var priceString: String?  // 스토어가 준 실제 가격(없으면 KRW 폴백)
+        /// 첫 구매 할인 팩이면 정가(취소선으로 같이 보여 준다).
+        var regularPrice: String? = nil
+        /// 구독 첫 결제 할인(애플 Introductory Offer)을 받을 수 있으면 그 가격(스토어 문자열).
+        var introPrice: String? = nil
         var displayPrice: String { priceString ?? Copy.krw(krw) }
     }
 
     /// `src/PortraitStudio.jsx` CREDIT_PACKS / SUB_PLANS.
     /// 이름·배지가 번역 문구라 볼 때마다 만든다(앱 안 언어 전환 — `L`). 가격은 아래 인스턴스 `packs` 가 붙인다.
+    /// 2026-09-30 오너 가격 개편: 인트로 팩(6장 ₩3,900) 판매 중단, 미니 12·스탠다드 24·프로 48.
     static var packs: [Pack] { [
-        .init(id: "rimikimi.pack.intro", credits: 6, krw: 3900, label: Copy.packIntro, badge: Copy.badgeFirst, isSubscription: false, period: nil),
-        .init(id: "rimikimi.pack.mini", credits: 12, krw: 7900, label: Copy.packMini, badge: nil, isSubscription: false, period: nil),
-        .init(id: "rimikimi.pack.standard", credits: 24, krw: 14900, label: Copy.packStandard, badge: Copy.badgeBest, isSubscription: false, period: nil),
-        .init(id: "rimikimi.pack.pro", credits: 45, krw: 27000, label: Copy.packPro, badge: Copy.badgeCheapest, isSubscription: false, period: nil),
+        .init(id: "rimikimi.pack.mini", credits: 12, krw: 11900, label: Copy.packMini, badge: nil, isSubscription: false, period: nil),
+        .init(id: "rimikimi.pack.standard", credits: 24, krw: 22900, label: Copy.packStandard, badge: Copy.badgeBest, isSubscription: false, period: nil),
+        .init(id: "rimikimi.pack.pro", credits: 48, krw: 44900, label: Copy.packPro, badge: Copy.badgeCheapest, isSubscription: false, period: nil),
     ] }
+    /// 첫 구매 30% 할인 — 소모품엔 애플 할인 기능이 없어 **별도 상품**이다(같은 장수). 한 번도 산 적 없는 계정
+    /// (서버 quota `firstPurchase`)에게만, 그리고 스토어가 그 상품을 돌려줄 때만(심사 전이면 없음) 정가 팩 대신 보여 준다.
+    static let firstPackID: [String: String] = [
+        "rimikimi.pack.mini": "rimikimi.pack.mini.first",
+        "rimikimi.pack.standard": "rimikimi.pack.standard.first",
+        "rimikimi.pack.pro": "rimikimi.pack.pro.first",
+    ]
+    static let firstPackKRW: [String: Int] = ["rimikimi.pack.mini": 8300, "rimikimi.pack.standard": 15900, "rimikimi.pack.pro": 31500]
     static var subs: [Pack] { [
-        .init(id: "rimikimi.sub.plus.weekly", credits: 8, krw: 6900, label: Copy.subWeekly, badge: nil, isSubscription: true, period: "주"),
-        .init(id: "rimikimi.sub.plus.monthly", credits: 30, krw: 12900, label: Copy.subMonthly, badge: nil, isSubscription: true, period: "월"),
-        .init(id: "rimikimi.sub.plus.annual", credits: 240, krw: 109000, label: Copy.subAnnual, badge: Copy.badgeLowest, isSubscription: true, period: "년"),
+        .init(id: "rimikimi.sub.plus.weekly", credits: 10, krw: 9900, label: Copy.subWeekly, badge: nil, isSubscription: true, period: "주"),
+        .init(id: "rimikimi.sub.plus.monthly", credits: 35, krw: 29900, label: Copy.subMonthly, badge: nil, isSubscription: true, period: "월"),
+        .init(id: "rimikimi.sub.plus.annual", credits: 400, krw: 299000, label: Copy.subAnnual, badge: Copy.badgeLowest, isSubscription: true, period: "년"),
     ] }
-    static var allIDs: [String] { (packs + subs).map(\.id) }
+    static var allIDs: [String] { (packs + subs).map(\.id) + Array(firstPackID.values) }
 
     /// 화면용 목록 — 이름·배지는 지금 언어로, 가격은 스토어가 준 값(아직 없으면 KRW 폴백).
-    var packs: [Pack] { Self.packs.map(withStorePrice) }
-    var subs: [Pack] { Self.subs.map(withStorePrice) }
+    /// `firstPurchase` 면 첫 구매 할인 팩으로 바꿔 보여 준다(정가는 취소선용으로 같이).
+    func packs(firstPurchase: Bool) -> [Pack] {
+        Self.packs.map { base in
+            let regular = withStorePrice(base)
+            guard firstPurchase, let fid = Self.firstPackID[base.id], let fp = storeProducts[fid] else { return regular }
+            var x = Pack(id: fid, credits: base.credits, krw: Self.firstPackKRW[base.id] ?? base.krw, label: base.label,
+                         badge: Copy.badgeFirstDiscount, isSubscription: false, period: nil)
+            x.priceString = fp.localizedPriceString
+            x.regularPrice = regular.displayPrice
+            return x
+        }
+    }
+    var subs: [Pack] {
+        Self.subs.map { p in
+            var x = withStorePrice(p)
+            // 첫 결제 할인 — 애플이 이 계정을 대상자로 판정했을 때만 표시(결제창에도 애플이 같은 값을 띄운다).
+            if introEligible.contains(p.id), let d = storeProducts[p.id]?.introductoryDiscount, d.price > 0 {
+                x.introPrice = d.localizedPriceString
+            }
+            return x
+        }
+    }
     private func withStorePrice(_ p: Pack) -> Pack { var x = p; x.priceString = storeProducts[p.id]?.localizedPriceString; return x }
+    /// 구독 첫 결제 할인 대상 상품 id(RevenueCat `checkTrialOrIntroDiscountEligibility`).
+    private(set) var introEligible: Set<String> = []
     private(set) var isLoading = false
     private(set) var purchasing: String?
     private(set) var lastError: String?
@@ -84,6 +118,13 @@ final class StoreManager {
         defer { isLoading = false }
         let products = await Purchases.shared.products(Self.allIDs)
         for p in products { storeProducts[p.productIdentifier] = p }
+        let subIDs = Self.subs.map(\.id).filter { storeProducts[$0]?.introductoryDiscount != nil }
+        if !subIDs.isEmpty {
+            let el = await Purchases.shared.checkTrialOrIntroDiscountEligibility(productIdentifiers: subIDs)
+            introEligible = Set(el.filter { $0.value.status == .eligible }.map(\.key))
+        } else {
+            introEligible = []
+        }
         if products.isEmpty {
             lastError = Copy.storeNoProducts
         } else {

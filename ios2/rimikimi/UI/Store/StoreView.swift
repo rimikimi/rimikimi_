@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 프로필 > 스토어 — 크레딧 팩 4 + rimikimi+ 구독 3. 가격은 스토어가 준 값, 없으면 KRW 정가.
+/// 프로필 > 스토어 — 크레딧 팩 3(첫 구매면 30% 할인 팩) + rimikimi+ 구독 3(첫 결제 할인 표시). 가격은 스토어가 준 값, 없으면 KRW 정가.
 struct StoreView: View {
     @Environment(AppState.self) private var app
     @State private var busyID: String?
@@ -23,7 +23,7 @@ struct StoreView: View {
 
                 SectionHeader(title: Copy.storePacks)
                 VStack(spacing: Spacing.s2) {
-                    ForEach(app.store.packs) { p in PackRow(pack: p, busy: busyID == p.id) { buy(p) } }
+                    ForEach(app.store.packs(firstPurchase: app.quota?.firstPurchase == true)) { p in PackRow(pack: p, busy: busyID == p.id) { buy(p) } }
                 }
                 .padding(.horizontal, Spacing.page)
 
@@ -101,9 +101,16 @@ struct PackRow: View {
                     }
                     Text(pack.isSubscription ? Copy.subLine(period: pack.period, credits: pack.credits) : Copy.perImage(krw: pack.krw / pack.credits))
                         .font(AppFont.footnote).foregroundStyle(Color.ink2)
+                    if let intro = pack.introPrice {
+                        Text(Copy.introLine(period: pack.period, intro: intro, regular: pack.displayPrice))
+                            .font(AppFont.footnote).foregroundStyle(Color.accent)
+                    }
                 }
                 Spacer()
-                Text(busy ? Copy.processing : pack.displayPrice)
+                if let regular = pack.regularPrice, !busy {
+                    Text(regular).font(AppFont.footnote).strikethrough().foregroundStyle(Color.ink3)
+                }
+                Text(busy ? Copy.processing : (pack.introPrice ?? pack.displayPrice))
                     .font(AppFont.calloutEmphasis)
                     .foregroundStyle(Color.onAccent)
                     .padding(.horizontal, Spacing.s3)
@@ -125,7 +132,7 @@ struct CreditsSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var busyID: String?
 
-    private var packs: [StoreManager.Pack] { Array(app.store.packs.prefix(3)) }
+    private var packs: [StoreManager.Pack] { Array(app.store.packs(firstPurchase: app.quota?.firstPurchase == true).prefix(3)) }
     private var sub: StoreManager.Pack? { app.store.subs.first { $0.id == "rimikimi.sub.plus.monthly" } }
 
     var body: some View {

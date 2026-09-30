@@ -23,6 +23,8 @@ struct QuotaInfo: Decodable {
     var referralCount: Int?
     var referralCode: String?
     var untilNext: Int?
+    /// 한 번도 결제한 적 없는 계정 — 크레딧팩 첫 구매 30% 할인 대상(서버 판정, 없으면 false).
+    var firstPurchase: Bool?
 
     var creditsAvailable: Int { credits ?? 0 }
     var freeLeft: Int { max(0, (limit ?? 1) - (used ?? 0)) }

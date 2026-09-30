@@ -400,6 +400,18 @@ enum Copy {
     static var subMonthly: String { L.t("먼슬리", "Monthly") }
     static var subAnnual: String { L.t("애뉴얼", "Annual") }
     static var badgeFirst: String { L.t("첫 구매", "First purchase") }
+    static var badgeFirstDiscount: String { L.t("첫 구매 30% 할인", "30% off your first purchase") }
+    /// 구독 첫 결제 할인 한 줄 — "첫 결제 30% 할인 · 첫 달 ₩20,900, 이후 ₩29,900"
+    static func introLine(period: String?, intro: String, regular: String) -> String {
+        if L.ko { return "첫 결제 30% 할인 · 첫 \(period ?? "달") \(intro), 이후 \(regular)" }
+        let first: String
+        switch period {
+        case "주": first = "first week"
+        case "년": first = "first year"
+        default: first = "first month"
+        }
+        return "30% off your first payment · \(intro) for the \(first), then \(regular)"
+    }
     static var badgeBest: String { L.t("베스트 가치", "Best value") }
     static var badgeCheapest: String { L.t("장당 최저", "Lowest per photo") }
     static var badgeLowest: String { L.t("가장 저렴", "Best price") }
