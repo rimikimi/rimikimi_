@@ -13,11 +13,14 @@
 
 const PLAN_SCHEMA = {
   type: "OBJECT",
-  required: ["allowed", "lang", "summary", "scope", "keep_detail", "edits", "keep", "regions", "protect"],
+  required: ["intent", "allowed", "lang", "summary", "scope", "keep_detail", "edits", "keep", "regions", "protect"],
   properties: {
+    intent: { type: "STRING" },
     allowed: { type: "BOOLEAN" },
     scope: { type: "STRING" },
     keep_detail: { type: "BOOLEAN" },
+    pose_change: { type: "BOOLEAN" },
+    background_only: { type: "BOOLEAN" },
     refusal: { type: "STRING" },
     lang: { type: "STRING" },
     summary: { type: "STRING" },
@@ -36,6 +39,10 @@ It may be written casually and in any language. Read the context and intent, not
 Customer request:
 """${String(text).slice(0, 1000)}"""
 
+0) INTENT — first write "intent" (English, 1-3 sentences): what the customer is unhappy with or wishes for, reading the context
+   behind casual words, what they like and want kept (e.g. "인물은 이쁜데" = the person is fine, do not touch them), and what visible
+   result would make them say "yes, that's it". Complaints ("밋밋해", "심심해", "칙칙해", "허전해", "정신없어", "별로야") mean the thing
+   named must change clearly — not a faint tint. Everything below must serve this intent.
 1) SAFETY — set "allowed": false (and write "refusal": one polite sentence in the customer's language) if the request asks to:
    remove or reduce clothing, make anyone nude or sexual, sexualize anyone, alter a minor's body; make a person look like a different
    or specific real person (face swap); add weapons, blood, injuries or violence; add hateful symbols; create or alter official
@@ -47,12 +54,23 @@ Customer request:
    atmosphere (and at most small ambient touches) while KEEPING every object, building, storefront, product, person and the layout
    that is in the photo. Never replace the background, the location or remove things unless the customer explicitly asks for that
    (e.g. "배경을 바꿔줘", "replace the background", "put me in Paris"). Write "edits" and "keep" accordingly.
+   PLAIN BACKGROUND REQUESTS: "배경이 밋밋해/심심해/허전해/휑해/비어 보여", "boring/plain/empty background" mean the customer wants the
+   background itself to become more interesting — ADD real, fitting things and depth that match this kind of place (for a room: e.g.
+   plants or flowers in a vase, framed art, a stylish chair or side table, soft window light and shadow patterns, a textured wall; for
+   a street or nature: fitting scenery details), clearly visible, tasteful, not cluttered, never covering the person. Light/tone tweaks
+   alone are NOT enough. The people stay exactly as they are (face, hair, pose, clothes, bag). Use scope "local" with one region
+   covering the whole frame, and "background_only": true.
+   "background_only": true when the edits change only the background/surroundings and every person must stay untouched; otherwise false.
    "scope": "global" if the request changes the look of the WHOLE photo — time of day (e.g. night, sunset), weather, season, overall
    lighting or mood, color grade/filter look, or the entire background; otherwise "local" (specific people, objects or areas).
    "keep_detail": ALWAYS true for a MOOD REQUEST (see above). Otherwise true when a "global" change only changes light, time of day, color or mood and adds or removes nothing
    (e.g. make it daytime/night/sunset, warmer, film look); false when it adds or removes things or textures
    (rain, snow, fog, new objects, removing a person, a new background). For "local" requests set false.
-3) REGIONS — "regions": tight boxes around the areas the edits touch (including where changed things will end up), and nothing else.
+   "pose_change": true if the request moves any body part — raising/lowering a hand or arm, a hand gesture (V-sign, waving,
+   pointing), changing posture, sitting/standing, turning the head or body, looking in another direction; otherwise false.
+   A moved body part must disappear from where it was — the result must still have exactly two arms and two hands per person.
+3) REGIONS — "regions": tight boxes around the areas the edits touch (including where changed things will end up AND where a moved
+   body part was before, e.g. the whole arm from shoulder to the pocket it leaves), and nothing else.
    "text_boxes": ALWAYS list a tight box around EVERY piece of legible text, number, logo, sign, sticker, price tag or license
    plate in the photo (small ones too) — never leave it empty when the photo has any text.
    "protect": a tight box around every person's face that the edits do NOT change — if the request changes someone's pose,
@@ -69,6 +87,10 @@ export function editPrompt(plan) {
 
 Change ONLY the light, color and atmosphere, clearly enough to notice:
 ${plan.edits.map((e) => "- " + e).join("\n")}
+
+Commit to a distinct, finished look — a real color grade (tone curve, color balance, shadows/highlights, light direction and glow),
+the kind of before/after a popular photo editor gives. Side by side with the original, the difference must be obvious at first glance;
+a barely visible tint is a failure. (Stronger light and color only — the place and everything in it stay the same.)
 
 Everything that is in the photo must stay: the same place, walls, buildings, storefronts, doors, windows, signs, products, people
 and every object, in the same positions and shapes. Do not replace the location, do not add or remove objects or people.
@@ -93,6 +115,7 @@ ${(plan.keep || []).map((e) => "- " + e).join("\n")}
 - Relight the people naturally to match the new light and atmosphere (it must look like one real photo, not a pasted cut-out)
 (Each "same" rule above yields only where a change above explicitly asks for it — every listed change must be done, including removals.)
 When removing someone or something, fill the space only with the background that would naturally be behind it — never put a new person, animal or object in its place.
+Correct human anatomy for every person: exactly two arms and two hands, five fingers per hand, natural joints — a hand or arm that moves must no longer appear in its old place.
 Photorealistic, like the same real photo re-shot or re-graded by a skilled photographer. No added objects, no text, no watermark, no frame or border.`;
   }
   return `Retouch this exact photograph. This is an edit of the provided photo, not a new photo.
@@ -108,6 +131,7 @@ ${(plan.keep || []).map((e) => "- " + e).join("\n")}
 - Same background and scenery
 (Each "same" rule above yields only where an edit above explicitly asks for that change.)
 When removing something, fill the space only with the background that would naturally be behind it — never put a new person, animal or object in its place.
+Correct human anatomy for every person: exactly two arms and two hands, five fingers per hand, natural joints — a hand or arm that moves must no longer appear in its old place.
 The result must look like the same real photo after a skilled human retoucher's careful work: photorealistic, no painted or AI look, no added objects, no text, no watermark, no frame or border.`;
 }
 
@@ -142,6 +166,18 @@ function isMoodRequest(text) {
   return mood && !replace;
 }
 
+// "배경이 밋밋해요" — 계획 AI 가 조명·톤만 만지는 전체 보정으로 읽고 인물까지 다시 그렸다(9/30 오너 실사용: 배경은 그대로, 얼굴 윤곽 겹침).
+function isPlainBackgroundRequest(text) {
+  const t = String(text || "").toLowerCase();
+  return /배경.{0,12}(밋밋|심심|허전|휑|비어|단조|썰렁|무난|평범)|(plain|boring|empty|dull|bland).{0,12}background|background.{0,12}(plain|boring|empty|dull|bland)/.test(t);
+}
+
+// 팔·손·자세를 움직이는 요청 — 계획 AI 가 pose_change 를 빠뜨릴 때를 코드로 한 번 더 잡는다.
+function isPoseRequest(text) {
+  const t = String(text || "").toLowerCase();
+  return /포즈|자세|브이|v\s*사인|손\s*(을|으로)?\s*(들|올|흔들|내려|모아|펴)|팔\s*(을)?\s*(들|올|벌|내려|뻗|꼬)|앉|일어서|서\s*있|고개|돌아|쳐다|바라보|내려다|올려다|pose|wave|waving|peace sign|raise|arms?\b|looking (at|down|up|away)|turn(ing)? (her|his|their|the) (head|body)/.test(t);
+}
+
 export async function planRetouch(apiKey, jpegB64, text) {
   const j = await gemini(apiKey, "gemini-3-flash-preview", {
     contents: [{ role: "user", parts: [{ inline_data: { mime_type: "image/jpeg", data: jpegB64 } }, { text: planPrompt(text) }] }],
@@ -150,19 +186,27 @@ export async function planRetouch(apiKey, jpegB64, text) {
   if (!j) return null;
   try {
     const p = JSON.parse((j?.candidates?.[0]?.content?.parts || []).map((x) => x.text || "").join(""));
-    return {
+    const out = {
       allowed: p.allowed !== false,
       refusal: String(p.refusal || ""),
       lang: String(p.lang || ""),
       summary: String(p.summary || "").slice(0, 400),
       scope: p.scope === "global" ? "global" : "local",
       keepDetail: p.scope === "global" && (p.keep_detail === true || isMoodRequest(text)),
+      poseChange: p.pose_change === true || isPoseRequest(text),
+      backgroundOnly: p.background_only === true || isPlainBackgroundRequest(text),
       edits: (p.edits || []).map(String).filter(Boolean).slice(0, 12),
       keep: (p.keep || []).map(String).filter(Boolean).slice(0, 12),
       regions: cleanBoxes(p.regions),
       protect: cleanBoxes(p.protect),
       textBoxes: cleanBoxes(p.text_boxes).slice(0, 60),
     };
+    // 배경만 바꾸는 요청은 부분 편집으로 — 사람은 원본 픽셀(차이 마스크가 바뀐 배경만 가져온다)
+    if (out.backgroundOnly && !out.poseChange) {
+      out.scope = "local"; out.keepDetail = false;
+      if (!out.regions.length) out.regions = [{ label: "background", box_2d: [0, 0, 1000, 1000] }];
+    }
+    return out;
   } catch (_) { return null; }
 }
 
@@ -658,6 +702,56 @@ export function compositeRetouch(O, E, w, h, regions, protect, scope = "local", 
  * srcBuf: 회전·알파 제거까지 끝난 원본 JPEG. text: 사용자가 쓴 요청(아무 언어).
  * 성공: { finalJpeg, plan, w, h, stats } · 거절: { refused: true, message } · 실패: { error: "busy" | "plan" }
  */
+// 인체 구조 검사 — 결과를 내보내기 전에 한 번 본다(오너 지시 9/30: "어떤 결과물이든 human anatomy 검증은 무조건").
+// 손 세 개(원래 손 + 옮긴 손), 머리 두 개, 손가락 개수, 팔다리가 물건에 녹아든 것 등. 사람이 없으면 바로 통과.
+// 방식(9/30 실측): 손마다 "어느 팔에 붙었는지" 따라가게 해서 코드가 판정한다. "문제 있냐"고 물으면 멀쩡한 사진도 절반쯤 걸고
+// (정상 6장 중 4장), Pro 도 더 낫지 않았다. 가벼운 모델로 3번 동시에 보고 2번 이상 걸릴 때만 불합격 —
+// 손 세 개 사진은 매번 걸렸고, 정상 사진은 한 번 넘게 걸린 적이 없다.
+const ANATOMY_SCHEMA = {
+  type: "OBJECT", required: ["hands", "extra_heads", "floating_object"],
+  properties: {
+    floating_object: { type: "STRING" },
+    hands: { type: "ARRAY", items: { type: "OBJECT", required: ["person", "connected_arm", "doing"], properties: {
+      person: { type: "STRING" }, connected_arm: { type: "STRING", enum: ["left", "right", "none"] }, doing: { type: "STRING" } } } },
+    extra_heads: { type: "BOOLEAN" },
+  },
+};
+const ANATOMY_PROMPT = `List EVERY hand of the main (foreground) people in this photo, including a hand hidden inside a pocket (a pocket with a hand in it counts as a hand).
+For each: "person" (which person, same wording each time), "connected_arm": which of that person's arms it is attached to
+("left"/"right" = the person's own left/right arm, trace the sleeve from the shoulder to the hand), or "none" if it is not attached to any arm of that person.
+"doing": what the hand does. Do not skip a hand because it seems odd — list what is actually there.
+"extra_heads": true if any person has two heads or a duplicated/ghost face.
+"floating_object": name an object that would normally be held or worn (cup, phone, bag, glass, bottle) but is floating in the air
+with no hand or body supporting it; empty string if none.`;
+function anatomyVerdict(a) {
+  if (a.extra_heads) return "a person has two heads or a duplicated face";
+  if (String(a.floating_object || "").trim()) return `a ${String(a.floating_object).trim()} is floating in the air with no hand holding it`;
+  const per = {};
+  for (const hd of a.hands || []) (per[String(hd.person).toLowerCase()] ||= []).push(hd);
+  for (const [p, hs] of Object.entries(per)) {
+    if (hs.length > 2) return `${p} has ${hs.length} hands`;
+    const f = hs.find((x) => x.connected_arm === "none");
+    if (f) return `${p} has a hand not attached to any arm (${f.doing})`;
+    if (hs.filter((x) => x.connected_arm === "left").length > 1 || hs.filter((x) => x.connected_arm === "right").length > 1) return `${p} has two hands on one arm`;
+  }
+  return "";
+}
+export async function checkAnatomy(apiKey, sharp, outJpeg) {
+  const img = (await sharp(outJpeg).resize(1536, 1536, { fit: "inside" }).jpeg({ quality: 90 }).toBuffer()).toString("base64");
+  const one = async (retry = 1) => {
+    const j = await gemini(apiKey, "gemini-3-flash-preview", {
+      contents: [{ role: "user", parts: [{ inline_data: { mime_type: "image/jpeg", data: img } }, { text: ANATOMY_PROMPT }] }],
+      generationConfig: { responseMimeType: "application/json", responseSchema: ANATOMY_SCHEMA },
+    }, 40000);
+    try { return anatomyVerdict(JSON.parse((j?.candidates?.[0]?.content?.parts || []).map((x) => x.text || "").join(""))); }
+    catch (_) { return retry ? one(retry - 1) : null; }   // 혼잡으로 빈 응답이면 한 번 더 — 표가 모자라면 판정이 약해진다
+  };
+  const votes = (await Promise.all([one(), one(), one()])).filter((v) => v !== null);
+  if (!votes.length) return { ok: true, problem: "", unchecked: true };   // 검사 자체 실패는 막지 않는다
+  const bad = votes.filter(Boolean);
+  return { ok: bad.length < 2, problem: bad[0] || "", votes: `${bad.length}/${votes.length}` };
+}
+
 export async function runRetouch({ apiKey, sharp, srcBuf, text }) {
   const meta = await sharp(srcBuf).metadata();
   const w = meta.width, h = meta.height;
@@ -666,29 +760,53 @@ export async function runRetouch({ apiKey, sharp, srcBuf, text }) {
   if (!plan) return { error: "plan" };
   if (!plan.allowed) return { refused: true, message: plan.refusal, lang: plan.lang };
   if (!plan.edits.length || (plan.scope !== "global" && !plan.regions.length)) return { error: "plan" };
-  const editB64 = await editImage(apiKey, b64, nearestAspect(w, h), editPrompt(plan));
-  if (!editB64) return { error: "busy" };
   const O = await sharp(srcBuf).removeAlpha().raw().toBuffer();
-  let E = await sharp(Buffer.from(editB64, "base64")).rotate().resize(w, h, { fit: "fill" }).removeAlpha().raw().toBuffer();
-  // 빛·분위기 요청인데 장소를 통째로 바꿔 왔으면(9/30 나이키 매장 → 공원) 한 번 더 그린다
-  if (plan.scope === "global" && plan.keepDetail && !sameSpot(O, E, w, h, 0, 0, w, h, 0.45, false)) {
-    const again = await editImage(apiKey, b64, nearestAspect(w, h), editPrompt(plan));
-    if (again) {
-      const E2 = await sharp(Buffer.from(again, "base64")).rotate().resize(w, h, { fit: "fill" }).removeAlpha().raw().toBuffer();
-      if (sameSpot(O, E2, w, h, 0, 0, w, h, 0.45, false)) E = E2;
+  const toJpeg = (buf) => sharp(buf, { raw: { width: w, height: h, channels: 3 } }).jpeg({ quality: 92 }).toBuffer();
+  let fix = "";
+  const tried = [];
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const prompt = editPrompt(plan) + (fix ? `\nThe previous attempt had this anatomy error — do not repeat it: ${fix}` : "");
+    const editB64 = await editImage(apiKey, b64, nearestAspect(w, h), prompt);
+    if (!editB64) return { error: "busy" };
+    let E = await sharp(Buffer.from(editB64, "base64")).rotate().resize(w, h, { fit: "fill" }).removeAlpha().raw().toBuffer();
+    // 빛·분위기 요청인데 장소를 통째로 바꿔 왔으면(9/30 나이키 매장 → 공원) 한 번 더 그린다
+    if (plan.scope === "global" && plan.keepDetail && !sameSpot(O, E, w, h, 0, 0, w, h, 0.45, false)) {
+      const again = await editImage(apiKey, b64, nearestAspect(w, h), prompt);
+      if (again) {
+        const E2 = await sharp(Buffer.from(again, "base64")).rotate().resize(w, h, { fit: "fill" }).removeAlpha().raw().toBuffer();
+        if (sameSpot(O, E2, w, h, 0, 0, w, h, 0.45, false)) E = E2;
+      }
     }
+    if (process.env.DEBUG_SAVE_E) await sharp(E, { raw: { width: w, height: h, channels: 3 } }).jpeg({ quality: 92 }).toFile(process.env.DEBUG_SAVE_E);
+    // 배경을 통째로 바꾸는 요청(실내→야외, 새 배경)은 원본과 맞출 기준이 없다 — 정렬하면 엉뚱하게 늘어난다.
+    const align = plan.scope === "global" && !plan.keepDetail ? null : alignEdit(O, E, w, h, plan.regions, plan.scope);
+    if (align) E = warpRGB(E, w, h, align);
+    let { out, pasted, same, thr } = compositeRetouch(O, E, w, h, plan.regions, plan.protect, plan.scope, plan.keepDetail, plan.textBoxes);
+    // 부분 편집인데 사진의 1/3 넘게 바뀌면(자세·베일·드레스처럼 큰 변화) 원본과 AI 를 반씩 섞는 경계에서
+    // 벽 모서리·창틀이 어긋나 꺾여 보인다(9/30 웨딩 "베일 날리며 내려다보기", 58% 붙임). 이럴 땐 AI 결과를 통째로 쓰고
+    // 글자·얼굴만 같은 자리일 때 옮긴다(전체 변경 경로와 같은 처리).
+    // 팔·손·자세를 움직이는 요청도 통째로 — AI 가 그린 몸은 팔이 두 개인데, 원본과 섞으면 박스 밖에 남은 원래 손이 살아나
+    // 손이 세 개가 된다(9/30 "커피 안 든 손으로 브이": 주머니 손 + 브이 손 + 컵 든 손).
+    let whole = plan.scope === "global";
+    // 배경만 바꾸는 요청은 붙은 면적이 커도 통째로 쓰지 않는다 — 통째로 쓰면 AI 가 다시 그린 인물이 나간다.
+    if (!whole && (plan.poseChange || (pasted > 0.35 && !plan.backgroundOnly))) {
+      ({ out, pasted, same, thr } = compositeRetouch(O, E, w, h, plan.regions, plan.protect, "global", false, plan.textBoxes));
+      whole = true;
+    }
+    let finalJpeg = await toJpeg(out);
+    let chk = await checkAnatomy(apiKey, sharp, finalJpeg);
+    // 섞은 결과가 걸렸으면 AI 결과 통째(섞으면서 생긴 손·머리 중복이면 이걸로 풀린다)
+    if (!chk.ok && !whole) {
+      const g = compositeRetouch(O, E, w, h, plan.regions, plan.protect, "global", false, plan.textBoxes);
+      const j2 = await toJpeg(g.out);
+      const c2 = await checkAnatomy(apiKey, sharp, j2);
+      if (c2.ok) ({ out, pasted, same, thr } = g), finalJpeg = j2, chk = c2;
+    }
+    console.log(`[retouch] anatomy try${attempt + 1} ${chk.ok ? "ok" : "FAIL: " + chk.problem}${chk.unchecked ? " (unchecked)" : " " + chk.votes}`);
+    if (chk.ok) return { finalJpeg, plan, w, h, stats: { pasted, same, thr, align, attempts: attempt + 1 } };
+    tried.push(chk.problem);
+    fix = chk.problem;
   }
-  // 배경을 통째로 바꾸는 요청(실내→야외, 새 배경)은 원본과 맞출 기준이 없다 — 정렬하면 엉뚱하게 늘어난다.
-  if (process.env.DEBUG_SAVE_E) await sharp(E, { raw: { width: w, height: h, channels: 3 } }).jpeg({ quality: 92 }).toFile(process.env.DEBUG_SAVE_E);
-  const align = plan.scope === "global" && !plan.keepDetail ? null : alignEdit(O, E, w, h, plan.regions, plan.scope);
-  if (align) E = warpRGB(E, w, h, align);
-  let { out, pasted, same, thr } = compositeRetouch(O, E, w, h, plan.regions, plan.protect, plan.scope, plan.keepDetail, plan.textBoxes);
-  // 부분 편집인데 사진의 1/3 넘게 바뀌면(자세·베일·드레스처럼 큰 변화) 원본과 AI 를 반씩 섞는 경계에서
-  // 벽 모서리·창틀이 어긋나 꺾여 보인다(9/30 웨딩 "베일 날리며 내려다보기", 58% 붙임). 이럴 땐 AI 결과를 통째로 쓰고
-  // 글자·얼굴만 같은 자리일 때 옮긴다(전체 변경 경로와 같은 처리).
-  if (plan.scope !== "global" && pasted > 0.35) {
-    ({ out, pasted, same, thr } = compositeRetouch(O, E, w, h, plan.regions, plan.protect, "global", false, plan.textBoxes));
-  }
-  const finalJpeg = await sharp(out, { raw: { width: w, height: h, channels: 3 } }).jpeg({ quality: 92 }).toBuffer();
-  return { finalJpeg, plan, w, h, stats: { pasted, same, thr, align } };
+  // 두 번 다 몸이 잘못 나왔으면 내보내지 않는다(503 → 차감 없음)
+  return { error: "anatomy", problems: tried };
 }

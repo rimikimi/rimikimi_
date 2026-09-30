@@ -1080,7 +1080,7 @@ async function handleGenerate(req, res, hold) {
       });
     }
     if (rt.error) {
-      console.error(`[retouch] ${rt.error === "plan" ? "의도 파악 실패" : "편집 모델 실패"}`);
+      console.error(`[retouch] ${rt.error === "plan" ? "의도 파악 실패" : rt.error === "anatomy" ? "인체 구조 검사 2회 실패: " + (rt.problems || []).join(" | ") : "편집 모델 실패"}`);
       return res.status(503).json(failBody);
     }
 
