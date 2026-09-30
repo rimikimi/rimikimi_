@@ -112,6 +112,8 @@ final class GenerationCoordinator {
         let job = Job(conceptId: request.concept.id, conceptTitle: request.concept.title,
                       startedAt: Date(), count: request.displayCount)
         addMarker(job)
+        // 매직 부스(올린 사진을 변환)는 결과 화면에서 길게 눌러 원본과 비교한다 — 원본은 기기에만 둔다.
+        if request.concept.isArtTransform { OriginalStore.saveForJob(job.id, image: request.photo) }
         entries.insert(Entry(job: job, phase: .running(waiting: false)), at: 0)
         quotaExceeded = false
         Task { await run(request, job: job, token: token, pushToken: pushToken) }
@@ -123,6 +125,7 @@ final class GenerationCoordinator {
             guard isLive(job.id) else { return }
             lastCredits = r.credits
             let items = r.items.map { ResultItem(id: $0.id, image: $0.image, url: nil, expiresAt: $0.galleryExpiresAt) }
+            OriginalStore.link(jobId: job.id, to: items.map(\.id))
             removeMarker(job.id)
             setPhase(job.id, .done(items))
             pendingPresentation = items
@@ -180,6 +183,7 @@ final class GenerationCoordinator {
             switch await lookup(job) {
             case .found(let items):
                 guard isLive(job.id) else { return false }
+                OriginalStore.link(jobId: job.id, to: items.map(\.id))
                 removeMarker(job.id)
                 setPhase(job.id, .done(items))
                 pendingPresentation = items

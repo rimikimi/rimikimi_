@@ -200,6 +200,8 @@ enum Copy {
     static func resultCount(_ n: Int, page: Int) -> String {
         L.ko ? "\(n)장 만들었어요 · \(page) / \(n)" : "\(plural(n, "photo", "photos")) made · \(page) / \(n)"
     }
+    static var resultHoldOriginal: String { L.t("길게 눌러 원본 보기", "Hold to see the original") }
+    static var resultOriginalBadge: String { L.t("원본", "Original") }
     static var resultSavedNotice: String { L.t("내 사진에 저장됐어요 · 앨범에도 저장", "Saved to My Photos · save to your album too") }
     static var resultNotThreeFour: String { L.t("사진이 3:4 가 아니에요 · 정방향 맞춤", "This photo isn't 3:4 · Fit to 3:4") }
     static var saving: String { L.t("저장 중…", "Saving…") }

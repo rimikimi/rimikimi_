@@ -173,17 +173,50 @@ struct ResultPhoto: View {
     var item: GenerationCoordinator.ResultItem
     @Binding var loaded: [String: UIImage]
     var override: UIImage? = nil
+    /// 매직 부스 원본(기기에만 보관, `OriginalStore`) — 있으면 길게 누르는 동안 원본을 보여 준다.
+    @State private var original: UIImage?
+    @GestureState private var showingOriginal = false
 
     var body: some View {
+        let result = override ?? item.image ?? loaded[item.id]
         ZStack {
             RoundedRectangle(cornerRadius: Radius.card, style: .continuous).fill(Color.fill)
-            if let img = override ?? item.image ?? loaded[item.id] {
+            if showingOriginal, let original {
+                Image(uiImage: original).resizable().scaledToFill()
+            } else if let img = result {
                 Image(uiImage: img).resizable().scaledToFill()
             } else {
                 ProgressView().tint(Color.ink2)
             }
         }
+        .overlay(alignment: .bottom) {
+            if original != nil, result != nil {
+                Text(showingOriginal ? Copy.resultOriginalBadge : Copy.resultHoldOriginal)
+                    .font(AppFont.footnote).foregroundStyle(.white)
+                    .padding(.horizontal, Spacing.s3).padding(.vertical, 6)
+                    .background(.black.opacity(0.45), in: Capsule())
+                    .padding(.bottom, Spacing.s3)
+                    .allowsHitTesting(false)
+            }
+        }
         .clipShape(RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
+        .contentShape(Rectangle())
+        // 길게 누르는 동안만 원본(손 떼면 결과). 짧은 스와이프는 그대로 페이지 넘김.
+        .simultaneousGesture(
+            LongPressGesture(minimumDuration: 0.2)
+                .sequenced(before: DragGesture(minimumDistance: 0))
+                .updating($showingOriginal) { value, state, _ in
+                    if case .second(true, _) = value, original != nil { state = true }
+                }
+        )
+        .sensoryFeedback(.selection, trigger: showingOriginal)
+        .task(id: item.id) {
+            // 완성 직후엔 원본을 결과 id 로 옮겨 적는 중일 수 있다 — 2초까지 다시 본다.
+            for _ in 0..<10 {
+                if let img = OriginalStore.image(for: item.id) { original = img; return }
+                try? await Task.sleep(for: .milliseconds(200))
+            }
+        }
         // id 로 묶는다 — 같은 화면이 다른 결과로 바뀌어도 다시 내려받게(그냥 .task 는 처음 한 번만 돈다).
         // 네트워크가 잠깐 끊겨도 로딩 표시에 갇히지 않게 3번까지 다시 시도한다.
         .task(id: item.url) {
