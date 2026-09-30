@@ -25,6 +25,7 @@ const PLAN_SCHEMA = {
     keep: { type: "ARRAY", items: { type: "STRING" } },
     regions: { type: "ARRAY", items: { type: "OBJECT", required: ["label", "box_2d"], properties: { label: { type: "STRING" }, box_2d: { type: "ARRAY", items: { type: "INTEGER" } } } } },
     protect: { type: "ARRAY", items: { type: "OBJECT", required: ["label", "box_2d"], properties: { label: { type: "STRING" }, box_2d: { type: "ARRAY", items: { type: "INTEGER" } } } } },
+    text_boxes: { type: "ARRAY", items: { type: "OBJECT", required: ["label", "box_2d"], properties: { label: { type: "STRING" }, box_2d: { type: "ARRAY", items: { type: "INTEGER" } } } } },
   },
 };
 
@@ -48,6 +49,8 @@ Customer request:
    (e.g. make it daytime/night/sunset, warmer, film look); false when it adds or removes things or textures
    (rain, snow, fog, new objects, removing a person, a new background). For "local" requests set false.
 3) REGIONS — "regions": tight boxes around the areas the edits touch (including where changed things will end up), and nothing else.
+   "text_boxes": when "keep_detail" is true, a tight box around EVERY piece of legible text, number, logo, sign, sticker or license
+   plate in the photo (small ones too); otherwise [].
    "protect": a tight box around every person's face (forehead to chin, ear to nose tip) that the edits do NOT explicitly change.
    Boxes are [ymin, xmin, ymax, xmax] normalized 0-1000.
 Return JSON only.`;
@@ -127,6 +130,7 @@ export async function planRetouch(apiKey, jpegB64, text) {
       keep: (p.keep || []).map(String).filter(Boolean).slice(0, 12),
       regions: cleanBoxes(p.regions),
       protect: cleanBoxes(p.protect),
+      textBoxes: cleanBoxes(p.text_boxes).slice(0, 60),
     };
   } catch (_) { return null; }
 }
@@ -310,32 +314,45 @@ export function warpRGB(E, w, h, { s, tx, ty }) {
  * 화질 차이가 없고, 원본 크기로 하면 사진 한 장에 16초가 걸렸다(실측). 섞기(합성)는 원본 크기에서 한다.
  * 반환: { out: RGB Uint8, pasted: 붙인 면적 비율, same: 원본과 같은 픽셀 비율 }
  */
-export function compositeRetouch(O, E, w, h, regions, protect, scope = "local", keepDetail = false) {
+export function compositeRetouch(O, E, w, h, regions, protect, scope = "local", keepDetail = false, textBoxes = []) {
   const n = w * h;
   // ── 사진 전체를 바꾸는 요청(밤으로·눈 오는 날·색감 등) ──
   //    아래 "부분 편집" 방식(바뀐 곳만 붙이기 + 전체 색 이동 되돌리기)은 전체 변경을 도로 원본으로 돌려놓는다
   //    (오너 실측 2026-09-30 "완전 밤으로 바꾸진 않네?"). 전체 변경은 AI 결과를 그대로 쓰되,
   //    얼굴만 **조명·색(저주파)은 AI, 이목구비·피부결(고주파)은 원본** 으로 합친다 — 밤 조명을 받은 같은 사람.
   //    (얼굴을 원본 그대로 두면 어두운 장면에 낮 얼굴이 오려 붙인 것처럼 뜬다 — 재현 확인)
-  if (scope === "global" && keepDetail) {
-    // 빛·시간대·색만 바꾸는 요청(낮으로·밤으로·노을·필름톤): **조명(저주파)은 AI, 세부(고주파)는 원본** 을 사진 전체에.
-    // AI 는 화면을 다시 그리면서 작은 글자를 깨뜨린다 — 9/30 오너 버스 사진 "대낮처럼": BYD→BVC, 서울→세종,
-    // 스티커 문구 깨짐. 곱셈형(원본/원본저주파 비율)으로 옮겨야 어두운 곳의 세부도 새 밝기에 맞게 산다.
-    // 눈·비·사람 지우기처럼 새로 그려 넣는 요청은 keepDetail=false(계획 단계에서 정함) — 옮기면 눈송이가 지워진다.
-    const out = Buffer.alloc(n * 3);
-    const sd = Math.max(2, Math.min(w, h) * 0.0023);            // 2000px 기준 3.5px — 글자 획 굵기
-    for (let c = 0; c < 3; c++) {
-      const oc = new Float32Array(n), ec = new Float32Array(n);
-      for (let i = 0; i < n; i++) { oc[i] = O[i * 3 + c]; ec[i] = E[i * 3 + c]; }
-      const ol = gauss(oc, w, h, sd), el = gauss(ec, w, h, sd);
-      for (let i = 0; i < n; i++) {
-        let r = (oc[i] + 8) / (ol[i] + 8);
-        r = r < 0.6 ? 0.6 : r > 1.6 ? 1.6 : r;
-        const v = el[i] * r;
-        out[i * 3 + c] = v < 0 ? 0 : v > 255 ? 255 : Math.round(v);
+  if (scope === "global" && keepDetail && textBoxes.length) {
+    // 빛·시간대·색만 바꾸는 요청(낮으로·밤으로·노을): AI 는 화면을 다시 그리며 작은 글자를 깨뜨린다(9/30 오너 버스 사진:
+    // BYD→BVC, 서울→세종, 스티커 문구). **글자·로고·번호판 박스 안에서만** 조명(저주파)=AI, 세부(고주파)=원본으로 합친다.
+    // ⚠️ 사진 전체에 하면 밤 노이즈·빛 번짐·거친 질감까지 살아나 "디테일만 살고 사진이 구리다"(오너 9/30) — 박스만.
+    const out = Buffer.from(E);
+    const short = Math.min(w, h), sd = Math.max(2, short * 0.0023), feather = Math.max(3, short * 0.006);
+    for (const g of textBoxes) {
+      const [y0, x0, y1, x1] = g.box_2d;
+      const pad = Math.ceil(feather * 3 + sd * 3);
+      const xa = Math.max(0, Math.floor(x0 / 1000 * w) - pad), xb = Math.min(w, Math.ceil(x1 / 1000 * w) + pad);
+      const ya = Math.max(0, Math.floor(y0 / 1000 * h) - pad), yb = Math.min(h, Math.ceil(y1 / 1000 * h) + pad);
+      const cw = xb - xa, ch = yb - ya, cn = cw * ch;
+      if (cw < 6 || ch < 6) continue;
+      const m = new Float32Array(cn);                              // 박스(여유 1 feather) → 부드러운 가장자리
+      const bx0 = x0 / 1000 * w - feather - xa, bx1 = x1 / 1000 * w + feather - xa, by0 = y0 / 1000 * h - feather - ya, by1 = y1 / 1000 * h + feather - ya;
+      for (let y = 0; y < ch; y++) for (let x = 0; x < cw; x++) if (x >= bx0 && x <= bx1 && y >= by0 && y <= by1) m[y * cw + x] = 1;
+      const a = gauss(m, cw, ch, feather);
+      for (let c = 0; c < 3; c++) {
+        const oc = new Float32Array(cn), ec = new Float32Array(cn);
+        for (let y = 0; y < ch; y++) for (let x = 0; x < cw; x++) { const i = ((y + ya) * w + x + xa) * 3 + c; oc[y * cw + x] = O[i]; ec[y * cw + x] = out[i]; }
+        const ol = gauss(oc, cw, ch, sd), el = gauss(ec, cw, ch, sd);
+        for (let j = 0; j < cn; j++) {
+          if (a[j] <= 0.002) continue;
+          let r = (oc[j] + 8) / (ol[j] + 8);
+          r = r < 0.6 ? 0.6 : r > 1.6 ? 1.6 : r;
+          const v = ec[j] + (el[j] * r - ec[j]) * Math.min(1, a[j]);
+          const i = (((j / cw) | 0) + ya) * w * 3 + ((j % cw) + xa) * 3 + c;
+          out[i] = v < 0 ? 0 : v > 255 ? 255 : Math.round(v);
+        }
       }
     }
-    return { out, pasted: 1, same: 0, thr: 0 };
+    E = out;                                                        // 이어서 아래 얼굴 처리(조명 AI · 이목구비 원본)
   }
   if (scope === "global") {
     const out = Buffer.from(E);
@@ -559,7 +576,7 @@ export async function runRetouch({ apiKey, sharp, srcBuf, text }) {
   let E = await sharp(Buffer.from(editB64, "base64")).rotate().resize(w, h, { fit: "fill" }).removeAlpha().raw().toBuffer();
   const align = alignEdit(O, E, w, h, plan.regions, plan.scope);
   if (align) E = warpRGB(E, w, h, align);
-  const { out, pasted, same, thr } = compositeRetouch(O, E, w, h, plan.regions, plan.protect, plan.scope, plan.keepDetail);
+  const { out, pasted, same, thr } = compositeRetouch(O, E, w, h, plan.regions, plan.protect, plan.scope, plan.keepDetail, plan.textBoxes);
   const finalJpeg = await sharp(out, { raw: { width: w, height: h, channels: 3 } }).jpeg({ quality: 92 }).toBuffer();
   return { finalJpeg, plan, w, h, stats: { pasted, same, thr, align } };
 }
