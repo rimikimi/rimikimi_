@@ -1102,7 +1102,9 @@ async function handleGenerate(req, res, hold) {
       const wm = await applyWatermark(rawData, rawMime);
       rawData = wm.base64; rawMime = wm.mime;
     }
-    const small = await shrinkOutput(rawData, rawMime);
+    // 커스텀 보정은 **원본 해상도 그대로** 돌려준다(오너 9/30 "2k 로 출력하는 거 아님?") — 일반 경로의 1024 축소(shrinkOutput)를
+    // 쓰면 앱·웹에서 저장하는 사진이 원본보다 작아진다. 입력이 긴 변 2048 이하라 JPEG 92 로 1~2MB, 응답 한도(4.5MB) 안.
+    const small = { base64: rawData, mime: rawMime };
     let galleryId = null, galleryExpiresAt = null;
     try {
       const saved = await saveToGallery(admin, user, {
