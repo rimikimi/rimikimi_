@@ -55,10 +55,12 @@ Customer request:
    that is in the photo. Never replace the background, the location or remove things unless the customer explicitly asks for that
    (e.g. "배경을 바꿔줘", "replace the background", "put me in Paris"). Write "edits" and "keep" accordingly.
    PLAIN BACKGROUND REQUESTS: "배경이 밋밋해/심심해/허전해/휑해/비어 보여", "boring/plain/empty background" mean the customer wants the
-   background itself to become more interesting — ADD real, fitting things and depth that match this kind of place (for a room: e.g.
-   plants or flowers in a vase, framed art, a stylish chair or side table, soft window light and shadow patterns, a textured wall; for
-   a street or nature: fitting scenery details), clearly visible, tasteful, not cluttered, never covering the person. Light/tone tweaks
-   alone are NOT enough. The people stay exactly as they are (face, hair, pose, clothes, bag). Use scope "local" with one region
+   background of THIS SAME photo to look richer — it must stay the same photo of the same place. Keep every existing structure
+   exactly where it is (walls, windows, window frames, doors, curtains, floor, furniture, buildings): never remove, replace, move or
+   cover them, never turn a window into a wall. Only ADD a few small fitting details into EMPTY areas (for a room: e.g. a plant or a
+   vase with flowers on the floor or sill, soft sunlight and window-shadow patterns on the walls/floor; for a street or nature: small
+   fitting details) and enrich the light. Tasteful, not cluttered, never covering the person. Name the exact empty spot for each
+   addition in "edits". The people stay exactly as they are (face, hair, pose, clothes, bag). Use scope "local" with one region
    covering the whole frame, and "background_only": true.
    "background_only": true when the edits change only the background/surroundings and every person must stay untouched; otherwise false.
    "scope": "global" if the request changes the look of the WHOLE photo — time of day (e.g. night, sunset), weather, season, overall
@@ -129,6 +131,8 @@ ${(plan.keep || []).map((e) => "- " + e).join("\n")}
 - Same faces and identities (same face shape, eyes, nose, mouth, age), same body shapes, same clothing
 - Same lighting direction, exposure, white balance, color grading, contrast and photo texture
 - Same background and scenery
+- Every existing wall, window, window frame, door, curtain, floor and piece of furniture stays exactly where it is, same shape and
+  size — additions go only into empty space; never remove, replace or reshape the place itself
 (Each "same" rule above yields only where an edit above explicitly asks for that change.)
 When removing something, fill the space only with the background that would naturally be behind it — never put a new person, animal or object in its place.
 Correct human anatomy for every person: exactly two arms and two hands, five fingers per hand, natural joints — a hand or arm that moves must no longer appear in its old place.
