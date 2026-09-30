@@ -13,9 +13,10 @@
 
 const PLAN_SCHEMA = {
   type: "OBJECT",
-  required: ["allowed", "lang", "summary", "edits", "keep", "regions", "protect"],
+  required: ["allowed", "lang", "summary", "scope", "edits", "keep", "regions", "protect"],
   properties: {
     allowed: { type: "BOOLEAN" },
+    scope: { type: "STRING" },
     refusal: { type: "STRING" },
     lang: { type: "STRING" },
     summary: { type: "STRING" },
@@ -40,13 +41,31 @@ Customer request:
 2) PLAN — "edits": precise English edit instructions tied to what is visible in THIS photo (only what was asked or clearly implied,
    no extra "improvements"); "keep": what must stay exactly the same; "summary": one or two polite sentences in the SAME language as
    the request saying what will be fixed; "lang": language code of the request.
+   "scope": "global" if the request changes the look of the WHOLE photo — time of day (e.g. night, sunset), weather, season, overall
+   lighting or mood, color grade/filter look, or the entire background; otherwise "local" (specific people, objects or areas).
 3) REGIONS — "regions": tight boxes around the areas the edits touch (including where changed things will end up), and nothing else.
    "protect": a tight box around every person's face (forehead to chin, ear to nose tip) that the edits do NOT explicitly change.
    Boxes are [ymin, xmin, ymax, xmax] normalized 0-1000.
 Return JSON only.`;
 }
 
-function editPrompt(plan) {
+export function editPrompt(plan) {
+  if (plan.scope === "global") {
+    return `Edit this exact photograph. This is an edit of the provided photo, not a new photo.
+
+Apply these changes to the WHOLE photo, clearly and convincingly — the change must be obvious at first glance (for weather: clearly visible
+rain streaks or falling snow, wet or snowy surfaces; for time of day: the sky, light and shadows all match), not a subtle tweak:
+${plan.edits.map((e) => "- " + e).join("\n")}
+
+Keep:
+${(plan.keep || []).map((e) => "- " + e).join("\n")}
+- The same framing, crop, camera angle and composition; everyone the changes above do not remove stays in the same pose and position
+- The same faces and identities (same face shape, eyes, nose, mouth, age), same body shapes and the same clothing
+- Relight the people naturally to match the new light and atmosphere (it must look like one real photo, not a pasted cut-out)
+(Each "same" rule above yields only where a change above explicitly asks for it — every listed change must be done, including removals.)
+When removing someone or something, fill the space only with the background that would naturally be behind it — never put a new person, animal or object in its place.
+Photorealistic, like the same real photo re-shot or re-graded by a skilled photographer. No added objects, no text, no watermark, no frame or border.`;
+  }
   return `Retouch this exact photograph. This is an edit of the provided photo, not a new photo.
 
 Apply ONLY these changes:
@@ -59,11 +78,12 @@ ${(plan.keep || []).map((e) => "- " + e).join("\n")}
 - Same lighting direction, exposure, white balance, color grading, contrast and photo texture
 - Same background and scenery
 (Each "same" rule above yields only where an edit above explicitly asks for that change.)
+When removing something, fill the space only with the background that would naturally be behind it — never put a new person, animal or object in its place.
 The result must look like the same real photo after a skilled human retoucher's careful work: photorealistic, no painted or AI look, no added objects, no text, no watermark, no frame or border.`;
 }
 
 const ASPECTS = [["1:1", 1], ["2:3", 2 / 3], ["3:2", 3 / 2], ["3:4", 3 / 4], ["4:3", 4 / 3], ["4:5", 4 / 5], ["5:4", 5 / 4], ["9:16", 9 / 16], ["16:9", 16 / 9]];
-const nearestAspect = (w, h) =>
+export const nearestAspect = (w, h) =>
   ASPECTS.reduce((b, a) => (Math.abs(Math.log(a[1] / (w / h))) < Math.abs(Math.log(b[1] / (w / h))) ? a : b))[0];
 
 async function gemini(apiKey, model, body, timeoutMs) {
@@ -97,6 +117,7 @@ export async function planRetouch(apiKey, jpegB64, text) {
       refusal: String(p.refusal || ""),
       lang: String(p.lang || ""),
       summary: String(p.summary || "").slice(0, 400),
+      scope: p.scope === "global" ? "global" : "local",
       edits: (p.edits || []).map(String).filter(Boolean).slice(0, 12),
       keep: (p.keep || []).map(String).filter(Boolean).slice(0, 12),
       regions: cleanBoxes(p.regions),
@@ -105,7 +126,7 @@ export async function planRetouch(apiKey, jpegB64, text) {
   } catch (_) { return null; }
 }
 
-async function editImage(apiKey, jpegB64, aspect, prompt) {
+export async function editImage(apiKey, jpegB64, aspect, prompt) {
   const body = (cfg) => ({
     contents: [{ role: "user", parts: [{ inline_data: { mime_type: "image/jpeg", data: jpegB64 } }, { text: prompt }] }],
     generationConfig: { responseModalities: ["IMAGE"], ...(cfg ? { imageConfig: { imageSize: "2K", aspectRatio: aspect } } : {}) },
@@ -181,14 +202,155 @@ function shrinkRGB(src, w, h, k) {
   return { px: out, sw, sh };
 }
 
+/* ---------- 정렬 — AI 가 사진을 다시 잡아(확대·이동) 돌려줄 때 ---------- */
+// 9/30 셔츠 테스트: Pro 가 인물을 12% 작게·위로 옮겨 돌려줘서(12가지 중 1가지), 셔츠 박스만 붙이자 머리카락이
+// 박스 윗변에서 일자로 잘리고 옷깃이 두 겹이 됐다. 대부분은 1~2px 이라 늘여 맞추기로 충분했지만(SIFT 를 뺀 이유)
+// 이런 경우를 잡으려고 배율(가운데 기준)+이동을 거친→고운 탐색으로 찾는다. 윤곽(기울기 크기)의 NCC 라
+// AI 가 톤·색을 바꿔도(밤·흑백) 맞출 수 있고, 요청 영역(+4%)은 내용이 바뀌는 곳이라 빼고 잰다.
+// 배율·이동이 둘 다 분리 가능(x 는 x 만, y 는 y 만)이라 옮기기도 줄마다 싸다.
+function lumaGrad(src, w, h, k) {
+  const { px, sw, sh } = shrinkRGB(src, w, h, k);
+  const g = new Float32Array(sw * sh);
+  for (let j = 0; j < sw * sh; j++) g[j] = 0.299 * px[j * 3] + 0.587 * px[j * 3 + 1] + 0.114 * px[j * 3 + 2];
+  const o = new Float32Array(sw * sh);
+  for (let y = 1; y < sh - 1; y++) for (let x = 1; x < sw - 1; x++) {
+    const i = y * sw + x, gx = g[i + 1] - g[i - 1], gy = g[i + sw] - g[i - sw];
+    o[i] = Math.sqrt(gx * gx + gy * gy);
+  }
+  return { g: gauss(o, sw, sh, 1), sw, sh };
+}
+function nccAt(A, B, W, H, mask, s, tx, ty, step) {
+  const cx = W / 2, cy = H / 2;
+  let n = 0, sa = 0, sb = 0, saa = 0, sbb = 0, sab = 0;
+  for (let y = 2; y < H - 2; y += step) {
+    let fy = s * (y - cy) + cy + ty;
+    if (fy < 0) fy = 0; else if (fy > H - 1.001) fy = H - 1.001;
+    const y0 = fy | 0, wy = fy - y0;
+    for (let x = 2; x < W - 2; x += step) {
+      const i = y * W + x;
+      if (!mask[i]) continue;
+      let fx = s * (x - cx) + cx + tx;
+      if (fx < 0) fx = 0; else if (fx > W - 1.001) fx = W - 1.001;
+      const x0 = fx | 0, wx = fx - x0, k = y0 * W + x0;
+      const b = (B[k] * (1 - wx) + B[k + 1] * wx) * (1 - wy) + (B[k + W] * (1 - wx) + B[k + W + 1] * wx) * wy;
+      const a = A[i];
+      n++; sa += a; sb += b; saa += a * a; sbb += b * b; sab += a * b;
+    }
+  }
+  if (n < 50) return -1;
+  const va = saa - sa * sa / n, vb = sbb - sb * sb / n;
+  return (sab - sa * sb / n) / Math.sqrt(Math.max(1e-9, va * vb));
+}
+/** 반환: null(그대로 두면 됨) 또는 { s, tx, ty } — 원본 좌표 (x,y) 에 놓을 E 의 좌표 = s·(x−cx)+cx+tx (원본 픽셀) */
+export function alignEdit(O, E, w, h, regions, scope) {
+  const levels = [[160, 0.15, 0.02, 10, 2, 2], [160, 0.02, 0.01, 2, 1, 2], [320, 0.01, 0.004, 3, 1, 2], [640, 0.004, 0.002, 2, 1, 2]];
+  let best = { s: 1, tx: 0, ty: 0 }, prevW = 0, gain = 0, W = 0, H = 0;
+  for (const [L, sR, sS, tR, tS, step] of levels) {
+    const k = Math.max(1, Math.ceil(Math.max(w, h) / L));
+    const a = lumaGrad(O, w, h, k), b = lumaGrad(E, w, h, k);
+    W = a.sw; H = a.sh;
+    const mask = new Uint8Array(W * H).fill(1);
+    if (scope !== "global") for (const g of regions) {
+      const [y0, x0, y1, x1] = g.box_2d;
+      const ya = Math.max(0, Math.floor((y0 / 1000 - 0.04) * H)), yb = Math.min(H, Math.ceil((y1 / 1000 + 0.04) * H));
+      const xa = Math.max(0, Math.floor((x0 / 1000 - 0.04) * W)), xb = Math.min(W, Math.ceil((x1 / 1000 + 0.04) * W));
+      for (let y = ya; y < yb; y++) mask.fill(0, y * W + xa, y * W + xb);
+    }
+    const r = prevW ? W / prevW : 1;                     // 이전 단계 이동값을 이 해상도로
+    const c = { s: best.s, tx: best.tx * r, ty: best.ty * r };
+    let b2 = { ...c, v: -2 };
+    for (let sc = c.s - sR; sc <= c.s + sR + 1e-9; sc += sS)
+      for (let ty = c.ty - tR; ty <= c.ty + tR + 1e-9; ty += tS)
+        for (let tx = c.tx - tR; tx <= c.tx + tR + 1e-9; tx += tS) {
+          const v = nccAt(a.g, b.g, W, H, mask, sc, tx, ty, step);
+          if (v > b2.v) b2 = { s: sc, tx, ty, v };
+        }
+    best = b2; prevW = W;
+    if (L === 640) gain = b2.v - nccAt(a.g, b.g, W, H, mask, 1, 0, 0, step);
+  }
+  const f = w / W;
+  const out = { s: best.s, tx: best.tx * f, ty: best.ty * f };
+  // 거의 제자리이거나 맞춰 봐도 나아지지 않으면 그대로(엉뚱하게 옮기지 않게)
+  if (gain < 0.01 || (Math.abs(out.s - 1) < 0.003 && Math.abs(out.tx) < 1.5 && Math.abs(out.ty) < 1.5)) return null;
+  return out;
+}
+export function warpRGB(E, w, h, { s, tx, ty }) {
+  const out = Buffer.alloc(w * h * 3);
+  const cx = w / 2, cy = h / 2;
+  const X0 = new Int32Array(w), WX = new Float32Array(w);
+  for (let x = 0; x < w; x++) {
+    let fx = s * (x - cx) + cx + tx;
+    if (fx < 0) fx = 0; else if (fx > w - 1.001) fx = w - 1.001;
+    X0[x] = fx | 0; WX[x] = fx - X0[x];
+  }
+  for (let y = 0; y < h; y++) {
+    let fy = s * (y - cy) + cy + ty;
+    if (fy < 0) fy = 0; else if (fy > h - 1.001) fy = h - 1.001;
+    const y0 = fy | 0, wy = fy - y0, r0 = y0 * w, r1 = r0 + w;
+    for (let x = 0; x < w; x++) {
+      const x0 = X0[x], wx = WX[x], o = (y * w + x) * 3;
+      const i00 = (r0 + x0) * 3, i01 = i00 + 3, i10 = (r1 + x0) * 3, i11 = i10 + 3;
+      for (let c = 0; c < 3; c++) {
+        const v = (E[i00 + c] * (1 - wx) + E[i01 + c] * wx) * (1 - wy) + (E[i10 + c] * (1 - wx) + E[i11 + c] * wx) * wy;
+        out[o + c] = v + 0.5;
+      }
+    }
+  }
+  return out;
+}
+
 /**
  * O, E: 같은 w×h 의 RGB Uint8 (E 는 AI 결과를 원본 크기로 늘인 것). regions/protect: 0~1000 박스.
  * 마스크(어디를 붙일지)는 긴 변 ~1024 로 줄여서 계산하고 원본 크기로 부드럽게 늘린다 — 경계는 어차피 페더라
  * 화질 차이가 없고, 원본 크기로 하면 사진 한 장에 16초가 걸렸다(실측). 섞기(합성)는 원본 크기에서 한다.
  * 반환: { out: RGB Uint8, pasted: 붙인 면적 비율, same: 원본과 같은 픽셀 비율 }
  */
-export function compositeRetouch(O, E, w, h, regions, protect) {
+export function compositeRetouch(O, E, w, h, regions, protect, scope = "local") {
   const n = w * h;
+  // ── 사진 전체를 바꾸는 요청(밤으로·눈 오는 날·색감 등) ──
+  //    아래 "부분 편집" 방식(바뀐 곳만 붙이기 + 전체 색 이동 되돌리기)은 전체 변경을 도로 원본으로 돌려놓는다
+  //    (오너 실측 2026-09-30 "완전 밤으로 바꾸진 않네?"). 전체 변경은 AI 결과를 그대로 쓰되,
+  //    얼굴만 **조명·색(저주파)은 AI, 이목구비·피부결(고주파)은 원본** 으로 합친다 — 밤 조명을 받은 같은 사람.
+  //    (얼굴을 원본 그대로 두면 어두운 장면에 낮 얼굴이 오려 붙인 것처럼 뜬다 — 재현 확인)
+  if (scope === "global") {
+    const out = Buffer.from(E);
+    const shortF = Math.min(w, h);
+    const sig = Math.max(4, shortF * 0.012);
+    for (const g of protect) {
+      const [y0, x0, y1, x1] = g.box_2d;
+      const cx = (x0 + x1) / 2000 * w, cy = (y0 + y1) / 2000 * h;
+      const ax = Math.max(2, (x1 - x0) / 2000 * w), ay = Math.max(2, (y1 - y0) / 2000 * h);
+      const padc = Math.ceil(sig * 3);
+      const xa = Math.max(0, Math.floor(cx - ax * 1.25) - padc), xb = Math.min(w, Math.ceil(cx + ax * 1.25) + padc);
+      const ya = Math.max(0, Math.floor(cy - ay * 1.25) - padc), yb = Math.min(h, Math.ceil(cy + ay * 1.25) + padc);
+      const cw = xb - xa, ch = yb - ya;
+      if (cw < 8 || ch < 8) continue;
+      const cn = cw * ch;
+      const prot = new Float32Array(cn);
+      for (let y = 0; y < ch; y++) for (let x = 0; x < cw; x++) {
+        const dx = (x + xa - cx) / ax, dy = (y + ya - cy) / ay;
+        if (dx * dx + dy * dy <= 1) prot[y * cw + x] = 1;
+      }
+      const pb = gauss(prot, cw, ch, shortF * 0.012);
+      for (let c = 0; c < 3; c++) {
+        const oc = new Float32Array(cn), ec = new Float32Array(cn);
+        for (let y = 0; y < ch; y++) for (let x = 0; x < cw; x++) {
+          const i = ((y + ya) * w + (x + xa)) * 3 + c;
+          oc[y * cw + x] = O[i]; ec[y * cw + x] = E[i];
+        }
+        const ol = gauss(oc, cw, ch, sig), el = gauss(ec, cw, ch, sig);
+        for (let y = 0; y < ch; y++) for (let x = 0; x < cw; x++) {
+          const j = y * cw + x, p = Math.min(1, pb[j] * 1.6);
+          if (p <= 0.002) continue;
+          const f = el[j] + (oc[j] - ol[j]);               // 조명은 AI, 디테일은 원본
+          const i = ((y + ya) * w + (x + xa)) * 3 + c;
+          const v = E[i] * (1 - p) + f * p;
+          out[i] = v < 0 ? 0 : v > 255 ? 255 : Math.round(v);
+        }
+      }
+    }
+    return { out, pasted: 1, same: 0, thr: 0 };
+  }
   // 1) 색 맞춤 — 요청 영역 밖(바뀌면 안 되는 곳)에서 채널별 y = a·x + b (원본 크기, 표본만)
   const pad0 = 0.03;
   const inAllow = (x, y) => regions.some((g) => {
@@ -256,6 +418,64 @@ export function compositeRetouch(O, E, w, h, regions, protect) {
   const alphaS = gauss(filled, sw, sh, short * 0.006);
   const guard = dilate(filled, sw, sh, Math.max(2, Math.round(short * 0.015)));
   for (let j = 0; j < sn; j++) alphaS[j] = Math.min(1, alphaS[j] * guard[j]);
+  //    + 요청 영역 전체(여유 4%·부드러운 경계) — 차이 문턱만 쓰면 잡티·얼룩·표정처럼 **옅은 변화**가 문턱 아래라
+  //      통째로 버려진다(9/30 경우의 수 테스트: 벽 얼룩·피부·미소·"예쁘게" 가 0% 붙음). 요청한 자리는 AI 결과를 쓴다.
+  const regPad = Math.round(short * 0.04);
+  const reg = new Float32Array(sn);
+  for (const g of regions) {
+    const [y0, x0, y1, x1] = g.box_2d;
+    const ya = Math.max(0, Math.floor(y0 / 1000 * sh) - regPad), yb = Math.min(sh, Math.ceil(y1 / 1000 * sh) + regPad);
+    const xa = Math.max(0, Math.floor(x0 / 1000 * sw) - regPad), xb = Math.min(sw, Math.ceil(x1 / 1000 * sw) + regPad);
+    for (let y = ya; y < yb; y++) reg.fill(1, y * sw + xa, y * sw + xb);
+  }
+  const regSoft = gauss(reg, sw, sh, short * 0.015);
+  for (let j = 0; j < sn; j++) if (regSoft[j] > alphaS[j]) alphaS[j] = Math.min(1, regSoft[j]);
+  //    이음매 보정(심리스 클로닝 근사) — AI 는 요청 영역을 고치면서 주변 톤까지 살짝 바꾸곤 한다(벽이 밝아짐 등).
+  //    영역째 붙이면 네모난 자국이 보인다(9/30 벽 얼룩 테스트). 원본−AI 의 저주파 차이 D 를 영역 **밖**에서는 그대로,
+  //    **안**에서는 경계값으로 푼 라플라스 막(부드럽게 이어지는 면)으로 채워 AI 결과에 더한다.
+  //    ⚠️ 막을 영역 안쪽 끝까지 쓰면 **의도한 변화까지 되돌린다** — 경계가 바뀐 곳(셔츠 박스 윗변이 목깃,
+  //    피부 박스 가장자리가 볼)을 지나면 경계값이 그 변화의 반대라서 안쪽이 원본 쪽으로 끌려간다.
+  //    같은 AI 결과로 잰 값(9/30): 흰 셔츠 63%·피부 잡티 77% 만 남음 → 막을 **경계 띠(짧은 변 6%)** 에서만
+  //    쓰고 안쪽으로 갈수록 0 으로 줄이면 100%·100%, 벽 얼룩(작은 박스라 거의 전부 띠)·사람 지우기는 그대로.
+  const Dm = [0, 1, 2].map((c) => {
+    const d = new Float32Array(sn);
+    for (let j = 0; j < sn; j++) d[j] = So.px[j * 3 + c] - Se.px[j * 3 + c];
+    return gauss(d, sw, sh, Math.max(1, short * 0.005));
+  });
+  const q = Math.max(1, Math.ceil(Math.max(sw, sh) / 128));
+  const qw = Math.ceil(sw / q), qh = Math.ceil(sh / q), qn = qw * qh;
+  const inside = new Uint8Array(qn);
+  for (let y = 0; y < sh; y++) for (let x = 0; x < sw; x++) if (reg[y * sw + x]) inside[((y / q) | 0) * qw + ((x / q) | 0)] = 1;
+  const inner = gauss(reg, sw, sh, short * 0.03);               // 경계 0.5 → 안쪽 1
+  const Cm = [0, 1, 2].map((c) => {
+    const C = new Float32Array(qn), cnt = new Float32Array(qn);
+    for (let y = 0; y < sh; y++) for (let x = 0; x < sw; x++) { const k = ((y / q) | 0) * qw + ((x / q) | 0); C[k] += Dm[c][y * sw + x]; cnt[k]++; }
+    for (let k = 0; k < qn; k++) C[k] /= cnt[k] || 1;
+    // SOR — 안쪽 칸만 이웃 평균으로 푼다(경계 = 영역 밖 칸의 D 값, 그림 가장자리는 자유 경계)
+    for (let it = 0; it < 600; it++) {
+      for (let y = 0; y < qh; y++) for (let x = 0; x < qw; x++) {
+        const k = y * qw + x;
+        if (!inside[k]) continue;
+        let s2 = 0, m = 0;
+        if (x > 0) { s2 += C[k - 1]; m++; } if (x < qw - 1) { s2 += C[k + 1]; m++; }
+        if (y > 0) { s2 += C[k - qw]; m++; } if (y < qh - 1) { s2 += C[k + qw]; m++; }
+        if (m) C[k] += 1.9 * (s2 / m - C[k]);
+      }
+    }
+    // 마스크 해상도로 — 안쪽은 막 × 경계 띠 가중치(경계 1 → 안쪽 0), 밖은 D
+    const full = new Float32Array(sn);
+    for (let y = 0; y < sh; y++) {
+      const fy = Math.min(qh - 1, Math.max(0, (y + 0.5) / q - 0.5)), y0 = fy | 0, y1 = Math.min(qh - 1, y0 + 1), ty = fy - y0;
+      for (let x = 0; x < sw; x++) {
+        const j = y * sw + x;
+        if (!reg[j]) { full[j] = Dm[c][j]; continue; }
+        const fx = Math.min(qw - 1, Math.max(0, (x + 0.5) / q - 0.5)), x0 = fx | 0, x1 = Math.min(qw - 1, x0 + 1), tx = fx - x0;
+        const band = Math.max(0, Math.min(1, 2 * (1 - inner[j])));
+        full[j] = ((C[y0 * qw + x0] * (1 - tx) + C[y0 * qw + x1] * tx) * (1 - ty) + (C[y1 * qw + x0] * (1 - tx) + C[y1 * qw + x1] * tx) * ty) * band;
+      }
+    }
+    return gauss(full, sw, sh, Math.max(1, short * 0.004));
+  });
   //    얼굴 보호 — 요청이 얼굴을 바꾸는 게 아니면 얼굴은 원본(타원 + 넓은 페더: 사각형이면 머리카락에 이음매가 보인다)
   if (protect.length) {
     const prot = new Float32Array(sn);
@@ -284,9 +504,13 @@ export function compositeRetouch(O, E, w, h, regions, protect) {
       if (a <= 0.002) continue;
       pasted++;
       const i = (y * w + x) * 3;
-      out[i] = Math.round(O[i] + (Ec[i] - O[i]) * a);
-      out[i + 1] = Math.round(O[i + 1] + (Ec[i + 1] - O[i + 1]) * a);
-      out[i + 2] = Math.round(O[i + 2] + (Ec[i + 2] - O[i + 2]) * a);
+      const s00 = y0 * sw + x0, s01 = y0 * sw + x1, s10 = y1 * sw + x0, s11 = y1 * sw + x1;
+      for (let c = 0; c < 3; c++) {
+        const cc = Cm[c];
+        const corr = (cc[s00] * (1 - tx) + cc[s01] * tx) * (1 - ty) + (cc[s10] * (1 - tx) + cc[s11] * tx) * ty;
+        const v = O[i + c] + (Ec[i + c] + corr - O[i + c]) * a;
+        out[i + c] = v < 0 ? 0 : v > 255 ? 255 : Math.round(v);
+      }
     }
   }
   return { out, pasted: pasted / n, same: 1 - pasted / n, thr };
@@ -303,12 +527,14 @@ export async function runRetouch({ apiKey, sharp, srcBuf, text }) {
   const plan = await planRetouch(apiKey, b64, text);
   if (!plan) return { error: "plan" };
   if (!plan.allowed) return { refused: true, message: plan.refusal, lang: plan.lang };
-  if (!plan.edits.length || !plan.regions.length) return { error: "plan" };
+  if (!plan.edits.length || (plan.scope !== "global" && !plan.regions.length)) return { error: "plan" };
   const editB64 = await editImage(apiKey, b64, nearestAspect(w, h), editPrompt(plan));
   if (!editB64) return { error: "busy" };
   const O = await sharp(srcBuf).removeAlpha().raw().toBuffer();
-  const E = await sharp(Buffer.from(editB64, "base64")).rotate().resize(w, h, { fit: "fill" }).removeAlpha().raw().toBuffer();
-  const { out, pasted, same, thr } = compositeRetouch(O, E, w, h, plan.regions, plan.protect);
+  let E = await sharp(Buffer.from(editB64, "base64")).rotate().resize(w, h, { fit: "fill" }).removeAlpha().raw().toBuffer();
+  const align = alignEdit(O, E, w, h, plan.regions, plan.scope);
+  if (align) E = warpRGB(E, w, h, align);
+  const { out, pasted, same, thr } = compositeRetouch(O, E, w, h, plan.regions, plan.protect, plan.scope);
   const finalJpeg = await sharp(out, { raw: { width: w, height: h, channels: 3 } }).jpeg({ quality: 92 }).toBuffer();
-  return { finalJpeg, plan, w, h, stats: { pasted, same, thr } };
+  return { finalJpeg, plan, w, h, stats: { pasted, same, thr, align } };
 }

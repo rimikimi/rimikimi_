@@ -8,7 +8,7 @@
 // 5. 결과 + 갱신된 quota 반환
 // ============================================================
 
-import { getAuthedUser, countTodayUsage, FREE_DAILY, dailyLimitFor, isUnlimited, isTester } from "./_lib/auth.js";
+import { getAuthedUser, countTodayUsage, FREE_DAILY, dailyLimitFor, isUnlimited, isTester, holdFreeUsage, releaseFreeUsage } from "./_lib/auth.js";
 import { precheckHasFace, samePerson } from "./_lib/precheck.js";
 import { getCreditInfo, consumeCredit, consumeCredits, refundCredits, getProSampleUsed, markProSampleUsed } from "./_lib/credits.js";
 import { saveToGallery } from "./_lib/gallery.js";
@@ -376,7 +376,39 @@ function vertexSA() {
   try { return JSON.parse(raw); } catch (_) { return null; }
 }
 
+// 하루 무료 1장 — 게이트에서 잡아 두고(auth.js holdFreeUsage) 성공하면 그대로 둔다(keepFreeUsage).
+// 그 밖의 끝(실패 응답·예외)에서는 여기서 되돌린다. 실패 응답은 **보내기 전에** 되돌린다 — 응답이 나간 뒤의
+// 작업은 잘릴 수 있고, 사용자가 곧바로 다시 누르면 풀린 상태여야 한다. (아래 실패 반환은 전부 return res.status(4xx/5xx).json(...))
 export default async function handler(req, res) {
+  const hold = { admin: null, id: null };
+  const sendJson = res.json.bind(res);
+  res.json = async (body) => {
+    if (res.statusCode >= 400) await releaseHold(hold);
+    return sendJson(body);
+  };
+  try {
+    return await handleGenerate(req, res, hold);
+  } finally {
+    await releaseHold(hold);
+  }
+}
+
+async function releaseHold(hold) {
+  if (!hold.id) return;
+  const id = hold.id;
+  hold.id = null;
+  await releaseFreeUsage(hold.admin, id).catch((e) => console.error(`[free-hold] 되돌리기 실패 id=${id}:`, e?.message || e));
+}
+
+// 무료 1장 확정 — 게이트에서 넣은 행이 곧 오늘 기록이라 풀지 않게 표시만 한다.
+// 잡은 게 없으면(있을 수 없는 경로지만) 예전처럼 여기서 기록한다.
+async function keepFreeUsage(hold, admin, userId) {
+  if (hold.id) { hold.id = null; return; }
+  await admin.from("usage_log").insert({ user_id: userId })
+    .then(() => {}).catch((e) => console.error("usage_log insert 실패:", e));
+}
+
+async function handleGenerate(req, res, hold) {
   res.setHeader("Access-Control-Allow-Origin","*");
   res.setHeader("Access-Control-Allow-Methods","GET,POST,DELETE,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers","authorization,content-type");
@@ -393,7 +425,7 @@ export default async function handler(req, res) {
   }
   const { user, admin } = auth;
   const unlimited = isUnlimited(user);
-  const dailyLimit = dailyLimitFor(user); // 테스터 3 / 일반 1
+  const dailyLimit = dailyLimitFor(user); // 테스터 3 / 일반 2(9/30 전 가입)·1(그 뒤 가입)
 
   // ── 페이스 프로필 품질 게이트 2차(서버) ──────────────────────────────
   // face-profile-v1.md §1: "품질 게이트(클라 1차 + 서버 2차) … 미달 컷은 그 자리에서
@@ -883,20 +915,34 @@ export default async function handler(req, res) {
         });
       }
       freeProSample = true; // 게이트 우회 (아래 한도 체크 스킵)
-    } else if (usage.count >= dailyLimit) {
-      // 하루 한도 소진 → 크레딧 확인
-      const credit = await getCreditInfo(admin, user.id);
-      creditsLeft = credit.error ? 0 : credit.creditsAvailable;
-      if (creditsLeft > 0) {
-        useCredit = true; // 크레딧으로 진행
-      } else {
-        return res.status(429).json({
-          error:
-            "오늘의 무료 한도를 모두 사용했어요.\n친구를 초대하면 1명당 크레딧 3개가 생겨요!",
-          quotaUsed: usage.count,
-          quotaLimit: dailyLimit,
-          credits: 0,
-        });
+    } else {
+      // 무료 1장은 여기서 **원자적으로 잡는다**(auth.js holdFreeUsage) — 생성이 끝나기 전에 같은 사람이
+      // 또 보내도 두 번째는 무료로 못 나간다. 성공하면 keepFreeUsage, 실패로 끝나면 handler 가 되돌린다.
+      // 묶음(count>1)은 크레딧 전용이라 무료를 잡지 않는다(아래 묶음 분기가 잔액을 직접 본다).
+      const wantBatch = Number(req.body?.count) > 1 && !!BATCH_COST[Number(req.body?.count)];
+      let gotFree = false;
+      if (usage.count < dailyLimit && !wantBatch) {
+        const h = await holdFreeUsage(admin, user.id, dailyLimit);
+        if (h.error) {
+          return res.status(500).json({ error: "사용 기록 조회 실패: " + h.error });
+        }
+        if (h.ok) { hold.admin = admin; hold.id = h.id; gotFree = true; }
+      }
+      if (!gotFree && (usage.count >= dailyLimit || !wantBatch)) {
+        // 하루 한도 소진(또는 방금 다른 요청이 가져감) → 크레딧 확인
+        const credit = await getCreditInfo(admin, user.id);
+        creditsLeft = credit.error ? 0 : credit.creditsAvailable;
+        if (creditsLeft > 0) {
+          useCredit = true; // 크레딧으로 진행
+        } else {
+          return res.status(429).json({
+            error:
+              "오늘의 무료 한도를 모두 사용했어요.\n친구를 초대하면 1명당 크레딧 3개가 생겨요!",
+            quotaUsed: usage.count,
+            quotaLimit: dailyLimit,
+            credits: 0,
+          });
+        }
       }
     }
   }
@@ -1037,8 +1083,7 @@ export default async function handler(req, res) {
         await consumeCredit(admin, user.id);
         creditsLeft = Math.max(0, creditsLeft - 1);
       } else {
-        await admin.from("usage_log").insert({ user_id: user.id })
-          .then(() => {}).catch((e) => console.error("usage_log insert 실패:", e));
+        await keepFreeUsage(hold, admin, user.id);
       }
     }
 
@@ -1939,11 +1984,7 @@ export default async function handler(req, res) {
       //    건너뛰어서, Pro 가 혼잡한 동안(재시도 계층이 3겹일 만큼 흔하다) 무료
       //    사용자가 하루 한도 없이 무제한 생성할 수 있었다 — 이미지는 실제로
       //    나가므로 API 비용은 그대로 발생한다. 크레딧 면제와 한도 기록은 별개다.
-      await admin
-        .from("usage_log")
-        .insert({ user_id: user.id })
-        .then(() => {})
-        .catch((e) => console.error("usage_log insert 실패:", e));
+      await keepFreeUsage(hold, admin, user.id);
     }
   }
 

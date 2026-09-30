@@ -95,7 +95,7 @@ export default async function handler(req, res) {
 
   // 정식 오픈: 베타 차단 제거 — 모든 로그인 사용자가 하루 무료 한도 사용 가능
   // 오늘 사용량 + 역할별 한도
-  const limit = dailyLimitFor(user); // 테스터 3 / 일반 1
+  const limit = dailyLimitFor(user); // 테스터 3 / 일반 2(9/30 전 가입)·1(그 뒤 가입)
   const usage = await countTodayUsage(admin, user.id);
   if (usage.error) {
     return res.status(500).json({ error: usage.error });
