@@ -81,12 +81,13 @@ const say = (m) => console.log((MODE === "dry" ? "[dry] " : "") + m);
 
 // 1) 크레딧팩 — 새 게시 API(oneTimeProducts). 구형 inappproducts 는 403 "migrate to the new publishing API".
 //    KRW 가격을 Play 환산(pricing:convertRegionPrices)으로 전 지역에 펴고, 한국·미국은 정한 값으로 덮는다.
-const convCache = {};
+const convCache = {}, otherCache = {};
 let REGIONS_VERSION = "2022/02";
 async function regionConfigs(krw, usd) {
   if (!convCache[krw]) {
     const r = await g("POST", "/pricing:convertRegionPrices", { price: money("KRW", krw) });
     convCache[krw] = r.convertedRegionPrices || {};
+    otherCache[krw] = r.convertedOtherRegionsPrice || null;
     REGIONS_VERSION = r.regionVersion?.version || REGIONS_VERSION;   // 환산 결과와 같은 지역 버전으로 보내야 한다(불가리아 BGN→EUR 등)
   }
   const out = Object.values(convCache[krw]).map((r) => ({ regionCode: r.regionCode, price: r.price, availability: "AVAILABLE" }));
@@ -109,7 +110,18 @@ for (const [sku, n, krw, usd, ko, en] of PACKS) {
       { languageCode: "ko-KR", title: `${ko} · ${n}장`, description: `사진 ${n}장 생성 크레딧${first ? " · 첫 구매 전용" : ""}` },
       { languageCode: "en-US", title: `${en} · ${n} photo${n > 1 ? "s" : ""}`, description: `Credits for ${n} generated photo${n > 1 ? "s" : ""}${first ? " · first purchase only" : ""}` },
     ],
-    purchaseOptions: [{ purchaseOptionId: exists?.purchaseOptions?.[0]?.purchaseOptionId || "buy", buyOption: { legacyCompatible: true }, regionalPricingAndAvailabilityConfigs: await regionConfigs(krw, usd) }],
+    // 기존 구매 옵션의 다른 필드(newRegionsConfig 등)는 그대로 두고 가격만 바꾼다 —
+    // 새 지역 통화(EUR)를 빼면 400 "Cannot remove currency for new regions"(9/30 실측).
+    purchaseOptions: [await (async () => {
+      const prev = exists?.purchaseOptions?.[0] || {};
+      const regional = await regionConfigs(krw, usd);
+      const other = otherCache[krw];
+      const po = { ...prev, purchaseOptionId: prev.purchaseOptionId || "buy", buyOption: prev.buyOption || { legacyCompatible: true },
+        regionalPricingAndAvailabilityConfigs: regional };
+      delete po.state;
+      if (other) po.newRegionsConfig = { ...(prev.newRegionsConfig || {}), usdPrice: money("USD", usd), eurPrice: other.eurPrice, availability: prev.newRegionsConfig?.availability || "AVAILABLE" };
+      return po;
+    })()],
   };
   if (exists?.taxAndComplianceSettings) body.taxAndComplianceSettings = exists.taxAndComplianceSettings;
   // 단건 PATCH 경로는 404(HTML) — 새 API 는 batchUpdate 로만 만들고 고친다(9/30 실측).
