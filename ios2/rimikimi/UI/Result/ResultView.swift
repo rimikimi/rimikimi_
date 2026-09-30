@@ -184,10 +184,17 @@ struct ResultPhoto: View {
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
-        .task {
+        // id 로 묶는다 — 같은 화면이 다른 결과로 바뀌어도 다시 내려받게(그냥 .task 는 처음 한 번만 돈다).
+        // 네트워크가 잠깐 끊겨도 로딩 표시에 갇히지 않게 3번까지 다시 시도한다.
+        .task(id: item.url) {
             guard item.image == nil, loaded[item.id] == nil, let url = item.url else { return }
-            if let (data, _) = try? await URLSession.shared.data(from: url), let img = UIImage(data: data) {
-                loaded[item.id] = img
+            for attempt in 0..<3 {
+                if attempt > 0 { try? await Task.sleep(for: .seconds(1.5)) }
+                if Task.isCancelled { return }
+                if let (data, _) = try? await URLSession.shared.data(from: url), let img = UIImage(data: data) {
+                    loaded[item.id] = img
+                    return
+                }
             }
         }
     }

@@ -115,12 +115,13 @@ struct BatchOption: Hashable {
     let cost: Int
     let label: String
     let badge: String?
-    static let all: [BatchOption] = [
+    /// 이름·배지가 번역 문구라 볼 때마다 만든다(앱 안 언어 전환 — `L`).
+    static var all: [BatchOption] { [
         .init(count: 1, cost: 1, label: Copy.photos(1), badge: nil),
         .init(count: 3, cost: 3, label: Copy.photos(3), badge: nil),
         .init(count: 6, cost: 5, label: Copy.photos(6), badge: Copy.percentOff(17)),
         .init(count: 12, cost: 9, label: Copy.photos(12), badge: Copy.percentOff(25)),
-    ]
+    ] }
     static func cost(for count: Int) -> Int { all.first { $0.count == count }?.cost ?? count }
 }
 

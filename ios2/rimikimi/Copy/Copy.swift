@@ -348,11 +348,21 @@ enum Copy {
     static var pushDesc: String { L.t("매일 저녁 8시 새 컨셉이 오면 알려드려요", "We'll let you know at 8 PM your time when new concepts drop") }
     static var myPhotoSaved: String { L.t("등록됨 · 생성 때 얼굴 참조로 함께 보내요", "Saved · used when creating") }
     static var myPhotoEmpty: String { L.t("없음 · 컨셉을 만들 때 자동으로 등록돼요", "None · added automatically when you create") }
+    // 언어 — 선택지는 1.x 웹 프로필(`profile.lang.*`)과 같다. 언어 이름은 그 언어로 쓴다.
+    static var language: String { L.t("언어", "Language") }
+    static func languageOption(_ l: AppLanguage) -> String {
+        switch l {
+        case .system: return L.t("시스템 따라가기", "Follow system")
+        case .ko: return "한국어"
+        case .en: return "English"
+        }
+    }
 
     // MARK: 스토어
 
     static var storeBalance: String { L.t("현재 보유", "Balance") }
-    static var storeIntro: String { L.t("하루 무료 1장을 모두 사용했어요. 크레딧 1장으로 이미지 한 장을 만들 수 있어요.", "You've used today's 1 free image. 1 credit = 1 image.") }
+    /// 하루 무료 장수는 계정마다 다르다(9/30: 그 전 가입 2장 · 그 뒤 가입 1장) — 서버 quota 의 limit 을 받는다.
+    static func storeIntro(_ n: Int) -> String { L.ko ? "하루 무료 \(n)장을 모두 사용했어요. 크레딧 1장으로 이미지 한 장을 만들 수 있어요." : "You've used today's \(n) free \(n == 1 ? "image" : "images"). 1 credit = 1 image." }
     static var storePacks: String { L.t("크레딧 팩", "Credit packs") }
     static var storeSubs: String { L.t("rimikimi+ 구독", "rimikimi+ subscription") }
     static var storeSubsDesc: String { L.t("광고·워터마크 제거 + 크레딧 자동 충전", "No ads or watermark + automatic credit refills") }

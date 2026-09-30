@@ -25,6 +25,7 @@ final class PushManager: NSObject {
     private(set) var pendingGalleryId: String?
 
     private var configured = false
+    @ObservationIgnored private var topicSync: Task<Void, Never>?
 
     /// 앱 시작 — Firebase 만 설정한다. 권한은 묻지 않는다.
     func configureAtLaunch() {
@@ -37,12 +38,21 @@ final class PushManager: NSObject {
         UNUserNotificationCenter.current().delegate = self
         configured = true
         Task { await refreshAuthorization() }
-        // 알림을 켜 둔 사용자는 기기 언어에 맞는 드롭 토픽으로 맞춘다(언어를 바꿨거나 2.0.1 에서 올라온 영어 사용자).
-        if newConceptAlerts {
-            Task {
-                try? await Messaging.messaging().subscribe(toTopic: Self.dropTopic)
-                try? await Messaging.messaging().unsubscribe(fromTopic: Self.topic(ko: !L.ko))
-            }
+        // 알림을 켜 둔 사용자는 앱 언어에 맞는 드롭 토픽으로 맞춘다(언어를 바꿨거나 2.0.1 에서 올라온 영어 사용자).
+        syncDropTopic()
+    }
+
+    /// 알림을 켜 둔 사용자의 드롭 토픽을 **지금 앱 언어** 쪽으로 맞춘다 — 실행 때, 그리고 프로필에서 언어를 바꿨을 때.
+    /// 앞 작업이 끝난 뒤에 돌린다: 언어를 빠르게 두 번 바꾸면 구독·해지가 엇갈려 두 토픽이 다 끊길 수 있다.
+    func syncDropTopic() {
+        guard configured, newConceptAlerts else { return }
+        let previous = topicSync
+        topicSync = Task {
+            await previous?.value
+            guard newConceptAlerts else { return } // 기다리는 사이 알림을 껐으면 다시 구독하지 않는다
+            let ko = L.ko
+            try? await Messaging.messaging().subscribe(toTopic: Self.topic(ko: ko))
+            try? await Messaging.messaging().unsubscribe(fromTopic: Self.topic(ko: !ko))
         }
     }
 

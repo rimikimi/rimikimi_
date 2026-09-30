@@ -11,7 +11,8 @@ struct FilterTabView: View {
     struct Preset: Identifiable { let key: String; var label: String { Copy.filterName(key) }; var id: String { key } }
     struct Group: Identifiable { let key: String; let title: String; let emoji: String; let presets: [Preset]; var id: String { key } }
 
-    static let groups: [Group] = [
+    // 그룹 제목이 번역 문구라 `static let` 이면 처음 읽은 언어로 굳는다(앱 안 언어 전환) — 볼 때마다 만든다.
+    static var groups: [Group] { [
         // 폰카 — 연도별 아이폰 색감. 이름은 모델 번호만(오너 지시 2026-09-23, "iPhone" 은 안 붙인다).
         // 이름(ko/en)은 `Copy.filterNames` — 여기는 key 만.
         .init(key: "phone", title: Copy.filterGroupPhone, emoji: "📱", presets: [
@@ -35,7 +36,7 @@ struct FilterTabView: View {
             .init(key: "thermal"), .init(key: "glitch"), .init(key: "vhs"),
             .init(key: "pixelate"), .init(key: "sketch"),
         ]),
-    ]
+    ] }
 
     /// 오늘의 필터 — 날짜로 고르므로 하루 동안 고정이고 매일 바뀐다.
     private var todays: (group: Group, preset: Preset) {

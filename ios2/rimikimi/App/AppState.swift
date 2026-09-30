@@ -515,6 +515,11 @@ final class AppState {
             guard let token = await auth.validAccessToken(),
                   let items = try? await RimikimiAPI.shared.fetchGallery(token: token) else { return }
             guard let item = (galleryId.flatMap { id in items.first { $0.id == id } }) ?? items.first else { return }
+            // 같은 결과가 이미 화면에 떠 있으면(생성 완료로 먼저 자동 표시된 뒤 알림을 누른 경우) 그대로 둔다.
+            // 예전엔 이미지를 가진 화면을 URL 만 가진 새 화면으로 갈아 끼워, 완성본이 잠깐 보였다가
+            // 로딩 표시만 남았다(9/30 오너 실기기, 커스텀 보정 알림).
+            if case .result(let shown)? = myPhotosPath.last, tab == .myPhotos,
+               shown.items.contains(where: { $0.id == item.id && $0.image != nil }) { return }
             present([.init(id: item.id, image: nil, url: item.url, expiresAt: item.expiresAt)],
                     job: .init(conceptId: item.conceptId ?? "", conceptTitle: item.conceptTitle ?? "",
                                startedAt: item.createdAt ?? Date(), count: 1))

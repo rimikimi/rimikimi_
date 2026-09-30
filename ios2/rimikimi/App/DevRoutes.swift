@@ -19,6 +19,7 @@ import UIKit
 ///                                             동의 플래그를 지워 "다시 1회 뜨는지" 재확인용.
 ///   com.rimikimi.app://dev/systemcamera  실제 카메라 플로우(SystemCameraPicker) 강제 표시(캡처용).
 ///                                        시뮬레이터엔 카메라가 없어 사진 보관함으로 자동 대체됨.
+///   com.rimikimi.app://dev/lang?set=system|ko|en[&after=<초>]  프로필 "언어" 행과 같은 길로 언어 전환(캡처용 — 메뉴를 탭할 수 없다).
 @MainActor
 enum DevRoutes {
     /// 처리했으면 true.
@@ -100,6 +101,13 @@ enum DevRoutes {
         case "/store": app.tab = .profile; app.profilePath = [.store]
         case "/invite": app.tab = .profile; app.profilePath = [.invite]
         case "/profile": app.tab = .profile; app.profilePath = []
+        case "/lang":
+            // `after=<초>` — 그만큼 뒤에 바꾼다. 실행 인자(-rimikimi-url)로 넘기면 같은 프로세스 안에서
+            // 전환 전·후를 캡처할 수 있다(openurl 은 iOS 27 에서 "열기" 확인창에 막힌다).
+            guard let lang = AppLanguage(rawValue: q["set"] ?? "") else { return true }
+            DispatchQueue.main.asyncAfter(deadline: .now() + (Double(q["after"] ?? "0") ?? 0)) {
+                LanguageRow.apply(lang, app: app)
+            }
         case "/credits":
             app.tab = .gallery; app.galleryPath = []
             if let id = q["concept"], let c = app.concepts.concept(id: id), let photo = app.userPhoto.image {

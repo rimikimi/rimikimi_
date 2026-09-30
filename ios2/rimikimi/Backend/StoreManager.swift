@@ -22,21 +22,24 @@ final class StoreManager {
     }
 
     /// `src/PortraitStudio.jsx` CREDIT_PACKS / SUB_PLANS.
-    static let packs: [Pack] = [
+    /// 이름·배지가 번역 문구라 볼 때마다 만든다(앱 안 언어 전환 — `L`). 가격은 아래 인스턴스 `packs` 가 붙인다.
+    static var packs: [Pack] { [
         .init(id: "rimikimi.pack.intro", credits: 6, krw: 3900, label: Copy.packIntro, badge: Copy.badgeFirst, isSubscription: false, period: nil),
         .init(id: "rimikimi.pack.mini", credits: 12, krw: 7900, label: Copy.packMini, badge: nil, isSubscription: false, period: nil),
         .init(id: "rimikimi.pack.standard", credits: 24, krw: 14900, label: Copy.packStandard, badge: Copy.badgeBest, isSubscription: false, period: nil),
         .init(id: "rimikimi.pack.pro", credits: 45, krw: 27000, label: Copy.packPro, badge: Copy.badgeCheapest, isSubscription: false, period: nil),
-    ]
-    static let subs: [Pack] = [
+    ] }
+    static var subs: [Pack] { [
         .init(id: "rimikimi.sub.plus.weekly", credits: 8, krw: 6900, label: Copy.subWeekly, badge: nil, isSubscription: true, period: "주"),
         .init(id: "rimikimi.sub.plus.monthly", credits: 30, krw: 12900, label: Copy.subMonthly, badge: nil, isSubscription: true, period: "월"),
         .init(id: "rimikimi.sub.plus.annual", credits: 240, krw: 109000, label: Copy.subAnnual, badge: Copy.badgeLowest, isSubscription: true, period: "년"),
-    ]
+    ] }
     static var allIDs: [String] { (packs + subs).map(\.id) }
 
-    private(set) var packs: [Pack] = StoreManager.packs
-    private(set) var subs: [Pack] = StoreManager.subs
+    /// 화면용 목록 — 이름·배지는 지금 언어로, 가격은 스토어가 준 값(아직 없으면 KRW 폴백).
+    var packs: [Pack] { Self.packs.map(withStorePrice) }
+    var subs: [Pack] { Self.subs.map(withStorePrice) }
+    private func withStorePrice(_ p: Pack) -> Pack { var x = p; x.priceString = storeProducts[p.id]?.localizedPriceString; return x }
     private(set) var isLoading = false
     private(set) var purchasing: String?
     private(set) var lastError: String?
@@ -86,8 +89,6 @@ final class StoreManager {
         } else {
             lastError = nil
         }
-        packs = Self.packs.map { var x = $0; x.priceString = storeProducts[$0.id]?.localizedPriceString; return x }
-        subs = Self.subs.map { var x = $0; x.priceString = storeProducts[$0.id]?.localizedPriceString; return x }
     }
 
     // MARK: 구매

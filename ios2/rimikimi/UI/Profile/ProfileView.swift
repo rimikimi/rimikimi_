@@ -50,6 +50,10 @@ struct ProfileView: View {
                     .background(Color.card, in: RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
                     .padding(.horizontal, Spacing.page)
                 }
+                // 언어 — 로그인과 상관없이 보인다(2026-09-30 오너 지시). 기본은 기기 언어.
+                CardGroup {
+                    LanguageRow()
+                }
                 CardGroup {
                     SettingsRow(title: Copy.terms, systemImage: "doc.text") { open(Config.termsURL, Copy.terms) }
                     SettingsRow(title: Copy.privacy, systemImage: "hand.raised") { open(Config.privacyURL, Copy.privacy) }
@@ -163,6 +167,46 @@ struct NotificationToggleRow: View {
         }
         .padding(.horizontal, Spacing.s4)
         .frame(minHeight: ControlHeight.row)
+    }
+}
+
+/// "언어" 행 — 시스템 따라가기(기본) · 한국어 · English. 고르면 앱 문구가 바로 바뀐다(`L`, L10n.swift).
+/// 메뉴 안 Picker 라 지금 고른 항목에 체크 표시가 붙는다.
+struct LanguageRow: View {
+    @Environment(AppState.self) private var app
+
+    var body: some View {
+        Menu {
+            Picker(Copy.language, selection: Binding(get: { L.preference }, set: { select($0) })) {
+                ForEach(AppLanguage.allCases) { Text(Copy.languageOption($0)).tag($0) }
+            }
+        } label: {
+            HStack(spacing: Spacing.s3) {
+                Image(systemName: "globe").font(.system(size: 16, weight: .medium)).foregroundStyle(Color.ink2).frame(width: 24)
+                Text(Copy.language).font(AppFont.body).foregroundStyle(Color.ink)
+                Spacer()
+                Text(Copy.languageOption(L.preference)).font(AppFont.callout).foregroundStyle(Color.ink2)
+                Image(systemName: "chevron.up.chevron.down").font(.system(size: 12, weight: .semibold)).foregroundStyle(Color.ink3)
+            }
+            .padding(.horizontal, Spacing.s4)
+            .frame(minHeight: ControlHeight.row)
+            .contentShape(Rectangle())
+        }
+        .menuStyle(.button)
+        .buttonStyle(RowButtonStyle())
+    }
+
+    private func select(_ lang: AppLanguage) {
+        guard lang != L.preference else { return }
+        Self.apply(lang, app: app)
+        HapticPlayer.selection()
+    }
+
+    /// 언어 적용 — 이 행과 DEBUG `dev/lang` 이 같은 길을 쓴다.
+    static func apply(_ lang: AppLanguage, app: AppState) {
+        L.set(lang)
+        // 새 컨셉 알림은 언어별 토픽이다(`drop_p540` / `_en`) — 켜 둔 사용자는 새 언어 쪽으로 옮긴다.
+        app.push.syncDropTopic()
     }
 }
 

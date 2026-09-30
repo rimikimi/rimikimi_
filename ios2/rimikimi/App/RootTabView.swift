@@ -58,6 +58,10 @@ struct RootTabView: View {
             if app.showsCameraTabButton {
                 CameraTabButton(bottomPadding: cameraBottomPadding) { openCamera() }
                     .transition(.opacity.combined(with: .scale(scale: 0.9)))
+                    // 키보드 여백을 받지 않는다 — 9/30 build 16 오너 실기기에서 원만 ~44pt(키보드 툴바 높이) 떠
+                    // 있었다가 다시 돌아왔다(커스텀 보정 글 입력칸 + "완료" 툴바가 새로 생긴 빌드). 탭바는 그대로였고
+                    // 원의 아래 기준만 올라가 있었다. 키보드가 떠 있는 동안 이 원은 원래 안 보이므로 다른 영향은 없다.
+                    .ignoresSafeArea(.keyboard)
             }
         }
         .animation(Motion.exitCurve(), value: app.showsCameraTabButton)

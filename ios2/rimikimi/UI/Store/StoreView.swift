@@ -18,7 +18,7 @@ struct StoreView: View {
                 .background(Color.card, in: RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
                 .padding(.horizontal, Spacing.page)
 
-                Text(Copy.storeIntro)
+                Text(Copy.storeIntro(app.quota?.limit ?? 1))
                     .font(AppFont.footnote).foregroundStyle(Color.ink2).padding(.horizontal, Spacing.page)
 
                 SectionHeader(title: Copy.storePacks)
