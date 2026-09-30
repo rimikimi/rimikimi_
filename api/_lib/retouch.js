@@ -519,12 +519,13 @@ export function compositeRetouch(O, E, w, h, regions, protect, scope = "local", 
   }
   //    차이(Lab 거리) → 블러 → 잡음 수준(허용 영역 밖 분포) 기준 문턱
   const lo = new Float32Array(3), le = new Float32Array(3);
-  const D = new Float32Array(sn);
+  const D = new Float32Array(sn), Dc = new Float32Array(sn);
   for (let j = 0; j < sn; j++) {
     toLab(So.px[j * 3] | 0, So.px[j * 3 + 1] | 0, So.px[j * 3 + 2] | 0, lo);
     toLab(Se.px[j * 3] | 0, Se.px[j * 3 + 1] | 0, Se.px[j * 3 + 2] | 0, le);
     const d0 = lo[0] - le[0], d1 = lo[1] - le[1], d2 = lo[2] - le[2];
     D[j] = Math.sqrt(d0 * d0 + d1 * d1 + d2 * d2);
+    Dc[j] = Math.sqrt(d1 * d1 + d2 * d2);   // 색 계열 차이(밝기 뺀 것) — 얼굴이 조금 밀려도 피부↔피부는 작고, 옷 색 교체는 크다
   }
   const Db = gauss(D, sw, sh, short * 0.004);
   const bgv = [];
@@ -562,9 +563,12 @@ export function compositeRetouch(O, E, w, h, regions, protect, scope = "local", 
   //    피부 박스 가장자리가 볼)을 지나면 경계값이 그 변화의 반대라서 안쪽이 원본 쪽으로 끌려간다.
   //    같은 AI 결과로 잰 값(9/30): 흰 셔츠 63%·피부 잡티 77% 만 남음 → 막을 **경계 띠(짧은 변 6%)** 에서만
   //    쓰고 안쪽으로 갈수록 0 으로 줄이면 100%·100%, 벽 얼룩(작은 박스라 거의 전부 띠)·사람 지우기는 그대로.
+  //    막은 **톤 차이**(AI 가 벽을 살짝 밝힌 것)만 옮겨야 한다 — 물건 자체가 바뀐 곳(후드가 사라진 자리)의 차이까지 옮기면
+  //    박스 윗변 너머의 원본 색이 안으로 번져 유령이 된다(9/30 거울 셀카: 턱 옆 초록 줄). 큰 차이는 0 으로.
+  const big = Math.max(25, thr * 3);
   const Dm = [0, 1, 2].map((c) => {
     const d = new Float32Array(sn);
-    for (let j = 0; j < sn; j++) d[j] = So.px[j * 3 + c] - Se.px[j * 3 + c];
+    for (let j = 0; j < sn; j++) d[j] = Db[j] > big ? 0 : So.px[j * 3 + c] - Se.px[j * 3 + c];
     return gauss(d, sw, sh, Math.max(1, short * 0.005));
   });
   const q = Math.max(1, Math.ceil(Math.max(sw, sh) / 128));
@@ -618,7 +622,12 @@ export function compositeRetouch(O, E, w, h, regions, protect, scope = "local", 
         }
     }
     const pb = gauss(prot, sw, sh, short * 0.012);
-    for (let j = 0; j < sn; j++) alphaS[j] *= 1 - Math.min(1, pb[j] * 1.6);
+    // 얼굴 타원이 목·옷깃까지 덮는다 — 옷 색을 바꾸면(초록 후드→빨간 니트) 그 자리만 원본 옷이 되살아났다(9/30 거울 셀카).
+    // 색 계열이 크게 바뀐 곳(얼굴 보정으론 안 나오는 차이)은 보호하지 않는다.
+    let chg = new Float32Array(sn);
+    for (let j = 0; j < sn; j++) chg[j] = Dc[j] > 15 ? 1 : 0;
+    chg = gauss(dilate(chg, sw, sh, 6), sw, sh, short * 0.004);
+    for (let j = 0; j < sn; j++) alphaS[j] *= 1 - Math.min(1, pb[j] * 1.6) * (1 - Math.min(1, chg[j] * 2));
   }
 
   // 3) 원본 크기에서 섞기 — 마스크는 양선형으로 늘린다. alpha 0 인 곳은 원본 바이트 그대로
