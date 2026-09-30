@@ -76,13 +76,18 @@ export default async function handler(req, res) {
 
   // 크레딧 정보는 모든 로그인 사용자에게 공통으로 계산
   const credit = await getCreditInfo(admin, user.id);
+  // 첫 구매 30% 할인(2026-09-30) — 결제 기록(iap_events)이 한 건도 없으면 앱이 첫 구매 전용 팩을 보여 준다.
+  const { count: paidCount } = await admin
+    .from("iap_events").select("*", { count: "exact", head: true }).eq("user_id", user.id);
+  const firstPurchase = (paidCount || 0) === 0;
   const creditFields = credit.error
-    ? { credits: 0, referralCount: 0, untilNext: 1, referralCode }
+    ? { credits: 0, referralCount: 0, untilNext: 1, referralCode, firstPurchase }
     : {
         credits: credit.creditsAvailable,
         referralCount: credit.referralCount,
         untilNext: credit.untilNext,
         referralCode,
+        firstPurchase,
       };
 
   // 어드민/무제한
