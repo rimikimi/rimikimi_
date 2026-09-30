@@ -55,7 +55,9 @@ Customer request:
 3) REGIONS — "regions": tight boxes around the areas the edits touch (including where changed things will end up), and nothing else.
    "text_boxes": ALWAYS list a tight box around EVERY piece of legible text, number, logo, sign, sticker, price tag or license
    plate in the photo (small ones too) — never leave it empty when the photo has any text.
-   "protect": a tight box around every person's face (forehead to chin, ear to nose tip) that the edits do NOT explicitly change.
+   "protect": a tight box around every person's face that the edits do NOT change — if the request changes someone's pose,
+   head direction, gaze or expression (e.g. looking down, turning, smiling), do NOT protect that person's face.
+   (forehead to chin, ear to nose tip) that the edits do NOT explicitly change.
    Boxes are [ymin, xmin, ymax, xmax] normalized 0-1000.
 Return JSON only.`;
 }
@@ -603,6 +605,10 @@ export function compositeRetouch(O, E, w, h, regions, protect, scope = "local", 
   if (protect.length) {
     const prot = new Float32Array(sn);
     for (const g of protect) {
+      // AI 가 머리 방향·자세를 바꿨으면(예: "내려다보는") 원본 얼굴을 덮으면 **머리가 두 개**가 된다(9/30 웨딩 사진).
+      // 얼굴 칸이 AI 결과와 같은 배치일 때만 보호한다.
+      { const [a0, b0, a1, b1] = g.box_2d;
+        if (!sameSpot(O, Ec, w, h, b0 / 1000 * w, a0 / 1000 * h, b1 / 1000 * w, a1 / 1000 * h, 0.75, false)) continue; }
       const [y0, x0, y1, x1] = g.box_2d;
       const cx = (x0 + x1) / 2000 * sw, cy = (y0 + y1) / 2000 * sh, ax = Math.max(1, (x1 - x0) / 2000 * sw), ay = Math.max(1, (y1 - y0) / 2000 * sh);
       for (let y = Math.max(0, Math.floor(cy - ay)); y < Math.min(sh, Math.ceil(cy + ay)); y++)
