@@ -10032,5 +10032,20 @@
    "판타지 / 콘셉트"
   ],
   "title_en": "Bridal Makeup Mirror"
+ },
+ {
+  "id": "1015",
+  "title": "커스텀 보정",
+  "title_en": "Custom Retouch",
+  "category": "🪄 매직 부스",
+  "categories": [
+   "🪄 매직 부스"
+  ],
+  "mode": "retouch",
+  "requires": [
+   "retouch"
+  ],
+  "sensitive": false,
+  "text": "Custom retouch: fix only what the user asks for in their own words, keeping everything else in the photo unchanged."
  }
 ]

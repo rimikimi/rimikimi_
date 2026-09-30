@@ -177,6 +177,15 @@ enum Copy {
     /// 묶음 할인 배지 — "17% 할인" / "Save 17%"
     static func percentOff(_ pct: Int) -> String { L.ko ? "\(pct)% 할인" : "Save \(pct)%" }
     static var footArt: String { L.t("업로드하신 사진을 선택한 컨셉으로 변환해 드려요.", "We'll transform your photo into the selected concept.") }
+    // 커스텀 보정(매직 부스) — 2026-09-30
+    static var retouchPhotoTitle: String { L.t("고칠 사진", "Photo to fix") }
+    static var retouchPhotoSub: String { L.t("고치고 싶은 사진을 골라 주세요", "Choose the photo you want to fix") }
+    static var retouchTitle: String { L.t("어떻게 고칠까요?", "What should we fix?") }
+    static var retouchPlaceholder: String { L.t("예) 뒤에 지나가는 사람 지워줘\n예) 베일이 처졌어, 머리도 정리해줘", "e.g. Remove the person walking behind me\ne.g. My veil is drooping, tidy my hair too") }
+    static var retouchHint: String { L.t("아무 언어로 편하게 적어 주세요. 말한 부분만 고치고 나머지는 원본 그대로 둬요.", "Write it any way you like, in any language. We fix only what you mention and keep the rest of your photo as it is.") }
+    static var needRetouchText: String { L.t("고칠 내용을 적어 주세요", "Tell us what to fix") }
+    static var keyboardDone: String { L.t("완료", "Done") }
+    static var footRetouch: String { L.t("AI 가 요청을 이해하고 그 부분만 고쳐요. 얼굴과 나머지는 원본 그대로예요.", "AI reads your request and fixes only that part. Faces and everything else stay as in your photo.") }
     static var footFace: String { L.t("선택한 컨셉으로 내 얼굴 특징을 살린 이미지를 만들어 드려요.", "We'll create this concept keeping your facial features.") }
     static func makeCost(_ n: Int) -> String { L.ko ? "만들기 · \(n) 크레딧" : "Create · \(plural(n, "credit", "credits"))" }
     static var loginToSave: String { L.t("생성된 이미지 저장을 위해 로그인이 필요합니다", "Sign in to save your generated image") }

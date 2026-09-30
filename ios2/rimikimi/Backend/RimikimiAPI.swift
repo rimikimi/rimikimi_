@@ -74,6 +74,8 @@ struct GenerateRequest {
     var faceRef: UIImage? = nil
     /// 얼굴 스캔으로 모은 다각도 참조(정면·옆·옆). 비면 `faceRef` 한 장만 간다.
     var faceProfile: [(image: UIImage, angle: String)] = []
+    /// 커스텀 보정: 사용자가 쓴 "고칠 내용"(아무 언어).
+    var retouchText: String? = nil
 
     var prompt: String { concept.isFourcut ? "인생네컷" : concept.text }
     var skipFacePrecheck: Bool { concept.isArtTransform }
@@ -121,7 +123,10 @@ final class RimikimiAPI {
     // MARK: 공개
 
     func fetchConcepts() async throws -> [Concept] {
-        var req = URLRequest(url: Config.apiBase.appendingPathComponent("concepts.json"))
+        // caps — 이 앱이 아는 새 기능. `requires` 가 붙은 컨셉(커스텀 보정 등)은 이게 있어야 목록에 온다.
+        var comps = URLComponents(url: Config.apiBase.appendingPathComponent("concepts.json"), resolvingAgainstBaseURL: false)!
+        comps.queryItems = [URLQueryItem(name: "caps", value: "retouch")]
+        var req = URLRequest(url: comps.url!)
         req.cachePolicy = .reloadIgnoringLocalCacheData
         let (data, resp) = try await session.data(for: req)
         try Self.check(resp, data)
@@ -169,7 +174,11 @@ final class RimikimiAPI {
 
     /// `POST /api/generate` — 본문은 웹 `generateImage()` 와 동일한 키.
     func generate(_ r: GenerateRequest, token: String, pushToken: String? = nil) async throws -> GenerateResult {
-        let photo = ImageUtil.jpegPayload(r.photo, maxSide: 1024, quality: 0.85)
+        // 커스텀 보정은 결과가 "원본 + 고친 부분"이라 올린 사진 해상도가 곧 결과 해상도다 → 크게(2048) 보낸다.
+        // (2048·0.9 JPEG 는 ~1~1.5MB → base64 로도 요청 4.5MB 한도 안)
+        let photo = r.concept.isRetouch
+            ? ImageUtil.jpegPayload(r.photo, maxSide: 2048, quality: 0.9)
+            : ImageUtil.jpegPayload(r.photo, maxSide: 1024, quality: 0.85)
         var body: [String: Any] = [
             "mimeType": photo.mimeType, "base64": photo.base64, "prompt": r.prompt,
             "conceptId": r.concept.id, "conceptTitle": r.concept.title,
@@ -180,6 +189,9 @@ final class RimikimiAPI {
         if let partner = r.partnerPhoto, r.concept.isCouple {
             let p2 = ImageUtil.jpegPayload(partner, maxSide: 1024, quality: 0.85)
             body["mimeType2"] = p2.mimeType; body["base64_2"] = p2.base64; body["couple"] = true
+        }
+        if r.concept.isRetouch, let text = r.retouchText?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty {
+            body["retouchText"] = String(text.prefix(1000))
         }
         if r.concept.isFourcut {
             body["fourcutStyle"] = r.fourcutStyle

@@ -70,9 +70,11 @@ export default function handler(req, res) {
     // 필터·고정핀·정렬은 api/_lib/conceptList.js 에 있다. 빌드 때 오프라인 폴백
     // (public/concepts.fallback.json)을 굽는 scripts/build-fallback.mjs 가 같은
     // 함수를 쓰기 때문이다 — 로직이 두 벌이면 폴백이 조용히 어긋난다.
-    list = publishedConcepts(ALL, now);
+    // ?caps=retouch — 앱이 아는 새 기능 목록(쉼표). requires 가 붙은 컨셉은 이게 있어야 보인다.
+    const caps = new Set(String(req.query?.caps || "").split(",").map((x) => x.trim()).filter(Boolean));
+    list = publishedConcepts(ALL, now, caps);
   } catch (_) {
-    list = ALL; // 필터가 어떤 이유로든 터지면 전부 내보낸다 (빈 갤러리보다 낫다)
+    list = ALL.filter((c) => !Array.isArray(c?.requires)); // 필터가 어떤 이유로든 터지면 전부 내보낸다 (빈 갤러리보다 낫다)
   }
 
   // 다음 공개 시각까지만 캐시 — 길어야 10분이라 드롭이 늦어도 10분 안에 반영된다.

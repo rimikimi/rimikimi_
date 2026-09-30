@@ -15,6 +15,7 @@ struct ConceptOptionsView: View {
     @State private var garments: [UIImage] = []
     @State private var partnerPhoto: UIImage?
     @State private var artPhoto: UIImage?
+    @State private var retouchText = ""
 
     private var styles: [FourcutStyle] {
         FourcutDefaults.resolve(concept.fourcutStyles ?? app.concepts.concepts.first { $0.isFourcut }?.fourcutStyles)
@@ -25,6 +26,7 @@ struct ConceptOptionsView: View {
 
     private var missingReason: String? {
         if mainPhoto == nil { return concept.isArtTransform ? Copy.needArt : Copy.needMain }
+        if concept.isRetouch && retouchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return Copy.needRetouchText }
         if concept.isCouple && partnerPhoto == nil { return Copy.needPartner }
         if concept.isDressroom && garments.isEmpty { return Copy.needGarment }
         return nil
@@ -42,7 +44,10 @@ struct ConceptOptionsView: View {
                     .padding(.top, Spacing.s2)
 
                 if concept.isArtTransform {
-                    PhotoSlotCard(title: Copy.artTitle, subtitle: Copy.artSub, image: artPhoto) { artPhoto = $0 }
+                    PhotoSlotCard(title: concept.isRetouch ? Copy.retouchPhotoTitle : Copy.artTitle,
+                                  subtitle: concept.isRetouch ? Copy.retouchPhotoSub : Copy.artSub,
+                                  image: artPhoto) { artPhoto = $0 }
+                    if concept.isRetouch { RetouchTextBlock(text: $retouchText) }
                 } else {
                     MyPhotoCard()
                 }
@@ -77,13 +82,14 @@ struct ConceptOptionsView: View {
                         }
                     }
                 }
-                Text(concept.isArtTransform ? Copy.footArt : Copy.footFace)
+                Text(concept.isRetouch ? Copy.footRetouch : concept.isArtTransform ? Copy.footArt : Copy.footFace)
                     .font(AppFont.footnote).foregroundStyle(Color.ink2)
                     .padding(.horizontal, Spacing.page)
             }
             .padding(.bottom, Spacing.s5)
         }
         .scrollIndicators(.hidden)
+        .scrollDismissesKeyboard(.interactively)
         .background(Color.bg)
         .inlineTitle(concept.displayTitle)
         .toolbar(.hidden, for: .tabBar)
@@ -131,9 +137,46 @@ struct ConceptOptionsView: View {
         req.partnerPhoto = concept.isCouple ? partnerPhoto : nil
         req.garments = concept.isDressroom ? garments : []
         req.dressStyle = dressStyle
+        req.retouchText = concept.isRetouch ? retouchText : nil
         req.count = (concept.isFourcut || concept.isArtTransform) ? 1 : batchCount
         if concept.isFourcut { req.cutCount = fourcutCount; req.fourcutStyle = fourcutStyleKey }
         app.requireLogin(.generate(req), message: Copy.loginToSave)
+    }
+}
+
+/// 커스텀 보정 — "어떻게 고칠까요?" 글 입력. OptionBlock 은 가로 스크롤이라 글 입력칸엔 안 맞아 따로 둔다(같은 카드 모양).
+struct RetouchTextBlock: View {
+    @Binding var text: String
+    @FocusState private var focused: Bool
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.s2) {
+            Text(Copy.retouchTitle).font(AppFont.headline).tracking(Tracking.headline)
+            ZStack(alignment: .topLeading) {
+                if text.isEmpty {
+                    Text(Copy.retouchPlaceholder)
+                        .font(AppFont.body).foregroundStyle(Color.ink3)
+                        .padding(.horizontal, 5).padding(.vertical, 8)
+                        .allowsHitTesting(false)
+                }
+                TextEditor(text: $text)
+                    .font(AppFont.body)
+                    .scrollContentBackground(.hidden)
+                    .focused($focused)
+                    .frame(minHeight: 96, maxHeight: 160)
+                    .onChange(of: text) { _, v in if v.count > 1000 { text = String(v.prefix(1000)) } }
+            }
+            Text(Copy.retouchHint).font(AppFont.footnote).foregroundStyle(Color.ink2)
+        }
+        .padding(Spacing.s4)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.card, in: RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
+        .padding(.horizontal, Spacing.page)
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button(Copy.keyboardDone) { focused = false }
+            }
+        }
     }
 }
 

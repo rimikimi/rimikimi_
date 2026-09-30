@@ -17,6 +17,7 @@ import { buildEditorialStrip } from "./_lib/fourcutEditorial.js";
 import { buildGlowStrip } from "./_lib/fourcutGlow.js";
 import { SPRITE_CONCEPT_IDS, describeForSprite } from "./_lib/sprite.js";
 import { inspectImage } from "./_lib/qa.js";
+import { runRetouch } from "./_lib/retouch.js";
 // 컨셉 원본(프롬프트 포함). **서버가 프롬프트의 출처**여야 한다 — 아래 resolvePrompt 참고.
 import ALL_CONCEPTS from "./_data/concepts.json" with { type: "json" };
 
@@ -974,6 +975,110 @@ export default async function handler(req, res) {
     return res
       .status(500)
       .json({ error: "서버에 GEMINI_API_KEY 가 설정돼 있지 않습니다." });
+  }
+
+  // ── 커스텀 보정 (매직 부스, 컨셉 mode "retouch") — 2026-09-30 ─────────────────────
+  // 사진 + 사용자가 **아무 언어로 자유롭게** 쓴 요청(retouchText) → 의도 파악·안전 판정·영역(flash 1회) →
+  // Pro 편집 → **고친 부분만** 원본에 합성(api/_lib/retouch.js). 과금·워터마크·갤러리·완료 알림은 다른 컨셉과 같다.
+  // ⚠️ 경로 판별은 **서버 컨셉 데이터의 mode** 로만 한다 — 클라가 보낸 값으로 바꾸지 않는다.
+  // ⚠️ 글 입력칸이 없는 구버전 앱은 retouchText 를 못 보낸다 → 차감 전에 업데이트 안내(커플 가드와 같은 426).
+  //    컨셉 목록에서도 `requires: ["retouch"]` 로 가려 두어 원래는 여기까지 오지 않는다(api/concepts.js).
+  // QA(생성 불량 검사)는 돌리지 않는다 — 결과의 대부분이 원본 픽셀이라 팔·손가락 불량이 생길 곳이 없다.
+  const conceptRow = conceptId != null ? ALL_CONCEPTS.find((c) => String(c.id) === String(conceptId)) : null;
+  if (conceptRow?.mode === "retouch") {
+    const retouchText = String((req.body && req.body.retouchText) || "").trim().slice(0, 1000);
+    if (!retouchText) {
+      return res.status(426).json({
+        error: "이 컨셉은 앱을 최신 버전으로 업데이트하면 사용할 수 있어요 🙂",
+        needsUpdate: true,
+      });
+    }
+    const failBody = {
+      error: "지금 이미지 서버가 많이 붐비고 있어요.\n1~2분 뒤에 다시 시도해 주세요.\n크레딧은 차감되지 않았어요 🙂",
+      busy: true,
+      quotaUsed: unlimited ? 0 : usage.count, quotaLimit: unlimited ? null : dailyLimit, unlimited,
+    };
+    const sharp = (await import("sharp")).default;
+    let srcBuf;
+    try {
+      // EXIF 회전 먼저 반영 + 긴 변 2048 — Gemini 입력·영역 박스·합성이 모두 같은 프레임이어야 한다
+      srcBuf = await sharp(Buffer.from(base64, "base64")).rotate()
+        .flatten({ background: { r: 255, g: 255, b: 255 } })
+        .resize(2048, 2048, { fit: "inside", withoutEnlargement: true })
+        .jpeg({ quality: 95 }).toBuffer();
+    } catch (_) {
+      return res.status(400).json({ error: "이미지를 읽지 못했어요." });
+    }
+    let rt;
+    try {
+      rt = await runRetouch({ apiKey, sharp, srcBuf, text: retouchText });
+    } catch (e) {
+      console.error("[retouch] 실패:", e?.message || e);
+      return res.status(503).json(failBody);
+    }
+    if (rt.refused) {
+      console.log(`[retouch] 거절 lang=${rt.lang}`);
+      return res.status(422).json({
+        error: rt.message || "이 요청은 도와드릴 수 없어요. 다른 내용으로 적어 주세요.\n크레딧은 차감되지 않았어요 🙂",
+        refused: true,
+        quotaUsed: unlimited ? 0 : usage.count, quotaLimit: unlimited ? null : dailyLimit, unlimited,
+      });
+    }
+    if (rt.error) {
+      console.error(`[retouch] ${rt.error === "plan" ? "의도 파악 실패" : "편집 모델 실패"}`);
+      return res.status(503).json(failBody);
+    }
+
+    // 성공 → 차감 (일반 경로 6번과 같은 규칙)
+    if (!unlimited) {
+      if (freeProSample) {
+        await markProSampleUsed(admin, user.id);
+      } else if (useCredit) {
+        await consumeCredit(admin, user.id);
+        creditsLeft = Math.max(0, creditsLeft - 1);
+      } else {
+        await admin.from("usage_log").insert({ user_id: user.id })
+          .then(() => {}).catch((e) => console.error("usage_log insert 실패:", e));
+      }
+    }
+
+    let rawData = rt.finalJpeg.toString("base64");
+    let rawMime = "image/jpeg";
+    if (!useCredit) { // 결제(크레딧)로 만든 것만 깨끗하다 — 일반 경로와 동일
+      const wm = await applyWatermark(rawData, rawMime);
+      rawData = wm.base64; rawMime = wm.mime;
+    }
+    const small = await shrinkOutput(rawData, rawMime);
+    let galleryId = null, galleryExpiresAt = null;
+    try {
+      const saved = await saveToGallery(admin, user, {
+        conceptId: conceptId || 0, conceptTitle: conceptTitle || null, base64: rawData, mimeType: rawMime,
+      });
+      if (saved.ok) { galleryId = saved.id; galleryExpiresAt = saved.expiresAt; }
+      else console.error("[gallery save failed]", saved.error);
+    } catch (e) {
+      console.error("[gallery save throw]", e?.message || e);
+    }
+    console.log(`[retouch] ${rt.w}x${rt.h} lang=${rt.plan.lang} edits=${rt.plan.edits.length} ` +
+      `붙임 ${(rt.stats.pasted * 100).toFixed(1)}% credit=${useCredit}`);
+    await notifyDone(pushToken, 1, conceptTitle, galleryId, lang, conceptId);
+    return res.status(200).json({
+      mimeType: small.mime,
+      base64: small.base64,
+      quotaUsed: unlimited ? 0 : (useCredit || freeProSample) ? usage.count : usage.count + 1,
+      quotaLimit: unlimited ? null : dailyLimit,
+      usedCredit: useCredit,
+      credits: unlimited ? null : creditsLeft,
+      unlimited,
+      engine: "pro",
+      busyFallback: false,
+      proSample: freeProSample,
+      proSampleAvailable: false,
+      galleryId,
+      galleryExpiresAt,
+      // AI 가 이해한 내용(사용자 언어) — 결과 화면에 "이렇게 고쳤어요"로 보여 줄 수 있다
+      retouchSummary: rt.plan.summary,
+    });
   }
 
   // 3.5) 사전 얼굴 검사 (Flash Lite, ~$0.002, 1~2초)

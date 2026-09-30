@@ -39,8 +39,15 @@ export function isPublished(c, now) {
 // ⚠️ 정렬은 서버가 결정한다. 앱은 이 배열 순서를 그대로 그린다.
 //    정렬 규칙이 앱 안에 박혀 있으면 순서 하나 바꾸는 데도 스토어 심사를
 //    거쳐야 한다(실제로 그래서 새 컨셉이 목록 뒤로 밀린 채 방치됐다).
-export function publishedConcepts(ALL, now) {
-  const list = ALL.filter((c) => isPublished(c, now));
+// 새 앱 기능이 있어야 쓸 수 있는 컨셉(`requires: ["retouch"]` 등)은 그 기능을 아는 앱에만 보낸다.
+// 앱이 `/concepts.json?caps=retouch` 로 자기가 아는 기능을 알려 준다. 모르는 앱(구버전·아직 안 붙인 플랫폼)에는
+// 아예 안 보여서 "눌렀더니 업데이트하래요"가 생기지 않는다. 오프라인 폴백(caps 없음)에도 빠진다. (2026-09-30)
+export function supportsConcept(c, caps) {
+  return !Array.isArray(c?.requires) || c.requires.every((r) => caps.has(r));
+}
+
+export function publishedConcepts(ALL, now, caps = new Set()) {
+  const list = ALL.filter((c) => isPublished(c, now) && supportsConcept(c, caps));
 
   for (const c of list) {
     const at = PINNED[Number(c.id)];

@@ -305,11 +305,16 @@ final class AppState {
         let preset = photoPickPreset ?? "none"
         photoPickPreset = nil
         guard !images.isEmpty else { return }
-        // 편집기는 1080px 미리보기로 줄여 쓰므로 여기서 과하게 큰 원본을 보낼 이유가 없다.
-        // (base64 로 웹뷰에 넘기는 값이라 너무 크면 느려진다)
-        let srcs: [String] = images.prefix(10).compactMap { img in
-            let scaled = img.downscaled(maxLong: 2048)
-            guard let d = scaled.jpegData(compressionQuality: 0.92) else { return nil }
+        // ⚠️ 2026-09-30: 예전엔 전부 긴 변 2048·JPEG 0.92 로 줄였다 — 편집기는 받은 크기 그대로 저장하므로
+        //    12MP(4032px) 원본이 약 3MP 로 저장됐다(오너 "필터 적용하면 화질이 낮아진다").
+        //    미리보기는 편집기가 1080px 로 따로 만들고, 저장은 받은 해상도로 한다 → 받는 쪽을 키운다.
+        //    웹뷰 메모리(편집기는 최근 3장을 디코드해 둔다 + 사진마다 base64 문자열) 때문에 장수로 상한을 나눈다:
+        //    1~3장 = 4096(12MP 원본 그대로) · 4~10장 = 3072.
+        let picked = Array(images.prefix(10))
+        let maxLong: CGFloat = picked.count <= 3 ? 4096 : 3072
+        let srcs: [String] = picked.compactMap { img in
+            let scaled = img.downscaled(maxLong: maxLong)
+            guard let d = scaled.jpegData(compressionQuality: 0.95) else { return nil }
             return "data:image/jpeg;base64,\(d.base64EncodedString())"
         }
         guard !srcs.isEmpty else { return }
@@ -319,7 +324,7 @@ final class AppState {
 
     /// 결과 화면 "다듬기" — 지금 보고 있는 사진을 편집기에 바로 실어 보낸다(사진 선택 화면 생략).
     func openEditor(image: UIImage) {
-        let data = image.jpegData(compressionQuality: 0.92) ?? Data()
+        let data = image.jpegData(compressionQuality: 0.95) ?? Data()
         let dataUrl = "data:image/jpeg;base64,\(data.base64EncodedString())"
         webTool = WebTool(url: Config.filterToolURL(mode: "edit"), title: Copy.edit,
                            initialPayload: ["mode": "edit", "src": dataUrl])

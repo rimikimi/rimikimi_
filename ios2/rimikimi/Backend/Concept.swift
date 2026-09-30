@@ -55,6 +55,9 @@ struct Concept: Identifiable, Hashable, Decodable {
 
     var isFourcut: Bool { mode == "fourcut" || title.contains("인생네컷") }
     var isDressroom: Bool { mode == "dressroom" }
+    /// 커스텀 보정(매직 부스) — 사진 + 고칠 내용을 글로 받아 그 부분만 고친다(2.0.2 build 16~). 서버가 `requires: ["retouch"]` 로
+    /// 이 기능을 아는 앱에만 목록을 보낸다(`fetchConcepts` 의 `caps=retouch`).
+    var isRetouch: Bool { mode == "retouch" }
     var isCouple: Bool { mode == "couple" || categories.contains(Concept.coupleCategory) }
     /// 매직 부스 = 얼굴 유지 없이 올린 사진을 변환. 드레스룸은 같은 카테고리지만 동작이 반대.
     var isArt: Bool { categories.contains(Concept.artCategory) }
