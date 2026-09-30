@@ -163,6 +163,7 @@ for (const [pid, period, krw, usd, ikrw, iusd] of SUBS) {
         otherRegionsConfig: { otherRegionsPrices: { usdPrice: money("USD", iusd), eurPrice: otherCache[ikrw]?.eurPrice || money("EUR", iusd) } } }],
       targeting: { acquisitionRule: { scope: { thisSubscription: {} } } },
       regionalConfigs: [{ regionCode: "KR", newSubscriberAvailability: true }, { regionCode: "US", newSubscriberAvailability: true }],
+      otherRegionsConfig: { otherRegionsNewSubscriberAvailability: true },   // 단계(phase)에 기타 지역 가격을 넣으면 최상위에도 필요(400)
     };
     await g("POST", `/subscriptions/${pid}/basePlans/${bp.basePlanId}/offers?offerId=first30&regionsVersion.version=${encodeURIComponent(REGIONS_VERSION)}`, offer);
     await g("POST", `/subscriptions/${pid}/basePlans/${bp.basePlanId}/offers/first30:activate`, {});
