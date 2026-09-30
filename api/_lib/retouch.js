@@ -43,20 +43,38 @@ Customer request:
 2) PLAN — "edits": precise English edit instructions tied to what is visible in THIS photo (only what was asked or clearly implied,
    no extra "improvements"); "keep": what must stay exactly the same; "summary": one or two polite sentences in the SAME language as
    the request saying what will be fixed; "lang": language code of the request.
+   MOOD REQUESTS: words like "분위기", "느낌", "감성", "vibe", "mood", "feel", "look like" mean changing light, color, air and
+   atmosphere (and at most small ambient touches) while KEEPING every object, building, storefront, product, person and the layout
+   that is in the photo. Never replace the background, the location or remove things unless the customer explicitly asks for that
+   (e.g. "배경을 바꿔줘", "replace the background", "put me in Paris"). Write "edits" and "keep" accordingly.
    "scope": "global" if the request changes the look of the WHOLE photo — time of day (e.g. night, sunset), weather, season, overall
    lighting or mood, color grade/filter look, or the entire background; otherwise "local" (specific people, objects or areas).
-   "keep_detail": true when a "global" change only changes light, time of day, color or mood and adds or removes nothing
+   "keep_detail": ALWAYS true for a MOOD REQUEST (see above). Otherwise true when a "global" change only changes light, time of day, color or mood and adds or removes nothing
    (e.g. make it daytime/night/sunset, warmer, film look); false when it adds or removes things or textures
    (rain, snow, fog, new objects, removing a person, a new background). For "local" requests set false.
 3) REGIONS — "regions": tight boxes around the areas the edits touch (including where changed things will end up), and nothing else.
-   "text_boxes": when "scope" is "global", a tight box around EVERY piece of legible text, number, logo, sign, sticker or license
-   plate in the photo (small ones too); otherwise [].
+   "text_boxes": ALWAYS list a tight box around EVERY piece of legible text, number, logo, sign, sticker, price tag or license
+   plate in the photo (small ones too) — never leave it empty when the photo has any text.
    "protect": a tight box around every person's face (forehead to chin, ear to nose tip) that the edits do NOT explicitly change.
    Boxes are [ymin, xmin, ymax, xmax] normalized 0-1000.
 Return JSON only.`;
 }
 
 export function editPrompt(plan) {
+  if (plan.scope === "global" && plan.keepDetail) {
+    // 빛·색·분위기만 바꾸는 요청 — "확실히 바꿔라"를 세게 걸면 Pro 가 장소를 통째로 갈아 끼운다(9/30 나이키 매장 → 공원).
+    return `Edit this exact photograph. This is an edit of the provided photo, not a new photo.
+
+Change ONLY the light, color and atmosphere, clearly enough to notice:
+${plan.edits.map((e) => "- " + e).join("\n")}
+
+Everything that is in the photo must stay: the same place, walls, buildings, storefronts, doors, windows, signs, products, people
+and every object, in the same positions and shapes. Do not replace the location, do not add or remove objects or people.
+Keep:
+${(plan.keep || []).map((e) => "- " + e).join("\n")}
+- The same framing, crop, camera angle and composition
+Photorealistic, like the same real photo re-lit or re-graded by a skilled photographer. No text changes, no watermark, no frame.`;
+  }
   if (plan.scope === "global") {
     return `Edit this exact photograph. This is an edit of the provided photo, not a new photo.
 
@@ -66,6 +84,8 @@ ${plan.edits.map((e) => "- " + e).join("\n")}
 
 Keep:
 ${(plan.keep || []).map((e) => "- " + e).join("\n")}
+- Every object, building, storefront, product, sign and structure in the photo stays where it is and recognisably the same —
+  change the light, color and atmosphere around them, do not replace the location or remove things unless a change above says so
 - The same framing, crop, camera angle and composition; everyone the changes above do not remove stays in the same pose and position
 - The same faces and identities (same face shape, eyes, nose, mouth, age), same body shapes and the same clothing
 - Relight the people naturally to match the new light and atmosphere (it must look like one real photo, not a pasted cut-out)
@@ -111,6 +131,15 @@ const cleanBoxes = (arr) => (Array.isArray(arr) ? arr : [])
   .map((g) => ({ label: String(g.label || "").slice(0, 40), box_2d: g.box_2d.map((v) => Math.max(0, Math.min(1000, Math.round(v)))) }))
   .filter((g) => g.box_2d[2] > g.box_2d[0] && g.box_2d[3] > g.box_2d[1]);
 
+// "분위기·느낌·감성" 요청인데 장소 교체·추가·제거를 말하지 않았으면 빛·색만 바꾸는 요청으로 본다 — 계획 AI 판정이 매번
+// 달라서(9/30 같은 문장에 true/false) 코드로 한 번 더 잡는다. 이러면 장소를 통째로 바꾸지 않는 지시·재시도가 걸린다.
+function isMoodRequest(text) {
+  const t = String(text || "").toLowerCase();
+  const mood = /분위기|느낌|감성|무드|톤|vibe|mood|feel|atmosphere|aesthetic/.test(t);
+  const replace = /배경|바꿔\s*넣|합성|지워|없애|추가|넣어|replace|remove|add |background|put me|눈|비 오|비가|안개|snow|rain|fog/.test(t);
+  return mood && !replace;
+}
+
 export async function planRetouch(apiKey, jpegB64, text) {
   const j = await gemini(apiKey, "gemini-3-flash-preview", {
     contents: [{ role: "user", parts: [{ inline_data: { mime_type: "image/jpeg", data: jpegB64 } }, { text: planPrompt(text) }] }],
@@ -125,7 +154,7 @@ export async function planRetouch(apiKey, jpegB64, text) {
       lang: String(p.lang || ""),
       summary: String(p.summary || "").slice(0, 400),
       scope: p.scope === "global" ? "global" : "local",
-      keepDetail: p.scope === "global" && p.keep_detail === true,
+      keepDetail: p.scope === "global" && (p.keep_detail === true || isMoodRequest(text)),
       edits: (p.edits || []).map(String).filter(Boolean).slice(0, 12),
       keep: (p.keep || []).map(String).filter(Boolean).slice(0, 12),
       regions: cleanBoxes(p.regions),
@@ -280,10 +309,11 @@ export function alignEdit(O, E, w, h, regions, scope) {
   const f = w / W;
   const out = { s: best.s, tx: best.tx * f, ty: best.ty * f };
   // 옮긴 틀이 AI 사진 밖으로 2% 넘게 나가면 버린다 — 가장자리가 늘어나 줄무늬가 된다(9/30 실내→야외, 배율 1.10 오정렬).
-  const cx = w / 2, cy = h / 2, m = 0.02;
+  const cx = w / 2, cy = h / 2, m = 0.06;
   const lx = out.s * (0 - cx) + cx + out.tx, rx = out.s * (w - cx) + cx + out.tx;
   const ty0 = out.s * (0 - cy) + cy + out.ty, by = out.s * (h - cy) + cy + out.ty;
   if (lx < -w * m || rx > w * (1 + m) || ty0 < -h * m || by > h * (1 + m)) return null;
+  if (process.env.DEBUG_ALIGN) console.log("[align]", JSON.stringify({ ...out, gain }));
   // 거의 제자리이거나 맞춰 봐도 나아지지 않으면 그대로(엉뚱하게 옮기지 않게)
   if (gain < 0.01 || (Math.abs(out.s - 1) < 0.003 && Math.abs(out.tx) < 1.5 && Math.abs(out.ty) < 1.5)) return null;
   return out;
@@ -317,7 +347,7 @@ export function warpRGB(E, w, h, { s, tx, ty }) {
 // 전체 변경에서 AI 가 물건·사람을 옮기거나 지웠는데 원본 글자·얼굴을 덮어쓰면 유령처럼 겹친다(9/30 실내→야외).
 // ⚠️ 세밀한 윤곽으로 비교하면 안 된다: AI 가 글자를 깨뜨린 칸이 "다른 내용"으로 보여 정작 고쳐야 할 칸을 건너뛴다
 //    (9/30 버스 스티커·번호판 재발). 칸 크기의 1/8 로 흐려서 판·덩어리 배치만 본다(밝기 차이는 상관이라 무관).
-function sameSpot(O, E, w, h, x0, y0, x1, y1) {
+function sameSpot(O, E, w, h, x0, y0, x1, y1, minCorr = 0.55, checkColor = true) {
   const xa = Math.max(0, Math.floor(x0)), xb = Math.min(w, Math.ceil(x1)), ya = Math.max(0, Math.floor(y0)), yb = Math.min(h, Math.ceil(y1));
   const bw = xb - xa, bh = yb - ya;
   if (bw < 8 || bh < 8) return false;
@@ -336,8 +366,20 @@ function sameSpot(O, E, w, h, x0, y0, x1, y1) {
   let sa = 0, sb = 0, saa = 0, sbb = 0, sab = 0;
   for (let j = 0; j < n; j++) { sa += A[j]; sb += B[j]; saa += A[j] * A[j]; sbb += B[j] * B[j]; sab += A[j] * B[j]; }
   const va = saa - sa * sa / n, vb = sbb - sb * sb / n;
+  // 색 계열(밝기를 뺀 r·g 비율)도 같아야 한다 — 주황 벽화 자리에 초록 나무가 들어온 경우처럼 모양 상관이 우연히
+  // 높아도 다른 물건이면 걸러진다(9/30). 조명이 크게 바뀌어도(밤→낮) 물건의 색 계열은 대체로 유지된다.
+  const chroma = (buf) => {
+    let r = 0, g = 0, t = 0;
+    for (let y = ya; y < yb; y += k) for (let x = xa; x < xb; x += k) {
+      const i = (y * w + x) * 3, sum = buf[i] + buf[i + 1] + buf[i + 2] + 1;
+      r += buf[i] / sum; g += buf[i + 1] / sum; t++;
+    }
+    return [r / t, g / t];
+  };
+  const [ro, go] = chroma(O), [re, ge] = chroma(E);
+  if (checkColor && Math.hypot(ro - re, go - ge) > 0.12) return false;
   if (va < 1e-3 || vb < 1e-3) return true;                              // 둘 다 밋밋하면 비교 불가 — 옮겨도 해가 없다
-  return (sab - sa * sb / n) / Math.sqrt(va * vb) >= 0.5;
+  return (sab - sa * sb / n) / Math.sqrt(va * vb) >= minCorr;
 }
 
 /**
@@ -370,7 +412,8 @@ export function compositeRetouch(O, E, w, h, regions, protect, scope = "local", 
       const bx0 = x0 / 1000 * w - feather - xa, bx1 = x1 / 1000 * w + feather - xa, by0 = y0 / 1000 * h - feather - ya, by1 = y1 / 1000 * h + feather - ya;
       for (let y = 0; y < ch; y++) for (let x = 0; x < cw; x++) if (x >= bx0 && x <= bx1 && y >= by0 && y <= by1) m[y * cw + x] = 1;
       // 이 글자가 AI 사진에서도 **같은 자리**에 있을 때만 옮긴다(배경을 통째로 바꾸면 물건이 옮겨지거나 사라진다).
-      if (!sameSpot(O, out, w, h, x0 / 1000 * w, y0 / 1000 * h, x1 / 1000 * w, y1 / 1000 * h)) continue;
+      // 빛만 바꾸는 요청(keepDetail)은 조명 때문에 색 계열도 바뀐다(밤 파란빛 → 낮) — 모양 배치만 본다.
+      if (!sameSpot(O, out, w, h, x0 / 1000 * w, y0 / 1000 * h, x1 / 1000 * w, y1 / 1000 * h, 0.55, !keepDetail)) continue;
       const a = gauss(m, cw, ch, feather);
       for (let c = 0; c < 3; c++) {
         const oc = new Float32Array(cn), ec = new Float32Array(cn);
@@ -398,7 +441,7 @@ export function compositeRetouch(O, E, w, h, regions, protect, scope = "local", 
       const ax = Math.max(2, (x1 - x0) / 2000 * w), ay = Math.max(2, (y1 - y0) / 2000 * h);
       const padc = Math.ceil(sig * 3);
       // AI 가 이 사람을 옮기거나 지웠으면(새 배경 등) 원본 얼굴을 덮지 않는다 — 유령 얼굴이 남는다.
-      if (!sameSpot(O, E, w, h, x0 / 1000 * w, y0 / 1000 * h, x1 / 1000 * w, y1 / 1000 * h)) continue;
+      if (!sameSpot(O, E, w, h, x0 / 1000 * w, y0 / 1000 * h, x1 / 1000 * w, y1 / 1000 * h, 0.55, !keepDetail)) continue;
       const xa = Math.max(0, Math.floor(cx - ax * 1.25) - padc), xb = Math.min(w, Math.ceil(cx + ax * 1.25) + padc);
       const ya = Math.max(0, Math.floor(cy - ay * 1.25) - padc), yb = Math.min(h, Math.ceil(cy + ay * 1.25) + padc);
       const cw = xb - xa, ch = yb - ya;
@@ -610,6 +653,14 @@ export async function runRetouch({ apiKey, sharp, srcBuf, text }) {
   if (!editB64) return { error: "busy" };
   const O = await sharp(srcBuf).removeAlpha().raw().toBuffer();
   let E = await sharp(Buffer.from(editB64, "base64")).rotate().resize(w, h, { fit: "fill" }).removeAlpha().raw().toBuffer();
+  // 빛·분위기 요청인데 장소를 통째로 바꿔 왔으면(9/30 나이키 매장 → 공원) 한 번 더 그린다
+  if (plan.scope === "global" && plan.keepDetail && !sameSpot(O, E, w, h, 0, 0, w, h, 0.45, false)) {
+    const again = await editImage(apiKey, b64, nearestAspect(w, h), editPrompt(plan));
+    if (again) {
+      const E2 = await sharp(Buffer.from(again, "base64")).rotate().resize(w, h, { fit: "fill" }).removeAlpha().raw().toBuffer();
+      if (sameSpot(O, E2, w, h, 0, 0, w, h, 0.45, false)) E = E2;
+    }
+  }
   // 배경을 통째로 바꾸는 요청(실내→야외, 새 배경)은 원본과 맞출 기준이 없다 — 정렬하면 엉뚱하게 늘어난다.
   const align = plan.scope === "global" && !plan.keepDetail ? null : alignEdit(O, E, w, h, plan.regions, plan.scope);
   if (align) E = warpRGB(E, w, h, align);
