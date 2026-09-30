@@ -393,6 +393,7 @@ enum Copy {
     static var oneCreditOneImage: String { L.t("크레딧 1장으로 이미지 한 장을 만들 수 있어요.", "1 credit = 1 image.") }
     static var inviteForFree: String { L.t("친구 초대로 무료 3장", "Invite friends · 3 free credits") }
     static var packIntro: String { L.t("인트로", "Intro") }
+    static var packSingle: String { L.t("1장", "Single") }
     static var packMini: String { L.t("미니", "Mini") }
     static var packStandard: String { L.t("스탠다드", "Standard") }
     static var packPro: String { L.t("프로", "Pro") }

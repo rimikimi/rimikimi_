@@ -28,7 +28,10 @@ final class StoreManager {
     /// `src/PortraitStudio.jsx` CREDIT_PACKS / SUB_PLANS.
     /// 이름·배지가 번역 문구라 볼 때마다 만든다(앱 안 언어 전환 — `L`). 가격은 아래 인스턴스 `packs` 가 붙인다.
     /// 2026-09-30 오너 가격 개편: 인트로 팩(6장 ₩3,900) 판매 중단, 미니 12·스탠다드 24·프로 48.
+    ///   + 1장 ₩1,900 · 인트로 3장 ₩3,900(새 상품 — 옛 intro 는 애플 설명이 "6장"으로 고정).
     static var packs: [Pack] { [
+        .init(id: "rimikimi.pack.single", credits: 1, krw: 1900, label: Copy.packSingle, badge: nil, isSubscription: false, period: nil),
+        .init(id: "rimikimi.pack.trial", credits: 3, krw: 3900, label: Copy.packIntro, badge: nil, isSubscription: false, period: nil),
         .init(id: "rimikimi.pack.mini", credits: 12, krw: 11900, label: Copy.packMini, badge: nil, isSubscription: false, period: nil),
         .init(id: "rimikimi.pack.standard", credits: 24, krw: 22900, label: Copy.packStandard, badge: Copy.badgeBest, isSubscription: false, period: nil),
         .init(id: "rimikimi.pack.pro", credits: 48, krw: 44900, label: Copy.packPro, badge: Copy.badgeCheapest, isSubscription: false, period: nil),
@@ -36,11 +39,13 @@ final class StoreManager {
     /// 첫 구매 30% 할인 — 소모품엔 애플 할인 기능이 없어 **별도 상품**이다(같은 장수). 한 번도 산 적 없는 계정
     /// (서버 quota `firstPurchase`)에게만, 그리고 스토어가 그 상품을 돌려줄 때만(심사 전이면 없음) 정가 팩 대신 보여 준다.
     static let firstPackID: [String: String] = [
+        "rimikimi.pack.single": "rimikimi.pack.single.first",
+        "rimikimi.pack.trial": "rimikimi.pack.trial.first",
         "rimikimi.pack.mini": "rimikimi.pack.mini.first",
         "rimikimi.pack.standard": "rimikimi.pack.standard.first",
         "rimikimi.pack.pro": "rimikimi.pack.pro.first",
     ]
-    static let firstPackKRW: [String: Int] = ["rimikimi.pack.mini": 8300, "rimikimi.pack.standard": 15900, "rimikimi.pack.pro": 31500]
+    static let firstPackKRW: [String: Int] = ["rimikimi.pack.single": 1300, "rimikimi.pack.trial": 2700, "rimikimi.pack.mini": 8300, "rimikimi.pack.standard": 15900, "rimikimi.pack.pro": 31500]
     static var subs: [Pack] { [
         .init(id: "rimikimi.sub.plus.weekly", credits: 10, krw: 9900, label: Copy.subWeekly, badge: nil, isSubscription: true, period: "주"),
         .init(id: "rimikimi.sub.plus.monthly", credits: 35, krw: 29900, label: Copy.subMonthly, badge: nil, isSubscription: true, period: "월"),
