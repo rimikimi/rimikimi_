@@ -82,8 +82,13 @@ const say = (m) => console.log((MODE === "dry" ? "[dry] " : "") + m);
 // 1) 크레딧팩 — 새 게시 API(oneTimeProducts). 구형 inappproducts 는 403 "migrate to the new publishing API".
 //    KRW 가격을 Play 환산(pricing:convertRegionPrices)으로 전 지역에 펴고, 한국·미국은 정한 값으로 덮는다.
 const convCache = {};
+let REGIONS_VERSION = "2022/02";
 async function regionConfigs(krw, usd) {
-  convCache[krw] ||= (await g("POST", "/pricing:convertRegionPrices", { price: money("KRW", krw) })).convertedRegionPrices || {};
+  if (!convCache[krw]) {
+    const r = await g("POST", "/pricing:convertRegionPrices", { price: money("KRW", krw) });
+    convCache[krw] = r.convertedRegionPrices || {};
+    REGIONS_VERSION = r.regionVersion?.version || REGIONS_VERSION;   // 환산 결과와 같은 지역 버전으로 보내야 한다(불가리아 BGN→EUR 등)
+  }
   const out = Object.values(convCache[krw]).map((r) => ({ regionCode: r.regionCode, price: r.price, availability: "AVAILABLE" }));
   for (const c of out) {
     if (c.regionCode === "KR") c.price = money("KRW", krw);
@@ -109,7 +114,7 @@ for (const [sku, n, krw, usd, ko, en] of PACKS) {
   if (exists?.taxAndComplianceSettings) body.taxAndComplianceSettings = exists.taxAndComplianceSettings;
   // 단건 PATCH 경로는 404(HTML) — 새 API 는 batchUpdate 로만 만들고 고친다(9/30 실측).
   await g("POST", `/oneTimeProducts:batchUpdate`, { requests: [{ oneTimeProduct: body, updateMask: "listings,purchaseOptions",
-    regionsVersion: { version: "2022/02" }, allowMissing: true, latencyTolerance: "PRODUCT_UPDATE_LATENCY_TOLERANCE_LATENCY_TOLERANT" }] });
+    regionsVersion: { version: REGIONS_VERSION }, allowMissing: true, latencyTolerance: "PRODUCT_UPDATE_LATENCY_TOLERANCE_LATENCY_TOLERANT" }] });
   if (!exists) await batchState(sku, "activatePurchaseOptionRequest");
 }
 if (iaps.some((p) => p.productId === "rimikimi.pack.intro" && p.purchaseOptions?.[0]?.state === "ACTIVE")) {
@@ -117,7 +122,7 @@ if (iaps.some((p) => p.productId === "rimikimi.pack.intro" && p.purchaseOptions?
   if (MODE === "apply") await batchState("rimikimi.pack.intro", "deactivatePurchaseOptionRequest");
 }
 
-// 2) 구독 가격 + 3) 첫 결제 오퍼
+// 2) 구독 가격 + 3) 첫 결제 오퍼 — 기존 요금제의 다른 나라 가격은 2022/02 통화 그대로라 구독은 2022/02 로 보낸다(한국·미국만 바꿈)
 for (const [pid, period, krw, usd, ikrw, iusd] of SUBS) {
   const s = subs.find((x) => x.productId === pid);
   if (!s) { say(`!! 구독 없음 ${pid}`); continue; }
