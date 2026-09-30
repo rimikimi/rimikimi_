@@ -134,18 +134,24 @@ if (iaps.some((p) => p.productId === "rimikimi.pack.intro" && p.purchaseOptions?
   if (MODE === "apply") await batchState("rimikimi.pack.intro", "deactivatePurchaseOptionRequest");
 }
 
-// 2) 구독 가격 + 3) 첫 결제 오퍼 — 기존 요금제의 다른 나라 가격은 2022/02 통화 그대로라 구독은 2022/02 로 보낸다(한국·미국만 바꿈)
+// 2) 구독 가격 + 3) 첫 결제 오퍼
 for (const [pid, period, krw, usd, ikrw, iusd] of SUBS) {
   const s = subs.find((x) => x.productId === pid);
   if (!s) { say(`!! 구독 없음 ${pid}`); continue; }
   const bp = s.basePlans?.find((b) => b.state === "ACTIVE") || s.basePlans?.[0];
   say(`구독 ${pid}/${bp.basePlanId} 가격 ₩${krw} / $${usd} (기존 구독자 옛 가격 유지)`);
   if (MODE === "apply") {
-    const regionalConfigs = (bp.regionalConfigs || []).map((r) =>
-      r.regionCode === "KR" ? { ...r, price: money("KRW", krw) } : r.regionCode === "US" ? { ...r, price: money("USD", usd) } : r);
-    const next = { ...s, basePlans: s.basePlans.map((b) => (b.basePlanId === bp.basePlanId ? { ...b, regionalConfigs } : b)) };
-    await g("PATCH", `/subscriptions/${pid}?updateMask=basePlans&regionsVersion.version=2022%2F02`, next);
+    // 전 지역 가격을 새 KRW 기준으로 다시 환산해 넣는다(한국·미국은 정한 값). 옛 2022/02 로는 이후 추가된
+    // 나라(ET 등)가 "not billable" 이고, 새 버전에선 옛 통화(BG=BGN)가 거절된다 — 환산 버전으로 통일(9/30 실측).
+    const regional = await regionConfigs(krw, usd);
+    const regionalConfigs = regional.map((r) => ({ regionCode: r.regionCode, newSubscriberAvailability: true, price: r.price }));
+    const other = otherCache[krw];
+    const nb = { ...bp, regionalConfigs };
+    if (other) nb.otherRegionsConfig = { ...(bp.otherRegionsConfig || {}), usdPrice: money("USD", usd), eurPrice: other.eurPrice, newSubscriberAvailability: true };
+    const next = { ...s, basePlans: s.basePlans.map((b) => (b.basePlanId === bp.basePlanId ? nb : b)) };
+    await g("PATCH", `/subscriptions/${pid}?updateMask=basePlans&regionsVersion.version=${encodeURIComponent(REGIONS_VERSION)}`, next);
   }
+  if (MODE === "apply") await regionConfigs(ikrw, iusd);
   const offers = ((await g("GET", `/subscriptions/${pid}/basePlans/${bp.basePlanId}/offers`)) || {}).subscriptionOffers || [];
   if (offers.some((o) => o.offerId === "first30")) { say(`  첫 결제 오퍼 first30 이미 있음`); continue; }
   say(`  첫 결제 30% 오퍼 first30: 첫 ${period} ₩${ikrw} / $${iusd} (신규 구독자)`);
@@ -154,11 +160,11 @@ for (const [pid, period, krw, usd, ikrw, iusd] of SUBS) {
       packageName: PKG, productId: pid, basePlanId: bp.basePlanId, offerId: "first30",
       phases: [{ recurrenceCount: 1, duration: period,
         regionalConfigs: [{ regionCode: "KR", price: money("KRW", ikrw) }, { regionCode: "US", price: money("USD", iusd) }],
-        otherRegionsConfig: { otherRegionsPrice: { usdPrice: money("USD", iusd), eurPrice: money("EUR", iusd) } } }],
+        otherRegionsConfig: { otherRegionsPrice: { usdPrice: money("USD", iusd), eurPrice: otherCache[ikrw]?.eurPrice || money("EUR", iusd) } } }],
       targeting: { acquisitionRule: { scope: { thisSubscription: {} } } },
       regionalConfigs: [{ regionCode: "KR", newSubscriberAvailability: true }, { regionCode: "US", newSubscriberAvailability: true }],
     };
-    await g("POST", `/subscriptions/${pid}/basePlans/${bp.basePlanId}/offers?offerId=first30&regionsVersion.version=2022%2F02`, offer);
+    await g("POST", `/subscriptions/${pid}/basePlans/${bp.basePlanId}/offers?offerId=first30&regionsVersion.version=${encodeURIComponent(REGIONS_VERSION)}`, offer);
     await g("POST", `/subscriptions/${pid}/basePlans/${bp.basePlanId}/offers/first30:activate`, {});
   }
 }
