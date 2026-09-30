@@ -413,7 +413,9 @@ export function compositeRetouch(O, E, w, h, regions, protect, scope = "local", 
       for (let y = 0; y < ch; y++) for (let x = 0; x < cw; x++) if (x >= bx0 && x <= bx1 && y >= by0 && y <= by1) m[y * cw + x] = 1;
       // 이 글자가 AI 사진에서도 **같은 자리**에 있을 때만 옮긴다(배경을 통째로 바꾸면 물건이 옮겨지거나 사라진다).
       // 빛만 바꾸는 요청(keepDetail)은 조명 때문에 색 계열도 바뀐다(밤 파란빛 → 낮) — 모양 배치만 본다.
-      if (!sameSpot(O, out, w, h, x0 / 1000 * w, y0 / 1000 * h, x1 / 1000 * w, y1 / 1000 * h, 0.55, !keepDetail)) continue;
+      //   빛만 바꾸는 요청은 물건이 제자리라 느슨하게(조명 때문에 밝기 배치 상관이 0.5~0.6 까지 떨어진다 — 9/30 버스 번호판),
+      //   장면이 바뀌는 요청은 엄격하게.
+      if (!sameSpot(O, out, w, h, x0 / 1000 * w, y0 / 1000 * h, x1 / 1000 * w, y1 / 1000 * h, keepDetail ? 0.3 : 0.55, !keepDetail)) continue;
       const a = gauss(m, cw, ch, feather);
       for (let c = 0; c < 3; c++) {
         const oc = new Float32Array(cn), ec = new Float32Array(cn);
@@ -662,6 +664,7 @@ export async function runRetouch({ apiKey, sharp, srcBuf, text }) {
     }
   }
   // 배경을 통째로 바꾸는 요청(실내→야외, 새 배경)은 원본과 맞출 기준이 없다 — 정렬하면 엉뚱하게 늘어난다.
+  if (process.env.DEBUG_SAVE_E) await sharp(E, { raw: { width: w, height: h, channels: 3 } }).jpeg({ quality: 92 }).toFile(process.env.DEBUG_SAVE_E);
   const align = plan.scope === "global" && !plan.keepDetail ? null : alignEdit(O, E, w, h, plan.regions, plan.scope);
   if (align) E = warpRGB(E, w, h, align);
   const { out, pasted, same, thr } = compositeRetouch(O, E, w, h, plan.regions, plan.protect, plan.scope, plan.keepDetail, plan.textBoxes);
