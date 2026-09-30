@@ -17,7 +17,22 @@
 // ============================================================
 
 export const PACKAGES = [
-  // ── 소비형 크레딧 팩 — 2026-09-30 오너 가격 개편(장당 약 ₩1,000 기준, 인트로 팩 폐지) ──
+  // ── 소비형 크레딧 팩 — 2026-09-30 오너 가격 개편(장당 약 ₩1,000 기준, 옛 인트로 6장 폐지) ──
+  //    1장(₩1,900)·인트로 3장(₩3,900) 은 새 상품(옛 intro 는 애플 설명이 "6장"으로 고정돼 재사용 불가)
+  {
+    id: "rimikimi.pack.single", kind: "consumable", credits: 1,
+    usd: "1.49", krw: 1900,
+    label_ko: "1장", label_en: "Single",
+    tagline_ko: "1장", tagline_en: "1 image",
+    badge_ko: null, badge_en: null,
+  },
+  {
+    id: "rimikimi.pack.trial", kind: "consumable", credits: 3,
+    usd: "2.99", krw: 3900,
+    label_ko: "인트로 팩", label_en: "Intro",
+    tagline_ko: "3장", tagline_en: "3 images",
+    badge_ko: null, badge_en: null,
+  },
   {
     id: "rimikimi.pack.mini", kind: "consumable", credits: 12,
     usd: "8.99", krw: 11900,
@@ -69,6 +84,8 @@ export const PACKAGES = [
 //    판매 목록(PACKAGES)에는 넣지 않는다: 앱이 quota.firstPurchase 가 참일 때만 일반 팩 대신 보여 준다.
 //    지급 장수는 일반 팩과 같다.
 export const FIRST_PURCHASE_PACKAGES = [
+  { id: "rimikimi.pack.single.first", kind: "consumable", credits: 1, usd: "0.99", krw: 1300 },
+  { id: "rimikimi.pack.trial.first", kind: "consumable", credits: 3, usd: "1.99", krw: 2700 },
   { id: "rimikimi.pack.mini.first", kind: "consumable", credits: 12, usd: "5.99", krw: 8300 },
   { id: "rimikimi.pack.standard.first", kind: "consumable", credits: 24, usd: "11.99", krw: 15900 },
   { id: "rimikimi.pack.pro.first", kind: "consumable", credits: 48, usd: "22.99", krw: 31500 },
