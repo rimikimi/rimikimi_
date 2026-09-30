@@ -673,7 +673,13 @@ export async function runRetouch({ apiKey, sharp, srcBuf, text }) {
   if (process.env.DEBUG_SAVE_E) await sharp(E, { raw: { width: w, height: h, channels: 3 } }).jpeg({ quality: 92 }).toFile(process.env.DEBUG_SAVE_E);
   const align = plan.scope === "global" && !plan.keepDetail ? null : alignEdit(O, E, w, h, plan.regions, plan.scope);
   if (align) E = warpRGB(E, w, h, align);
-  const { out, pasted, same, thr } = compositeRetouch(O, E, w, h, plan.regions, plan.protect, plan.scope, plan.keepDetail, plan.textBoxes);
+  let { out, pasted, same, thr } = compositeRetouch(O, E, w, h, plan.regions, plan.protect, plan.scope, plan.keepDetail, plan.textBoxes);
+  // 부분 편집인데 사진의 1/3 넘게 바뀌면(자세·베일·드레스처럼 큰 변화) 원본과 AI 를 반씩 섞는 경계에서
+  // 벽 모서리·창틀이 어긋나 꺾여 보인다(9/30 웨딩 "베일 날리며 내려다보기", 58% 붙임). 이럴 땐 AI 결과를 통째로 쓰고
+  // 글자·얼굴만 같은 자리일 때 옮긴다(전체 변경 경로와 같은 처리).
+  if (plan.scope !== "global" && pasted > 0.35) {
+    ({ out, pasted, same, thr } = compositeRetouch(O, E, w, h, plan.regions, plan.protect, "global", false, plan.textBoxes));
+  }
   const finalJpeg = await sharp(out, { raw: { width: w, height: h, channels: 3 } }).jpeg({ quality: 92 }).toBuffer();
   return { finalJpeg, plan, w, h, stats: { pasted, same, thr, align } };
 }
