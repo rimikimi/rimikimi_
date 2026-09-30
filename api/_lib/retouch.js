@@ -49,7 +49,7 @@ Customer request:
    (e.g. make it daytime/night/sunset, warmer, film look); false when it adds or removes things or textures
    (rain, snow, fog, new objects, removing a person, a new background). For "local" requests set false.
 3) REGIONS — "regions": tight boxes around the areas the edits touch (including where changed things will end up), and nothing else.
-   "text_boxes": when "keep_detail" is true, a tight box around EVERY piece of legible text, number, logo, sign, sticker or license
+   "text_boxes": when "scope" is "global", a tight box around EVERY piece of legible text, number, logo, sign, sticker or license
    plate in the photo (small ones too); otherwise [].
    "protect": a tight box around every person's face (forehead to chin, ear to nose tip) that the edits do NOT explicitly change.
    Boxes are [ymin, xmin, ymax, xmax] normalized 0-1000.
@@ -279,6 +279,11 @@ export function alignEdit(O, E, w, h, regions, scope) {
   }
   const f = w / W;
   const out = { s: best.s, tx: best.tx * f, ty: best.ty * f };
+  // 옮긴 틀이 AI 사진 밖으로 2% 넘게 나가면 버린다 — 가장자리가 늘어나 줄무늬가 된다(9/30 실내→야외, 배율 1.10 오정렬).
+  const cx = w / 2, cy = h / 2, m = 0.02;
+  const lx = out.s * (0 - cx) + cx + out.tx, rx = out.s * (w - cx) + cx + out.tx;
+  const ty0 = out.s * (0 - cy) + cy + out.ty, by = out.s * (h - cy) + cy + out.ty;
+  if (lx < -w * m || rx > w * (1 + m) || ty0 < -h * m || by > h * (1 + m)) return null;
   // 거의 제자리이거나 맞춰 봐도 나아지지 않으면 그대로(엉뚱하게 옮기지 않게)
   if (gain < 0.01 || (Math.abs(out.s - 1) < 0.003 && Math.abs(out.tx) < 1.5 && Math.abs(out.ty) < 1.5)) return null;
   return out;
@@ -308,6 +313,33 @@ export function warpRGB(E, w, h, { s, tx, ty }) {
   return out;
 }
 
+// 두 사진의 한 칸(x0..x1, y0..y1)에 **같은 물건이 같은 자리에** 있는지 — 흐리게 본 밝기 배치의 상관.
+// 전체 변경에서 AI 가 물건·사람을 옮기거나 지웠는데 원본 글자·얼굴을 덮어쓰면 유령처럼 겹친다(9/30 실내→야외).
+// ⚠️ 세밀한 윤곽으로 비교하면 안 된다: AI 가 글자를 깨뜨린 칸이 "다른 내용"으로 보여 정작 고쳐야 할 칸을 건너뛴다
+//    (9/30 버스 스티커·번호판 재발). 칸 크기의 1/8 로 흐려서 판·덩어리 배치만 본다(밝기 차이는 상관이라 무관).
+function sameSpot(O, E, w, h, x0, y0, x1, y1) {
+  const xa = Math.max(0, Math.floor(x0)), xb = Math.min(w, Math.ceil(x1)), ya = Math.max(0, Math.floor(y0)), yb = Math.min(h, Math.ceil(y1));
+  const bw = xb - xa, bh = yb - ya;
+  if (bw < 8 || bh < 8) return false;
+  const k = Math.max(1, Math.floor(Math.min(bw, bh) / 24));            // 짧은 변 ~24칸으로 줄여서
+  const sw = Math.ceil(bw / k), sh = Math.ceil(bh / k);
+  const lum = (buf) => {
+    const o = new Float32Array(sw * sh), c = new Float32Array(sw * sh);
+    for (let y = ya; y < yb; y++) for (let x = xa; x < xb; x++) {
+      const i = (y * w + x) * 3, j = ((((y - ya) / k) | 0) * sw) + (((x - xa) / k) | 0);
+      o[j] += buf[i] * 0.299 + buf[i + 1] * 0.587 + buf[i + 2] * 0.114; c[j]++;
+    }
+    for (let j = 0; j < o.length; j++) o[j] /= c[j] || 1;
+    return gauss(o, sw, sh, 1.5);
+  };
+  const A = lum(O), B = lum(E), n = A.length;
+  let sa = 0, sb = 0, saa = 0, sbb = 0, sab = 0;
+  for (let j = 0; j < n; j++) { sa += A[j]; sb += B[j]; saa += A[j] * A[j]; sbb += B[j] * B[j]; sab += A[j] * B[j]; }
+  const va = saa - sa * sa / n, vb = sbb - sb * sb / n;
+  if (va < 1e-3 || vb < 1e-3) return true;                              // 둘 다 밋밋하면 비교 불가 — 옮겨도 해가 없다
+  return (sab - sa * sb / n) / Math.sqrt(va * vb) >= 0.5;
+}
+
 /**
  * O, E: 같은 w×h 의 RGB Uint8 (E 는 AI 결과를 원본 크기로 늘인 것). regions/protect: 0~1000 박스.
  * 마스크(어디를 붙일지)는 긴 변 ~1024 로 줄여서 계산하고 원본 크기로 부드럽게 늘린다 — 경계는 어차피 페더라
@@ -321,7 +353,7 @@ export function compositeRetouch(O, E, w, h, regions, protect, scope = "local", 
   //    (오너 실측 2026-09-30 "완전 밤으로 바꾸진 않네?"). 전체 변경은 AI 결과를 그대로 쓰되,
   //    얼굴만 **조명·색(저주파)은 AI, 이목구비·피부결(고주파)은 원본** 으로 합친다 — 밤 조명을 받은 같은 사람.
   //    (얼굴을 원본 그대로 두면 어두운 장면에 낮 얼굴이 오려 붙인 것처럼 뜬다 — 재현 확인)
-  if (scope === "global" && keepDetail && textBoxes.length) {
+  if (scope === "global" && textBoxes.length) {
     // 빛·시간대·색만 바꾸는 요청(낮으로·밤으로·노을): AI 는 화면을 다시 그리며 작은 글자를 깨뜨린다(9/30 오너 버스 사진:
     // BYD→BVC, 서울→세종, 스티커 문구). **글자·로고·번호판 박스 안에서만** 조명(저주파)=AI, 세부(고주파)=원본으로 합친다.
     // ⚠️ 사진 전체에 하면 밤 노이즈·빛 번짐·거친 질감까지 살아나 "디테일만 살고 사진이 구리다"(오너 9/30) — 박스만.
@@ -337,6 +369,8 @@ export function compositeRetouch(O, E, w, h, regions, protect, scope = "local", 
       const m = new Float32Array(cn);                              // 박스(여유 1 feather) → 부드러운 가장자리
       const bx0 = x0 / 1000 * w - feather - xa, bx1 = x1 / 1000 * w + feather - xa, by0 = y0 / 1000 * h - feather - ya, by1 = y1 / 1000 * h + feather - ya;
       for (let y = 0; y < ch; y++) for (let x = 0; x < cw; x++) if (x >= bx0 && x <= bx1 && y >= by0 && y <= by1) m[y * cw + x] = 1;
+      // 이 글자가 AI 사진에서도 **같은 자리**에 있을 때만 옮긴다(배경을 통째로 바꾸면 물건이 옮겨지거나 사라진다).
+      if (!sameSpot(O, out, w, h, x0 / 1000 * w, y0 / 1000 * h, x1 / 1000 * w, y1 / 1000 * h)) continue;
       const a = gauss(m, cw, ch, feather);
       for (let c = 0; c < 3; c++) {
         const oc = new Float32Array(cn), ec = new Float32Array(cn);
@@ -363,6 +397,8 @@ export function compositeRetouch(O, E, w, h, regions, protect, scope = "local", 
       const cx = (x0 + x1) / 2000 * w, cy = (y0 + y1) / 2000 * h;
       const ax = Math.max(2, (x1 - x0) / 2000 * w), ay = Math.max(2, (y1 - y0) / 2000 * h);
       const padc = Math.ceil(sig * 3);
+      // AI 가 이 사람을 옮기거나 지웠으면(새 배경 등) 원본 얼굴을 덮지 않는다 — 유령 얼굴이 남는다.
+      if (!sameSpot(O, E, w, h, x0 / 1000 * w, y0 / 1000 * h, x1 / 1000 * w, y1 / 1000 * h)) continue;
       const xa = Math.max(0, Math.floor(cx - ax * 1.25) - padc), xb = Math.min(w, Math.ceil(cx + ax * 1.25) + padc);
       const ya = Math.max(0, Math.floor(cy - ay * 1.25) - padc), yb = Math.min(h, Math.ceil(cy + ay * 1.25) + padc);
       const cw = xb - xa, ch = yb - ya;
@@ -574,7 +610,8 @@ export async function runRetouch({ apiKey, sharp, srcBuf, text }) {
   if (!editB64) return { error: "busy" };
   const O = await sharp(srcBuf).removeAlpha().raw().toBuffer();
   let E = await sharp(Buffer.from(editB64, "base64")).rotate().resize(w, h, { fit: "fill" }).removeAlpha().raw().toBuffer();
-  const align = alignEdit(O, E, w, h, plan.regions, plan.scope);
+  // 배경을 통째로 바꾸는 요청(실내→야외, 새 배경)은 원본과 맞출 기준이 없다 — 정렬하면 엉뚱하게 늘어난다.
+  const align = plan.scope === "global" && !plan.keepDetail ? null : alignEdit(O, E, w, h, plan.regions, plan.scope);
   if (align) E = warpRGB(E, w, h, align);
   const { out, pasted, same, thr } = compositeRetouch(O, E, w, h, plan.regions, plan.protect, plan.scope, plan.keepDetail, plan.textBoxes);
   const finalJpeg = await sharp(out, { raw: { width: w, height: h, channels: 3 } }).jpeg({ quality: 92 }).toBuffer();

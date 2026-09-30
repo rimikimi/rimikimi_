@@ -263,19 +263,22 @@ const PAYMENTS_ENABLED = isNative();
 // ⚠️ 옛 credits10/30/70/120 은 이 판매 목록에서 뺐을 뿐 지우지 않았다 — 크레딧 매핑은
 // api/_lib/payments/packages.js 의 LEGACY_PACKAGES 에 남아있다(과거 구매자 그랜트/복원용).
 const CREDIT_PACKS = [
-  { id: "rimikimi.pack.intro",    count: 6,  krw: 3900,  usd: "2.99",  badgeKey: "store.badge.first" },
-  { id: "rimikimi.pack.mini",     count: 12, krw: 7900,  usd: "5.99",  badgeKey: null },
-  { id: "rimikimi.pack.standard", count: 24, krw: 14900, usd: "10.99", badgeKey: "store.badge.best" },
-  { id: "rimikimi.pack.pro",      count: 45, krw: 27000, usd: "19.99", badgeKey: "store.badge.cheapest" },
+  // 2026-09-30 가격 개편(오너): 1장 ₩1,900 · 인트로 3장 ₩3,900 · 미니 12 · 스탠다드 24 · 프로 48.
+  // 옛 인트로 6장(rimikimi.pack.intro)은 판매 중단 — 매핑은 iap.js·서버 LEGACY 에 남는다.
+  { id: "rimikimi.pack.single",   count: 1,  krw: 1900,  usd: "1.49",  badgeKey: null },
+  { id: "rimikimi.pack.trial",    count: 3,  krw: 3900,  usd: "2.99",  badgeKey: null },
+  { id: "rimikimi.pack.mini",     count: 12, krw: 11900, usd: "8.99",  badgeKey: null },
+  { id: "rimikimi.pack.standard", count: 24, krw: 22900, usd: "16.99", badgeKey: "store.badge.best" },
+  { id: "rimikimi.pack.pro",      count: 48, krw: 44900, usd: "32.99", badgeKey: "store.badge.cheapest" },
 ];
 
 // 구독 rimikimi+ (자동갱신) — 광고·워터마크 제거 + 크레딧 자동충전.
-// 2026-08-14 claire 구조로 통일: 주 8 / 월 30 / 연 240 크레딧.
+// 2026-09-30 가격 개편: 주 10 / 월 35 / 연 400 크레딧(첫 결제 30%는 스토어 첫 결제 할인).
 // 옛 plus_monthly·plus_annual 은 판매 목록에서 뺐지만 기존 구독자 갱신은 계속된다(iap.js 참조).
 const SUB_PLANS = [
-  { id: "rimikimi.sub.plus.weekly",  period: "week",  credits: 8,   krw: 6900,   usd: "4.99",  label_ko: "위클리", label_en: "Weekly", badge: null },
-  { id: "rimikimi.sub.plus.monthly", period: "month", credits: 30,  krw: 12900,  usd: "9.99",  label_ko: "먼슬리", label_en: "Monthly", badge: null },
-  { id: "rimikimi.sub.plus.annual",  period: "year",  credits: 240, krw: 109000, usd: "89.99", label_ko: "애뉴얼", label_en: "Annual", badge: "가장 저렴" },
+  { id: "rimikimi.sub.plus.weekly",  period: "week",  credits: 10,  krw: 9900,   usd: "6.99",   label_ko: "위클리", label_en: "Weekly", badge: null },
+  { id: "rimikimi.sub.plus.monthly", period: "month", credits: 35,  krw: 29900,  usd: "19.99",  label_ko: "먼슬리", label_en: "Monthly", badge: null },
+  { id: "rimikimi.sub.plus.annual",  period: "year",  credits: 400, krw: 299000, usd: "199.99", label_ko: "애뉴얼", label_en: "Annual", badge: "가장 저렴" },
 ];
 const SUB_IDS = SUB_PLANS.map((p) => p.id);
 
@@ -344,6 +347,12 @@ function isArtConcept(concept) {
   if (!concept) return false;
   const cats = concept.categories || (concept.category ? [concept.category] : []);
   return cats.includes(ART_CATEGORY);
+}
+
+// 커스텀 보정(매직 부스, mode "retouch", 1015) — 사진 + 고칠 내용(자유 글)을 받아 그 부분만 고친다.
+// 서버는 `/concepts.json?caps=retouch` 를 보낸 클라이언트에만 이 컨셉을 준다(api/_lib/conceptList.js).
+function isRetouchConcept(concept) {
+  return !!concept && concept.mode === "retouch";
 }
 
 // 사진 복원 = 스타일을 입히지 않고 원본을 고화질로 되살리는 컨셉.
@@ -561,7 +570,10 @@ async function generateImage(accessToken, dataUrl, promptText, conceptMeta = {})
   // API로 보내기 전 사진을 적당한 크기로 축소 (요청 용량 줄이기)
   let sendUrl;
   try {
-    sendUrl = await shrinkImage(dataUrl, 1024, 0.85);
+    // 커스텀 보정은 원본에 고친 부분만 붙이므로 해상도가 곧 결과 화질이다 — 긴 변 2048(앱과 같음)
+    sendUrl = conceptMeta.retouchText
+      ? await shrinkImage(dataUrl, 2048, 0.9)
+      : await shrinkImage(dataUrl, 1024, 0.85);
   } catch (_) {
     sendUrl = dataUrl;
   }
@@ -625,6 +637,8 @@ async function generateImage(accessToken, dataUrl, promptText, conceptMeta = {})
         cutCount: conceptMeta.cutCount,
         // 드레스룸: 의상 1~5장 + 스타일 (프롬프트는 서버가 조립)
         ...(garments ? { garments, dressStyle: conceptMeta.dressStyle } : {}),
+        // 커스텀 보정: 고칠 내용
+        ...(conceptMeta.retouchText ? { retouchText: conceptMeta.retouchText } : {}),
         // 무료 Pro 체험(계정당 1회) — 결과화면 비교 슬라이더용
         proSample: !!conceptMeta.proSample,
         // 이 기기의 푸시 토큰. 서버가 생성을 마치면 여기로 "완성됐어요"를 쏜다.
@@ -712,6 +726,8 @@ async function generateImage(accessToken, dataUrl, promptText, conceptMeta = {})
     engine: json.engine,
     proSample: json.proSample,
     proSampleAvailable: json.proSampleAvailable,
+    // 커스텀 보정: 무엇을 고쳤는지(사용자 언어)
+    retouchSummary: json.retouchSummary || null,
     // 갤러리 보관 정보 — 만료 10분 전 리마인드 푸시 예약에 사용
     galleryId: json.galleryId,
     galleryExpiresAt: json.galleryExpiresAt,
@@ -887,6 +903,8 @@ export default function PortraitStudio() {
   });
   // 아트 변환 컨셉용 일회용 사진. localStorage 안 함 (휘발성).
   const [artPhoto, setArtPhoto] = useState(null);
+  // 커스텀 보정 — 고칠 내용(자유 글, 휘발성)
+  const [retouchText, setRetouchText] = useState("");
   // 드레스룸 — 의상 사진(최대 5장, 휘발성) + 스타일(mirror|model).
   // localStorage 저장 안 함: 의상은 매번 새로 고르는 게 자연스럽고 용량도 크다.
   const [garmentPhotos, setGarmentPhotos] = useState([]);
@@ -1235,8 +1253,8 @@ export default function PortraitStudio() {
       // /concepts.json 은 서버에서 함수로 서빙된다(api/concepts.js) — 공개 시각이
       // 지난 컨셉만 내려온다. 오프라인 폴백은 앱에 번들된 스냅샷.
       const urls = isNative()
-        ? [`${LEGAL_BASE}/concepts.json`, "/concepts.fallback.json"]
-        : ["/concepts.json"];
+        ? [`${LEGAL_BASE}/concepts.json?caps=retouch`, "/concepts.fallback.json"]
+        : ["/concepts.json?caps=retouch"];
       for (const url of urls) {
         try {
           const r = await fetch(url, { cache: "no-cache" });
@@ -1718,6 +1736,7 @@ export default function PortraitStudio() {
     }
     // 아트 변환 컨셉이면 이전 일회용 사진 비우고 들어감 (매번 새로 받음)
     if (isArtConcept(p)) setArtPhoto(null);
+    if (isRetouchConcept(p)) setRetouchText("");
     // 드레스룸도 의상은 매번 새로 (이전 코디가 남아 있으면 헷갈린다)
     if (isDressroom(p)) { setGarmentPhotos([]); setDressStyleKey("mirror"); }
     setBatchCount(1); // 컨셉을 바꾸면 장수 선택도 초기화
@@ -2170,6 +2189,13 @@ export default function PortraitStudio() {
       setTimeout(() => setPayToast(""), 3000);
       return;
     }
+    // 커스텀 보정은 고칠 내용이 있어야 한다
+    if (isRetouchConcept(selected) && !retouchText.trim()) {
+      setScreen("home");
+      setPayToast(t("retouch.need"));
+      setTimeout(() => setPayToast(""), 3000);
+      return;
+    }
     // 드레스룸은 의상이 최소 1장 있어야 생성된다
     if (isDressroom(selected) && garmentPhotos.length === 0) {
       setScreen("home");
@@ -2332,7 +2358,9 @@ export default function PortraitStudio() {
         // 아트 변환은 풍경/물건 등 얼굴 없는 사진도 가능해야 하므로 face precheck 우회
         skipFacePrecheck: art,
         // 사진 복원: 768×1024 로 강제 크롭하지 말고 올린 사진의 비율을 그대로 유지
-        keepRatio: isRestoreConcept(selected),
+        keepRatio: isRestoreConcept(selected) || isRetouchConcept(selected),
+        // 커스텀 보정: 고칠 내용(아무 언어) — 서버가 의도를 읽고 그 부분만 고친다
+        ...(isRetouchConcept(selected) ? { retouchText: retouchText.trim().slice(0, 1000) } : {}),
           // 묶음 생성 장수. 인생네컷은 자체 컷 수가 있고, 매직부스는 일회용 사진이라 1장 고정.
         // ⚠️ 드레스룸은 매직부스 카테고리지만 묶음 생성이 된다 — isArtConcept 만 보면
         //    UI 에선 3/6/12 를 골랐는데 요청은 1장으로 나간다(실사용 2회 재현된 버그).
@@ -2384,6 +2412,11 @@ export default function PortraitStudio() {
       // 서버가 알려준 진짜 사용량으로 업데이트
       if (typeof result.unlimited === "boolean") setUnlimited(result.unlimited);
       if (typeof result.quotaUsed === "number") setFreeUsed(result.quotaUsed);
+      // 커스텀 보정: 서버가 무엇을 고쳤는지 한두 문장으로 알려 준다(사용자 언어)
+      if (result.retouchSummary && isLatest()) {
+        setPayToast(result.retouchSummary);
+        setTimeout(() => setPayToast(""), 5000);
+      }
       // Pro 혼잡으로 base 폴백됐으면 고지 (무과금)
       if (result.busyFallback && isLatest()) {
         setPayToast(t("engine.busyFallback"));
@@ -2650,6 +2683,8 @@ export default function PortraitStudio() {
               onMake={() => { if (!session) handleContinueFromHome(); else startGenerate(); }}
               isArt={art}
               isDress={isDressroom(selected)}
+              isRetouch={isRetouchConcept(selected)}
+              retouchText={retouchText} setRetouchText={setRetouchText}
               isCouple={isCoupleConcept(selected)}
               photo={art ? artPhoto : photo}
               onPickPhoto={() => pickPhoto(art ? "art" : "profile")}
@@ -3864,7 +3899,7 @@ function OptionBlock({ title, note, children }) {
 
 function OptionsScreen({
   prompt, onBack, onMake,
-  isArt, isDress, isCouple,
+  isArt, isDress, isCouple, isRetouch = false, retouchText = "", setRetouchText,
   photo, onPickPhoto, partnerPhoto, onPickPartner,
   garmentPhotos = [], onPickGarments, onRemoveGarment,
   dressStyleKey, setDressStyleKey,
@@ -3879,9 +3914,10 @@ function OptionsScreen({
   const needConsent = requireConsent || pickedHere;
   const pickMain = () => { setPickedHere(true); onPickPhoto && onPickPhoto(); };
   const pickPartner = () => { setPickedHere(true); onPickPartner && onPickPartner(); };
-  const missing = !photo ? (isArt ? t("opt.needArt") : t("opt.needMain"))
+  const missing = !photo ? (isRetouch ? t("retouch.photoSub") : isArt ? t("opt.needArt") : t("opt.needMain"))
     : isCouple && !partnerPhoto ? t("opt.needPartner")
     : isDress && garmentPhotos.length === 0 ? t("dress.needGarment")
+    : isRetouch && !retouchText.trim() ? t("retouch.need")
     : needConsent && !ageConfirmed ? t("opt.needConsent")
     : null;
   const cost = fourcut || isArt ? 1 : (BATCH_OPTIONS.find((b) => b.count === batchCount)?.cost || 1);
@@ -3908,7 +3944,10 @@ function OptionsScreen({
         />
       </div>
 
-      {isArt ? (
+      {isRetouch ? (
+        <OptionSlotCard title={t("retouch.photoTitle")} sub={photo ? t("opt.slotReady") : t("retouch.photoSub")}
+          image={photo} onPick={pickMain} actionLabel={photo ? t("opt.change") : t("opt.pick")} />
+      ) : isArt ? (
         <OptionSlotCard title={t("opt.artTitle")} sub={photo ? t("opt.slotReady") : t("opt.artSub")}
           image={photo} onPick={pickMain} actionLabel={photo ? t("opt.change") : t("opt.pick")} />
       ) : (
@@ -3918,6 +3957,21 @@ function OptionsScreen({
       {isCouple && (
         <OptionSlotCard title={t("opt.partnerTitle")} sub={partnerPhoto ? t("opt.slotReady") : t("opt.partnerSub")}
           image={partnerPhoto} onPick={pickPartner} actionLabel={partnerPhoto ? t("opt.change") : t("opt.pick")} />
+      )}
+
+      {isRetouch && (
+        <div style={O.block}>
+          <div style={O.blockHead}><span style={O.blockTitle}>{t("retouch.title")}</span></div>
+          <textarea
+            value={retouchText}
+            maxLength={1000}
+            rows={4}
+            placeholder={t("retouch.placeholder")}
+            onChange={(e) => setRetouchText && setRetouchText(e.target.value.slice(0, 1000))}
+            style={O.retouchInput}
+          />
+          <div style={O.foot}>{t("retouch.hint")}</div>
+        </div>
       )}
 
       {isDress && (
@@ -3989,7 +4043,7 @@ function OptionsScreen({
         </OptionBlock>
       )}
 
-      <div style={O.footPad}>{isArt ? t("opt.footArt") : t("opt.foot")}</div>
+      <div style={O.footPad}>{isRetouch ? t("retouch.foot") : isArt ? t("opt.footArt") : t("opt.foot")}</div>
 
       {needConsent && (
         <label style={O.consent}>
@@ -6135,6 +6189,11 @@ const O = {
     color: "rgba(35,31,32,0.6)", fontFamily: FONT, cursor: "pointer",
   },
   foot: { fontSize: 13, fontWeight: 500, color: "rgba(35,31,32,0.55)", marginTop: 10 },
+  retouchInput: {
+    width: "100%", boxSizing: "border-box", minHeight: 110, resize: "vertical",
+    background: CARD, border: "1px solid rgba(35,31,32,0.12)", borderRadius: 14, padding: 12,
+    fontFamily: FONT, fontSize: 16, lineHeight: 1.45, color: INK, outline: "none",
+  },
   footPad: { fontSize: 13, fontWeight: 500, color: "rgba(35,31,32,0.55)", marginTop: 16, lineHeight: 1.45 },
   consent: {
     display: "flex", gap: 10, alignItems: "flex-start", marginTop: 16,

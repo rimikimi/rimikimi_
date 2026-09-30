@@ -32,13 +32,20 @@ import { Purchases as _PurchasesStatic } from "@revenuecat/purchases-capacitor";
 // 끝난 소비형 상품이라 이 화면에서 다시 조회/구매할 필요는 없다(복원은 RevenueCat
 // restorePurchases() 로 별도 동작, IAP_PRODUCTS 맵과 무관).
 export const IAP_PRODUCTS = {
-  "rimikimi.pack.intro": 6,
+  "rimikimi.pack.intro": 6,          // 2026-09-30 판매 중단 — 옛 구매 매핑용
+  "rimikimi.pack.single": 1,
+  "rimikimi.pack.single.first": 1,
+  "rimikimi.pack.trial": 3,
+  "rimikimi.pack.trial.first": 3,
   "rimikimi.pack.mini": 12,
+  "rimikimi.pack.mini.first": 12,
   "rimikimi.pack.standard": 24,
-  "rimikimi.pack.pro": 45,
-  "rimikimi.sub.plus.weekly": 8,
-  "rimikimi.sub.plus.monthly": 30,
-  "rimikimi.sub.plus.annual": 240,
+  "rimikimi.pack.standard.first": 24,
+  "rimikimi.pack.pro": 48,
+  "rimikimi.pack.pro.first": 48,
+  "rimikimi.sub.plus.weekly": 10,
+  "rimikimi.sub.plus.monthly": 35,
+  "rimikimi.sub.plus.annual": 400,
   // 옛 구독 — 신규 판매는 안 하지만 **기존 구독자가 갱신 중**이라 남긴다.
   // 여기서 빠지면 갱신 영수증이 "알 수 없는 상품"으로 거부돼 크레딧이 안 들어간다.
   plus_monthly: 20,
