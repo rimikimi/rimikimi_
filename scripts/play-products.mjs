@@ -160,7 +160,7 @@ for (const [pid, period, krw, usd, ikrw, iusd] of SUBS) {
       packageName: PKG, productId: pid, basePlanId: bp.basePlanId, offerId: "first30",
       phases: [{ recurrenceCount: 1, duration: period,
         regionalConfigs: [{ regionCode: "KR", price: money("KRW", ikrw) }, { regionCode: "US", price: money("USD", iusd) }],
-        otherRegionsConfig: { otherRegionsPrice: { usdPrice: money("USD", iusd), eurPrice: otherCache[ikrw]?.eurPrice || money("EUR", iusd) } } }],
+        otherRegionsConfig: { otherRegionsPrices: { usdPrice: money("USD", iusd), eurPrice: otherCache[ikrw]?.eurPrice || money("EUR", iusd) } } }],
       targeting: { acquisitionRule: { scope: { thisSubscription: {} } } },
       regionalConfigs: [{ regionCode: "KR", newSubscriberAvailability: true }, { regionCode: "US", newSubscriberAvailability: true }],
     };
