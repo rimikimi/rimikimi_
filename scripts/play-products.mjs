@@ -107,7 +107,9 @@ for (const [sku, n, krw, usd, ko, en] of PACKS) {
     purchaseOptions: [{ purchaseOptionId: exists?.purchaseOptions?.[0]?.purchaseOptionId || "buy", buyOption: { legacyCompatible: true }, regionalPricingAndAvailabilityConfigs: await regionConfigs(krw, usd) }],
   };
   if (exists?.taxAndComplianceSettings) body.taxAndComplianceSettings = exists.taxAndComplianceSettings;
-  await g("PATCH", `/oneTimeProducts/${sku}?updateMask=listings,purchaseOptions&regionsVersion.version=2022%2F02&allowMissing=true`, body);
+  // 단건 PATCH 경로는 404(HTML) — 새 API 는 batchUpdate 로만 만들고 고친다(9/30 실측).
+  await g("POST", `/oneTimeProducts:batchUpdate`, { requests: [{ oneTimeProduct: body, updateMask: "listings,purchaseOptions",
+    regionsVersion: { version: "2022/02" }, allowMissing: true, latencyTolerance: "PRODUCT_UPDATE_LATENCY_TOLERANCE_LATENCY_TOLERANT" }] });
   if (!exists) await batchState(sku, "activatePurchaseOptionRequest");
 }
 if (iaps.some((p) => p.productId === "rimikimi.pack.intro" && p.purchaseOptions?.[0]?.state === "ACTIVE")) {

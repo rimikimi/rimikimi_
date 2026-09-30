@@ -250,6 +250,15 @@ function nearestAspect(w, h) {
 //   원인: 매끈한 피부/완벽한 대칭/과한 샤프닝이 전형적인 생성형 룩을 만든다.
 //   → 피부 질감(모공·잔주름·점·주근깨)과 자연스러운 비대칭을 "보존"하라고 명시하고,
 //     실제 카메라 특성(85mm, 얕은 심도, 미세 그레인)을 요구한다. 전 모드 공통 적용.
+// 피부 정리 — **컨셉 문장 뒤에 한 번 더** 붙인다(2026-09-30 오너 "이건 왜 피부 트러블을 만들어냈음?").
+//   PHOTOREALISM 의 리터칭 지시는 맨 앞에 있어서, 컨셉 쪽의 "Candid iPhone photo, no filter …
+//   hyper-realistic skin texture"(511 바버샵 의자 등 스냅류) 같은 뒤쪽 문장에 밀려 여드름·잡티가 생겼다.
+//   마지막에 두면 이긴다. 모공·질감은 남기라고 해서 스냅 느낌은 유지된다.
+const SKIN_FINAL =
+  "\n\nSKIN (final rule — overrides any 'no filter', 'unedited' or 'hyper-realistic skin texture' wording above): " +
+  "clean, clear retouched skin — no acne, pimples, spots, blemishes, breakouts, blotchy redness or dark circles, " +
+  "even tone; keep natural pore texture visible so it still looks like a real photo, never plastic or airbrushed.";
+
 const PHOTOREALISM =
   "CRITICAL — the output must look like a REAL PHOTOGRAPH taken by a professional photographer, " +
   "not an AI image, not a 3D render, not an illustration, not a digital painting. " +
@@ -1470,7 +1479,7 @@ async function handleGenerate(req, res, hold) {
   }
   const instruction = isSprite
     ? prompt + "\n\nSUBJECT DESCRIPTION: " + spriteDesc
-    : (skipFacePrecheck ? conceptInstruction : PHOTOREALISM + conceptInstruction) + headTiltClause + faceClause;
+    : (skipFacePrecheck ? conceptInstruction : PHOTOREALISM + conceptInstruction + SKIN_FINAL) + headTiltClause + faceClause;
 
   // 드레스룸 일상컷: 장면 토큰을 "이 샷의 배경"으로 치환한다. 배치에서 shotIdx 가
   // 달라지면 같은 그룹 안의 다른 배경이 들어간다(오너: "그룹 안에서는 랜덤이어야").
