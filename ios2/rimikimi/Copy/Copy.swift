@@ -208,7 +208,7 @@ enum Copy {
     static var saveToAlbum: String { L.t("앨범에 저장", "Save to album") }
     static var edit: String { L.t("다듬기", "Edit") }
     static var oneMore: String { L.t("한 장 더", "One more") }
-    static var reportResult: String { L.t("🚩 부적절한 결과 신고", "🚩 Report inappropriate result") }
+    static var reportResult: String { L.t("부적절한 결과 신고", "Report inappropriate result") }
     static var similarConcepts: String { L.t("비슷한 컨셉", "Similar concepts") }
     static var resultTitle: String { L.t("결과", "Result") }
     static var fittedToast: String { L.t("3:4 로 맞췄어요", "Fitted to 3:4") }
@@ -302,6 +302,9 @@ enum Copy {
         ]
     }
     static var guideExpire: String { L.t("만든 사진은 24시간 뒤 사라져요. 마음에 들면 꼭 저장하세요.", "Your photos disappear after 24 hours. Save the ones you like.") }
+    /// 화면 곳곳에 있던 안내(서버 미저장·얼굴 사진 기기 보관·길게 눌러 원본)를 튜토리얼 한 곳으로 모았다(오너 지시 10/1).
+    static var guidePrivacy: String { L.t("올린 사진은 만들 때만 쓰고 서버에 저장하지 않아요. 얼굴 사진은 이 기기에만 보관돼요.", "Photos you upload are used only while creating and never stored on our servers. Face photos stay on this device.") }
+    static var guideHold: String { L.t("결과 사진을 길게 누르면 원본과 비교할 수 있어요.", "Press and hold a result to compare it with the original.") }
     static var guideStart: String { L.t("시작하기", "Get started") }
 
     // MARK: 내 사진

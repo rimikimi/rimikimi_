@@ -82,9 +82,6 @@ struct ConceptOptionsView: View {
                         }
                     }
                 }
-                Text(concept.isRetouch ? Copy.footRetouch : concept.isArtTransform ? Copy.footArt : Copy.footFace)
-                    .font(AppFont.footnote).foregroundStyle(Color.ink2)
-                    .padding(.horizontal, Spacing.page)
             }
             .padding(.bottom, Spacing.s5)
         }
@@ -104,11 +101,6 @@ struct ConceptOptionsView: View {
         .scrollEdgeEffectStyle(.hard, for: .bottom)
         .safeAreaBar(edge: .bottom) {
             VStack(spacing: Spacing.s2) {
-                Text(missingReason ?? " ")
-                    .font(AppFont.footnote).foregroundStyle(Color.ink2)
-                    .frame(height: 18)
-                    .opacity(missingReason == nil ? 0 : 1)
-                    .animation(.easeOut(duration: 0.18), value: missingReason)
                 Button(action: generate) {
                     Text(Copy.makeCost(cost))
                 }
@@ -165,7 +157,6 @@ struct RetouchTextBlock: View {
                     .frame(minHeight: 96, maxHeight: 160)
                     .onChange(of: text) { _, v in if v.count > 1000 { text = String(v.prefix(1000)) } }
             }
-            Text(Copy.retouchHint).font(AppFont.footnote).foregroundStyle(Color.ink2)
         }
         .padding(Spacing.s4)
         .frame(maxWidth: .infinity, alignment: .leading)

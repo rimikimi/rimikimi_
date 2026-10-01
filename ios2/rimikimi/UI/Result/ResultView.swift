@@ -38,9 +38,6 @@ struct ResultView: View {
                         .font(AppFont.footnote).foregroundStyle(Color.ink2)
                 }
 
-                Text(Copy.resultSavedNotice)
-                    .font(AppFont.callout).foregroundStyle(Color.ink2)
-
                 if needsFit, let img = currentImage {
                     Button { fitImage = img } label: {
                         HStack(spacing: Spacing.s2) {
@@ -87,18 +84,6 @@ struct ResultView: View {
                 }
                 .padding(.horizontal, Spacing.page)
 
-                // 부적절 콘텐츠 신고 (App Store Guideline 1.2 — AI 인물 이미지 서비스는 인앱 신고
-                // 경로가 있어야 한다). 웹 `src/PortraitStudio.jsx` 의 신고 링크와 같은 수신함
-                // (enquiry@rimikimi.com)·같은 제목 규칙으로 맞췄다 — 1.x 에 있던 기능이 2.0 재작성
-                // 때 빠졌던 것(`public/terms.html` 제7조는 "앱 내 신고 기능"이 있다고 이미 약속하고
-                // 있어, 이게 없으면 약관과 실제 동작이 어긋난다).
-                Button(action: reportIssue) {
-                    Text(Copy.reportResult)
-                        .font(AppFont.footnote)
-                        .foregroundStyle(Color.ink3)
-                }
-                .buttonStyle(.plain)
-
                 if let concept {
                     ConceptRail(title: Copy.similarConcepts, concepts: app.concepts.similar(to: concept))
                 }
@@ -109,6 +94,16 @@ struct ResultView: View {
         .background(Color.bg)
         .inlineTitle(displayTitle.isEmpty ? Copy.resultTitle : displayTitle)
         .toolbar(.hidden, for: .tabBar)
+        // 부적절 콘텐츠 신고 (App Store Guideline 1.2 — AI 인물 이미지 서비스는 인앱 신고 경로가 있어야 하고,
+        // `public/terms.html` 제7조도 "앱 내 신고 기능"을 약속한다). 화면에 문구로 두지 않고 ⋯ 메뉴 안에
+        // (오너 지시 10/1: 경고·안내 문구는 튜토리얼·설정에만). 수신함·제목 규칙은 웹 신고 링크와 같다.
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Button(role: .destructive, action: reportIssue) { Label(Copy.reportResult, systemImage: "flag") }
+                } label: { Image(systemName: "ellipsis") }
+            }
+        }
         // ATT는 결과 화면이 실제로 보이는 이 시점에만 시도한다(`TrackingPrompt` 주석 참고) — 내비게이션
         // 전환 중(`RootTabView`의 onChange)에 부르면 앱이 아직 `.active`가 아닐 수 있어 팝업 없이
         // 플래그만 타 버릴 위험이 있었다(컴플라이언스 리뷰로 발견). 매번 호출해도 안전 —
@@ -190,8 +185,9 @@ struct ResultPhoto: View {
             }
         }
         .overlay(alignment: .bottom) {
-            if original != nil, result != nil {
-                Text(showingOriginal ? Copy.resultOriginalBadge : Copy.resultHoldOriginal)
+            // 평소엔 문구 없음 — "길게 눌러 원본 보기"는 튜토리얼로 옮겼다(10/1). 누르는 동안만 "원본" 표시.
+            if original != nil, result != nil, showingOriginal {
+                Text(Copy.resultOriginalBadge)
                     .font(AppFont.footnote).foregroundStyle(.white)
                     .padding(.horizontal, Spacing.s3).padding(.vertical, 6)
                     .background(.black.opacity(0.45), in: Capsule())

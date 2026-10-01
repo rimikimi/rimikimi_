@@ -122,7 +122,6 @@ struct InviteCard: View {
         HStack(spacing: Spacing.s3) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(Copy.inviteHeadline).font(AppFont.headline)
-                Text(Copy.inviteDescShort).font(AppFont.footnote).foregroundStyle(Color.ink2)
             }
             Spacer()
             Button(Copy.shareAction) {

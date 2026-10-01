@@ -23,8 +23,12 @@ struct GuideView: View {
                     .staggerIn(delay: Double(i) * 0.06)
                 }
             }
-            Text(Copy.guideExpire)
-                .font(AppFont.footnote).foregroundStyle(Color.ink2).padding(.top, Spacing.s3)
+            VStack(alignment: .leading, spacing: 6) {
+                Text(Copy.guideExpire)
+                Text(Copy.guidePrivacy)
+                Text(Copy.guideHold)
+            }
+            .font(AppFont.footnote).foregroundStyle(Color.ink2).padding(.top, Spacing.s3)
             Spacer(minLength: 0)
             Button(Copy.guideStart) { HapticPlayer.commit(); onDone() }
                 .buttonStyle(PrimaryButtonStyle())

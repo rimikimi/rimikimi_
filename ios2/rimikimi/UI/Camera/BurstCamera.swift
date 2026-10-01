@@ -64,9 +64,7 @@ struct BurstCameraView: View {
 
             if !model.shots.isEmpty { thumbnails }
 
-            Text(model.shots.count >= BurstCameraModel.maxShots
-                 ? Copy.burstAllTaken
-                 : Copy.burstHint)
+            Text(model.shots.count >= BurstCameraModel.maxShots ? Copy.burstAllTaken : " ")
                 .font(AppFont.footnote)
                 .foregroundStyle(.white.opacity(0.75))
                 .padding(.bottom, Spacing.s3)

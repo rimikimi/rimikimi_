@@ -18,9 +18,6 @@ struct StoreView: View {
                 .background(Color.card, in: RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
                 .padding(.horizontal, Spacing.page)
 
-                Text(Copy.storeIntro(app.quota?.limit ?? 1))
-                    .font(AppFont.footnote).foregroundStyle(Color.ink2).padding(.horizontal, Spacing.page)
-
                 SectionHeader(title: Copy.storePacks)
                 VStack(spacing: Spacing.s2) {
                     ForEach(app.store.packs(firstPurchase: app.quota?.firstPurchase == true)) { p in PackRow(pack: p, busy: busyID == p.id) { buy(p) } }
@@ -147,8 +144,6 @@ struct CreditsSheet: View {
                     }
                     .buttonStyle(.plain).accessibilityLabel(Copy.close)
                 }
-                Text(app.willContinueAfterPurchase ? Copy.continueAfterTopUp : Copy.oneCreditOneImage)
-                    .font(AppFont.callout).foregroundStyle(Color.ink2)
 
                 ForEach(packs) { p in PackRow(pack: p, busy: busyID == p.id) { buy(p) } }
                 if let sub { PackRow(pack: sub, busy: busyID == sub.id) { buy(sub) } }

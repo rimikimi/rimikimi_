@@ -27,10 +27,6 @@ struct MyPhotosView: View {
                 } else if items.isEmpty {
                     EmptyState(message: error ?? Copy.mineEmpty, actionTitle: Copy.mineEmptyCta) { app.tab = .gallery }
                 } else {
-                    Text(Copy.mineNotice)
-                        .font(AppFont.footnote).foregroundStyle(Color.ink2)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, Spacing.page)
                     LazyVGrid(columns: columns, spacing: 6) {
                         ForEach(items) { item in
                             NavigationLink(value: Route.result(ResultPayload(
@@ -138,9 +134,7 @@ struct ProgressCard: View {
                     ProgressView().tint(Color.accent)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(Copy.genRunning).font(AppFont.headline)
-                        Text(waiting ? Copy.genWaiting
-                             : (job.count > 1 ? Copy.genBatchHint(job.count) : Copy.genHint))
-                            .font(AppFont.footnote).foregroundStyle(Color.ink2)
+                        if waiting { Text(Copy.genWaiting).font(AppFont.footnote).foregroundStyle(Color.ink2) }
                         Text(app.concepts.displayTitle(id: job.conceptId, fallback: job.conceptTitle)).font(AppFont.caption).foregroundStyle(Color.ink3)
                     }
                     Spacer()

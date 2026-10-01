@@ -9,11 +9,7 @@ struct MyPhotoCard: View {
     var body: some View {
         HStack(spacing: Spacing.s3) {
             Thumb(image: app.userPhoto.image)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(Copy.myPhoto).font(AppFont.headline)
-                Text(app.userPhoto.hasPhoto ? Copy.myPhotoInUse : Copy.myPhotoNone)
-                    .font(AppFont.footnote).foregroundStyle(Color.ink2).lineLimit(2)
-            }
+            Text(Copy.myPhoto).font(AppFont.headline)
             Spacer()
             PhotosPicker(selection: $pick, matching: .images, photoLibrary: .shared()) {
                 Text(app.userPhoto.hasPhoto ? Copy.change : Copy.choose)
@@ -44,10 +40,7 @@ struct PhotoSlotCard: View {
     var body: some View {
         HStack(spacing: Spacing.s3) {
             Thumb(image: image)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(AppFont.headline)
-                Text(image == nil ? subtitle : Copy.slotReady).font(AppFont.footnote).foregroundStyle(Color.ink2).lineLimit(2)
-            }
+            Text(title).font(AppFont.headline)
             Spacer()
             PhotosPicker(selection: $pick, matching: .images, photoLibrary: .shared()) {
                 Text(image == nil ? Copy.choose : Copy.change)
@@ -107,7 +100,6 @@ struct GarmentsBlock: View {
                 }
             }
             .scrollIndicators(.hidden)
-            Text(Copy.garmentAutoNote).font(AppFont.footnote).foregroundStyle(Color.ink2)
         }
         .padding(Spacing.s4)
         .frame(maxWidth: .infinity, alignment: .leading)

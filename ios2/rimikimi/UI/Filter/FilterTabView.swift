@@ -121,14 +121,8 @@ struct FilterTabView: View {
                     .font(AppFont.caption).foregroundStyle(.white.opacity(0.85))
                 Text(t.preset.label)
                     .font(AppFont.sectionTitle).foregroundStyle(.white)
-                Text(Copy.filterTapToStart)
-                    .font(AppFont.footnote).foregroundStyle(.white.opacity(0.85))
             }
             Spacer(minLength: Spacing.s2)
-            VStack(alignment: .trailing, spacing: 4) {
-                pill(Copy.filterUpTo10)
-                pill(Copy.filterAllFree)
-            }
         }
         .padding(Spacing.s4)
         .background {
@@ -147,8 +141,6 @@ struct FilterTabView: View {
                 Text(Copy.filterShootCamera).font(AppFont.bodyEmphasis).foregroundStyle(Color.onInk)
                 // 문구 정정(2026-09-22): 아이폰 기본 카메라로 바뀌며 촬영 중 라이브 필터가 없어졌고,
                 // 지금은 연속 촬영(여러 장) → 한 번에 필터다. 실제 동작과 다른 문구는 심사(2.3.1)에서 걸린다.
-                Text(Copy.filterShootCameraSub)
-                    .font(AppFont.footnote).foregroundStyle(Color.onInk.opacity(0.7))
                 Spacer(minLength: 0)
                 Image(systemName: "chevron.right")
                     .font(.system(size: 13, weight: .semibold)).foregroundStyle(Color.onInk.opacity(0.6))

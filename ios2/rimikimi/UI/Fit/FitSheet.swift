@@ -22,8 +22,6 @@ struct FitSheet: View {
                 }
                 .buttonStyle(.plain).accessibilityLabel(Copy.close)
             }
-            Text(Copy.fitDesc)
-                .font(AppFont.callout).foregroundStyle(Color.ink2)
 
             HStack(spacing: Spacing.s3) {
                 VStack(spacing: 6) {
@@ -81,8 +79,6 @@ struct FitSheet: View {
                         .multilineTextAlignment(.leading).fixedSize(horizontal: false, vertical: true)
                 }
             }
-            Text(Copy.fitFootnote)
-                .font(AppFont.caption).foregroundStyle(Color.ink3)
             Spacer(minLength: 0)
         }
         .padding(Spacing.page)

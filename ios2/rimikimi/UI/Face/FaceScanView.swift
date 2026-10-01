@@ -129,10 +129,6 @@ struct FaceScanView: View {
             Spacer()
             Text(Copy.faceUseThis)
                 .font(AppFont.title2).foregroundStyle(fg)
-            Text(Copy.faceStoredOnDevice)
-                .font(AppFont.footnote).foregroundStyle(fg.opacity(0.7))
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, Spacing.page)
 
             HStack(spacing: Spacing.s3) {
                 ForEach(FaceProfileStore.Angle.allCases, id: \.self) { a in
