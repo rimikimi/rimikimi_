@@ -26,6 +26,9 @@ export default function Guide() {
             </View>
           ))}
         </View>
+        <View style={styles.notes}>
+          {copy.guide.notes.map((n) => <Text key={n} size="footnote" tone="muted">{n}</Text>)}
+        </View>
       </View>
       <Button
         label={copy.guide.cta}
@@ -44,5 +47,6 @@ const styles = themedStyles(() => StyleSheet.create({
   body: { flex: 1, alignItems: "center", justifyContent: "center" },
   steps: { alignSelf: "stretch", marginTop: space.s5 },
   step: { paddingVertical: space.s3, gap: 2 },
+  notes: { alignSelf: "stretch", marginTop: space.s4, gap: space.s2 },
   stepLine: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: color.line },
 }));

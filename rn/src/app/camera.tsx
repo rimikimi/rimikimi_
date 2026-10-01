@@ -338,7 +338,7 @@ export default function CameraScreen() {
         ) : null}
 
         <Text pointerEvents="none" size="footnote" style={styles.hint}>
-          {full ? copy.shoot.full : copy.shoot.hint}
+          {full ? copy.shoot.full : ""}
         </Text>
 
         <View pointerEvents="box-none" style={styles.bottomRow}>

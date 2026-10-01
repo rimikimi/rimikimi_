@@ -48,10 +48,7 @@ function ProgressCard({ job }: { job: Job }) {
             ) : failed ? (
               <Text size="footnote" tone="danger" numberOfLines={3}>{job.error || copy.progress.fail}</Text>
             ) : (
-              <>
-                <Text size="footnote" tone="muted">{job.status === "waiting" ? copy.progress.resume : job.count > 1 ? copy.progress.hintBatch(job.count) : copy.progress.hint}</Text>
-                <Text size="caption" tone="subtle" weight="medium">{copy.progress.safe}</Text>
-              </>
+              job.status === "waiting" ? <Text size="footnote" tone="muted">{copy.progress.resume}</Text> : null
             )}
             {done ? <Button label={copy.progress.open} size="sm" onPress={open} style={styles.cta} /> : null}
           </View>

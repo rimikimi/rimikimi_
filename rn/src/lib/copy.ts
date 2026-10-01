@@ -149,6 +149,11 @@ const copyKo = {
       { t: "2. 사진 한 장 올리기", d: "얼굴이 잘 보이는 사진이면 충분해요." },
       { t: "3. 기다리기", d: "최대 몇 분 걸려요. 앱을 닫아도 계속 만들어지고, 다 되면 알려드려요." },
     ],
+    // 화면 곳곳에 있던 안내를 한 곳으로(오너 지시 10/1: 경고·안내 문구는 튜토리얼·설정에만)
+    notes: [
+      "만든 사진은 24시간 뒤 사라져요. 마음에 들면 꼭 저장하세요.",
+      "올린 사진은 만들 때만 쓰고 서버에 저장하지 않아요. 얼굴 사진은 이 휴대폰에만 보관돼요.",
+    ],
     cta: "시작하기",
   },
   store: {
@@ -509,6 +514,10 @@ const copyEn: Copy = {
       { t: "1. Pick a concept", d: "New concepts drop every day." },
       { t: "2. Upload one photo", d: "Any photo where your face is clearly visible." },
       { t: "3. Wait", d: "It can take a few minutes. You can close the app — we'll notify you when it's ready." },
+    ],
+    notes: [
+      "Your photos disappear after 24 hours. Save the ones you like.",
+      "Photos you upload are used only while creating and never stored on our servers. Face photos stay on this phone.",
     ],
     cta: "Get started",
   },

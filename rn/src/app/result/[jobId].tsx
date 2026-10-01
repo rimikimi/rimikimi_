@@ -126,8 +126,6 @@ export default function Result() {
         </ScrollView>
       ) : null}
 
-      <Text size="footnote" tone="muted" center>{copy.result.savedNote}</Text>
-
       <View style={styles.actions}>
         <Button label={copy.result.saveAlbum} variant="secondary" loading={saving} leading={<IconDownload size={20} color={color.ink} />} onPress={() => { void save(); }} style={styles.action} />
         <Button

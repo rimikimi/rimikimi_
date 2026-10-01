@@ -127,11 +127,10 @@ export default function ConceptOptions() {
         <Image source={{ uri: thumbUrl(concept.id) }} style={{ width: previewW, height: previewH, borderRadius: radius.card, backgroundColor: color.mat }} contentFit="cover" transition={duration.enter} cachePolicy="disk" />
 
         {art ? (
-          <PhotoRow label={copy.options.artPhoto} hint={copy.options.artHint} photo={artPhoto} actionLabel={artPhoto ? copy.options.change : copy.options.artPick} onPress={() => { void pickOne(setArtPhoto); }} />
+          <PhotoRow label={copy.options.artPhoto} photo={artPhoto} actionLabel={artPhoto ? copy.options.change : copy.options.artPick} onPress={() => { void pickOne(setArtPhoto); }} />
         ) : (
           <PhotoRow
             label={copy.options.myPhoto}
-            hint={photo ? `${copy.options.useRegistered} · ${copy.options.registeredHint}` : copy.options.pickHint}
             photo={photo}
             actionLabel={photo ? copy.options.change : copy.options.pick}
             onPress={() => { void changeMyPhoto(); }}
@@ -139,14 +138,13 @@ export default function ConceptOptions() {
         )}
 
         {couple ? (
-          <PhotoRow label={copy.options.partner} hint={copy.options.partnerNeed} photo={partner} actionLabel={partner ? copy.options.change : copy.options.partnerPick} onPress={() => { void pickOne(setPartner); }} />
+          <PhotoRow label={copy.options.partner} photo={partner} actionLabel={partner ? copy.options.change : copy.options.partnerPick} onPress={() => { void pickOne(setPartner); }} />
         ) : null}
 
         {dress ? (
           <Card style={{ gap: space.s3 }}>
             <Text size="footnote" weight="semibold">{copy.options.dress.garmentLabel}</Text>
             <GarmentRow garments={garments} max={GARMENT_MAX} onAdd={() => { void addGarments(); }} onRemove={(i) => setGarments((g) => g.filter((_, k) => k !== i))} addFirst={copy.options.dress.addFirst} addMore={copy.options.dress.addMore} />
-            <Text size="caption" tone="subtle" weight="medium">{copy.options.dress.autoNote}</Text>
             <Text size="footnote" weight="semibold" style={{ marginTop: space.s2 }}>{copy.options.dress.styleLabel}</Text>
             <Segmented options={[{ value: "mirror", label: copy.options.dress.mirror }, { value: "model", label: copy.options.dress.model }] as const} value={dressStyle} onChange={setDressStyle} />
           </Card>
@@ -197,7 +195,6 @@ export default function ConceptOptions() {
                 />
               ))}
             </View>
-            <Text size="caption" tone="subtle">{copy.options.idphoto.disclaimer}</Text>
           </Card>
         ) : null}
       </Screen>

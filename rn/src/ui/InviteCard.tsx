@@ -34,7 +34,6 @@ export function InviteCard() {
             <IconClose size={20} color={color.ink3} />
           </Pressable>
         </View>
-        <Text size="footnote" tone="muted" style={{ marginTop: space.s1 }}>{copy.invite.cardDesc}</Text>
         <Button label={copy.invite.cardCta} size="sm" style={{ alignSelf: "flex-start", marginTop: space.s3 }} onPress={() => { done(); router.push("/(tabs)/profile"); }} />
       </Card>
     </Animated.View>

@@ -15,12 +15,10 @@ export default function StoreScreen() {
   const { quota } = useQuota();
   return (
     <Screen scrollModel="scroll" header={<AppHeader title={copy.store.title} back right={<View />} />} contentStyle={styles.content}>
-      <Text size="footnote" tone="muted">{copy.store.intro(quota?.limit ?? 1)}</Text>
       {quota ? <Text size="footnote" weight="semibold">{copy.store.held(quota.credits)}</Text> : null}
       <PackRows flow={flow} />
       <SubRows flow={flow} />
       <StoreMessage flow={flow} />
-      <Text size="caption" tone="subtle" weight="medium">{copy.store.note}</Text>
       <Text size="caption" tone="subtle" weight="medium">{copy.store.subLegal}</Text>
       <View style={{ alignItems: "center" }}><RestoreButton flow={flow} /></View>
     </Screen>

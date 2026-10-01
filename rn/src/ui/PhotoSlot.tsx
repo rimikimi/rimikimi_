@@ -11,7 +11,7 @@ import { copy } from "@/lib/copy";
 /** "내 사진: 등록된 사진 사용 · 변경" 한 줄 카드. 사진이 없으면 여기서 고른다. */
 export function PhotoRow({ label, hint, photo, actionLabel, onPress }: {
   label: string;
-  hint: string;
+  hint?: string;
   photo: PhotoRef | null;
   actionLabel: string;
   onPress: () => void;
@@ -26,7 +26,7 @@ export function PhotoRow({ label, hint, photo, actionLabel, onPress }: {
         )}
         <View style={styles.body}>
           <Text size="headline">{label}</Text>
-          <Text size="footnote" tone="muted" numberOfLines={2}>{hint}</Text>
+          {hint ? <Text size="footnote" tone="muted" numberOfLines={2}>{hint}</Text> : null}
         </View>
         <Text size="footnote" weight="semibold" tone="accent">{actionLabel}</Text>
       </Pressable>

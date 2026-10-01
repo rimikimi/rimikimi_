@@ -6,7 +6,7 @@ import { Card } from "./Card";
 import { Spinner } from "./Spinner";
 import { Button } from "./Button";
 import { IconChevron } from "./icons";
-import { cropToPortrait, hasFaceDetector } from "@/lib/fit";
+import { cropToPortrait } from "@/lib/fit";
 import { encodeForUpload, type PhotoRef } from "@/lib/photo";
 import { outpaintImage, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -72,12 +72,10 @@ export function FitSheet({ open, uri, onClose, onFitted }: { open: boolean; uri:
 
   return (
     <Sheet open={open} title={copy.fit.title} onClose={onClose}>
-      <Text size="footnote" tone="muted">{copy.fit.desc}</Text>
       <Card padded={false}>
         <Pressable accessibilityRole="button" disabled={busy || outBusy} onPress={() => { void crop(); }} style={({ pressed }) => [styles.row, pressed && { backgroundColor: color.fill }]}>
           <View style={{ flex: 1, gap: 2 }}>
             <Text size="headline">{copy.fit.crop}</Text>
-            <Text size="footnote" tone="muted">{hasFaceDetector() ? copy.fit.cropHint : copy.ui.cropHintCenter}</Text>
           </View>
           {busy ? <Spinner size={20} color={color.accent} /> : <IconChevron size={16} color={color.ink3} />}
         </Pressable>
@@ -85,7 +83,6 @@ export function FitSheet({ open, uri, onClose, onFitted }: { open: boolean; uri:
         <Pressable accessibilityRole="button" disabled={busy || outBusy} onPress={outpaint} style={({ pressed }) => [styles.row, pressed && { backgroundColor: color.fill }]}>
           <View style={{ flex: 1, gap: 2 }}>
             <Text size="headline">{copy.fit.outpaint}</Text>
-            <Text size="footnote" tone="muted">{copy.fit.outpaintHint}</Text>
           </View>
           {outBusy ? <Spinner size={20} color={color.accent} /> : <IconChevron size={16} color={color.ink3} />}
         </Pressable>

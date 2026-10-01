@@ -197,9 +197,6 @@ export default function FaceScanScreen() {
       >
         <View style={styles.grow} />
         <Text size="title2" style={{ color: fg }}>{copy.faceScan.confirmTitle}</Text>
-        <Text size="footnote" style={[styles.centered, { color: fgDim }]}>
-          {copy.faceScan.privacy}
-        </Text>
         <View style={styles.slots}>
           {ANGLES.map((a) => (
             <Slot key={a} uri={shots[a]?.uri} label={LABEL[a]} tint={fg} size={96} />

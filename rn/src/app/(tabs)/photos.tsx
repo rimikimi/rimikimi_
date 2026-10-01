@@ -89,7 +89,6 @@ export default function PhotosTab() {
         </View>
       ) : (
         <>
-          <Text size="caption" tone="subtle" weight="medium" style={styles.notice}>{copy.photos.notice}</Text>
           <View style={styles.grid}>
             {items.map((it) => (
               <Pressable
@@ -112,7 +111,6 @@ export default function PhotosTab() {
 
 const styles = themedStyles(() => StyleSheet.create({
   empty: { paddingVertical: space.s7, paddingHorizontal: space.s5, alignItems: "center", gap: space.s4 },
-  notice: { paddingHorizontal: space.screen, marginBottom: space.s3 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: space.s1, paddingHorizontal: space.screen },
   thumb: { borderRadius: radius.thumb - 4, backgroundColor: color.mat },
 }));

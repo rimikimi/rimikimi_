@@ -93,11 +93,6 @@ export default function FilterTab() {
             <View style={styles.heroCaptionText}>
               <Text size="footnote" style={styles.onPhotoDim}>{copy.filterTab.today(today.group)}</Text>
               <Text size="headline" style={styles.onPhoto}>{presetName(today.preset)}</Text>
-              <Text size="footnote" style={styles.onPhotoDim}>{copy.filterTab.tapToStart}</Text>
-            </View>
-            <View style={styles.heroPills}>
-              <Pill text={copy.filterTab.upTo10} />
-              <Pill text={copy.filterTab.free} />
             </View>
           </View>
         </Pressable>
@@ -111,8 +106,6 @@ export default function FilterTab() {
       >
         <IconCamera size={20} color={color.accentOn} />
         <Text size="headline" style={styles.shootLabel}>{copy.filter.shoot}</Text>
-        {/* 문구는 실제 동작과 같아야 한다 — 다르면 심사(2.3.1)에서 걸린다. */}
-        <Text size="footnote" style={styles.shootHint}>{copy.filterTab.shootHint}</Text>
         <View style={styles.grow} />
         <IconChevron size={16} color={color.accentOn} />
       </Pressable>
@@ -177,7 +170,6 @@ const styles = themedStyles(() => StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.42)",
   },
   heroCaptionText: { flex: 1, gap: 2 },
-  heroPills: { alignItems: "flex-end", gap: 4 },
   onPhoto: { color: "#FFFFFF" },
   onPhotoDim: { color: "rgba(255,255,255,0.85)" },
   pill: {
@@ -201,7 +193,6 @@ const styles = themedStyles(() => StyleSheet.create({
     backgroundColor: color.ink,
   },
   shootLabel: { color: color.accentOn },
-  shootHint: { color: color.accentOn, opacity: 0.7 },
   grow: { flex: 1 },
 
   group: { marginBottom: space.s5 },

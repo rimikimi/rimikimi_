@@ -17,7 +17,6 @@ export function CreditSheet() {
   const flow = useStoreFlow();
   return (
     <Sheet open={gate.open} title={copy.creditSheet.title} onClose={gate.close}>
-      <Text size="footnote" tone="muted">{copy.creditSheet.desc(gate.need)} {copy.creditSheet.resume}</Text>
       <PackRows flow={flow} limit={3} onBought={gate.onPurchased} />
       <SubRows flow={flow} only={["rimikimi.sub.plus.monthly"]} onBought={gate.onPurchased} />
       <Card padded={false}>
