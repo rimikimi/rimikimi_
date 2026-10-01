@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Alert, ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
+import { Alert, Linking, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { Image } from "expo-image";
 import * as Haptics from "expo-haptics";
@@ -9,7 +9,7 @@ import { AppHeader } from "@/ui/AppHeader";
 import { Text } from "@/ui/Text";
 import { Button } from "@/ui/Button";
 import { ConceptRail } from "@/ui/ConceptCard";
-import { IconDownload, IconShare, IconWand } from "@/ui/icons";
+import { IconDownload, IconFlag, IconShare, IconWand } from "@/ui/icons";
 import { FitSheet } from "@/ui/FitSheet";
 import { needsFit } from "@/lib/fit";
 import { useGeneration, type ResultImage } from "@/lib/generation";
@@ -105,8 +105,20 @@ export default function Result() {
     router.push({ pathname: "/concept/[id]", params: { id: String(concept.id) } });
   };
 
+  const report = () => {
+    const label = concept ? `${conceptTitle(concept)} (#${concept.id})` : "-";
+    const id = jobId || "-";
+    const url = `mailto:enquiry@rimikimi.com?subject=${encodeURIComponent(copy.result.reportSubject(id))}&body=${encodeURIComponent(copy.result.reportBody(label, id))}`;
+    void Linking.openURL(url).catch(() => undefined);
+  };
+
   return (
-    <Screen scrollModel="scroll" header={<AppHeader title={conceptTitle(concept)} back right={<View />} />} contentStyle={styles.content}>
+    <Screen scrollModel="scroll" header={<AppHeader title={conceptTitle(concept)} back right={
+      // 부적절한 결과 신고 — 문구 없이 깃발만(오너 10/1: 안내 문구는 튜토리얼·설정에만). iOS ⋯ 메뉴와 같은 수신함·제목.
+      <Pressable accessibilityRole="button" accessibilityLabel={copy.result.report} hitSlop={12} onPress={report} style={styles.flag}>
+        <IconFlag size={20} color={color.ink3} />
+      </Pressable>
+    } />} contentStyle={styles.content}>
       {img ? (
         <Image source={{ uri: img.uri }} style={{ width: w, height: h, borderRadius: radius.card, backgroundColor: color.mat }} contentFit="cover" transition={duration.enter} />
       ) : (
@@ -150,6 +162,7 @@ export default function Result() {
 }
 
 const styles = themedStyles(() => StyleSheet.create({
+  flag: { width: 40, height: 40, alignItems: "center", justifyContent: "center", marginRight: -space.s2 },
   content: { paddingHorizontal: space.screen, gap: space.s4 },
   empty: { borderRadius: radius.card, backgroundColor: color.mat, alignItems: "center", justifyContent: "center" },
   thumb: { width: 60, height: 80, borderRadius: radius.thumb, backgroundColor: color.mat, opacity: 0.6 },

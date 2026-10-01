@@ -34,6 +34,8 @@ export interface Quota {
   referralCount?: number;
   referralCode?: string;
   untilNext?: number;
+  /** 결제 기록이 없는 계정 — 첫 구매 30% 할인 팩을 보여 준다(서버 /api/quota). */
+  firstPurchase?: boolean;
 }
 
 export async function fetchQuota(token: string): Promise<Quota> {
@@ -49,6 +51,7 @@ export async function fetchQuota(token: string): Promise<Quota> {
     referralCount: j.referralCount,
     referralCode: j.referralCode,
     untilNext: j.untilNext,
+    firstPurchase: j.firstPurchase === true,
   };
 }
 

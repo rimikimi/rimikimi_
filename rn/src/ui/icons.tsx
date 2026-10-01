@@ -177,6 +177,14 @@ export const IconTrash = (p: IconProps) => (
   </Base>
 );
 
+/** 깃발 — 결과 신고(헤더 오른쪽). */
+export const IconFlag = (p: IconProps) => (
+  <Base {...p}>
+    <Path d="M5.5 21 L5.5 4" />
+    <Path d="M5.5 4.5 C9 2.5 11.5 6.5 18.5 4.5 L18.5 13 C11.5 15 9 11 5.5 13" />
+  </Base>
+);
+
 export const IconSparkle = (p: IconProps) => (
   <Base {...p}>
     <Path d="M12 3.5 L13.8 9.2 L19.5 11 L13.8 12.8 L12 18.5 L10.2 12.8 L4.5 11 L10.2 9.2 Z" />

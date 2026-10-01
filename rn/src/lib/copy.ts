@@ -102,6 +102,9 @@ const copyKo = {
     share: "공유",
     oneMore: "한 장 더",
     similar: "비슷한 컨셉",
+    report: "부적절한 결과 신고",
+    reportSubject: (id: string) => `[신고] 부적절한 생성 결과 #${id}`,
+    reportBody: (concept: string, id: string) => `신고 사유를 적어주세요.\n\n컨셉: ${concept}\n결과 ID: ${id}\n`,
   },
   photos: {
     title: "내 사진",
@@ -169,7 +172,10 @@ const copyKo = {
     restoring: "복원 중…",
     restoreOk: "구매 내역을 복원했어요.",
     restoreFail: "복원할 구매 내역을 찾지 못했어요.",
-    badge: { first: "첫 구매", best: "베스트 가치", cheapest: "장당 최저", popular: "가장 인기" },
+    badge: { first: "첫 구매", best: "베스트 가치", cheapest: "장당 최저", popular: "가장 인기", firstDiscount: "첫 구매 30% 할인" },
+    /** 구독 첫 결제 할인 한 줄 — iOS Copy.introLine 과 같다 */
+    introLine: (period: "week" | "month" | "year", intro: string, regular: string) =>
+      `첫 결제 30% 할인 · 첫 ${period === "week" ? "주" : period === "year" ? "해" : "달"} ${intro}, 이후 ${regular}`,
     subTitle: "rimikimi+",
     subDesc: "광고 없음 · 워터마크 없음 · 크레딧 자동 충전",
     subLegal: "구독은 표시된 기간마다 자동 갱신되며 Google Play 계정으로 결제돼요. 기간 종료 24시간 전까지 해지하지 않으면 갱신돼요. Google Play 설정에서 언제든 관리·해지할 수 있어요.",
@@ -469,6 +475,9 @@ const copyEn: Copy = {
     share: "Share",
     oneMore: "One more",
     similar: "Similar concepts",
+    report: "Report inappropriate result",
+    reportSubject: (id: string) => `[신고][Report] Inappropriate result #${id}`,
+    reportBody: (concept: string, id: string) => `Please tell us why you're reporting this.\n\nConcept: ${concept}\nResult ID: ${id}\n`,
   },
   photos: {
     title: "My Photos",
@@ -534,7 +543,9 @@ const copyEn: Copy = {
     restoring: "Restoring…",
     restoreOk: "Purchases restored.",
     restoreFail: "No purchases found to restore.",
-    badge: { first: "First purchase", best: "Best value", cheapest: "Lowest per photo", popular: "Most popular" },
+    badge: { first: "First purchase", best: "Best value", cheapest: "Lowest per photo", popular: "Most popular", firstDiscount: "30% off your first purchase" },
+    introLine: (period: "week" | "month" | "year", intro: string, regular: string) =>
+      `30% off your first payment · ${intro} for the first ${period}, then ${regular}`,
     subTitle: "rimikimi+",
     subDesc: "No ads · No watermark · Credits refill automatically",
     subLegal: "Subscriptions renew automatically each period and are billed to your Google Play account. They renew unless you cancel at least 24 hours before the period ends. Manage or cancel anytime in Google Play settings.",

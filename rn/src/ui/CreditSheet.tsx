@@ -33,6 +33,8 @@ export function CreditSheet() {
         </Pressable>
       </Card>
       <StoreMessage flow={flow} />
+      {/* 구독을 파는 화면이라 자동갱신 고지 필요(Play 구독 정책 · iOS 크레딧 시트와 같음) */}
+      <Text size="caption" tone="subtle" weight="medium">{copy.store.subLegal}</Text>
     </Sheet>
   );
 }
