@@ -16,7 +16,7 @@ import { buildDressroom, expectedHem, checkHem } from "./_lib/dressroom.js";
 import { buildEditorialStrip } from "./_lib/fourcutEditorial.js";
 import { buildGlowStrip } from "./_lib/fourcutGlow.js";
 import { SPRITE_CONCEPT_IDS, describeForSprite } from "./_lib/sprite.js";
-import { inspectImage } from "./_lib/qa.js";
+import { checkIdentity, inspectImage } from "./_lib/qa.js";
 import { runRetouch } from "./_lib/retouch.js";
 // 컨셉 원본(프롬프트 포함). **서버가 프롬프트의 출처**여야 한다 — 아래 resolvePrompt 참고.
 import ALL_CONCEPTS from "./_data/concepts.json" with { type: "json" };
@@ -1465,6 +1465,8 @@ async function handleGenerate(req, res, hold) {
   const isSprite = !!spriteDesc;
 
   // 생성 불량 검사(api/_lib/qa.js) 설정 — 몇 명·몇 칸·그림체인지에 따라 기준이 다르다.
+  // 얼굴 동일인 검사 — 내 얼굴로 만드는 컨셉 1인만(매직 부스·그림체·커플·픽셀은 원래 얼굴이 바뀌거나 2인이라 제외)
+  const wantIdentity = !skipFacePrecheck && !hasSecond && !isFourcut && !SPRITE_CONCEPT_IDS.has(String(conceptId));
   const qaOpts = {
     people: hasSecond ? 2 : 1,
     panels: isFourcut && fourcutStyle && cutCount && Number(cutCount) > 1 ? Number(cutCount) : 1,
@@ -1767,15 +1769,19 @@ async function handleGenerate(req, res, hold) {
       if (left() < 45000) return r;                   // 다시 뽑을 시간이 없다
       const inline = await qaInline(r);
       if (!inline) return r;
-      const [hemOk, qa] = await Promise.all([
+      const [hemOk, qa, idt] = await Promise.all([
         dressWantHem ? checkHem(inline.data, inline.mime, dressWantHem, apiKey).catch(() => null) : null,
         inspectImage({ base64: inline.data, mimeType: inline.mime, apiKey, ...qaOpts,
           timeoutMs: Math.max(5000, Math.min(20000, left() - 45000)) }),
+        wantIdentity ? checkIdentity({ refBase64: base64, refMime: mimeType, base64: inline.data, mimeType: inline.mime, apiKey,
+          timeoutMs: Math.max(5000, Math.min(15000, left() - 45000)) }) : { ok: null },
       ]);
-      console.log(`[qa] ${qa.ok === false ? "불량" : qa.ok ? "통과" : "판단불가"} concept=${conceptId} shot=${shotIdx}${qa.issue ? ` "${qa.issue}"` : ""}`);
-      if (hemOk !== false && qa.ok !== false) return r;
+      console.log(`[qa] ${qa.ok === false ? "불량" : qa.ok ? "통과" : "판단불가"} concept=${conceptId} shot=${shotIdx}${qa.issue ? ` "${qa.issue}"` : ""}` +
+        ` identity=${idt.ok === false ? "다른사람" : idt.ok ? "같음" : "-"}`);
+      if (hemOk !== false && qa.ok !== false && idt.ok !== false) return r;
       console.log(`[generate] 불량 → 재생성 shot=${shotIdx} concept=${conceptId}` +
-        (hemOk === false ? ` 기장(기대 ${dressWantHem})` : "") + (qa.ok === false ? ` qa="${qa.issue}"` : ""));
+        (hemOk === false ? ` 기장(기대 ${dressWantHem})` : "") + (qa.ok === false ? ` qa="${qa.issue}"` : "") +
+        (idt.ok === false ? ` identity="${idt.issue}"` : ""));
       const again = await attemptShot(shotIdx);
       return (!isBusyFailure(again) && again?.upstream?.ok) ? again : r;
     }
@@ -1899,11 +1905,18 @@ async function handleGenerate(req, res, hold) {
   // 판단 불가·타임아웃·시간 부족이면 그대로 내보낸다 — 검사가 생성을 막으면 안 된다.
   if (result?.upstream?.ok && !isBusyFailure(result) && left() > 50000) {
     const inline = await qaInline(result);
-    const qa = inline
-      ? await inspectImage({ base64: inline.data, mimeType: inline.mime, apiKey, ...qaOpts,
-          timeoutMs: Math.max(5000, Math.min(20000, left() - 45000)) })
-      : { ok: null };
-    console.log(`[qa] ${qa.ok === false ? "불량" : qa.ok ? "통과" : "판단불가"} concept=${conceptId}${qa.issue ? ` "${qa.issue}"` : ""}`);
+    const [qa0, idt] = inline
+      ? await Promise.all([
+          inspectImage({ base64: inline.data, mimeType: inline.mime, apiKey, ...qaOpts,
+            timeoutMs: Math.max(5000, Math.min(20000, left() - 45000)) }),
+          wantIdentity ? checkIdentity({ refBase64: base64, refMime: mimeType, base64: inline.data, mimeType: inline.mime, apiKey,
+            timeoutMs: Math.max(5000, Math.min(15000, left() - 45000)) }) : { ok: null },
+        ])
+      : [{ ok: null }, { ok: null }];
+    // 다른 사람이 나왔으면 불량과 같이 한 번 다시 뽑는다(2026-10-02 밴쿠버 다이너 서양인 얼굴)
+    const qa = idt.ok === false && qa0.ok !== false ? { ok: false, issue: `다른 사람: ${idt.issue}` } : qa0;
+    console.log(`[qa] ${qa0.ok === false ? "불량" : qa0.ok ? "통과" : "판단불가"} concept=${conceptId}${qa0.issue ? ` "${qa0.issue}"` : ""}` +
+      ` identity=${idt.ok === false ? "다른사람" : idt.ok ? "같음" : "-"}`);
     if (qa.ok === false) {
       console.log(`[generate] 불량 → 재생성 concept=${conceptId} qa="${qa.issue}"`);
       let again = null;

@@ -120,3 +120,51 @@ export async function inspectImage({ base64, mimeType, apiKey, people = 1, panel
     clearTimeout(t);
   }
 }
+
+// ============================================================
+// 얼굴 동일인 검사 (2026-10-02 오너 신고: 평소 쓰던 사진으로 "밴쿠버 레트로 다이너"를 만들었는데
+// 서양인 얼굴이 나왔다). 같은 사진·같은 프롬프트로도 가끔 장면(외국 장소·서양식 옷)에 끌려 다른 사람이 된다.
+// 프롬프트로 확률을 0 으로 만들 수 없으니 결과를 원본과 비교해 다르면 한 번 다시 뽑는다.
+// 오탐은 재생성(시간·원가)만 늘리므로 두 번 물어 둘 다 "다른 사람"일 때만 false.
+// ============================================================
+function identityPrompt() {
+  return (
+    "Image 1 is the customer's own photo. Image 2 is an AI-generated portrait that MUST show the same person.\n" +
+    "Decide whether the main person in image 2 is recognisably the SAME individual as in image 1.\n" +
+    "Compare stable traits only: ethnicity, eye shape and eyelids, nose, lips, face shape, jaw and cheekbones, brow shape, skin undertone.\n" +
+    "IGNORE: hairstyle and hair colour, makeup, outfit, lighting, camera angle, expression, retouched skin, and a slightly different age look.\n" +
+    "A different ethnicity, or a clearly different face that friends would not recognise as this person, means NOT the same.\n" +
+    'Reply with JSON only: {"same_person": true|false, "ethnicity_changed": true|false, "reason": "short"}'
+  );
+}
+export async function checkIdentity({ refBase64, refMime, base64, mimeType, apiKey, timeoutMs = 15000 }) {
+  if (!refBase64 || !base64 || !apiKey) return { ok: null };
+  const [ref, out] = await Promise.all([shrinkForQa(refBase64, refMime), shrinkForQa(base64, mimeType)]);
+  const once = async () => {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${QA_MODEL}:generateContent`, {
+        method: "POST", signal: ctrl.signal,
+        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [
+            { inline_data: { mime_type: ref.mime, data: ref.data } },
+            { inline_data: { mime_type: out.mime, data: out.data } },
+            { text: identityPrompt() },
+          ] }],
+          generationConfig: { responseMimeType: "application/json", temperature: 0, thinkingConfig: { thinkingLevel: "low" } },
+        }),
+      });
+      if (!r.ok) return null;
+      const j = await r.json();
+      const v = JSON.parse((j?.candidates?.[0]?.content?.parts || []).map((p) => p.text || "").join(""));
+      if (typeof v?.same_person !== "boolean") return null;
+      return { same: v.same_person && v.ethnicity_changed !== true, reason: String(v.reason || "").slice(0, 160) };
+    } catch (_) { return null; } finally { clearTimeout(t); }
+  };
+  const votes = (await Promise.all([once(), once()])).filter(Boolean);
+  if (!votes.length) return { ok: null };
+  const diff = votes.filter((v) => !v.same);
+  return { ok: !(diff.length === votes.length), issue: diff[0]?.reason || "" };
+}
