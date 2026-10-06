@@ -1,5 +1,16 @@
 [
  {
+  "id": "1061",
+  "title": "매거진 일러스트",
+  "title_en": "Magazine Illustration",
+  "category": "🪄 매직 부스",
+  "categories": [
+   "🪄 매직 부스"
+  ],
+  "sensitive": false,
+  "text": "Re-render the provided image as a witty New Yorker–style magazine illustration: confident hand-inked black (#1A1714) pen outlines with a slight hand-drawn wobble, filled with rich, saturated watercolour and gouache. Colour fills are bold and nearly full — not pale or sketchy — with lively visible brushwork, speckled and stippled textures on fabrics and seats, and a little bleed past the lines on warm off-white paper (#FBF7EC). People are simplified into charming cartoon characters: small dot eyes or gently closed curved eyes, a simple nose line, round rosy (#EF8F86) cheeks, slightly exaggerated playful proportions and expressive body language; clothing patterns (stripes, checks, knits, polka dots) drawn crisply in bright colours. Backgrounds become clear, flattened editorial scenes with simple perspective, every object outlined in ink and coloured — leaving a soft wash or bare paper only at the outer edges. Cheerful saturated palette: sunny yellow (#F5D547), leaf green (#7DBB3C), teal (#2E9CA6), tomato red (#E0453A), cobalt blue (#2F63B5) and warm ochre (#D9973A). Keep every sign, logo and piece of text that appears in the photo, redrawn in the same illustration style. Preserve the subject's identity, composition and recognizable features — if it is a person, keep their hairstyle, outfit colours and pose in this cartoon style; if it is an animal, object or scene, keep its distinctive shape and character. Every part of the image, people and background alike, must be fully illustrated — no photographic areas left. Do not add any new text, signature or frame. Warm, witty, everyday-life editorial cartoon."
+ },
+ {
   "id": "1060",
   "title": "시티팝 드로잉",
   "title_en": "City Pop Drawing",
