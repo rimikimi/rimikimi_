@@ -2577,6 +2577,35 @@ export default function PortraitStudio() {
   // 앨범 다중 선택 → 남은 슬롯만큼 채운다.
   // 네이티브 pickImages 는 webPath(파일 URL)를 주는데, 생성 API 는 data URL 을 요구하므로
   // (buildPayload 의 garments 파서가 data:...;base64 를 정규식으로 읽는다) 여기서 변환한다.
+  // 사진 칸 밖(왼쪽 큰 샘플 등)에 놓아도 브라우저가 파일을 열어 버리지 않게 — 옵션 화면이면 첫 칸으로 받는다
+  const dropCtxRef = useRef(null);
+  dropCtxRef.current = (screen === "home" || screen === "confirm") && selected
+    ? (isArtConcept(selected) && !isDressroom(selected) ? "art" : "profile")
+    : screen === "profile" ? "profile" : null;
+  useEffect(() => {
+    if (isNative()) return;
+    const isFiles = (e) => Array.from(e.dataTransfer?.types || []).includes("Files");
+    const over = (e) => { if (isFiles(e)) e.preventDefault(); };
+    const drop = (e) => {
+      if (!isFiles(e) || e.defaultPrevented) return;
+      e.preventDefault();
+      const slot = dropCtxRef.current;
+      const files = Array.from(e.dataTransfer.files || []).filter((f) => f.type.startsWith("image/"));
+      if (slot && files.length) dropPhotos(files, slot);
+    };
+    window.addEventListener("dragover", over);
+    window.addEventListener("drop", drop);
+    return () => { window.removeEventListener("dragover", over); window.removeEventListener("drop", drop); };
+  }, []);
+
+  // PC 웹 드래그 업로드 — file input 과 같은 처리(handleFile/onGarmentFiles)를 그대로 탄다
+  function dropPhotos(files, slot) {
+    const fake = { target: { files, value: "" } };
+    if (slot === "garment") { onGarmentFiles(fake); return; }
+    photoTargetRef.current = slot;
+    handleFile(fake);
+  }
+
   async function pickGarments() {
     const room = GARMENT_MAX - garmentPhotos.length;
     if (room <= 0) return;
@@ -2718,6 +2747,7 @@ export default function PortraitStudio() {
               onPickPhoto={() => pickPhoto(art ? "art" : "profile")}
               partnerPhoto={partnerPhoto}
               onPickPartner={() => pickPhoto("partner")}
+              onDropFiles={isNative() ? null : (files, slot) => dropPhotos(files, slot === "partner" ? "partner" : slot === "garment" ? "garment" : art ? "art" : "profile")}
               garmentPhotos={garmentPhotos}
               onPickGarments={pickGarments}
               onRemoveGarment={removeGarmentAt}
@@ -3891,9 +3921,9 @@ function InlineTitle({ title, onBack }) {
   );
 }
 
-function OptionSlotCard({ title, sub, image, onPick, actionLabel }) {
+function OptionSlotCard({ title, sub, image, onPick, actionLabel, drop }) {
   return (
-    <div style={O.slot}>
+    <div style={O.slot} data-drop={drop}>
       <div style={O.thumb}>
         {image ? <img src={image} alt="" style={O.thumbImg} /> : (
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={INK} strokeOpacity="0.35" strokeWidth="1.6" aria-hidden="true">
@@ -3952,6 +3982,7 @@ function OptionsScreen({
   batchCount, setBatchCount, credits = 0, unlimited = false, freeLeft = 0,
   fourcut, fourcutCount, setFourcutCount, fourcutStyleKey, setFourcutStyleKey, fourcutStyles = FOURCUT_STYLES,
   ageConfirmed, setAgeConfirmed, onOpenGuide, canSwitch = false, requireConsent = true,
+  onDropFiles,
 }) {
   // 동의 체크는 예전 STEP 02(사진 업로드)에만 있었다 — 저장된 사진으로 바로 옵션에 온 로그인 사용자는
   // 체크 없이 만들었다. 그 흐름을 그대로 둔다: 업로드 경로(requireConsent)거나 여기서 사진을 새로 고르면 받는다.
@@ -3960,6 +3991,23 @@ function OptionsScreen({
   const needConsent = requireConsent || pickedHere;
   const pickMain = () => { setPickedHere(true); onPickPhoto && onPickPhoto(); };
   const pickPartner = () => { setPickedHere(true); onPickPartner && onPickPartner(); };
+  // PC 웹: 사진을 끌어다 놓으면 놓은 칸(data-drop)에, 칸 밖이면 첫 칸(내 사진/원본)에 넣는다
+  const [dragOver, setDragOver] = useState(false);
+  const hasFiles = (e) => Array.from(e.dataTransfer?.types || []).includes("Files");
+  const dropProps = onDropFiles ? {
+    onDragOver: (e) => { if (!hasFiles(e)) return; e.preventDefault(); if (!dragOver) setDragOver(true); },
+    onDragLeave: (e) => { if (!e.currentTarget.contains(e.relatedTarget)) setDragOver(false); },
+    onDrop: (e) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      setDragOver(false);
+      const files = Array.from(e.dataTransfer.files || []).filter((f) => f.type.startsWith("image/"));
+      if (!files.length) return;
+      const slot = e.target.closest?.("[data-drop]")?.getAttribute("data-drop") || "main";
+      if (slot !== "garment") setPickedHere(true);
+      onDropFiles(files, slot);
+    },
+  } : null;
   const missing = !photo ? (isRetouch ? t("retouch.photoSub") : isArt ? t("opt.needArt") : t("opt.needMain"))
     : isCouple && !partnerPhoto ? t("opt.needPartner")
     : isDress && garmentPhotos.length === 0 ? t("dress.needGarment")
@@ -3973,7 +4021,10 @@ function OptionsScreen({
   const [imgSrc, setImgSrc] = useState(`${ASSET_BASE}/large/${prompt.id}.webp`);
   useEffect(() => { setImgSrc(`${ASSET_BASE}/large/${prompt.id}.webp`); }, [prompt.id]);
   return (
-    <div className="fade" style={O.wrap}>
+    <div className="fade" style={{ ...O.wrap, position: "relative" }} {...dropProps}>
+      {dragOver && (
+        <div style={O.dropHint}>{t("opt.dropHint")}</div>
+      )}
       <div style={O.topBar}>
         <button type="button" style={O.backBtn} onClick={onBack} aria-label={t("opt.back")}>
           <svg width="12" height="20" viewBox="0 0 12 20" aria-hidden="true"><path d="M10 2L2 10l8 8" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
@@ -3992,17 +4043,17 @@ function OptionsScreen({
 
       {isRetouch ? (
         <OptionSlotCard title={t("retouch.photoTitle")} sub={photo ? t("opt.slotReady") : t("retouch.photoSub")}
-          image={photo} onPick={pickMain} actionLabel={photo ? t("opt.change") : t("opt.pick")} />
+          image={photo} onPick={pickMain} actionLabel={photo ? t("opt.change") : t("opt.pick")} drop="main" />
       ) : isArt ? (
         <OptionSlotCard title={t("opt.artTitle")} sub={photo ? t("opt.slotReady") : t("opt.artSub")}
-          image={photo} onPick={pickMain} actionLabel={photo ? t("opt.change") : t("opt.pick")} />
+          image={photo} onPick={pickMain} actionLabel={photo ? t("opt.change") : t("opt.pick")} drop="main" />
       ) : (
         <OptionSlotCard title={t("opt.myPhoto")} sub={photo ? t("opt.myPhotoHas") : t("opt.myPhotoNone")}
-          image={photo} onPick={pickMain} actionLabel={photo ? t("opt.change") : t("opt.pick")} />
+          image={photo} onPick={pickMain} actionLabel={photo ? t("opt.change") : t("opt.pick")} drop="main" />
       )}
       {isCouple && (
         <OptionSlotCard title={t("opt.partnerTitle")} sub={partnerPhoto ? t("opt.slotReady") : t("opt.partnerSub")}
-          image={partnerPhoto} onPick={pickPartner} actionLabel={partnerPhoto ? t("opt.change") : t("opt.pick")} />
+          image={partnerPhoto} onPick={pickPartner} actionLabel={partnerPhoto ? t("opt.change") : t("opt.pick")} drop="partner" />
       )}
 
       {isRetouch && (
@@ -4023,7 +4074,7 @@ function OptionsScreen({
       {isDress && (
         <div style={O.block}>
           <div style={O.blockHead}><span style={O.blockTitle}>{t("dress.garmentLabel")}</span></div>
-          <div style={O.blockRow} data-hscroll="">
+          <div style={O.blockRow} data-hscroll="" data-drop="garment">
             {garmentPhotos.map((g, i) => (
               <div key={i} style={O.garment}>
                 <img src={g} alt={"의상 " + (i + 1)} style={O.thumbImg} />
@@ -6168,6 +6219,12 @@ button:active { transition-duration: var(--d-press); transform: scale(0.985); }
 // 2.0 옵션 화면 스타일 — 색·글꼴 토큰(INK/BG/FONT…) 선언 뒤여야 한다(모듈 로드 순서).
 const O = {
   wrap: { paddingBottom: 40, fontFamily: FONT, color: INK },
+  dropHint: {
+    position: "absolute", inset: 8, zIndex: 20, borderRadius: 20, pointerEvents: "none",
+    border: "2px dashed " + INK + "66", background: "rgba(251,248,243,.86)",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    fontSize: 17, fontWeight: 700, color: INK,
+  },
   topBar: {
     position: "sticky", top: 0, zIndex: 40, background: BG,
     display: "flex", alignItems: "center", justifyContent: "space-between",

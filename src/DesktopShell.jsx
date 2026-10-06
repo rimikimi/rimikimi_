@@ -305,9 +305,9 @@ const H = {
 const P = {
   split: { maxWidth: 1328, margin: "0 auto", padding: "32px 56px 48px", display: "grid", gridTemplateColumns: "1fr 520px", gap: 40, alignItems: "start" },
   big: { position: "sticky", top: 108, height: "calc(100dvh - 148px)", minHeight: 520, borderRadius: 24, overflow: "hidden", background: DK.s1 },
-  sheet: { borderRadius: 24, overflow: "hidden", background: "#FBF8F3", minHeight: "calc(100dvh - 148px)", position: "relative" },
+  sheet: { borderRadius: 24, overflow: "hidden", background: "#FBF8F3", color: "#231f20", padding: "4px 24px 24px", boxSizing: "border-box", minHeight: "calc(100dvh - 148px)", position: "relative" },
   center: { maxWidth: 1328, margin: "0 auto", padding: "32px 56px 48px", display: "flex", justifyContent: "center" },
-  sheetWide: { width: 640, borderRadius: 24, overflow: "hidden", background: "#FBF8F3", minHeight: "calc(100dvh - 148px)", position: "relative" },
+  sheetWide: { width: 640, borderRadius: 24, overflow: "hidden", background: "#FBF8F3", color: "#231f20", padding: "4px 24px 24px", boxSizing: "border-box", minHeight: "calc(100dvh - 148px)", position: "relative" },
 };
 const F = {
   bar: { maxWidth: 1440, margin: "80px auto 0", borderTop: `1px solid ${DK.line}`, padding: "36px 56px 48px", display: "flex", justifyContent: "space-between", gap: 32, color: "#6d6d74", fontSize: 13, lineHeight: 1.8, fontFamily: FONT },
