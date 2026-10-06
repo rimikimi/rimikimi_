@@ -9,7 +9,30 @@ import { getLang, localizedTitle, localizedCategory, t } from "./i18n";
 // 생성·결제·로그인 흐름은 기존 화면을 그대로 쓰고(DesktopPanel 안에), 홈·탐색·상단 바만 새로 그린다.
 // ============================================================
 
-export const DK = { bg: "#0B0B0C", s1: "#141416", s2: "#1C1C1F", line: "#27272B", tx: "#F4F4F5", mu: "#8C8C94", ac: "#E6403C" };
+// 색은 CSS 변수 — .dk[data-dk="light"|"dark"] 가 값을 바꾼다(DK_CSS). 인라인 스타일은 변수 이름만 쓴다.
+export const DK = { bg: "var(--dk-bg)", s1: "var(--dk-s1)", s2: "var(--dk-s2)", line: "var(--dk-line)", tx: "var(--dk-tx)", mu: "var(--dk-mu)", ac: "#E6403C", dim: "var(--dk-dim)", nav: "var(--dk-nav)", sheetLine: "var(--dk-sheet-line)" };
+const THEME_KEY = "rimikimi_pc_theme";
+
+// 라이트/다크 — 처음엔 OS 설정을 따르고, 상단 바에서 바꾸면 그 선택을 기억한다
+export function useDkTheme() {
+  const sys = () => (typeof window !== "undefined" && window.matchMedia?.("(prefers-color-scheme: light)").matches ? "light" : "dark");
+  const [saved, setSaved] = useState(() => { try { return localStorage.getItem(THEME_KEY); } catch (_) { return null; } });
+  const [osTheme, setOsTheme] = useState(sys);
+  useEffect(() => {
+    const m = window.matchMedia?.("(prefers-color-scheme: light)");
+    if (!m) return;
+    const f = () => setOsTheme(m.matches ? "light" : "dark");
+    m.addEventListener ? m.addEventListener("change", f) : m.addListener(f);
+    return () => (m.removeEventListener ? m.removeEventListener("change", f) : m.removeListener(f));
+  }, []);
+  const theme = saved === "light" || saved === "dark" ? saved : osTheme;
+  const toggle = () => {
+    const next = theme === "dark" ? "light" : "dark";
+    setSaved(next);
+    try { localStorage.setItem(THEME_KEY, next); } catch (_) {}
+  };
+  return [theme, toggle];
+}
 
 export function useIsDesktop() {
   const q = "(min-width: 1024px)";
@@ -28,11 +51,14 @@ const en = () => getLang() === "en";
 const L = (ko, e) => (en() ? e : ko);
 
 export const DK_CSS = `
+.dk { --dk-bg:#0B0B0C; --dk-s1:#141416; --dk-s2:#1C1C1F; --dk-line:#27272B; --dk-tx:#F4F4F5; --dk-mu:#8C8C94; --dk-dim:#5d5d64; --dk-nav:rgba(11,11,12,.86); --dk-scroll:#2a2a2f; --dk-sheet-line:transparent; color-scheme: dark; }
+.dk[data-dk="light"] { --dk-bg:#F3F1ED; --dk-s1:#FFFFFF; --dk-s2:#E8E5DF; --dk-line:#DDD9D2; --dk-tx:#161618; --dk-mu:#6A6A72; --dk-dim:#9A9AA2; --dk-nav:rgba(243,241,237,.86); --dk-scroll:#CFCBC4; --dk-sheet-line:#E2DED7; color-scheme: light; }
+.dk, .dk main { transition: background-color .2s ease-out, color .2s ease-out; }
 .dk, .dk * { word-break: keep-all; overflow-wrap: break-word; }
 .dk [data-dkhide] { display: none !important; }
 .dk [data-dkbar] { position: sticky !important; bottom: 0 !important; max-width: none !important; margin: 0 !important; }
 .dk ::-webkit-scrollbar { width: 10px; height: 10px; }
-.dk ::-webkit-scrollbar-thumb { background: #2a2a2f; border-radius: 10px; }
+.dk ::-webkit-scrollbar-thumb { background: var(--dk-scroll); border-radius: 10px; }
 .dkCard { cursor: pointer; text-align: left; background: none; border: 0; color: inherit; padding: 0; font: inherit; }
 .dkCard .dkIm { transition: transform .25s cubic-bezier(.2,.7,.2,1), outline-color .2s; outline: 2px solid transparent; outline-offset: 3px; }
 .dkCard .dkGo { opacity: 0; transform: translateY(6px); transition: opacity .2s, transform .2s; }
@@ -50,7 +76,7 @@ export const DK_CSS = `
 const img = (id, size = "large") => `/${size}/${id}.webp`;
 const onImgErr = (id) => (e) => { e.currentTarget.onerror = null; e.currentTarget.src = img(id, "thumbs"); };
 
-export function DesktopNav({ Logo, active, onNav, query, setQuery, chipLabel, onChip, photo, onProfile }) {
+export function DesktopNav({ Logo, active, onNav, query, setQuery, chipLabel, onChip, photo, onProfile, theme, onTheme }) {
   const links = [
     ["concepts", L("컨셉", "Concepts")],
     ["booth", L("매직 부스", "Magic Booth")],
@@ -77,6 +103,17 @@ export function DesktopNav({ Logo, active, onNav, query, setQuery, chipLabel, on
         />
       </label>
       {chipLabel != null && <button className="dkBtn" style={N.chip} onClick={onChip}>{chipLabel}</button>}
+      {onTheme && (
+        <button className="dkBtn" style={N.chip} onClick={onTheme}
+          aria-label={theme === "dark" ? L("라이트 모드로", "Switch to light mode") : L("다크 모드로", "Switch to dark mode")}
+          title={theme === "dark" ? L("라이트 모드", "Light mode") : L("다크 모드", "Dark mode")}>
+          {theme === "dark" ? (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.2" /><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6" /></svg>
+          ) : (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true"><path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5a8.5 8.5 0 1 0 10.7 10.7Z" /></svg>
+          )}
+        </button>
+      )}
       <a className="dkBtn" style={N.ghost} href="/download">{L("앱 받기", "Get the app")}</a>
       <button style={N.ava} onClick={onProfile} aria-label={L("프로필", "Profile")}>
         {photo ? <img src={photo} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: 18 }}>👤</span>}
@@ -218,7 +255,7 @@ function BeforeAfter({ onClick, label }) {
 }
 const BA = {
   tag: { position: "absolute", top: 18, fontSize: 13, fontWeight: 800, padding: "6px 12px", borderRadius: 999, background: "rgba(0,0,0,.6)", color: "#fff" },
-  req: { position: "absolute", left: 18, bottom: 18, fontSize: 15, fontWeight: 700, padding: "10px 16px", borderRadius: 14, background: "rgba(255,255,255,.94)", color: DK.bg },
+  req: { position: "absolute", left: 18, bottom: 18, fontSize: 15, fontWeight: 700, padding: "10px 16px", borderRadius: 14, background: "rgba(255,255,255,.94)", color: "#0B0B0C" },
 };
 
 // 기존 화면(옵션·결과·스토어·프로필·내 사진)을 감싸는 틀. 옵션 화면이면 왼쪽에 컨셉 샘플을 크게.
@@ -251,8 +288,8 @@ export function DesktopFooter({ isKorea }) {
 
 const FONT = '"Pretendard", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif';
 const N = {
-  bar: { position: "sticky", top: 0, zIndex: 60, height: 76, display: "flex", alignItems: "center", gap: 36, padding: "0 56px", background: "rgba(11,11,12,.86)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", borderBottom: `1px solid ${DK.line}`, fontFamily: FONT },
-  logo: { background: "none", border: 0, padding: 0, cursor: "pointer", display: "flex", alignItems: "center" },
+  bar: { position: "sticky", top: 0, zIndex: 60, height: 76, display: "flex", alignItems: "center", gap: 36, padding: "0 56px", background: DK.nav, backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", borderBottom: `1px solid ${DK.line}`, fontFamily: FONT },
+  logo: { background: "none", color: DK.tx, border: 0, padding: 0, cursor: "pointer", display: "flex", alignItems: "center" },
   links: { display: "flex", gap: 26 },
   link: { background: "none", border: 0, padding: "8px 0", cursor: "pointer", fontSize: 16, fontWeight: 650, fontFamily: FONT },
   search: { width: 320, height: 42, borderRadius: 12, background: DK.s1, border: `1px solid ${DK.line}`, display: "flex", alignItems: "center", gap: 10, padding: "0 14px", color: DK.mu },
@@ -271,7 +308,7 @@ const C = {
   im: { position: "relative", aspectRatio: "3 / 4", borderRadius: 18, overflow: "hidden", background: DK.s1 },
   img: { width: "100%", height: "100%", objectFit: "cover", display: "block" },
   nw: { position: "absolute", left: 12, top: 12, background: DK.ac, color: "#fff", fontSize: 12, fontWeight: 800, padding: "5px 9px", borderRadius: 999 },
-  go: { position: "absolute", left: 12, right: 12, bottom: 12, height: 44, borderRadius: 12, background: "rgba(255,255,255,.94)", color: DK.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 800 },
+  go: { position: "absolute", left: 12, right: 12, bottom: 12, height: 44, borderRadius: 12, background: "rgba(255,255,255,.94)", color: "#0B0B0C", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 800 },
   t: { marginTop: 12, fontSize: 17, fontWeight: 700, color: DK.tx },
   c: { marginTop: 4, fontSize: 14, color: DK.mu },
 };
@@ -299,17 +336,17 @@ const H = {
   side: { position: "sticky", top: 96, alignSelf: "start", display: "flex", flexDirection: "column", gap: 2, maxHeight: "calc(100dvh - 120px)", overflowY: "auto" },
   sideItem: { display: "flex", justifyContent: "space-between", padding: "11px 14px", borderRadius: 10, fontSize: 16, fontWeight: 600, color: DK.mu, background: "none", border: 0, cursor: "pointer", textAlign: "left", fontFamily: FONT },
   sideOn: { background: DK.s2, color: DK.tx },
-  sideN: { fontSize: 13, color: "#5d5d64" },
+  sideN: { fontSize: 13, color: DK.dim },
   grid4: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 18 },
 };
 const P = {
   split: { maxWidth: 1328, margin: "0 auto", padding: "32px 56px 48px", display: "grid", gridTemplateColumns: "1fr 520px", gap: 40, alignItems: "start" },
   big: { position: "sticky", top: 108, height: "calc(100dvh - 148px)", minHeight: 520, borderRadius: 24, overflow: "hidden", background: DK.s1 },
-  sheet: { borderRadius: 24, overflow: "hidden", background: "#FBF8F3", color: "#231f20", padding: "4px 24px 24px", boxSizing: "border-box", minHeight: "calc(100dvh - 148px)", position: "relative" },
+  sheet: { borderRadius: 24, overflow: "hidden", background: "#FBF8F3", border: `1px solid ${DK.sheetLine}`, color: "#231f20", padding: "4px 24px 24px", boxSizing: "border-box", minHeight: "calc(100dvh - 148px)", position: "relative" },
   center: { maxWidth: 1328, margin: "0 auto", padding: "32px 56px 48px", display: "flex", justifyContent: "center" },
-  sheetWide: { width: 640, borderRadius: 24, overflow: "hidden", background: "#FBF8F3", color: "#231f20", padding: "4px 24px 24px", boxSizing: "border-box", minHeight: "calc(100dvh - 148px)", position: "relative" },
+  sheetWide: { width: 640, borderRadius: 24, overflow: "hidden", background: "#FBF8F3", border: `1px solid ${DK.sheetLine}`, color: "#231f20", padding: "4px 24px 24px", boxSizing: "border-box", minHeight: "calc(100dvh - 148px)", position: "relative" },
 };
 const F = {
-  bar: { maxWidth: 1440, margin: "80px auto 0", borderTop: `1px solid ${DK.line}`, padding: "36px 56px 48px", display: "flex", justifyContent: "space-between", gap: 32, color: "#6d6d74", fontSize: 13, lineHeight: 1.8, fontFamily: FONT },
-  a: { color: "#8C8C94", textDecoration: "none" },
+  bar: { maxWidth: 1440, margin: "80px auto 0", borderTop: `1px solid ${DK.line}`, padding: "36px 56px 48px", display: "flex", justifyContent: "space-between", gap: 32, color: DK.mu, fontSize: 13, lineHeight: 1.8, fontFamily: FONT },
+  a: { color: DK.mu, textDecoration: "none" },
 };
