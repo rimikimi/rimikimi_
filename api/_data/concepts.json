@@ -1,5 +1,16 @@
 [
  {
+  "id": "1060",
+  "title": "시티팝 드로잉",
+  "title_en": "City Pop Drawing",
+  "category": "🪄 매직 부스",
+  "categories": [
+   "🪄 매직 부스"
+  ],
+  "sensitive": false,
+  "text": "Re-render the provided image as a 1980s Japanese city pop album-cover illustration. Clean, confident ink outlines with flat areas of bright colour and smooth airbrushed gradients; hard-edged graphic shadows; glossy highlights on hair, glass and metal. A sunny, nostalgic summer palette — turquoise (#2EC4C6) and cobalt (#1F5FBF) blues, coral pink (#FF7A8A), lemon yellow (#FFD84D) and crisp white (#FFFFFF) — with skies turned into a smooth cyan-to-pink gradient and surfaces simplified into clean graphic shapes. Preserve the subject's identity, composition and recognizable features — if it is a person, keep the exact face, hairstyle and pose, drawn with simple elegant lines in the same illustration style; if it is an animal, object or scene, keep its distinctive shape and character. Every part of the image, people and background alike, must be fully illustrated — no photographic areas left. No text, no logos, no frame. Retro, breezy, stylish 80s pop illustration."
+ },
+ {
   "id": "1030",
   "title": "호박 카빙 홈카페",
   "title_en": "Pumpkin Carving Cafe",
