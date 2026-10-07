@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+:root{--bg:#FBF8F3;--ink:#231f20;--mu:#6f6a66;--red:#E6403C;--yel:#F7C23B;--sky:#4FC3DC;--pur:#9B6BC9}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#ddd;font-family:Pretendard,sans-serif;color:var(--ink);word-break:keep-all}
+.s{width:1080px;height:1920px;background:var(--bg);position:relative;overflow:hidden;margin:0 0 40px;display:flex;flex-direction:column;align-items:center;padding:120px 72px 0}
+h1{font-size:96px;font-weight:800;line-height:1.14;letter-spacing:-.045em;text-align:center}
+h1 em{font-style:normal;color:var(--red)}
+.sub{margin-top:28px;font-size:40px;font-weight:600;color:var(--mu);text-align:center;letter-spacing:-.02em}
+.img{border-radius:36px;overflow:hidden;box-shadow:0 18px 50px rgba(35,31,32,.16);background:#eee}
+.img img{width:100%;height:100%;object-fit:cover;display:block}
+.tag{position:absolute;left:22px;top:22px;background:rgba(35,31,32,.78);color:#fff;font-size:30px;font-weight:700;padding:10px 20px;border-radius:999px}
+.rel{position:relative}
+.chips{display:flex;gap:16px;margin-top:44px;flex-wrap:wrap;justify-content:center}
+.chip{font-size:34px;font-weight:700;padding:16px 28px;border-radius:999px;background:#fff;border:2px solid #231f2014}
+.arrow{font-size:80px;font-weight:800;color:var(--red)}
+.hearts{display:flex;gap:14px;margin-bottom:34px}
+.hearts i{width:22px;height:22px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:block}
+</style></head><body>
+
+<!-- 1 셀카 → 화보 -->
+<section class="s" id="s1">
+  <div class="hearts"><i style="background:#E6403C"></i><i style="background:#F7C23B"></i><i style="background:#4FC3DC"></i><i style="background:#9B6BC9"></i></div>
+  <h1>셀카 한 장이면<br><em>오늘의 화보</em></h1>
+  <div class="sub">내 얼굴 그대로, 매일 새로운 컨셉으로</div>
+  <div class="rel" style="margin-top:70px;width:900px;height:1330px">
+    <div class="img" style="position:absolute;right:0;top:0;width:740px;height:1200px"><img src="img/r_1008.jpg"><span class="tag">AI 화보</span></div>
+    <div class="img" style="position:absolute;left:0;bottom:0;width:300px;height:400px;border:10px solid #fff"><img src="img/ref_f.jpg"><span class="tag" style="font-size:24px">내 셀카</span></div>
+    <div class="arrow" style="position:absolute;left:250px;bottom:420px">↗</div>
+  </div>
+</section>
+
+<!-- 2 같은 얼굴 여러 화보 -->
+<section class="s" id="s2">
+  <h1>같은 얼굴로<br><em>매일 다른 화보</em></h1>
+  <div class="sub">웨딩 · 여행 · 스튜디오 · 시즌 컨셉</div>
+  <div style="margin-top:64px;display:grid;grid-template-columns:1fr 1fr;gap:24px;width:936px">
+    <div class="img" style="height:700px"><img src="img/r_566.jpg"></div>
+    <div class="img" style="height:700px"><img src="img/r_424.jpg"></div>
+    <div class="img" style="height:700px"><img src="img/r_369.jpg"></div>
+    <div class="img rel" style="height:700px"><img src="img/ref_f.jpg"><span class="tag">원본 셀카</span></div>
+  </div>
+</section>
+
+<!-- 3 남자 -->
+<section class="s" id="s3">
+  <h1>남자 프로필도<br><em>셀카 한 장으로</em></h1>
+  <div class="sub">수트 화보부터 여행 스냅까지</div>
+  <div class="rel" style="margin-top:64px;width:936px;height:1360px">
+    <div class="img" style="position:absolute;left:0;top:0;width:456px;height:1000px"><img src="img/r_906.jpg"></div>
+    <div class="img" style="position:absolute;right:0;top:120px;width:456px;height:1000px"><img src="img/r_971.jpg"></div>
+    <div class="img" style="position:absolute;left:318px;bottom:0;width:300px;height:400px;border:10px solid #fff"><img src="img/ref_m.jpg"><span class="tag" style="font-size:24px">내 셀카</span></div>
+  </div>
+</section>
+
+<!-- 4 매일 저녁 8시 -->
+<section class="s" id="s4">
+  <h1>매일 저녁 8시<br><em>새 컨셉 4종</em></h1>
+  <div class="sub">지금까지 550종+, 지난 컨셉도 언제든</div>
+  <div style="margin-top:64px;display:grid;grid-template-columns:repeat(3,1fr);gap:18px;width:936px">
+    <div class="img" style="height:452px"><img src="img/t_997.jpg"></div>
+    <div class="img" style="height:452px"><img src="img/t_1008.jpg"></div>
+    <div class="img" style="height:452px"><img src="img/t_594.jpg"></div>
+    <div class="img" style="height:452px"><img src="img/t_592.jpg"></div>
+    <div class="img" style="height:452px"><img src="img/t_579.jpg"></div>
+    <div class="img" style="height:452px"><img src="img/t_571.jpg"></div>
+    <div class="img" style="height:452px"><img src="img/t_1006.jpg"></div>
+    <div class="img" style="height:452px"><img src="img/t_1007.jpg"></div>
+    <div class="img" style="height:452px"><img src="img/t_566.jpg"></div>
+  </div>
+</section>
+
+<!-- 5 말로 보정 -->
+<section class="s" id="s5">
+  <h1>말만 하면<br><em>그 부분만</em> 고쳐요</h1>
+  <div class="sub">얼굴과 나머지는 원본 그대로</div>
+  <div style="margin-top:56px;background:#fff;border-radius:28px;padding:26px 34px;font-size:38px;font-weight:700;box-shadow:0 10px 30px rgba(35,31,32,.1)">“들고 있는 커피를 딸기라떼로 바꿔줘”</div>
+  <div style="margin-top:44px;display:flex;gap:24px;width:936px">
+    <div class="img rel" style="flex:1;height:1060px"><img src="img/rt_before.jpg"><span class="tag">원본</span></div>
+    <div class="img rel" style="flex:1;height:1060px"><img src="img/rt_after.jpg"><span class="tag" style="background:var(--red)">보정 후</span></div>
+  </div>
+</section>
+
+<!-- 6 매직 부스 -->
+<section class="s" id="s6">
+  <h1>내 사진을<br><em>일러스트로</em></h1>
+  <div class="sub">매거진 일러스트 · 시티팝 · 유화 · 수채화</div>
+  <div class="rel" style="margin-top:64px;width:936px;height:1340px">
+    <div class="img" style="position:absolute;left:0;top:0;width:456px;height:700px"><img src="img/mb_mag.jpg"></div>
+    <div class="img" style="position:absolute;right:0;top:0;width:456px;height:700px"><img src="img/mb_city.jpg"></div>
+    <div class="img" style="position:absolute;left:268px;top:640px;width:440px;height:660px;border:10px solid #fff"><img src="img/mb_orig.jpg"><span class="tag">원본</span></div>
+  </div>
+</section>
+
+<!-- 7 네컷 + 복원 -->
+<section class="s" id="s7">
+  <h1>인생네컷도<br><em>옛날 사진 복원도</em></h1>
+  <div class="sub">사진관 안 가고 앱 하나로</div>
+  <div style="margin-top:64px;display:flex;gap:28px;width:936px;align-items:flex-start">
+    <div style="background:#231f20;padding:22px 22px 70px;border-radius:18px;display:grid;gap:14px;width:380px;box-shadow:0 18px 50px rgba(35,31,32,.2)">
+      <div style="height:292px;overflow:hidden"><img src="img/r_1008.jpg" style="width:100%;height:100%;object-fit:cover;object-position:50% 20%"></div>
+      <div style="height:292px;overflow:hidden"><img src="img/r_566.jpg" style="width:100%;height:100%;object-fit:cover;object-position:50% 12%"></div>
+      <div style="height:292px;overflow:hidden"><img src="img/r_424.jpg" style="width:100%;height:100%;object-fit:cover;object-position:50% 25%"></div>
+      <div style="height:292px;overflow:hidden"><img src="img/r_369.jpg" style="width:100%;height:100%;object-fit:cover;object-position:50% 18%"></div>
+    </div>
+    <div style="flex:1;display:flex;flex-direction:column;gap:20px">
+      <div class="img rel" style="height:900px"><img src="img/restore.jpg"></div>
+      <div style="font-size:34px;font-weight:700;color:var(--mu);text-align:center">빛바랜 사진을 선명하게</div>
+    </div>
+  </div>
+</section>
+</body></html>
