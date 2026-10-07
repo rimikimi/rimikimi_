@@ -580,6 +580,10 @@ final class AppState {
     func finishGuide() {
         UserDefaults.standard.set(true, forKey: "guide.done.v2")
         showGuide = false
+        // 2026-10-07 심사 리젝(2.1, iPad): "ATT 요청을 찾을 수 없다" — 예전엔 첫 생성 결과 뒤에만 물어서
+        // 로그인·생성까지 안 해 본 심사관은 볼 수가 없었다. 이제 첫 실행 가이드를 닫는 즉시 묻는다
+        // (가이드와 겹치지 않게 닫힌 뒤). 이미 물었으면 아무 일도 안 한다.
+        TrackingPrompt.requestOnceAfterFirstResult(delay: 0.6)
     }
 
     func showToast(_ message: String) { toast = message }

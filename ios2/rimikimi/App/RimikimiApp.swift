@@ -19,6 +19,9 @@ struct RimikimiApp: App {
                     // 전면광고 SDK 초기화 + 첫 광고 미리 로드. 팝업은 안 뜬다(ATT 는 TrackingPrompt 소유).
                     // 여기서 미리 받아 둬야 생성이 끝난 순간 기다림 없이 띄울 수 있다.
                     AdManager.shared.start()
+                    // 가이드를 이미 본 사용자(업데이트 설치 등)는 실행 직후 ATT 를 1회 묻는다.
+                    // 가이드가 떠 있으면 가이드를 닫을 때(finishGuide) 묻는다 — 팝업이 겹치지 않게.
+                    if !app.showGuide { TrackingPrompt.requestOnceAfterFirstResult(delay: 1.0) }
                     // 5주차: 아직 로그인 안 된 상태면 1.x WKWebView localStorage 에서 세션을 건질 수
                     // 있는지 1회 시도한다(LegacySessionMigration). 실패해도 부작용 없음 — 평소처럼 로그인 시트.
                     await LegacySessionMigration.attemptOnce()
@@ -51,6 +54,8 @@ struct RimikimiApp: App {
                 .onChange(of: scenePhase) { _, phase in
                     if phase == .active {
                         app.push.clearBadge()
+                        // 실행 직후 .task 시점엔 아직 .active 가 아니면 ATT 가 조용히 건너뛰어진다 → 활성화될 때 다시 시도(이미 물었으면 즉시 반환).
+                        if !app.showGuide { TrackingPrompt.requestOnceAfterFirstResult(delay: 1.0) }
                         app.generation.resumeIfNeeded()
                         Task { await app.refreshQuota(); await app.push.refreshAuthorization() }
                     }
