@@ -199,6 +199,10 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
   const [tab, setTab] = useState("filter"); // filter | fx | fit | sticker
   // 정방향 맞춤(SPEC §3) — 3:4 가 아니면 잘라 맞춤(무료) / 채워 맞춤(서버, 1크레딧).
   const [fitBusy, setFitBusy] = useState("");   // "" | "crop" | "outpaint"
+  // 제3자 AI 전송 동의(Apple 5.1.1(i)/5.1.2(i)) — 채워 맞춤은 사진을 Google Gemini 로 보낸다. 이 기기에서 1회 동의.
+  const [aiAsk, setAiAsk] = useState(false);
+  const AI_KEY = "rimikimi_ai_consent_v2";
+  const aiOk = () => { try { return localStorage.getItem(AI_KEY) === "1"; } catch (_) { return false; } };
   const [fitErr, setFitErr] = useState("");
   const [presetKey, setPresetKey] = useState(initialPresetKey);
   const [fx, setFx] = useState(() => fxOf(presetByKey(initialPresetKey)));
@@ -524,9 +528,10 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
     } finally { setFitBusy(""); }
   }
 
-  async function doOutpaintFit() {
+  async function doOutpaintFit(skipAsk) {
     const img = fullImgRef.current;
     if (!img || fitBusy) return;
+    if (!skipAsk && !aiOk()) { setAiAsk(true); return; }
     setFitErr(""); setFitBusy("outpaint"); hap.tap();
     try {
       const { data } = await supabase.auth.getSession();
@@ -1293,10 +1298,25 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
             <button style={ES.fitBtn} disabled={isThreeFour() || !!fitBusy} onClick={doCropFit}>
               {fitBusy === "crop" ? "맞추는 중…" : "잘라 맞춤 · 무료"}
             </button>
-            <button style={ES.fitBtnGhost} disabled={isThreeFour() || !!fitBusy} onClick={doOutpaintFit}>
+            <button style={ES.fitBtnGhost} disabled={isThreeFour() || !!fitBusy} onClick={() => doOutpaintFit(false)}>
               {fitBusy === "outpaint" ? "채우는 중…" : "채워 맞춤 · 1 크레딧"}
             </button>
             {fitErr && <div style={ES.fitErr}>{fitErr}</div>}
+            {aiAsk && (() => {
+              const en = getLang() === "en";
+              return (
+                <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+                  <div style={{ background: "#FBF8F3", color: "#231f20", width: "100%", maxWidth: 520, borderRadius: "20px 20px 0 0", padding: "24px 22px 30px", fontSize: 14.5, lineHeight: 1.55 }}>
+                    <div style={{ fontSize: 19, fontWeight: 800, marginBottom: 12 }}>{en ? "Share your photo with Google's AI?" : "사진을 Google AI로 보내도 될까요?"}</div>
+                    <p style={{ margin: "0 0 8px" }}>{en ? "What is sent: this photo, to fill in the edges for a 3:4 crop." : "보내는 데이터: 지금 편집 중인 이 사진(3:4로 바깥을 채우기 위해)."}</p>
+                    <p style={{ margin: "0 0 8px" }}>{en ? "Sent to: Google LLC's Gemini API (United States), only for this edit — never for ads or any other purpose." : "받는 곳: Google LLC의 Gemini API(미국). 이 편집에만 쓰이고 광고 등 다른 목적으로 쓰지 않아요."}</p>
+                    <p style={{ margin: "0 0 16px" }}>{en ? "Storage: not stored on our servers; discarded right after processing." : "보관: 우리 서버에 저장하지 않고 처리 후 바로 폐기해요."}</p>
+                    <button style={{ ...ES.fitBtn, width: "100%" }} onClick={() => { try { localStorage.setItem(AI_KEY, "1"); } catch (_) {} setAiAsk(false); doOutpaintFit(true); }}>{en ? "Allow and continue" : "허용하고 계속"}</button>
+                    <button style={{ ...ES.fitBtnGhost, width: "100%", marginTop: 8 }} onClick={() => setAiAsk(false)}>{en ? "Don't allow" : "허용 안 함"}</button>
+                  </div>
+                </div>
+              );
+            })()}
 
             <div style={ES.fitHint}>줌·광각 왜곡 보정</div>
             <input
