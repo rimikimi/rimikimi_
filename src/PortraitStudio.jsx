@@ -3651,12 +3651,22 @@ function MyGalleryScreen({ accessToken, onBack, onShared, onLoginRequest }) {
       }
       flashToast(t("save.toast.done"));
     } else {
-      const a = document.createElement("a");
-      a.href = it.url;
-      a.download = `rimikimi_${it.conceptId}.png`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
+      // ⚠️ it.url 은 다른 출처(Supabase 저장소)라 <a download> 가 무시되고 새 탭에 이미지만 열렸다.
+      //    blob 으로 받아 같은 출처 주소(objectURL)로 바꿔야 실제로 파일이 저장된다.
+      try {
+        const blob = await (await fetch(it.url)).blob();
+        const href = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = href;
+        a.download = `rimikimi_${it.conceptId || it.id}.${/jpe?g/i.test(blob.type) ? "jpg" : "png"}`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(href), 10000);
+      } catch (_) {
+        flashToast(t("save.toast.fail"));
+        return;
+      }
     }
     setSaved(markSaved(it.id));
     cancelExpiryNotice(it.id); // 저장했으니 만료 알림 불필요
