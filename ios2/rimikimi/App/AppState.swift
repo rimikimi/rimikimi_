@@ -557,6 +557,18 @@ final class AppState {
         }
     }
 
+    /// 저장 전 광고 — **무료 사용자만**(오너 지시 2026-10-07 "무료 사용자는 무조건 저장하려면 광고를 봐야 함",
+    /// "유료 사용자는 보이면 안 되고"). 크레딧이 남아 있는지와는 상관없다.
+    ///   - 무료 = 결제 기록이 한 번도 없는 계정(서버 quota `firstPurchase`). 크레딧팩·구독을 한 번이라도 샀으면 유료.
+    ///   - 무제한 계정·구독 중인 계정 → 안 띄운다.
+    ///   - quota 를 아직 못 불러왔으면 → 안 띄운다(모르면 안 띄우는 쪽).
+    /// 광고가 닫힐 때까지 기다렸다가 돌아오므로, 호출한 쪽은 그다음에 저장하면 된다.
+    func adGateBeforeSave() async {
+        guard let q = quota, q.unlimited != true, q.firstPurchase == true else { return }
+        if await store.hasActiveSubscription() { return }
+        await AdManager.shared.showAndWait()
+    }
+
     /// 홈 초대 카드를 닫는다 — 닫힌 상태를 영구 기억해 다음 실행에도 다시 뜨지 않게 한다(결함 #5).
     func dismissInviteCard() {
         showInviteCard = false

@@ -171,12 +171,15 @@ export function initAds(): void {
  * (규칙은 generation.tsx 에 있고 1.x PortraitStudio.jsx 의 showAds 와 같다).
  * await 하지 말 것 — 여기서 무슨 일이 나도 호출 흐름은 멈추지 않아야 한다.
  */
-export async function showInterstitial(): Promise<void> {
-  if (!INTERSTITIAL_ENABLED) return;
+export async function showInterstitial(onDone?: () => void): Promise<void> {
+  // onDone: 광고가 닫히거나(정상) 못 띄우고 끝났을 때 **한 번** 부른다 — 저장 전 광고(showAndWait)용.
+  let finished = false;
+  const finish = () => { if (!finished) { finished = true; try { onDone?.(); } catch { /* ignore */ } } };
+  if (!INTERSTITIAL_ENABLED) return finish();
   // 이미 광고가 떠 있으면 겹쳐 띄우지 않는다(뒤늦게 끝난 생성이 지금 광고를 덮지 않게).
-  if (showing && Date.now() - shownAt < SHOWING_STALE_MS) return;
+  if (showing && Date.now() - shownAt < SHOWING_STALE_MS) return finish();
   const m = ads();
-  if (!m) return;
+  if (!m) return finish();
   showing = true;
   shownAt = Date.now();
   try {
@@ -187,6 +190,7 @@ export async function showInterstitial(): Promise<void> {
     ready = null;
     if (!ad) {
       showing = false;
+      finish();
       return;
     }
     // 닫히거나(정상) 표시에 실패하면 → 표시 중 해제 + 다음 광고 미리 로드.
@@ -194,6 +198,7 @@ export async function showInterstitial(): Promise<void> {
       try { ad.removeAllListeners(); } catch { /* ignore */ }
       showing = false;
       preload();
+      finish();
     };
     ad.addAdEventListener(m.AdEventType.CLOSED, done);
     ad.addAdEventListener(m.AdEventType.ERROR, done);
@@ -209,5 +214,20 @@ export async function showInterstitial(): Promise<void> {
     // 로드·표시 어디서 터져도 조용히 넘어간다 — 사용자는 광고가 없었다는 것 외엔 모른다.
     showing = false;
     preload();
+    finish();
   }
+}
+
+/**
+ * 저장 전 광고 — 광고가 **닫힌 뒤에** resolve 한다(못 띄우면 바로).
+ * 오너 지시 2026-10-07: 무료 사용자는 이미지를 저장하려면 광고를 봐야 한다(판정은 saveAdGate.ts).
+ * 광고 재고가 없거나 실패해도 저장을 막지 않는다. 닫힘 이벤트가 끝내 안 오면 2분 뒤 풀어 준다.
+ */
+export function showAndWait(): Promise<void> {
+  return new Promise<void>((resolve) => {
+    let done = false;
+    const fin = () => { if (!done) { done = true; resolve(); } };
+    setTimeout(fin, 120_000);
+    void showInterstitial(fin);
+  });
 }

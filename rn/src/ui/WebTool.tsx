@@ -10,6 +10,7 @@ import { useAuth } from "@/lib/auth";
 import { useQuota } from "@/lib/quota";
 import { getEnv } from "@/lib/env";
 import { saveDataUrlToAlbum, shareDataUrlOrUrl } from "@/lib/nativeMedia";
+import { useSaveAdGate } from "@/lib/saveAdGate";
 import { chrome, color, space, themedStyles } from "@/theme/tokens";
 import { copy } from "@/lib/copy";
 import { isKo } from "@/lib/locale";
@@ -65,6 +66,7 @@ export function WebTool({ title, tool, query, initialPayload }: {
   const insets = useSafeAreaInsets();
   const { session } = useAuth();
   const { refresh: refreshQuota } = useQuota();
+  const adGate = useSaveAdGate();
   const [loading, setLoading] = useState(true);
   const webRef = useRef<WebView>(null);
   // 웹뷰의 localStorage 는 앱과 별개 저장소이고 웹은 navigator.language 로 언어를 정한다.
@@ -94,6 +96,7 @@ export function WebTool({ title, tool, query, initialPayload }: {
           break;
         }
         case "saveToAlbum": {
+          await adGate(); // 무료 사용자는 광고를 본 뒤 저장
           const r = await saveDataUrlToAlbum(String(payload?.dataUrl ?? ""), String(payload?.filename ?? "rimikimi"));
           resolve(id, r);
           break;

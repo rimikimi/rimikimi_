@@ -12,6 +12,7 @@ import { ConceptRail } from "@/ui/ConceptCard";
 import { IconDownload, IconFlag, IconShare, IconWand } from "@/ui/icons";
 import { FitSheet } from "@/ui/FitSheet";
 import { needsFit } from "@/lib/fit";
+import { useSaveAdGate } from "@/lib/saveAdGate";
 import { useGeneration, type ResultImage } from "@/lib/generation";
 import { useStore } from "@/lib/store";
 import { conceptTitle, similarConcepts } from "@/lib/concepts";
@@ -71,12 +72,14 @@ export default function Result() {
   const img = images[idx];
   const w = width - space.screen * 2;
   const h = Math.round((w * 4) / 3);
+  const adGate = useSaveAdGate();
   const similar = useMemo(() => (concept && concepts.length ? similarConcepts(concepts, concept) : []), [concept, concepts]);
 
   const save = async () => {
     if (!img) return;
     setSaving(true);
     try {
+      await adGate(); // 무료 사용자는 광고를 본 뒤 저장
       const MediaLibrary = await import("expo-media-library");
       const perm = await MediaLibrary.requestPermissionsAsync(true);
       if (!perm.granted) throw new Error("no permission");

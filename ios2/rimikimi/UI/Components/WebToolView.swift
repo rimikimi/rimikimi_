@@ -41,6 +41,8 @@ final class WebBridgeCoordinator: NSObject, WKScriptMessageHandler, WKNavigation
     var onClose: (() -> Void)?
     var onRefreshCredits: (() -> Void)?
     var onSaved: (() -> Void)?
+    /// 앨범에 저장하기 직전에 기다릴 일(무료 사용자 광고). 없으면 바로 저장.
+    var beforeSave: (() async -> Void)?
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         guard let body = message.body as? [String: Any], let type = body["type"] as? String else { return }
@@ -85,6 +87,7 @@ final class WebBridgeCoordinator: NSObject, WKScriptMessageHandler, WKNavigation
         }
         Task { [weak self] in
             guard let self else { return }
+            if let gate = await MainActor.run(body: { self.beforeSave }) { await gate() }
             do {
                 try await PHPhotoLibrary.shared().performChanges { PHAssetChangeRequest.creationRequestForAsset(from: img) }
                 await MainActor.run { self.onSaved?() }
@@ -123,6 +126,7 @@ struct WebToolView: UIViewRepresentable {
     var onClose: () -> Void
     var onRefreshCredits: () -> Void
     var onSaved: () -> Void
+    var beforeSave: (() async -> Void)? = nil
 
     func makeCoordinator() -> WebBridgeCoordinator {
         let c = WebBridgeCoordinator()
@@ -130,6 +134,7 @@ struct WebToolView: UIViewRepresentable {
         c.onClose = onClose
         c.onRefreshCredits = onRefreshCredits
         c.onSaved = onSaved
+        c.beforeSave = beforeSave
         return c
     }
 
@@ -180,7 +185,8 @@ struct WebToolScreen: View {
             initialPayload: initialPayload,
             onClose: { dismiss() },
             onRefreshCredits: { Task { await app.refreshQuota() } },
-            onSaved: { HapticPlayer.success(); app.showToast(Copy.savedToPhotos) }
+            onSaved: { HapticPlayer.success(); app.showToast(Copy.savedToPhotos) },
+            beforeSave: { await app.adGateBeforeSave() }
         )
     }
 

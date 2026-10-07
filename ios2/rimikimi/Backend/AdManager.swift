@@ -64,6 +64,9 @@ final class AdManager: NSObject {
     private var loadAttempt = 0
     private var didStart = false
     private var didKickOffFirstLoad = false
+    /// 저장 전 광고(`showAndWait`)가 닫히기를 기다리는 쪽. 한 번에 하나만.
+    private var dismissWaiter: CheckedContinuation<Void, Never>?
+    private var waiterToken = 0
 
     // MARK: 시작 (앱 실행 시 1회)
 
@@ -139,6 +142,32 @@ final class AdManager: NSObject {
         Task { await present() }
     }
 
+    /// 저장 전 광고 — 광고가 **닫힌 뒤에** 돌아온다(못 띄우면 바로 돌아온다).
+    /// 오너 지시 2026-10-07: 무료 사용자는 이미지를 저장하려면 광고를 봐야 한다. 판정은 `AppState.adGateBeforeSave()`.
+    /// 광고 재고가 없거나 실패해도 저장은 막지 않는다 — 광고는 있으면 보여 주는 것이지 저장의 조건이 아니다.
+    func showAndWait() async {
+        guard Self.interstitialEnabled else { return }
+        await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in
+            dismissWaiter?.resume()
+            dismissWaiter = c
+            waiterToken &+= 1
+            let token = waiterToken
+            Task { await present() }
+            // 닫힘 콜백이 끝내 안 오면 저장이 영영 멈춘다 → 2분 뒤엔 그냥 풀어 준다.
+            Task { [weak self] in
+                try? await Task.sleep(nanoseconds: 120_000_000_000)
+                guard let self, self.waiterToken == token else { return }
+                self.releaseWaiter()
+            }
+        }
+    }
+
+    /// `showAndWait` 가 기다리는 중이면 깨운다(닫힘·표시 실패·건너뜀 공통).
+    private func releaseWaiter() {
+        dismissWaiter?.resume()
+        dismissWaiter = nil
+    }
+
     private func present() async {
         if interstitial == nil {
             // 미리 로드가 아직 안 끝났거나 실패했다 — 지금이라도 시작해 보되 오래 붙잡지 않는다.
@@ -151,6 +180,7 @@ final class AdManager: NSObject {
         guard let ad = interstitial else {
             AppLog.ui.info("ads.show.skipped")
             loadInterstitial() // 다음 기회를 위해 채워 둔다
+            releaseWaiter()
             return
         }
         interstitial = nil // 한 광고는 한 번만 — 들고 있다가 두 번 띄우면 SDK 가 거부한다
@@ -168,11 +198,13 @@ final class AdManager: NSObject {
 extension AdManager: FullScreenContentDelegate {
     func adDidDismissFullScreenContent(_ ad: FullScreenPresentingAd) {
         AppLog.ui.info("ads.dismissed")
+        releaseWaiter()
         loadInterstitial()
     }
 
     func ad(_ ad: FullScreenPresentingAd, didFailToPresentFullScreenContentWithError error: Error) {
         AppLog.ui.info("ads.show.failed \(error.localizedDescription, privacy: .public)")
+        releaseWaiter()
         loadInterstitial()
     }
 }
