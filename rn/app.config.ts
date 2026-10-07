@@ -35,7 +35,7 @@ const config: ExpoConfig = {
   // 영어 기기에서는 런처 이름도 영어(values-en/strings.xml app_name). 기본값은 위 name.
   locales: { en: "./locales/en.json", ko: "./locales/ko.json" },
   slug: "rimikimi",
-  version: "2.0.3",
+  version: "2.0.4",
   orientation: "portrait",
   scheme: "com.rimikimi.app",
   icon: "./assets/images/icon.png",
@@ -50,7 +50,7 @@ const config: ExpoConfig = {
 
   android: {
     package: "com.rimikimi.app",
-    versionCode: 104,
+    versionCode: 105,
     // FCM (rimikimi-ad8aa) — 1.x android/app/google-services.json 사본. 완료 푸시 + 드롭 토픽(drop_p540).
     googleServicesFile: "./google-services.json",
     adaptiveIcon: {
