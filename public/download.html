@@ -138,6 +138,14 @@
       var isAndroid = /android/i.test(ua);
       var APP_STORE = "https://apps.apple.com/app/id6782776518";
       var PLAY = "https://play.google.com/store/apps/details?id=com.rimikimi.app";
+      // 광고 출처 전달 — /download?src=meta 처럼 들어오면 Play 설치 리퍼러(utm)로 넘겨,
+      // Play Console "획득 보고서 → 캠페인별" 에서 광고별 설치 수를 볼 수 있게 한다.
+      try {
+        var qs = new URLSearchParams(location.search);
+        var src = (qs.get("src") || qs.get("utm_source") || "").replace(/[^a-z0-9_\-]/gi, "").slice(0, 40);
+        var camp = (qs.get("c") || qs.get("utm_campaign") || src).replace(/[^a-z0-9_\-]/gi, "").slice(0, 60);
+        if (src) PLAY += "&referrer=" + encodeURIComponent("utm_source=" + src + "&utm_medium=paid&utm_campaign=" + camp);
+      } catch (e) {}
       var cta = document.getElementById("primaryCta");
       var hint = document.getElementById("hint");
 

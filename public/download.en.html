@@ -139,6 +139,13 @@
       var isAndroid = /android/i.test(ua);
       var APP_STORE = "https://apps.apple.com/us/app/id6782776518";
       var PLAY = "https://play.google.com/store/apps/details?id=com.rimikimi.app&hl=en";
+      // Pass the ad source to the Play install referrer (/download?src=meta) — see download.html.
+      try {
+        var qs = new URLSearchParams(location.search);
+        var src = (qs.get("src") || qs.get("utm_source") || "").replace(/[^a-z0-9_\-]/gi, "").slice(0, 40);
+        var camp = (qs.get("c") || qs.get("utm_campaign") || src).replace(/[^a-z0-9_\-]/gi, "").slice(0, 60);
+        if (src) PLAY += "&referrer=" + encodeURIComponent("utm_source=" + src + "&utm_medium=paid&utm_campaign=" + camp);
+      } catch (e) {}
       var cta = document.getElementById("primaryCta");
       var hint = document.getElementById("hint");
 
