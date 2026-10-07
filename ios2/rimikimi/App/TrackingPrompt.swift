@@ -23,6 +23,9 @@ enum TrackingPrompt {
     /// 아직 `.active` 가 아닐 수 있어 그 경우는 시도조차 하지 않고 다음 기회로 미룬다.
     static func requestOnceAfterFirstResult(delay: TimeInterval = 1.0, completion: (() -> Void)? = nil) {
         guard !asked else { completion?(); return }
+        #if DEBUG
+        if UserDefaults.standard.bool(forKey: "dev.noATT") { completion?(); return } // 캡처용
+        #endif
         Task {
             try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
             guard UIApplication.shared.applicationState == .active else { completion?(); return }

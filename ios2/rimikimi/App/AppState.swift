@@ -92,7 +92,7 @@ final class AppState {
     /// 채워 맞춤(outpaint)도 같은 Gemini 전송이라 같은 동의가 필요하다(재검증으로 발견 — 결과
     /// 화면을 거치지 않고 도달하는 이론적 우회가 남아 있었다). 이미지+완료 콜백을 미뤄둔다.
     private var pendingOutpaintAfterConsent: (image: UIImage, completion: (UIImage) -> Void)?
-    private static let aiConsentKey = "ai.consent.v1"
+    private static let aiConsentKey = "ai.consent.v2" // v2(2026-10-07 리젝 5.1.1/5.1.2): 보내는 데이터·받는 곳을 명시한 새 문구라 기존 동의자도 다시 묻는다
     static var aiConsentGiven: Bool { UserDefaults.standard.bool(forKey: aiConsentKey) }
     /// 크레딧 부족 시트(팩 3 · 구독 · 초대). 구매 성공 시 `pendingAfterPurchase` 를 이어간다.
     var creditsSheet = false

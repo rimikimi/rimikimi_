@@ -278,13 +278,13 @@ enum Copy {
 
     // MARK: AI 전송 고지
 
-    static var consentTitle: String { L.t("사진은 이렇게 쓰여요", "How your photos are used") }
-    static var consentAI: String { L.t("이 서비스는 인공지능(Google Gemini API)으로 이미지를 생성해요.", "This service creates images with AI (Google Gemini API).") }
-    static var consentUpload: String { L.t("업로드한 사진은 이미지를 생성할 때만 Google로 전송되고, 서버에 저장하지 않아요 — 처리 후 즉시 폐기돼요.", "Photos you upload are sent to Google only while an image is being generated and are never stored on our servers — they're discarded right after processing.") }
-    static var consentDevice: String { L.t("등록해 둔 얼굴 참조사진은 이용자 기기에만 저장돼요. 생성할 때만 함께 전송돼요.", "Face reference photos you save are stored only on your device. They're sent along only while generating.") }
+    static var consentTitle: String { L.t("사진을 Google AI로 보내도 될까요?", "Share your photo with Google's AI?") }
+    static var consentAI: String { L.t("보내는 데이터: 고른 사진, 등록한 얼굴 스캔 사진(있다면), 입력한 요청 문구와 선택한 컨셉.", "What is sent: the photo you choose, your saved face-scan photos (if any), and the request text / concept you pick.") }
+    static var consentUpload: String { L.t("받는 곳: Google LLC의 Gemini API(미국). 이미지 생성과 결과 품질 확인에만 쓰이고, 광고·학습 등 다른 목적으로 쓰지 않아요.", "Sent to: Google LLC's Gemini API (United States), only to create your image and check its quality — never for ads or any other purpose.") }
+    static var consentDevice: String { L.t("보관: 올린 사진은 우리 서버에 저장하지 않고 처리 후 바로 폐기해요. 결과 이미지는 24시간 뒤 자동 삭제되고, 얼굴 스캔 사진은 이 기기에만 저장돼요.", "Storage: your uploads are not stored on our servers and are discarded right after processing. Results are auto-deleted after 24 hours; face-scan photos stay on this device.") }
     static var consentPrivacyLink: String { L.t("개인정보처리방침에서 자세히 보기", "Learn more in our Privacy Policy") }
-    static var consentAgree: String { L.t("동의하고 계속", "Agree and continue") }
-    static var consentLater: String { L.t("다음에", "Not now") }
+    static var consentAgree: String { L.t("허용하고 계속", "Allow and continue") }
+    static var consentLater: String { L.t("허용 안 함", "Don't allow") }
 
     // MARK: 안내(온보딩)
 
