@@ -161,7 +161,9 @@ export function GenerationProvider({ children }: { children: React.ReactNode }) 
   // 새로 만들어진다. 값은 **만들기를 누른 시점**에 한 번 읽는다 — 1.x 도 생성 시작 시점의
   // 값을 클로저에 담고 있었다(생성으로 크레딧이 깎여도 그 판정은 안 바뀐다).
   const showAdsRef = useRef(false);
-  showAdsRef.current = quotaLoaded && !!quota && !quota.unlimited && quota.credits === 0;
+  // 2026-10-07 오너 지시: 무료 사용자는 "생성할 때 한 번, 저장할 때 한 번". 무료 판정은 저장 광고(saveAdGate.ts)와
+  // 같다 — 결제 기록이 없는 계정(firstPurchase), 크레딧 잔액과 무관. (예전 규칙: 크레딧 0 인 사람만)
+  showAdsRef.current = quotaLoaded && !!quota && !quota.unlimited && quota.firstPurchase === true;
   // 복구 중인 작업 id 집합. 예전엔 boolean 하나라 한 작업이 폴링 중이면 다른 작업은
   // 복구 시도조차 못 했다. 이제 **같은 작업의 중복 폴링만** 막고 다른 작업은 통과시킨다.
   const recovering = useRef<Set<string>>(new Set());

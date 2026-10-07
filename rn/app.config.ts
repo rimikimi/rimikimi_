@@ -50,7 +50,7 @@ const config: ExpoConfig = {
 
   android: {
     package: "com.rimikimi.app",
-    versionCode: 105,
+    versionCode: 106,
     // FCM (rimikimi-ad8aa) — 1.x android/app/google-services.json 사본. 완료 푸시 + 드롭 토픽(drop_p540).
     googleServicesFile: "./google-services.json",
     adaptiveIcon: {

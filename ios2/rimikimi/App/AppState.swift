@@ -549,7 +549,9 @@ final class AppState {
     /// 여기서 판정하는 이유는 `GenerationCoordinator` 가 크레딧/무제한 상태를 모르기 때문이다
     /// (`quota` 는 AppState 소유). 코디네이터에 역참조를 심으면 그 파일 구조를 건드리게 된다.
     func showInterstitialAfterGeneration() {
-        guard let q = quota, q.unlimited != true, q.creditsAvailable == 0 else { return }
+        // 2026-10-07 오너 지시: 무료 사용자는 "생성할 때 한 번, 저장할 때 한 번". 무료 판정은 저장 광고와 같다 —
+        // 결제 기록이 없는 계정(firstPurchase), 크레딧 잔액과 무관. (예전 규칙: 크레딧 0 인 사람만)
+        guard let q = quota, q.unlimited != true, q.firstPurchase == true else { return }
         Task {
             // 구독자(광고 제거)에게는 띄우지 않는다.
             if await store.hasActiveSubscription() { return }
