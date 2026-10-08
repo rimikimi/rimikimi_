@@ -13,6 +13,7 @@
 import ALL from "./_data/concepts.json" with { type: "json" };
 import { publishedConcepts } from "./_lib/conceptList.js";
 import { studioCatalog } from "./_lib/studio.js";
+import { weddingCatalog } from "./_lib/wedding.js";
 
 // 앞으로의 드롭 일정 — /api/drops 가 여기로 rewrite 된다.
 // ⚠️ 별도 파일로 두면 Vercel Hobby 의 서버리스 함수 12개 상한을 넘어 배포가
@@ -66,6 +67,12 @@ export default function handler(req, res) {
   if (req.query?.drops) return dropsResponse(req, res, now);
   // 브루클린 목적 사진 카탈로그(이력서·프로필 칸) — /studio-catalog.json 이 여기로 rewrite 된다.
   // ⚠️ 함수 파일을 새로 만들지 않는다(Vercel Hobby 함수 12개 상한).
+  // 조세핀 프리셋 드레스 160벌 — /wedding-catalog.json
+  if (req.query?.wedding) {
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    res.setHeader("Cache-Control", "public, max-age=0, s-maxage=600, stale-while-revalidate=3600");
+    return res.status(200).send(JSON.stringify(weddingCatalog()));
+  }
   if (req.query?.studio) {
     res.setHeader("Content-Type", "application/json; charset=utf-8");
     res.setHeader("Cache-Control", "public, max-age=0, s-maxage=600, stale-while-revalidate=3600");

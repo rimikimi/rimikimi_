@@ -75,6 +75,10 @@
       "destination": "/api/concepts?studio=1"
     },
     {
+      "source": "/wedding-catalog.json",
+      "destination": "/api/concepts?wedding=1"
+    },
+    {
       "source": "/api/drops",
       "destination": "/api/concepts?drops=1"
     },

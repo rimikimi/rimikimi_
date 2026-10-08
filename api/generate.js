@@ -19,6 +19,7 @@ import { SPRITE_CONCEPT_IDS, describeForSprite } from "./_lib/sprite.js";
 import { checkIdentity, inspectImage, checkScene } from "./_lib/qa.js";
 import { runRetouch } from "./_lib/retouch.js";
 import { resolveStudio } from "./_lib/studio.js";
+import { findDress, dressImageURL, buildPresetDressInstruction } from "./_lib/wedding.js";
 // 컨셉 원본(프롬프트 포함). **서버가 프롬프트의 출처**여야 한다 — 아래 resolvePrompt 참고.
 import ALL_CONCEPTS from "./_data/concepts.json" with { type: "json" };
 
@@ -994,6 +995,8 @@ async function handleGenerate(req, res, hold) {
     // 브루클린 목적 사진(2026-10-09 이식): { purpose, presetId, overrides } + 옷 사진(선택).
     // 지시문은 서버 카탈로그로만 만든다(api/_lib/studio.js) — 앱은 id·값만 보낸다.
     studio, outfitBase64, outfitMime,
+    // 조세핀 프리셋 드레스(2026-10-09 이식): { dressCode: "M01".."A80" }. 신랑도 함께면 base64_2(두 번째 사진).
+    wedding,
   } = req.body || {};
 
   // 얼굴 참조 정규화 — 최대 5장(스펙 §1: 필수 3 + 선택 2), 형식 불량은 조용히 버린다.
@@ -1011,7 +1014,24 @@ async function handleGenerate(req, res, hold) {
   const st = studio ? resolveStudio(studio, { faceRefCount: faceRefList.length, hasOutfit }) : null;
   if (st?.error) return res.status(400).json({ error: st.error });
   const isStudio = !!st;
-  const prompt = isStudio ? st.instruction : resolvePrompt(conceptId, clientPrompt);
+  // 웨딩 드레스: 고른 그 드레스의 실제 컷(전면·후면)을 참조로 넣고 그대로 재현시킨다(조세핀 방식).
+  const dress = wedding && typeof wedding.dressCode === "string" ? findDress(wedding.dressCode) : null;
+  if (wedding && !dress) return res.status(400).json({ error: "드레스를 찾을 수 없어요." });
+  const isWedding = !!dress;
+  let weddingRefs = [];
+  let weddingInstruction = "";
+  if (isWedding) {
+    for (const a of ["front", "back"]) {
+      try {
+        const r = await fetch(dressImageURL(dress.code, a), { signal: AbortSignal.timeout(8000) });
+        if (r.ok) weddingRefs.push({ mimeType: r.headers.get("content-type") || "image/webp", base64: Buffer.from(await r.arrayBuffer()).toString("base64"), angle: a });
+      } catch (_) {}
+    }
+    if (!weddingRefs.length) return res.status(502).json({ busy: true, error: "드레스 이미지를 불러오지 못했어요. 잠시 후 다시 시도해 주세요. 크레딧은 차감되지 않았어요 🙂" });
+    weddingInstruction = buildPresetDressInstruction(dress, weddingRefs.map((r) => r.angle),
+      { noBouquet: dress.kind === "after", skinRetouch: true }, base64_2 && mimeType2 ? "couple" : "bride_solo");
+  }
+  const prompt = isStudio ? st.instruction : isWedding ? weddingInstruction : resolvePrompt(conceptId, clientPrompt);
   if (!mimeType || !base64 || !prompt) {
     return res
       .status(400)
@@ -1326,6 +1346,8 @@ async function handleGenerate(req, res, hold) {
   const isStrip = isFourcut && !!STRIP_GRID[Number(cutCount)];
   const conceptInstruction = isStudio
     ? st.instruction
+    : isWedding
+    ? weddingInstruction
     : isDressroom
     ? dressroomInstruction
     : isFourcut
@@ -1444,7 +1466,7 @@ async function handleGenerate(req, res, hold) {
   const wantsCloseup = /close[- ]?up|bust[- ]?up|head[- ]?shot|beauty (shot|portrait)|shoulders[- ]?up/i
     .test(prompt || "");
   const headTiltClause =
-    wantsCloseup && !isStudio && !isIdPhoto && !skipFacePrecheck && !isDressroom && !isFourcut && !isRestore
+    wantsCloseup && !isStudio && !isWedding && !isIdPhoto && !skipFacePrecheck && !isDressroom && !isFourcut && !isRestore
       ? (() => {
           const deg = (2 + Math.random() * 3).toFixed(1);
           const dir = Math.random() < 0.5 ? "left" : "right";
@@ -1504,6 +1526,8 @@ async function handleGenerate(req, res, hold) {
   // 브루클린 지시문은 사진 사실감·얼굴 참조 절까지 자체로 완결돼 있다 — 리미키미 포장을 씌우지 않는다.
   const instruction = isStudio
     ? st.instruction
+    : isWedding
+    ? weddingInstruction + faceClause
     : isSprite
     ? prompt + "\n\nSUBJECT DESCRIPTION: " + spriteDesc
     : (skipFacePrecheck ? conceptInstruction : PHOTOREALISM + conceptInstruction + SKIN_FINAL) + headTiltClause + faceClause;
@@ -1564,6 +1588,8 @@ async function handleGenerate(req, res, hold) {
           ...(hasSecond
             ? [{ inline_data: { mime_type: mimeType2, data: base64_2 } }]
             : []),
+          // 웨딩 드레스 컷(전면·후면) — 지시문의 "REMAINING reference photos"(얼굴 참조보다 앞)
+          ...(isWedding ? weddingRefs.map((r) => ({ inline_data: { mime_type: r.mimeType, data: r.base64 } })) : []),
           // 드레스룸: 의상 1~5장 — 서수(SECOND..SIXTH)가 이 순서를 가리킨다
           ...(isDressroom
             ? garmentList.map((g) => ({
