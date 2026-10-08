@@ -16,7 +16,7 @@ import { buildDressroom, expectedHem, checkHem } from "./_lib/dressroom.js";
 import { buildEditorialStrip } from "./_lib/fourcutEditorial.js";
 import { buildGlowStrip } from "./_lib/fourcutGlow.js";
 import { SPRITE_CONCEPT_IDS, describeForSprite } from "./_lib/sprite.js";
-import { checkIdentity, inspectImage } from "./_lib/qa.js";
+import { checkIdentity, inspectImage, checkScene } from "./_lib/qa.js";
 import { runRetouch } from "./_lib/retouch.js";
 // 컨셉 원본(프롬프트 포함). **서버가 프롬프트의 출처**여야 한다 — 아래 resolvePrompt 참고.
 import ALL_CONCEPTS from "./_data/concepts.json" with { type: "json" };
@@ -1466,12 +1466,22 @@ async function handleGenerate(req, res, hold) {
 
   // 생성 불량 검사(api/_lib/qa.js) 설정 — 몇 명·몇 칸·그림체인지에 따라 기준이 다르다.
   // 얼굴 동일인 검사 — 내 얼굴로 만드는 컨셉 1인만(매직 부스·그림체·커플·픽셀은 원래 얼굴이 바뀌거나 2인이라 제외)
-  const wantIdentity = !skipFacePrecheck && !hasSecond && !isFourcut && !SPRITE_CONCEPT_IDS.has(String(conceptId));
+  // 오너 지시(2026-10-08): 얼굴 동일인 검사는 **모든 생성**에 — 커플은 두 사람 각각, 인생네컷은 칸마다,
+  // 그림체(매직 부스·픽셀)는 인종·피부톤·성별·안경·머리색만 보는 완화판(qa.js identityPrompt).
+  const wantIdentity = true;
   const qaOpts = {
-    people: hasSecond ? 2 : 1,
+    people: hasSecond ? 2 : isRestore ? 0 : 1,
     panels: isFourcut && fourcutStyle && cutCount && Number(cutCount) > 1 ? Number(cutCount) : 1,
     art: !!skipFacePrecheck,
   };
+  const idOpts = {
+    art: !!skipFacePrecheck || SPRITE_CONCEPT_IDS.has(String(conceptId)),
+    panels: qaOpts.panels,
+    ref2Base64: hasSecond ? base64_2 : null, ref2Mime: hasSecond ? mimeType2 : null,
+  };
+  // 장면 검사(2026-10-08 "여러 장 만들면 배경을 이상하게 따온다") — 컨셉이 장소를 정하는 경로만.
+  // 원본 배경을 살리는 매직 부스·복원, 장면을 따로 고르는 드레스룸, 칸 구성이 다른 인생네컷·픽셀은 제외.
+  const wantScene = !skipFacePrecheck && !isRestore && !isDressroom && !isFourcut && !SPRITE_CONCEPT_IDS.has(String(conceptId));
   // 응답 본문은 뒤에서 다시 읽으므로 clone 으로 이미지 한 장만 꺼낸다.
   async function qaInline(r) {
     try {
@@ -1769,19 +1779,21 @@ async function handleGenerate(req, res, hold) {
       if (left() < 45000) return r;                   // 다시 뽑을 시간이 없다
       const inline = await qaInline(r);
       if (!inline) return r;
-      const [hemOk, qa, idt] = await Promise.all([
+      const [hemOk, qa, idt, scn] = await Promise.all([
         dressWantHem ? checkHem(inline.data, inline.mime, dressWantHem, apiKey).catch(() => null) : null,
         inspectImage({ base64: inline.data, mimeType: inline.mime, apiKey, ...qaOpts,
           timeoutMs: Math.max(5000, Math.min(20000, left() - 45000)) }),
-        wantIdentity ? checkIdentity({ refBase64: base64, refMime: mimeType, base64: inline.data, mimeType: inline.mime, apiKey,
+        wantIdentity ? checkIdentity({ refBase64: base64, refMime: mimeType, base64: inline.data, mimeType: inline.mime, apiKey, ...idOpts,
           timeoutMs: Math.max(5000, Math.min(15000, left() - 45000)) }) : { ok: null },
+        wantScene ? checkScene({ refBase64: base64, refMime: mimeType, base64: inline.data, mimeType: inline.mime, apiKey,
+          sceneText: instructionAt(shotIdx), timeoutMs: Math.max(5000, Math.min(15000, left() - 45000)) }) : { ok: null },
       ]);
       console.log(`[qa] ${qa.ok === false ? "불량" : qa.ok ? "통과" : "판단불가"} concept=${conceptId} shot=${shotIdx}${qa.issue ? ` "${qa.issue}"` : ""}` +
-        ` identity=${idt.ok === false ? "다른사람" : idt.ok ? "같음" : "-"}`);
-      if (hemOk !== false && qa.ok !== false && idt.ok !== false) return r;
+        ` identity=${idt.ok === false ? "다른사람" : idt.ok ? "같음" : "-"} scene=${scn.ok === false ? "불량" : scn.ok ? "통과" : "-"}${scn.issue ? ` "${scn.issue}"` : ""}`);
+      if (hemOk !== false && qa.ok !== false && idt.ok !== false && scn.ok !== false) return r;
       console.log(`[generate] 불량 → 재생성 shot=${shotIdx} concept=${conceptId}` +
         (hemOk === false ? ` 기장(기대 ${dressWantHem})` : "") + (qa.ok === false ? ` qa="${qa.issue}"` : "") +
-        (idt.ok === false ? ` identity="${idt.issue}"` : ""));
+        (idt.ok === false ? ` identity="${idt.issue}"` : "") + (scn.ok === false ? ` scene="${scn.issue}"` : ""));
       const again = await attemptShot(shotIdx);
       return (!isBusyFailure(again) && again?.upstream?.ok) ? again : r;
     }
@@ -1905,18 +1917,23 @@ async function handleGenerate(req, res, hold) {
   // 판단 불가·타임아웃·시간 부족이면 그대로 내보낸다 — 검사가 생성을 막으면 안 된다.
   if (result?.upstream?.ok && !isBusyFailure(result) && left() > 50000) {
     const inline = await qaInline(result);
-    const [qa0, idt] = inline
+    const [qa0, idt, scn] = inline
       ? await Promise.all([
           inspectImage({ base64: inline.data, mimeType: inline.mime, apiKey, ...qaOpts,
             timeoutMs: Math.max(5000, Math.min(20000, left() - 45000)) }),
-          wantIdentity ? checkIdentity({ refBase64: base64, refMime: mimeType, base64: inline.data, mimeType: inline.mime, apiKey,
+          wantIdentity ? checkIdentity({ refBase64: base64, refMime: mimeType, base64: inline.data, mimeType: inline.mime, apiKey, ...idOpts,
             timeoutMs: Math.max(5000, Math.min(15000, left() - 45000)) }) : { ok: null },
+          wantScene ? checkScene({ refBase64: base64, refMime: mimeType, base64: inline.data, mimeType: inline.mime, apiKey,
+            sceneText: instructionAt(0), timeoutMs: Math.max(5000, Math.min(15000, left() - 45000)) }) : { ok: null },
         ])
-      : [{ ok: null }, { ok: null }];
+      : [{ ok: null }, { ok: null }, { ok: null }];
     // 다른 사람이 나왔으면 불량과 같이 한 번 다시 뽑는다(2026-10-02 밴쿠버 다이너 서양인 얼굴)
-    const qa = idt.ok === false && qa0.ok !== false ? { ok: false, issue: `다른 사람: ${idt.issue}` } : qa0;
+    // 셀카 배경을 가져왔거나 장소가 컨셉과 딴판이어도 한 번 다시(2026-10-08)
+    const qa = qa0.ok === false ? qa0
+      : idt.ok === false ? { ok: false, issue: `다른 사람: ${idt.issue}` }
+      : scn.ok === false ? { ok: false, issue: `장면: ${scn.issue}` } : qa0;
     console.log(`[qa] ${qa0.ok === false ? "불량" : qa0.ok ? "통과" : "판단불가"} concept=${conceptId}${qa0.issue ? ` "${qa0.issue}"` : ""}` +
-      ` identity=${idt.ok === false ? "다른사람" : idt.ok ? "같음" : "-"}`);
+      ` identity=${idt.ok === false ? "다른사람" : idt.ok ? "같음" : "-"} scene=${scn.ok === false ? "불량" : scn.ok ? "통과" : "-"}`);
     if (qa.ok === false) {
       console.log(`[generate] 불량 → 재생성 concept=${conceptId} qa="${qa.issue}"`);
       let again = null;

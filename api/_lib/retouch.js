@@ -10,6 +10,7 @@
 //
 // 사진은 이 요청에서만 쓰고 여기서는 저장하지 않는다(갤러리 저장은 generate.js 가 다른 컨셉과 똑같이).
 // ============================================================
+import { inspectImage, checkIdentity } from "./qa.js";
 
 const PLAN_SCHEMA = {
   type: "OBJECT",
@@ -756,6 +757,22 @@ export async function checkAnatomy(apiKey, sharp, outJpeg) {
   return { ok: bad.length < 2, problem: bad[0] || "", votes: `${bad.length}/${votes.length}` };
 }
 
+// 오너 지시(2026-10-08): 모든 생성에 얼굴 동일인 + 물리법칙 + 기본 해부학을 똑같이.
+// 손 개수(checkAnatomy, 3표) 위에 공용 검사(qa.js: 팔·관절·얼굴·융합·물리 / 동일인)를 같이 돌린다.
+// 단체 사진도 받으므로 인원 규칙은 끈다(people: 0). 검사 실패·타임아웃은 막지 않는다(공용 규칙과 같다).
+async function verifyRetouch(apiKey, sharp, srcBuf, outJpeg) {
+  const src = srcBuf.toString("base64"), out = outJpeg.toString("base64");
+  const [an, qa, idt] = await Promise.all([
+    checkAnatomy(apiKey, sharp, outJpeg),
+    inspectImage({ base64: out, mimeType: "image/jpeg", apiKey, people: 0 }).catch(() => ({ ok: null })),
+    checkIdentity({ refBase64: src, refMime: "image/jpeg", base64: out, mimeType: "image/jpeg", apiKey }).catch(() => ({ ok: null })),
+  ]);
+  if (!an.ok) return an;
+  if (qa.ok === false) return { ok: false, problem: qa.issue || "generation defect", votes: "qa" };
+  if (idt.ok === false) return { ok: false, problem: `the person no longer looks like the same individual: ${idt.issue}`, votes: "identity" };
+  return an;
+}
+
 export async function runRetouch({ apiKey, sharp, srcBuf, text }) {
   const meta = await sharp(srcBuf).metadata();
   const w = meta.width, h = meta.height;
@@ -769,7 +786,7 @@ export async function runRetouch({ apiKey, sharp, srcBuf, text }) {
   let fix = "";
   const tried = [];
   for (let attempt = 0; attempt < 2; attempt++) {
-    const prompt = editPrompt(plan) + (fix ? `\nThe previous attempt had this anatomy error — do not repeat it: ${fix}` : "");
+    const prompt = editPrompt(plan) + (fix ? `\nThe previous attempt had this error — do not repeat it: ${fix}` : "");
     const editB64 = await editImage(apiKey, b64, nearestAspect(w, h), prompt);
     if (!editB64) return { error: "busy" };
     let E = await sharp(Buffer.from(editB64, "base64")).rotate().resize(w, h, { fit: "fill" }).removeAlpha().raw().toBuffer();
@@ -798,12 +815,12 @@ export async function runRetouch({ apiKey, sharp, srcBuf, text }) {
       whole = true;
     }
     let finalJpeg = await toJpeg(out);
-    let chk = await checkAnatomy(apiKey, sharp, finalJpeg);
+    let chk = await verifyRetouch(apiKey, sharp, srcBuf, finalJpeg);
     // 섞은 결과가 걸렸으면 AI 결과 통째(섞으면서 생긴 손·머리 중복이면 이걸로 풀린다)
     if (!chk.ok && !whole) {
       const g = compositeRetouch(O, E, w, h, plan.regions, plan.protect, "global", false, plan.textBoxes);
       const j2 = await toJpeg(g.out);
-      const c2 = await checkAnatomy(apiKey, sharp, j2);
+      const c2 = await verifyRetouch(apiKey, sharp, srcBuf, j2);
       if (c2.ok) ({ out, pasted, same, thr } = g), finalJpeg = j2, chk = c2;
     }
     console.log(`[retouch] anatomy try${attempt + 1} ${chk.ok ? "ok" : "FAIL: " + chk.problem}${chk.unchecked ? " (unchecked)" : " " + chk.votes}`);

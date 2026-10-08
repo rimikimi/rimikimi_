@@ -14,7 +14,9 @@
 const QA_MODEL = "gemini-3-flash-preview";
 
 function buildPrompt({ people, panels, art }) {
-  const who = panels > 1
+  const who = people === 0
+    ? "The photo may contain any number of people — do not judge how many there are."
+    : panels > 1
     ? `This is a photo strip with ${panels} panels; each panel should show ${people === 2 ? "the same two people" : "the same one person"}.`
     : people === 2
     ? "The image should contain exactly two people."
@@ -50,6 +52,13 @@ function buildPrompt({ people, panels, art }) {
         "(embroidery on fabric, a clay figure, a miniature model, a painting on a table) is the INTENDED look — the " +
         "fabric, table or room around the craft is fine; only flag when the SUBJECT itself is partly a real photo.\n"
       : "") +
+    // 오너 지시(2026-10-08): 모든 생성에 물리법칙도 같이 본다 — 명백한 것만.
+    "9. PHYSICS: an object clearly floating with nothing holding or supporting it (a cup or phone hovering in the air, " +
+    "a bag hanging from nothing); a person or object passing through a solid object (a hand inside a table, legs merged " +
+    "into a chair); liquid, hair or fabric clearly defying gravity with no wind or motion to explain it; a mirror or window " +
+    "reflection showing a different person, a different pose or a scene that does not match; a shadow falling in a clearly " +
+    "impossible direction compared with the other shadows. " +
+    (art ? "Cartoon and craft styles may bend physics on purpose — only flag what is clearly a mistake, not a stylistic choice.\n" : "\n") +
     "\nDo NOT flag: stylisation, unusual but physically possible poses (a raised leg, crossed arms), hands or feet " +
     "hidden or cropped by the frame, motion blur, shallow depth of field, " +
     "artistic exaggeration (chibi proportions are fine), makeup, accessories, or anything you are unsure about. " +
@@ -127,19 +136,51 @@ export async function inspectImage({ base64, mimeType, apiKey, people = 1, panel
 // 프롬프트로 확률을 0 으로 만들 수 없으니 결과를 원본과 비교해 다르면 한 번 다시 뽑는다.
 // 오탐은 재생성(시간·원가)만 늘리므로 두 번 물어 둘 다 "다른 사람"일 때만 false.
 // ============================================================
-function identityPrompt() {
+// 오너 지시(2026-10-08): 얼굴 동일인 검사는 모든 생성에 — 커플(2인)·인생네컷(여러 칸)·그림체도.
+// 그림체는 얼굴이 원래 단순해지므로 안정 특징(인종·피부톤·성별·안경·머리색/길이)만 본다(10/02 서양인 얼굴 사고가 인종 변경).
+const NO_PERSON = "If image 1 shows no person at all (an animal, object or scene), answer same_person true.\n";
+function identityPrompt({ art = false, panels = 1, pair = false } = {}) {
+  if (pair) {
+    return (
+      "Image 1 is person A's own photo. Image 2 is person B's own photo. Image 3 is an AI-generated picture that MUST show both of them" +
+      (panels > 1 ? ` in every one of its ${panels} panels` : "") + ".\n" +
+      "Decide whether person A AND person B are each recognisably present in image 3 (as the same individuals, not lookalikes of another ethnicity).\n" +
+      (art
+        ? "Image 3 is an illustration — judge only stable traits: ethnicity, skin tone, gender presentation, glasses, hair colour and length.\n"
+        : "Compare stable traits: ethnicity, eye shape, nose, lips, face shape, jaw, brows, skin undertone. IGNORE hair styling, makeup, outfit, lighting, angle, expression.\n") +
+      "If either person is missing, swapped for someone else, or merged into one face, they are NOT the same.\n" +
+      'Reply with JSON only: {"same_person": true|false, "ethnicity_changed": true|false, "reason": "short"}'
+    );
+  }
+  if (art) {
+    return (
+      "Image 1 is the customer's own photo. Image 2 is an ILLUSTRATION / artwork (cartoon, pixel, embroidery, clay, painting…) " +
+      "made from it" + (panels > 1 ? `, with ${panels} panels` : "") + ".\n" +
+      "Faces are simplified on purpose in artwork — do NOT compare detailed facial features.\n" +
+      "Judge only whether the main person in image 2 could still be this customer by stable traits: ethnicity, skin tone, " +
+      "gender presentation, glasses (present or not), hair colour and rough hair length.\n" +
+      "Only a clear change of ethnicity / skin tone / gender, or a clearly different person, means NOT the same. When in doubt, answer the same.\n" +
+      NO_PERSON +
+      'Reply with JSON only: {"same_person": true|false, "ethnicity_changed": true|false, "reason": "short"}'
+    );
+  }
   return (
-    "Image 1 is the customer's own photo. Image 2 is an AI-generated portrait that MUST show the same person.\n" +
+    "Image 1 is the customer's own photo. Image 2 is an AI-generated portrait that MUST show the same person" +
+    (panels > 1 ? ` in every one of its ${panels} panels — if ANY panel shows a different person, it is NOT the same` : "") + ".\n" +
     "Decide whether the main person in image 2 is recognisably the SAME individual as in image 1.\n" +
     "Compare stable traits only: ethnicity, eye shape and eyelids, nose, lips, face shape, jaw and cheekbones, brow shape, skin undertone.\n" +
     "IGNORE: hairstyle and hair colour, makeup, outfit, lighting, camera angle, expression, retouched skin, and a slightly different age look.\n" +
     "A different ethnicity, or a clearly different face that friends would not recognise as this person, means NOT the same.\n" +
+    NO_PERSON +
     'Reply with JSON only: {"same_person": true|false, "ethnicity_changed": true|false, "reason": "short"}'
   );
 }
-export async function checkIdentity({ refBase64, refMime, base64, mimeType, apiKey, timeoutMs = 15000 }) {
+export async function checkIdentity({ refBase64, refMime, base64, mimeType, apiKey, timeoutMs = 15000,
+  art = false, panels = 1, ref2Base64 = null, ref2Mime = null }) {
   if (!refBase64 || !base64 || !apiKey) return { ok: null };
-  const [ref, out] = await Promise.all([shrinkForQa(refBase64, refMime), shrinkForQa(base64, mimeType)]);
+  const pair = !!ref2Base64;
+  const [ref, out, ref2] = await Promise.all([shrinkForQa(refBase64, refMime), shrinkForQa(base64, mimeType),
+    pair ? shrinkForQa(ref2Base64, ref2Mime) : null]);
   const once = async () => {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), timeoutMs);
@@ -150,8 +191,9 @@ export async function checkIdentity({ refBase64, refMime, base64, mimeType, apiK
         body: JSON.stringify({
           contents: [{ role: "user", parts: [
             { inline_data: { mime_type: ref.mime, data: ref.data } },
+            ...(pair ? [{ inline_data: { mime_type: ref2.mime, data: ref2.data } }] : []),
             { inline_data: { mime_type: out.mime, data: out.data } },
-            { text: identityPrompt() },
+            { text: identityPrompt({ art, panels, pair }) },
           ] }],
           generationConfig: { responseMimeType: "application/json", temperature: 0, thinkingConfig: { thinkingLevel: "low" } },
         }),
@@ -167,4 +209,58 @@ export async function checkIdentity({ refBase64, refMime, base64, mimeType, apiK
   if (!votes.length) return { ok: null };
   const diff = votes.filter((v) => !v.same);
   return { ok: !(diff.length === votes.length), issue: diff[0]?.reason || "" };
+}
+
+// ============================================================
+// 장면(배경) 검사 (2026-10-08 오너 지시: "한 번에 여러 장 생성하면 배경을 이상하게 따오는 경우 — 그런 일도 없어야 함").
+// 컨셉이 정한 장소 대신 손님 셀카의 방·배경을 그대로 가져오거나, 장소가 컨셉과 딴판인 경우만 잡는다.
+// 원본 배경을 일부러 살리는 경로(매직 부스·말로 고치기·복원·드레스룸 장면 치환)는 호출측에서 부르지 않는다.
+// 오탐이 더 나쁘다 — 두 번 물어 둘 다 불량일 때만 false.
+// ============================================================
+function scenePrompt(sceneText) {
+  return (
+    "Image 1 is the customer's own selfie (used ONLY for their face). Image 2 is an AI-generated photo that should be set in the scene described below.\n" +
+    "REQUESTED SCENE / CONCEPT (excerpt):\n" + sceneText + "\n\n" +
+    "Flag a problem ONLY in these two clear cases:\n" +
+    "1. COPIED BACKGROUND: image 2's background is visibly the same room / wall / backdrop / place as the selfie in image 1 " +
+    "(same furniture, same wall, same window, same street) instead of the requested scene.\n" +
+    "2. WRONG PLACE: the kind of place in image 2 clearly contradicts the requested scene (e.g. a bedroom when a beach was requested, " +
+    "an outdoor street when a studio backdrop was requested).\n" +
+    "Do NOT flag: a different but plausible interpretation of the scene, plain studio backdrops when the concept asks for a studio, " +
+    "lighting or colour differences, small props, or anything you are unsure about. When in doubt, answer no problem.\n" +
+    'Reply with JSON only: {"copied_background": true|false, "wrong_place": true|false, "reason": "short"}'
+  );
+}
+export async function checkScene({ refBase64, refMime, base64, mimeType, sceneText, apiKey, timeoutMs = 15000 }) {
+  if (!refBase64 || !base64 || !apiKey || !sceneText) return { ok: null };
+  const [ref, out] = await Promise.all([shrinkForQa(refBase64, refMime), shrinkForQa(base64, mimeType)]);
+  const text = scenePrompt(String(sceneText).slice(0, 1800));
+  const once = async () => {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${QA_MODEL}:generateContent`, {
+        method: "POST", signal: ctrl.signal,
+        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [
+            { inline_data: { mime_type: ref.mime, data: ref.data } },
+            { inline_data: { mime_type: out.mime, data: out.data } },
+            { text },
+          ] }],
+          generationConfig: { responseMimeType: "application/json", temperature: 0, thinkingConfig: { thinkingLevel: "low" } },
+        }),
+      });
+      if (!r.ok) return null;
+      const j = await r.json();
+      const v = JSON.parse((j?.candidates?.[0]?.content?.parts || []).map((p) => p.text || "").join(""));
+      if (typeof v?.copied_background !== "boolean") return null;
+      return { bad: v.copied_background === true || v.wrong_place === true,
+        reason: (v.copied_background ? "셀카 배경을 가져옴: " : v.wrong_place ? "장소가 컨셉과 다름: " : "") + String(v.reason || "").slice(0, 140) };
+    } catch (_) { return null; } finally { clearTimeout(t); }
+  };
+  const votes = (await Promise.all([once(), once()])).filter(Boolean);
+  if (!votes.length) return { ok: null };
+  const bad = votes.filter((v) => v.bad);
+  return { ok: !(bad.length === votes.length), issue: bad[0]?.reason || "" };
 }
