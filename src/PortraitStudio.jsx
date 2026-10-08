@@ -2900,6 +2900,8 @@ export default function PortraitStudio() {
             <a href={`${LEGAL_BASE}/privacy`} target="_blank" rel="noopener noreferrer" style={S.footerLink}>{t("footer.privacy")}</a>
             <span style={S.footerDot}>·</span>
             <a href={`${LEGAL_BASE}/refund`} target="_blank" rel="noopener noreferrer" style={S.footerLink}>{t("footer.refund")}</a>
+            <a href={getLang() === "en" ? "https://apps.rimikimi.com/apps/rimikimi.html" : "https://apps.rimikimi.com/ko/apps/rimikimi.html"} style={S.footerLink}>{t("footer.hubApp")}</a>
+            <a href={getLang() === "en" ? "https://apps.rimikimi.com/apps/" : "https://apps.rimikimi.com/ko/apps/"} style={S.footerLink}>{t("footer.hubAll")}</a>
           </div>
           {IS_KOREA && (
             <div style={S.footerBiz}>

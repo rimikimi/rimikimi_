@@ -281,6 +281,8 @@ export function DesktopFooter({ isKorea }) {
         <a className="dkLink" style={F.a} href="/terms" target="_blank" rel="noopener noreferrer">{t("footer.terms")}</a>
         <a className="dkLink" style={F.a} href="/privacy" target="_blank" rel="noopener noreferrer">{t("footer.privacy")}</a>
         <a className="dkLink" style={F.a} href="/refund" target="_blank" rel="noopener noreferrer">{t("footer.refund")}</a>
+        <a className="dkLink" style={F.a} href={getLang() === "en" ? "https://apps.rimikimi.com/apps/rimikimi.html" : "https://apps.rimikimi.com/ko/apps/rimikimi.html"}>{t("footer.hubApp")}</a>
+        <a className="dkLink" style={F.a} href={getLang() === "en" ? "https://apps.rimikimi.com/apps/" : "https://apps.rimikimi.com/ko/apps/"}>{t("footer.hubAll")}</a>
       </div>
     </footer>
   );
