@@ -16,6 +16,7 @@ const BODY = `<main style="max-width:640px;margin:0 auto;padding:24px 16px;font-
           <li>Available on iOS, Android and the web.</li>
         </ul>
         <p>Browse concepts: <a href="/en/c/studio">AI headshots</a> · <a href="/en/c/id-photo">ID photos</a> · <a href="/en/c/fourcut">Photo-booth strips</a> · <a href="/en/c/couple">Couple photos</a> · <a href="/en/c/wedding">Wedding</a> · <a href="/en/c/travel">Travel</a> · <a href="/en/c/art">Art</a> · <a href="/?lang=ko">한국어</a></p>
+        <p><a href="https://apps.rimikimi.com/apps/rimikimi.html">About this app</a> · <a href="https://apps.rimikimi.com/apps/">More apps by rimikimi studios</a></p>
       </main>`;
 
 export default function enIndex() {

@@ -287,7 +287,7 @@ ${faq.map(([q, a]) => `<div class="q">${esc(q)}</div><p>${esc(a)}</p>`).join("\n
   `<a class="chip" href="/c/${x.slug}">${esc(x.cat)}</a>`).join("")}</div>
 
 <footer>
-<a href="/">앱 사용하기</a><a href="/download">다운로드</a><a href="/privacy">개인정보처리방침</a><a href="/terms">이용약관</a><a href="/refund">환불정책</a>
+<a href="/">앱 사용하기</a><a href="/download">다운로드</a><a href="/privacy">개인정보처리방침</a><a href="/terms">이용약관</a><a href="/refund">환불정책</a><a href="https://apps.rimikimi.com/ko/apps/rimikimi.html">이 앱 소개</a><a href="https://apps.rimikimi.com/ko/apps/">rimikimi studios 다른 앱</a>
 <p>이 페이지에서 설명하는 결과물은 AI가 만든 이미지입니다. 실제로 촬영한 사진이 아닙니다.</p>
 </footer>
 </div>
