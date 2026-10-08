@@ -107,7 +107,7 @@ const DOC_META = {
     locale: "en_US",
   },
 };
-const BASE_URL = "https://rimikimi-app.vercel.app/";
+const BASE_URL = "https://app.rimikimi.com/";
 
 function setMeta(sel, attr, value) {
   try {

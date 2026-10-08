@@ -8,16 +8,16 @@
     />
     <title>rimikimi — 내 얼굴로 만드는 AI 인생 프로필</title>
     <meta name="description" content="셀카 한 장으로 만드는 AI 인생 프로필 앱 rimikimi. 증명사진, 이력서용 프로필 사진부터 카페·웨딩·스튜디오 컨셉의 화보풍 셀카 화보까지 내 얼굴로 몇 분 만에 완성해 원하는 배경과 스타일을 골라 바로 다운로드하세요." />
-    <link rel="canonical" href="https://rimikimi-app.vercel.app/" />
+    <link rel="canonical" href="https://app.rimikimi.com/" />
     <!-- 한/영 두 벌인데 hreflang 이 하나도 없었다 (2026-09-18 감사).
          언어 전환이 ?lang= 쿼리로만 되고 서버 응답엔 흔적이 없어서,
          ?lang=en 으로 들어온 영어권 사용자에게도 한국어 메타가 노출됐다.
          ⚠️ 검색엔진이 각 언어판을 크롤하려면 **각 변형이 자기 자신을 canonical**로
             가리켜야 한다 — src/i18n.js 가 렌더 언어에 맞춰 canonical·title·
             description·og:locale·html[lang] 을 함께 갈아끼운다. -->
-    <link rel="alternate" hreflang="ko" href="https://rimikimi-app.vercel.app/?lang=ko" />
-    <link rel="alternate" hreflang="en" href="https://rimikimi-app.vercel.app/?lang=en" />
-    <link rel="alternate" hreflang="x-default" href="https://rimikimi-app.vercel.app/" />
+    <link rel="alternate" hreflang="ko" href="https://app.rimikimi.com/?lang=ko" />
+    <link rel="alternate" hreflang="en" href="https://app.rimikimi.com/?lang=en" />
+    <link rel="alternate" hreflang="x-default" href="https://app.rimikimi.com/" />
     <meta name="robots" content="index, follow" />
 
     <!-- 폰트 — 예전엔 런타임 주입 <style> 맨 위의 @import 였다. @import 는 그 스타일시트
@@ -78,8 +78,8 @@
     <meta property="og:site_name" content="rimikimi studios" />
     <meta property="og:title" content="rimikimi — 내 얼굴로 만드는 AI 인생 프로필" />
     <meta property="og:description" content="내 얼굴로 인생 프로필 만들기 ✨" />
-    <meta property="og:url" content="https://rimikimi-app.vercel.app/" />
-    <meta property="og:image" content="https://rimikimi-app.vercel.app/og.png" />
+    <meta property="og:url" content="https://app.rimikimi.com/" />
+    <meta property="og:image" content="https://app.rimikimi.com/og.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:locale" content="ko_KR" />
@@ -88,7 +88,7 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="rimikimi — 내 얼굴로 만드는 AI 인생 프로필" />
     <meta name="twitter:description" content="내 얼굴로 인생 프로필 만들기 ✨" />
-    <meta name="twitter:image" content="https://rimikimi-app.vercel.app/og.png" />
+    <meta name="twitter:image" content="https://app.rimikimi.com/og.png" />
 
     <!-- JSON-LD -->
     <script type="application/ld+json">
@@ -110,15 +110,15 @@
     },
     {
       "@type": "WebSite",
-      "@id": "https://rimikimi-app.vercel.app/#site",
-      "url": "https://rimikimi-app.vercel.app/",
+      "@id": "https://app.rimikimi.com/#site",
+      "url": "https://app.rimikimi.com/",
       "name": "rimikimi",
       "inLanguage": ["ko-KR", "en"],
       "publisher": { "@id": "https://rimikimi.com/#org" }
     },
     {
       "@type": "MobileApplication",
-      "@id": "https://rimikimi-app.vercel.app/#app",
+      "@id": "https://app.rimikimi.com/#app",
       "name": "rimikimi",
       "alternateName": "리미키미",
       "operatingSystem": "iOS, Android",
@@ -126,7 +126,7 @@
       "applicationSubCategory": "Photo & Video",
       "description": "셀카 한 장으로 만드는 AI 사진관. 증명사진·프로필 사진부터 인생네컷·커플 화보까지 464가지 컨셉으로 만듭니다.",
       "inLanguage": ["ko-KR", "en"],
-      "url": "https://rimikimi-app.vercel.app/",
+      "url": "https://app.rimikimi.com/",
       "downloadUrl": [
         "https://apps.apple.com/kr/app/id6782776518",
         "https://play.google.com/store/apps/details?id=com.rimikimi.app"
@@ -149,7 +149,7 @@
         "464가지 컨셉, 매일 저녁 8시 신규 공개"
       ],
       "publisher": { "@id": "https://rimikimi.com/#org" },
-      "isPartOf": { "@id": "https://rimikimi-app.vercel.app/#site" }
+      "isPartOf": { "@id": "https://app.rimikimi.com/#site" }
     }
   ]
 }

@@ -29,10 +29,10 @@ export default function enIndex() {
       rep(/<html lang="ko">/, '<html lang="en">');
       rep(/<title>[^<]*<\/title>/, `<title>${T}</title>`);
       rep(/(<meta name="description" content=")[^"]*"/, `$1${D}"`);
-      rep(/(<link rel="canonical" href=")[^"]*"/, '$1https://rimikimi-app.vercel.app/?lang=en"');
+      rep(/(<link rel="canonical" href=")[^"]*"/, '$1https://app.rimikimi.com/?lang=en"');
       rep(/(<meta property="og:title" content=")[^"]*"/, `$1${T}"`);
       rep(/(<meta property="og:description" content=")[^"]*"/, `$1${OGD}"`);
-      rep(/(<meta property="og:url" content=")[^"]*"/, '$1https://rimikimi-app.vercel.app/?lang=en"');
+      rep(/(<meta property="og:url" content=")[^"]*"/, '$1https://app.rimikimi.com/?lang=en"');
       rep(/(<meta property="og:locale" content=")[^"]*"/, '$1en_US"');
       rep(/(<meta name="twitter:title" content=")[^"]*"/, `$1${T}"`);
       rep(/(<meta name="twitter:description" content=")[^"]*"/, `$1${OGD}"`);

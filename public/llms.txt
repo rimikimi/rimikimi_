@@ -28,12 +28,12 @@ keeping the person's face recognizable while changing only styling and setting.
 
 ## 문서 / Pages
 
-- [앱 사용하기 (웹)](https://rimikimi-app.vercel.app/): 컨셉 고르고 바로 생성
-- [앱 다운로드](https://rimikimi-app.vercel.app/download): iOS · Android
-- [개인정보처리방침](https://rimikimi-app.vercel.app/privacy): 사진 보관·삭제, 국외이전, 수탁사
-- [이용약관](https://rimikimi-app.vercel.app/terms)
-- [환불정책](https://rimikimi-app.vercel.app/refund): 7일 이내 미사용분 환불, 인앱결제 안내
-- [계정 삭제](https://rimikimi-app.vercel.app/delete-account)
+- [앱 사용하기 (웹)](https://app.rimikimi.com/): 컨셉 고르고 바로 생성
+- [앱 다운로드](https://app.rimikimi.com/download): iOS · Android
+- [개인정보처리방침](https://app.rimikimi.com/privacy): 사진 보관·삭제, 국외이전, 수탁사
+- [이용약관](https://app.rimikimi.com/terms)
+- [환불정책](https://app.rimikimi.com/refund): 7일 이내 미사용분 환불, 인앱결제 안내
+- [계정 삭제](https://app.rimikimi.com/delete-account)
 
 ## 스토어 / Stores
 
@@ -47,18 +47,18 @@ facts as the Korean pages (464 concepts, free 1 photo/day after signup, credits 
 generated photos auto-deleted after 24 hours, results are AI-generated images, not real
 photos). Each page links back to its Korean original via hreflang.
 
-- [Studio Headshots](https://rimikimi-app.vercel.app/en/c/studio): AI studio-style headshots from one selfie, 66 concepts.
-- [ID Photo](https://rimikimi-app.vercel.app/en/c/id-photo): AI ID-style photo for resumes/documents — not recommended for passports or visas.
-- [Photo Booth Strip](https://rimikimi-app.vercel.app/en/c/fourcut): AI version of a Korean 4-cut photo-booth strip (2–8 frames), 9 concepts.
-- [Couple](https://rimikimi-app.vercel.app/en/c/couple): AI couple photos from two separate selfies, 101 concepts.
-- [Wedding / Bridal](https://rimikimi-app.vercel.app/en/c/wedding): Preview wedding dress/tuxedo looks with AI, 81 concepts.
-- [Men](https://rimikimi-app.vercel.app/en/c/men): AI headshot concepts for men, 97 concepts.
-- [Everyday Snap](https://rimikimi-app.vercel.app/en/c/daily): Casual, natural-looking AI photos for everyday settings, 159 concepts.
-- [High Fashion / Editorial](https://rimikimi-app.vercel.app/en/c/fashion): Magazine-style AI editorial photos, 133 concepts.
-- [World Travel](https://rimikimi-app.vercel.app/en/c/travel): AI photos with the mood of cities worldwide, without traveling, 106 concepts.
-- [Art / Classic](https://rimikimi-app.vercel.app/en/c/art): Turn a photo into an oil/watercolor/pencil-style portrait, 66 concepts.
-- [Fantasy / Costume](https://rimikimi-app.vercel.app/en/c/fantasy): Non-realistic costume and character-style AI concepts, 45 concepts.
-- [Beach / Resort](https://rimikimi-app.vercel.app/en/c/beach): Bright beach and resort AI photo concepts, 45 concepts.
-- [Street Fashion](https://rimikimi-app.vercel.app/en/c/street): Urban street-style AI fashion photos, 37 concepts.
-- [Party / Event](https://rimikimi-app.vercel.app/en/c/party): Birthday, holiday, and celebration-mood AI photos, 31 concepts.
-- [Magic Booth](https://rimikimi-app.vercel.app/en/c/magic): AI photo restoration and virtual try-on (Dressing Room) tools, 21 concepts.
+- [Studio Headshots](https://app.rimikimi.com/en/c/studio): AI studio-style headshots from one selfie, 66 concepts.
+- [ID Photo](https://app.rimikimi.com/en/c/id-photo): AI ID-style photo for resumes/documents — not recommended for passports or visas.
+- [Photo Booth Strip](https://app.rimikimi.com/en/c/fourcut): AI version of a Korean 4-cut photo-booth strip (2–8 frames), 9 concepts.
+- [Couple](https://app.rimikimi.com/en/c/couple): AI couple photos from two separate selfies, 101 concepts.
+- [Wedding / Bridal](https://app.rimikimi.com/en/c/wedding): Preview wedding dress/tuxedo looks with AI, 81 concepts.
+- [Men](https://app.rimikimi.com/en/c/men): AI headshot concepts for men, 97 concepts.
+- [Everyday Snap](https://app.rimikimi.com/en/c/daily): Casual, natural-looking AI photos for everyday settings, 159 concepts.
+- [High Fashion / Editorial](https://app.rimikimi.com/en/c/fashion): Magazine-style AI editorial photos, 133 concepts.
+- [World Travel](https://app.rimikimi.com/en/c/travel): AI photos with the mood of cities worldwide, without traveling, 106 concepts.
+- [Art / Classic](https://app.rimikimi.com/en/c/art): Turn a photo into an oil/watercolor/pencil-style portrait, 66 concepts.
+- [Fantasy / Costume](https://app.rimikimi.com/en/c/fantasy): Non-realistic costume and character-style AI concepts, 45 concepts.
+- [Beach / Resort](https://app.rimikimi.com/en/c/beach): Bright beach and resort AI photo concepts, 45 concepts.
+- [Street Fashion](https://app.rimikimi.com/en/c/street): Urban street-style AI fashion photos, 37 concepts.
+- [Party / Event](https://app.rimikimi.com/en/c/party): Birthday, holiday, and celebration-mood AI photos, 31 concepts.
+- [Magic Booth](https://app.rimikimi.com/en/c/magic): AI photo restoration and virtual try-on (Dressing Room) tools, 21 concepts.

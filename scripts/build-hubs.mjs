@@ -22,7 +22,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const SITE = "https://rimikimi-app.vercel.app";
+const SITE = "https://app.rimikimi.com";
 const ALL = JSON.parse(readFileSync(join(ROOT, "api/_data/concepts.json"), "utf8"));
 
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
