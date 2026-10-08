@@ -8,7 +8,7 @@
 // 5. 결과 + 갱신된 quota 반환
 // ============================================================
 
-import { getAuthedUser, countTodayUsage, FREE_DAILY, dailyLimitFor, isUnlimited, isTester, holdFreeUsage, releaseFreeUsage } from "./_lib/auth.js";
+import { makeAdmin, getAuthedUser, countTodayUsage, FREE_DAILY, dailyLimitFor, isUnlimited, isTester, holdFreeUsage, releaseFreeUsage } from "./_lib/auth.js";
 import { precheckHasFace, samePerson } from "./_lib/precheck.js";
 import { getCreditInfo, consumeCredit, consumeCredits, refundCredits, getProSampleUsed, markProSampleUsed } from "./_lib/credits.js";
 import { saveToGallery } from "./_lib/gallery.js";
@@ -19,6 +19,7 @@ import { SPRITE_CONCEPT_IDS, describeForSprite } from "./_lib/sprite.js";
 import { checkIdentity, inspectImage, checkScene } from "./_lib/qa.js";
 import { runRetouch } from "./_lib/retouch.js";
 import { resolveStudio } from "./_lib/studio.js";
+import { claimGuest } from "./_lib/guestFirst.js";
 import { findDress, dressImageURL, buildPresetDressInstruction } from "./_lib/wedding.js";
 // 컨셉 원본(프롬프트 포함). **서버가 프롬프트의 출처**여야 한다 — 아래 resolvePrompt 참고.
 import ALL_CONCEPTS from "./_data/concepts.json" with { type: "json" };
@@ -431,12 +432,34 @@ async function handleGenerate(req, res, hold) {
 
   // 1) 사용자 인증
   const auth = await getAuthedUser(req);
+  // 게스트 첫 1장(2026-10-09): 로그인 안 했으면 기기당 1회만 — 미리보기 2장을 만들어 고르게 한다.
+  //   ⚠️ 생성 전용. 얼굴 앵커·채워 맞춤·말로 고치기·세부 조정·옷 사진은 로그인해야 한다.
+  let guestClaim = null;
   if (auth.error) {
-    return res.status(auth.status).json({ error: auth.error });
+    const g = req.body && req.body.guest;
+    const b0 = req.body || {};
+    if (!g) return res.status(auth.status).json({ error: auth.error });
+    const hasOptions = (b0.studio && b0.studio.overrides && Object.keys(b0.studio.overrides).length) || b0.outfitBase64;
+    if (b0.faceAnchor || b0.fit || b0.retouchText || b0.proSample || hasOptions) {
+      return res.status(403).json({ error: "로그인하면 쓸 수 있어요.", needLogin: true });
+    }
+    guestClaim = await claimGuest(req, makeAdmin(), g);
+    if (!guestClaim.ok) return res.status(guestClaim.status).json(guestClaim.body);
   }
-  const { user, admin } = auth;
-  const unlimited = isUnlimited(user);
-  const dailyLimit = dailyLimitFor(user); // 테스터 3 / 일반 2(9/30 전 가입)·1(그 뒤 가입)
+  const isGuest = !!guestClaim;
+  // 게스트가 오류로 끝나면(얼굴 없음·혼잡 등) 첫 1장 기회를 되돌린다 — 어떤 오류 경로든 빠짐없이.
+  if (isGuest) {
+    const json0 = res.json.bind(res);
+    let released = false;
+    res.json = (body) => {
+      if (res.statusCode >= 400 && !released) { released = true; guestClaim.release(); }
+      return json0(body);
+    };
+  }
+  const user = isGuest ? null : auth.user;
+  const admin = isGuest ? makeAdmin() : auth.admin;
+  const unlimited = isGuest ? false : isUnlimited(user);
+  const dailyLimit = isGuest ? 0 : dailyLimitFor(user); // 테스터 3 / 일반 2(9/30 전 가입)·1(그 뒤 가입)
 
   // ── 페이스 프로필 품질 게이트 2차(서버) ──────────────────────────────
   // face-profile-v1.md §1: "품질 게이트(클라 1차 + 서버 2차) … 미달 컷은 그 자리에서
@@ -910,7 +933,7 @@ async function handleGenerate(req, res, hold) {
   let useCredit = false;
   let creditsLeft = 0;
   let freeProSample = false;
-  if (!unlimited) {
+  if (!unlimited && !isGuest) {
     usage = await countTodayUsage(admin, user.id);
     if (usage.error) {
       return res.status(500).json({ error: "사용 기록 조회 실패: " + usage.error });
@@ -1006,8 +1029,8 @@ async function handleGenerate(req, res, hold) {
     .filter((r) => r && typeof r.base64 === "string" && /^image\//.test(r.mimeType || ""))
     .slice(0, FACE_REF_MAX);
 
-  const batchCount = BATCH_COST[Number(count)] ? Number(count) : 1;
-  const batchCost = BATCH_COST[batchCount];
+  const batchCount = isGuest ? 2 : BATCH_COST[Number(count)] ? Number(count) : 1;
+  const batchCost = isGuest ? 0 : BATCH_COST[batchCount];
   // ⚠️ prompt 는 **서버가 정한 값**을 쓴다. 앱이 보낸 건 컨셉을 못 찾을 때만 쓴다.
   //    (아래 로직 전체가 `prompt` 변수를 보므로 여기서 한 번만 정한다)
   const hasOutfit = !!studio && typeof outfitBase64 === "string" && !!outfitBase64 && /^image\//.test(outfitMime || "");
@@ -1771,12 +1794,12 @@ async function handleGenerate(req, res, hold) {
     //    분기 안에서만 true 가 되기 때문 — "무료 한도를 다 썼는가" 를 "크레딧을 쓸 수
     //    있는가" 의 대리 지표로 쓴 게 원인이다. 묶음은 애초에 크레딧 전용이므로
     //    무료 한도와 무관하게 **잔액을 직접 보고** 판단한다.
-    if (!unlimited && !useCredit) {
+    if (!unlimited && !isGuest && !useCredit) {
       const credit = await getCreditInfo(admin, user.id);
       creditsLeft = credit.error ? 0 : credit.creditsAvailable;
       if (creditsLeft >= batchCost) useCredit = true;
     }
-    if (!unlimited && (!useCredit || creditsLeft < batchCost)) {
+    if (!unlimited && !isGuest && (!useCredit || creditsLeft < batchCost)) {
       return res.status(402).json({
         error: `${batchCount}장 만들기는 크레딧이 필요해요.\n크레딧을 충전하면 한 번에 여러 장을 만들 수 있어요.`,
         credits: creditsLeft,
@@ -1785,7 +1808,7 @@ async function handleGenerate(req, res, hold) {
     }
     // ⚠️ 비싼 생성 호출 전에 원자적으로 예약한다. 나중에 차감하면 동시 요청이
     //    같은 잔액을 두 번 쓰는 레이스가 생긴다. 실패분은 아래에서 환불.
-    if (!unlimited) {
+    if (!unlimited && !isGuest) {
       const reserved = await consumeCredits(admin, user.id, batchCost);
       if (!reserved) {
         return res.status(429).json({
@@ -1873,7 +1896,8 @@ async function handleGenerate(req, res, hold) {
       }
       const small = await shrinkOutput(rawOut, rawMime);
       let gId = null, gExp = null;
-      try {
+      // 게스트는 계정 갤러리가 없다 — 사진은 응답으로만 가고, 앱이 "받기"(로그인) 뒤 앨범에 저장한다.
+      if (!isGuest) try {
         const saved = await saveToGallery(admin, user, {
           conceptId: conceptId || 0, conceptTitle: conceptTitle || null,
           base64: rawOut, mimeType: rawMime,
@@ -1887,7 +1911,7 @@ async function handleGenerate(req, res, hold) {
     }
 
     // 부분 실패 환불 — 만들어진 만큼만 받는다.
-    if (!unlimited && images.length < batchCount) {
+    if (!unlimited && !isGuest && images.length < batchCount) {
       const refundUnits = images.length === 0
         ? batchCost
         : batchCost - Math.ceil((batchCost * images.length) / batchCount);
@@ -1899,12 +1923,13 @@ async function handleGenerate(req, res, hold) {
     console.log(`[generate] batch ${batchCount}장 요청 → 성공 ${images.length} | cost=${batchCost}`);
 
     if (images.length === 0) {
+      if (isGuest) await guestClaim.release();   // 하나도 못 만들었으면 첫 1장 기회를 되돌린다
       return res.status(503).json({
         error: "지금 이미지 서버가 많이 붐비고 있어요.\n1~2분 뒤에 다시 시도해 주세요.\n크레딧은 차감되지 않았어요 🙂",
         busy: true, credits: creditsLeft,
       });
     }
-    if (images.length > 0) {
+    if (images.length > 0 && !isGuest) {
       admin.from("usage_log").insert({ user_id: user.id }).then(() => {}).catch(() => {});
     }
     await notifyDone(pushToken, images.length, conceptTitle, images[0]?.galleryId, lang, conceptId);
