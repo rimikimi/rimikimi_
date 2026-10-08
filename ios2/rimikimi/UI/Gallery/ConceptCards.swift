@@ -169,16 +169,12 @@ struct GeneratedScrim: View {
 /// "앨범" 탭 참고, 오너 지시 2026-09-19).
 struct AlbumsGrid: View {
     var tiles: [ConceptStore.AlbumTile]
-    private let columns = [GridItem(.flexible(), spacing: CardMetrics.railGap), GridItem(.flexible(), spacing: CardMetrics.railGap)]
+    // 2026-10-09: 3열(오너 지시 "3열로 보여줘"), 머리글 없음("이런 건 빼").
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: Spacing.s2), count: 3)
 
     var body: some View {
         if !tiles.isEmpty {
             VStack(alignment: .leading, spacing: 0) {
-                Text(Copy.categoriesHeader).font(AppFont.sectionTitle).tracking(Tracking.sectionTitle)
-                    .padding(.horizontal, Spacing.page)
-                    .padding(.top, Spacing.s1)
-                    .padding(.bottom, Spacing.s3 - 2)
-                    .accessibilityAddTraits(.isHeader)
                 LazyVGrid(columns: columns, spacing: Spacing.s4) {
                     ForEach(tiles) { AlbumGridTile(tile: $0) }
                 }
@@ -277,15 +273,29 @@ struct DensePhotoGrid: View {
                 //    막는다 — 아래 `guard` 는 손을 뗀 시점에 돈다.
                 Button {
                     guard !pinching else { return }
-                    app.pushRoute(.browse(category: category, startID: c.id))
+                    // 2026-10-09 개편: 셀카 한 장으로 되는 컨셉은 눌러서 담는다(여러 장 한 번에, 최대 8).
+                    // 상대 사진·옷 사진·컷 수가 필요한 컨셉은 지금처럼 크게 보기 → 옵션 화면.
+                    if c.isBatchable { withAnimation(Motion.easeOut(0.18)) { _ = app.toggleCart(c) } }
+                    else { app.pushRoute(.browse(category: category, startID: c.id)) }
                 } label: {
                     // ⚠️ 미리보기는 무조건 3:4 (오너 지시 2026-09-22). 정방형이면 인물이 잘린다.
                     RemoteImage(url: c.thumbURL, cornerRadius: 0)
                         .photoRatio()
                         .overlay { if app.favorites.hasGenerated(c.id) { GeneratedScrim() } }
-                        .overlay(alignment: .topTrailing) {
+                        .overlay(alignment: .topLeading) {
                             if app.favorites.isFavorite(concept: c.id) {
                                 FavoriteBadge(size: n == 5 ? 16 : 20).padding(4)
+                            }
+                        }
+                        .overlay {
+                            if let i = app.cartIndex(c) {
+                                RoundedRectangle(cornerRadius: n == 5 ? 6 : Radius.thumb, style: .continuous)
+                                    .strokeBorder(Color.accent, lineWidth: 3)
+                                    .overlay(alignment: .topTrailing) {
+                                        Text("\(i + 1)").font(.system(size: n == 5 ? 10 : 12, weight: .bold)).foregroundStyle(.white)
+                                            .frame(minWidth: n == 5 ? 18 : 22, minHeight: n == 5 ? 18 : 22)
+                                            .background(Color.accent, in: Capsule()).padding(n == 5 ? 3 : 6)
+                                    }
                             }
                         }
                         // 썸네일은 전부 둥글게(오너 지시 2026-09-22 "다 라운드 적용 해").
@@ -294,6 +304,13 @@ struct DensePhotoGrid: View {
                                                     style: .continuous))
                 }
                 .buttonStyle(.plain)
+                .contextMenu {
+                    Button { app.pushRoute(.browse(category: category, startID: c.id)) } label: { Label(Copy.viewLarge, systemImage: "arrow.up.left.and.arrow.down.right") }
+                    Button { app.favorites.toggle(concept: c.id) } label: {
+                        Label(app.favorites.isFavorite(concept: c.id) ? Copy.favoriteRemove : Copy.favoriteAdd,
+                              systemImage: app.favorites.isFavorite(concept: c.id) ? "star.slash" : "star")
+                    }
+                }
             }
         }
     }

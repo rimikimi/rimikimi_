@@ -15,6 +15,10 @@ enum Route: Hashable {
     case result(ResultPayload)
     case store
     case invite
+    /// 설정(예전 프로필 탭) — 탭이 3개(만들기·카메라필터·내 사진)로 줄면서 홈 오른쪽 위 ⚙︎ 로 들어간다.
+    case settings
+    /// 홈 목적 칸(이력서·프로필 / 프사·소개팅 / 웨딩·커플 / 컨셉화보).
+    case purpose(String)
 
     /// 이 화면이 탭바를 그대로 두는지(`.toolbar(.hidden, for: .tabBar)` 를 안 쓰는지).
     /// 떠 있는 카메라 원을 그릴지 판단하는 유일한 기준 — 탭바가 보이는데 카메라 원만 사라지면
@@ -22,8 +26,8 @@ enum Route: Hashable {
     /// 반대로 탭바를 숨기는 화면에서는 원도 숨겨야 한다 — 안 그러면 "만들기" 바 위에 겹친다.
     var keepsTabBar: Bool {
         switch self {
-        case .category: return true
-        case .concept, .browse, .result, .store, .invite: return false
+        case .category, .purpose: return true
+        case .concept, .browse, .result, .store, .invite, .settings: return false
         }
     }
 }
@@ -44,6 +48,8 @@ enum OutpaintPhase: Equatable {
 /// 로그인 뒤 자동으로 이어갈 동작 (1.x `rimikimi_pending_tool` / `pendingContinue` 와 같은 뜻).
 enum PendingAction {
     case generate(GenerateRequest)
+    /// 여러 컨셉 한 번에(담기 → "N장 만들기"). 컨셉마다 1장씩, 크레딧은 장수만큼 그대로 차감(오너 지시 2026-10-09).
+    case generateMany([GenerateRequest])
     case filterPick(presetKey: String?)
     case camera
 }
@@ -89,6 +95,43 @@ final class AppState {
     /// UserDefaults 에 1회만 기록, 동의 즉시 미뤄둔 요청을 이어간다(오너 지시 2026-09-19).
     var aiConsentSheet = false
     private var pendingAfterConsent: GenerateRequest?
+    private var pendingManyAfterConsent: [GenerateRequest]?
+    private var pendingManyAfterPurchase: [GenerateRequest]?
+
+    // MARK: 여러 장 담기 (오너 지시 2026-10-08 — 카테고리 상관없이 한 번에 최대 8장)
+    static let cartMax = 8
+    private(set) var cart: [Concept] = []
+    /// 담은 줄을 홈에서 펼쳤는지(홈에선 작은 배지, 누르면 펼침).
+    var cartExpanded = false
+    /// 담은 걸 만들려는데 등록된 내 사진이 없을 때 — 사진 고르기를 먼저 띄운다.
+    var cartNeedsPhoto = false
+    func isInCart(_ c: Concept) -> Bool { cart.contains { $0.id == c.id } }
+    func cartIndex(_ c: Concept) -> Int? { cart.firstIndex { $0.id == c.id } }
+    /// 담기/빼기. 가득 찼으면 false.
+    @discardableResult
+    func toggleCart(_ c: Concept) -> Bool {
+        if let i = cartIndex(c) { cart.remove(at: i); HapticPlayer.selection(); return true }
+        guard cart.count < Self.cartMax else { showToast(Copy.cartFull(Self.cartMax)); return false }
+        cart.append(c)
+        HapticPlayer.selection()
+        return true
+    }
+    func removeFromCart(at i: Int) { if cart.indices.contains(i) { cart.remove(at: i) } }
+    func clearCart() { cart.removeAll(); cartExpanded = false }
+    /// "N장 만들기" — 등록 사진으로 담은 컨셉을 한꺼번에 만든다.
+    func generateCart() {
+        guard !cart.isEmpty else { return }
+        guard let photo = userPhoto.image else { cartNeedsPhoto = true; return }
+        let reqs = cart.map { GenerateRequest(concept: $0, photo: photo) }
+        requireLogin(reqs.count == 1 ? .generate(reqs[0]) : .generateMany(reqs), message: Copy.loginToSave)
+    }
+
+    // MARK: 앱을 켜면 먼저 보일 화면 (설정에서 고른다 — 오너 지시 2026-10-09)
+    private static let startTabKey = "ui.startTab"
+    static var startsOnCamera: Bool {
+        get { UserDefaults.standard.string(forKey: startTabKey) == "camera" }
+        set { UserDefaults.standard.set(newValue ? "camera" : "make", forKey: startTabKey) }
+    }
     /// 채워 맞춤(outpaint)도 같은 Gemini 전송이라 같은 동의가 필요하다(재검증으로 발견 — 결과
     /// 화면을 거치지 않고 도달하는 이론적 우회가 남아 있었다). 이미지+완료 콜백을 미뤄둔다.
     private var pendingOutpaintAfterConsent: (image: UIImage, completion: (UIImage) -> Void)?
@@ -102,7 +145,7 @@ final class AppState {
     /// 크레딧 부족으로 미룬 채워 맞춤 원본 — 구매 뒤 `continueAfterPurchase` 가 이어간다.
     private var pendingOutpaintPhoto: UIImage?
     /// `CreditsSheet` 문구용 — 생성이든 채워 맞춤이든, 구매 후 뭔가 이어갈 게 있으면 true.
-    var willContinueAfterPurchase: Bool { pendingAfterPurchase != nil || pendingOutpaintPhoto != nil }
+    var willContinueAfterPurchase: Bool { pendingAfterPurchase != nil || pendingManyAfterPurchase != nil || pendingOutpaintPhoto != nil }
     private var outpaintCompletion: ((UIImage) -> Void)?
     #if DEBUG
     /// 캡처용: 채워 맞춤 진행 화면을 잠깐 보이게 인위적 지연을 준다(실서버는 즉시 성공/실패한다).
@@ -186,6 +229,7 @@ final class AppState {
     private var lastRequest: GenerateRequest?
 
     init() {
+        if Self.startsOnCamera { tab = .filter }
         // "⭐ 즐겨찾기" 앨범과 홈 정렬만 `FavoritesStore` 를 알면 된다 — `ConceptStore` 가 직접
         // 의존하지 않도록 클로저로 잇는다.
         concepts.favoriteIDs = { [favorites] in favorites.concepts }
@@ -257,6 +301,33 @@ final class AppState {
             HapticPlayer.commit()
             generation.start(req, token: token, pushToken: push.fcmToken)
             // 홈으로 복귀 + 내 사진 진행 카드 (SPEC §3).
+            galleryPath.removeAll()
+            tab = .myPhotos
+        case .generateMany(var reqs):
+            guard let token = await auth.validAccessToken() else { handleNoToken(); return }
+            guard Self.aiConsentGiven else {
+                pendingManyAfterConsent = reqs
+                aiConsentSheet = true
+                return
+            }
+            // 여러 장은 크레딧 전용(서버 묶음 규칙과 같다) — 장수만큼 있어야 한다.
+            if let q = quota, q.unlimited != true, q.creditsAvailable < reqs.count {
+                pendingManyAfterPurchase = reqs
+                creditsSheet = true
+                return
+            }
+            for i in reqs.indices {
+                reqs[i].faceRef = userPhoto.image
+                if reqs[i].faceProfile.isEmpty { reqs[i].faceProfile = faceProfile.ordered.map { ($0.image, $0.angle.rawValue) } }
+            }
+            HapticPlayer.commit()
+            lastRequest = reqs.last
+            // 동시에 다 던지면 서버(Vertex) 분당 한도에 걸린다 — 조금씩 띄워 보낸다(서버도 429 백오프가 있다).
+            for (i, r) in reqs.enumerated() {
+                if i > 0 { try? await Task.sleep(nanoseconds: 700_000_000) }
+                generation.start(r, token: token, pushToken: push.fcmToken)
+            }
+            clearCart()
             galleryPath.removeAll()
             tab = .myPhotos
         case .filterPick(let presetKey):
@@ -353,6 +424,7 @@ final class AppState {
     func cancelConsent() {
         aiConsentSheet = false
         pendingAfterConsent = nil
+        pendingManyAfterConsent = nil
         pendingOutpaintAfterConsent = nil
     }
 
@@ -363,6 +435,9 @@ final class AppState {
         if let req = pendingAfterConsent {
             pendingAfterConsent = nil
             Task { await perform(.generate(req)) }
+        } else if let reqs = pendingManyAfterConsent {
+            pendingManyAfterConsent = nil
+            Task { await perform(.generateMany(reqs)) }
         } else if let pending = pendingOutpaintAfterConsent {
             pendingOutpaintAfterConsent = nil
             requestOutpaint(pending.image, completion: pending.completion)
@@ -372,6 +447,7 @@ final class AppState {
     /// 크레딧 시트를 구매 없이 닫았을 때 — 미뤄둔 생성·채워 맞춤을 버린다.
     func dropPendingPurchase() {
         pendingAfterPurchase = nil
+        pendingManyAfterPurchase = nil
         pendingOutpaintPhoto = nil
     }
 
@@ -390,6 +466,11 @@ final class AppState {
             pendingAfterPurchase = nil
             generation.dismissFinished()
             await perform(.generate(req))
+            return
+        }
+        if let reqs = pendingManyAfterPurchase {
+            pendingManyAfterPurchase = nil
+            await perform(.generateMany(reqs))
             return
         }
         if let photo = pendingOutpaintPhoto {

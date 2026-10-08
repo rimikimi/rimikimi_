@@ -40,6 +40,28 @@ enum Copy {
 
     static var tabGallery: String { L.t("갤러리", "Gallery") }
     static var tabFilter: String { L.t("필터", "Filter") }
+    // MARK: 2026-10-09 개편 — 탭 3개 · 목적 칸 · 여러 장 담기
+    static var tabMake: String { L.t("만들기", "Create") }
+    static var tabCameraFilter: String { L.t("카메라·필터", "Camera") }
+    static var settingsTitle: String { L.t("설정", "Settings") }
+    static var featureRetouch: String { L.t("말로 고치기", "Fix with words") }
+    static var featureRestore: String { L.t("옛날 사진 복원", "Restore old photo") }
+    static var purposeProfile: String { L.t("이력서·프로필", "Resume · Profile") }
+    static var purposeSnap: String { L.t("프사·소개팅", "Profile pic · Dating") }
+    static var purposeWedding: String { L.t("웨딩·커플", "Wedding · Couple") }
+    static var purposeConcept: String { L.t("컨셉화보", "Concept shoots") }
+    static var segToday: String { L.t("오늘의 새 컨셉", "New today") }
+    static func cartFull(_ n: Int) -> String { L.t("한 번에 \(n)장까지 고를 수 있어요", "You can pick up to \(n) at once") }
+    static func cartMake(_ n: Int) -> String { L.t("\(n)장 만들기", "Create \(n)") }
+    static func cartCount(_ n: Int, _ max: Int) -> String { "\(n)/\(max)" }
+    static var cartPhotoTitle: String { L.t("내 사진을 먼저 골라 주세요", "Pick your photo first") }
+    static var viewLarge: String { L.t("크게 보기", "View") }
+    static var startScreen: String { L.t("앱을 켜면 먼저 보일 화면", "Opens to") }
+    static var startMake: String { L.t("만들기", "Create") }
+    static var startCamera: String { L.t("카메라·필터", "Camera") }
+    static var a11yRemoveFromCart: String { L.t("빼기", "Remove") }
+    static var a11yCart: String { L.t("담은 사진", "Picked") }
+
     static var tabMyPhotos: String { L.t("내 사진", "My Photos") }
     static var tabProfile: String { L.t("프로필", "Profile") }
 

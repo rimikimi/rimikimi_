@@ -98,9 +98,25 @@ enum DevRoutes {
             } else {
                 open()
             }
-        case "/store": app.tab = .profile; app.profilePath = [.store]
-        case "/invite": app.tab = .profile; app.profilePath = [.invite]
-        case "/profile": app.tab = .profile; app.profilePath = []
+        case "/purpose":
+            // 목적 화면으로 바로(캡처·검증용 — 시뮬레이터에서 칸을 탭할 수 없다). key=profile|snap|wedding|concept
+            app.tab = .gallery
+            app.galleryPath = [.purpose(q["key"] ?? "snap")]
+        case "/cart":
+            // 담기 시연 — n=개수만큼 목적(key)의 앞쪽 컨셉을 담는다. home=1 이면 홈에서 배지로.
+            let key = Purpose(rawValue: q["key"] ?? "snap") ?? .snap
+            Task { @MainActor in
+                // 실행 인자로 열면 컨셉이 아직 안 받아졌을 수 있다 — 받아질 때까지 기다린다.
+                for _ in 0..<40 where app.concepts.concepts.isEmpty { try? await Task.sleep(nanoseconds: 250_000_000) }
+                app.clearCart()
+                for c in app.concepts.concepts(for: key).prefix(Int(q["n"] ?? "3") ?? 3) { app.toggleCart(c) }
+                app.tab = .gallery
+                app.galleryPath = q["home"] == "1" ? [] : [.purpose(key.rawValue)]
+                app.cartExpanded = q["open"] == "1"
+            }
+        case "/store": app.tab = .gallery; app.galleryPath = [.settings, .store]
+        case "/invite": app.tab = .gallery; app.galleryPath = [.settings, .invite]
+        case "/profile": app.tab = .gallery; app.galleryPath = [.settings]
         case "/lang":
             // `after=<초>` — 그만큼 뒤에 바꾼다. 실행 인자(-rimikimi-url)로 넘기면 같은 프로세스 안에서
             // 전환 전·후를 캡처할 수 있다(openurl 은 iOS 27 에서 "열기" 확인창에 막힌다).
@@ -138,7 +154,7 @@ enum DevRoutes {
                 switch name {
                 case "gallery": app.tab = .gallery
                 case "myPhotos": app.tab = .myPhotos
-                case "profile": app.tab = .profile
+                case "profile": app.tab = .gallery; app.galleryPath = [.settings]
                 default: break
                 }
             }
@@ -226,7 +242,7 @@ enum DevRoutes {
             case "gallery": app.tab = .gallery
             case "filter": app.tab = .filter
             case "myPhotos": app.tab = .myPhotos
-            case "profile": app.tab = .profile
+            case "profile": app.tab = .gallery; app.galleryPath = [.settings]
             default: break
             }
             if q["pop"] == "1" { app.galleryPath.removeAll(); app.myPhotosPath.removeAll(); app.profilePath.removeAll() }

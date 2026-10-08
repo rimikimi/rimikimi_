@@ -12,31 +12,21 @@ struct RootTabView: View {
 
     var body: some View {
         @Bindable var app = app
+        // 2026-10-09 개편(오너 지시): 탭 3개 — 만들기 · 카메라·필터 · 내 사진. 프로필은 홈 ⚙︎(설정)로.
+        // 가운데 떠 있는 카메라 원도 없앴다 — 카메라는 "카메라·필터" 탭 안에 있다.
         TabView(selection: $app.tab) {
-            Tab(Copy.tabGallery, systemImage: "square.grid.2x2", value: .gallery) {
+            Tab(Copy.tabMake, systemImage: "sparkles", value: .gallery) {
                 NavigationStack(path: $app.galleryPath) {
-                    GalleryHomeView()
+                    HomeView()
                         .navigationDestination(for: Route.self) { RouteDestination(route: $0) }
                 }
             }
-            Tab(Copy.tabFilter, systemImage: "film", value: .filter) {
+            Tab(Copy.tabCameraFilter, systemImage: "camera", value: .filter) {
                 NavigationStack { FilterTabView() }
-            }
-            // 가운데 슬롯: 아이콘·라벨을 비워 두고(투명 이미지, 빈 문자열) 떠 있는 원만 보이게 한다.
-            Tab(value: .camera) {
-                Color.bg.ignoresSafeArea()
-            } label: {
-                Label { Text("") } icon: { Image(uiImage: UIImage.clearTabIcon) }
             }
             Tab(Copy.tabMyPhotos, systemImage: "photo.on.rectangle", value: .myPhotos) {
                 NavigationStack(path: $app.myPhotosPath) {
                     MyPhotosView()
-                        .navigationDestination(for: Route.self) { RouteDestination(route: $0) }
-                }
-            }
-            Tab(Copy.tabProfile, systemImage: "person.crop.circle", value: .profile) {
-                NavigationStack(path: $app.profilePath) {
-                    ProfileView()
                         .navigationDestination(for: Route.self) { RouteDestination(route: $0) }
                 }
             }
@@ -54,25 +44,6 @@ struct RootTabView: View {
         // 탭바를 숨기는 안쪽 화면에서만 카메라 원도 함께 숨긴다 — 만들기 바 위에 겹치던 문제.
         // ⚠️ "스택이 비었는가"로 판단하면 안 된다(2026-09-22 오너 지적): 카테고리 화면은 푸시지만
         //    탭바를 그대로 두는데 카메라 원만 사라졌다. 판단 기준은 `Route.keepsTabBar` 하나다.
-        .overlay(alignment: .bottom) {
-            if app.showsCameraTabButton {
-                CameraTabButton(bottomPadding: cameraBottomPadding) { openCamera() }
-                    .transition(.opacity.combined(with: .scale(scale: 0.9)))
-                    // 키보드 여백을 받지 않는다 — 9/30 build 16 오너 실기기에서 원만 ~44pt(키보드 툴바 높이) 떠
-                    // 있었다가 다시 돌아왔다(커스텀 보정 글 입력칸 + "완료" 툴바가 새로 생긴 빌드). 탭바는 그대로였고
-                    // 원의 아래 기준만 올라가 있었다. 키보드가 떠 있는 동안 이 원은 원래 안 보이므로 다른 영향은 없다.
-                    .ignoresSafeArea(.keyboard)
-            }
-        }
-        .animation(Motion.exitCurve(), value: app.showsCameraTabButton)
-        .onChange(of: app.tab) { old, new in
-            if new == .camera {
-                app.tab = old == .camera ? lastTab : old
-                openCamera()
-            } else {
-                lastTab = new
-            }
-        }
         // 생성 완료 → 결과 화면 1회 자동 표시.
         .onChange(of: app.generation.pendingPresentation?.map(\.id)) { _, ids in
             guard ids != nil, let items = app.generation.pendingPresentation else { return }
@@ -147,6 +118,18 @@ struct RootTabView: View {
             )
             .ignoresSafeArea()
         }
+        // 담은 걸 만들려는데 등록된 내 사진이 없을 때 — 한 장 고르면 등록하고 바로 이어서 만든다.
+        .sheet(isPresented: $app.cartNeedsPhoto) {
+            PhotoPicker(
+                limit: 1,
+                onPicked: { imgs in
+                    app.cartNeedsPhoto = false
+                    if let img = imgs.first { app.userPhoto.set(img); app.generateCart() }
+                },
+                onCancel: { app.cartNeedsPhoto = false }
+            )
+            .ignoresSafeArea()
+        }
         .fullScreenCover(item: $app.webTool) { tool in
             WebToolScreen(url: tool.url, title: tool.title, initialPayload: tool.initialPayload)
         }
@@ -210,6 +193,8 @@ struct RouteDestination: View {
         case .result(let payload): ResultView(payload: payload)
         case .store: StoreView()
         case .invite: InviteView()
+        case .settings: ProfileView()
+        case .purpose(let key): PurposeView(key: key)
         }
     }
 }

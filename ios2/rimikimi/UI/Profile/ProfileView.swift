@@ -15,8 +15,8 @@ struct ProfileView: View {
                 if app.auth.isSignedIn {
                     CardGroup {
                         SettingsRow(title: Copy.creditsLabel, value: app.quota?.chipLabel ?? "–", systemImage: "ticket", chevron: false) {}
-                        SettingsRow(title: Copy.store, value: Copy.storeValue, systemImage: "bag") { app.profilePath.append(.store) }
-                        SettingsRow(title: Copy.inviteFriends, value: app.quota?.referralCode, systemImage: "gift") { app.profilePath.append(.invite) }
+                        SettingsRow(title: Copy.store, value: Copy.storeValue, systemImage: "bag") { app.pushRoute(.store) }
+                        SettingsRow(title: Copy.inviteFriends, value: app.quota?.referralCode, systemImage: "gift") { app.pushRoute(.invite) }
                     }
                     CardGroup {
                         NotificationToggleRow()
@@ -52,6 +52,7 @@ struct ProfileView: View {
                 }
                 // 언어 — 로그인과 상관없이 보인다(2026-09-30 오너 지시). 기본은 기기 언어.
                 CardGroup {
+                    StartScreenRow()
                     LanguageRow()
                 }
                 CardGroup {
@@ -73,7 +74,7 @@ struct ProfileView: View {
         }
         .scrollIndicators(.hidden)
         .background(Color.bg)
-        .inlineTitle(Copy.tabProfile)
+        .inlineTitle(Copy.settingsTitle)
         .task(id: app.auth.session?.userID) { await app.refreshQuota() }
         .confirmationDialog(Copy.deleteConfirmTitle, isPresented: $confirmDelete, titleVisibility: .visible) {
             Button(Copy.deleteAccount, role: .destructive) { deleteAccount() }
@@ -244,5 +245,31 @@ struct MyPhotoRow: View {
                 pick = nil
             }
         }
+    }
+}
+
+/// 앱을 켜면 먼저 보일 화면 — 만들기 / 카메라·필터 (오너 지시 2026-10-09 "사용자 선택, 설정에서도").
+struct StartScreenRow: View {
+    @State private var camera = AppState.startsOnCamera
+    var body: some View {
+        Menu {
+            Picker(Copy.startScreen, selection: Binding(get: { camera }, set: { v in camera = v; AppState.startsOnCamera = v; HapticPlayer.selection() })) {
+                Text(Copy.startMake).tag(false)
+                Text(Copy.startCamera).tag(true)
+            }
+        } label: {
+            HStack(spacing: Spacing.s3) {
+                Image(systemName: "iphone").font(.system(size: 16, weight: .medium)).foregroundStyle(Color.ink2).frame(width: 24)
+                Text(Copy.startScreen).font(AppFont.body).foregroundStyle(Color.ink)
+                Spacer()
+                Text(camera ? Copy.startCamera : Copy.startMake).font(AppFont.callout).foregroundStyle(Color.ink2)
+                Image(systemName: "chevron.up.chevron.down").font(.system(size: 12, weight: .semibold)).foregroundStyle(Color.ink3)
+            }
+            .padding(.horizontal, Spacing.s4)
+            .frame(minHeight: ControlHeight.row)
+            .contentShape(Rectangle())
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
     }
 }

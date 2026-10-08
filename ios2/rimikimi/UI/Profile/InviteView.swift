@@ -125,8 +125,8 @@ struct InviteCard: View {
             }
             Spacer()
             Button(Copy.shareAction) {
-                app.tab = .profile
-                app.profilePath = [.invite]
+                app.tab = .gallery
+                app.galleryPath = [.settings, .invite]
             }
             .buttonStyle(SecondaryButtonStyle(small: true, fullWidth: false))
             Button { withAnimation(Motion.exitCurve()) { app.dismissInviteCard() } } label: {

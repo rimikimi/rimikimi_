@@ -89,7 +89,7 @@ struct GalleryHeader: View {
         HStack(spacing: Spacing.s3) {
             BrandLogo(height: 24)
             Spacer()
-            Button { app.tab = .profile } label: {
+            Button { app.pushRoute(.settings) } label: {
                 // 로그인 직후엔 크레딧이 아직 안 와 있을 수 있다 — "–" 대신 로딩 중임이 보이는 스켈레톤.
                 if app.auth.isSignedIn, app.quota == nil {
                     SkeletonBlock(cornerRadius: 15).frame(width: 52, height: 30)
@@ -104,7 +104,7 @@ struct GalleryHeader: View {
             }
             .buttonStyle(PressScaleButtonStyle())
             .accessibilityLabel(Copy.creditsLabel)
-            Button { app.tab = .profile } label: { Avatar(url: app.auth.session?.avatarURL, size: ControlHeight.avatar) }
+            Button { app.pushRoute(.settings) } label: { Avatar(url: app.auth.session?.avatarURL, size: ControlHeight.avatar) }
                 .buttonStyle(PressScaleButtonStyle())
                 .accessibilityLabel(Copy.tabProfile)
         }
@@ -211,6 +211,7 @@ struct CategoryListView: View {
         }
         .background(Color.bg)
         .inlineTitle(Copy.category(name))
+        .safeAreaInset(edge: .bottom) { CartBar() }
         .toolbar {
             // 즐겨찾기 앨범 자체엔 별을 달지 않는다(자기 자신을 즐겨찾기 할 수 없다).
             if name != FavoritesStore.albumName {

@@ -15,9 +15,11 @@ struct Concept: Identifiable, Hashable, Decodable {
     let pinFeatured: Int?
     let publishAt: Date?
     let sensitive: Bool
+    /// 홈 목적 칸(이력서·프로필 / 프사·소개팅 / 웨딩·커플)에 들어가는지 — 서버 데이터가 정한다(빌드 없이 분류를 바꿀 수 있게).
+    let purposes: [String]
 
     enum CodingKeys: String, CodingKey {
-        case id, title, title_en, category, categories, text, mode, fourcutStyle, fourcutStyles, pinFeatured, publishAt, sensitive
+        case id, title, title_en, category, categories, text, mode, fourcutStyle, fourcutStyles, pinFeatured, publishAt, sensitive, purposes
     }
 
     init(from decoder: Decoder) throws {
@@ -43,6 +45,7 @@ struct Concept: Identifiable, Hashable, Decodable {
         if let s = try? c.decode(String.self, forKey: .publishAt) { publishAt = Concept.iso.date(from: s) ?? Concept.isoPlain.date(from: s) }
         else { publishAt = nil }
         sensitive = (try? c.decode(Bool.self, forKey: .sensitive)) ?? false
+        purposes = (try? c.decode([String].self, forKey: .purposes)) ?? []
     }
 
     static let iso: ISO8601DateFormatter = { let f = ISO8601DateFormatter(); f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]; return f }()
@@ -66,6 +69,8 @@ struct Concept: Identifiable, Hashable, Decodable {
     var isRestore: Bool { id == "408" || title.range(of: "복원|restor", options: [.regularExpression, .caseInsensitive]) != nil }
     /// 기능 컨셉(매직부스·증명사진·인생네컷)은 "새로 나왔어요" 에서 뺀다.
     var isFeature: Bool { isArt || isIdPhoto || isFourcut }
+    /// 셀카 한 장만으로 만들 수 있어 여러 장 담기에 넣을 수 있는지 — 상대 사진·옷 사진·컷 수·글 입력이 필요한 컨셉은 옵션 화면으로.
+    var isBatchable: Bool { !isCouple && !isDressroom && !isFourcut && !isArtTransform && !isRetouch }
 
     /// 화면에 보일 이름 — 영어 UI 면 `title_en`(비어 있으면 한국어 제목). 판정·서버 전송은 계속 `title`.
     var displayTitle: String {

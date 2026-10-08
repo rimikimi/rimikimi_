@@ -150,8 +150,8 @@ struct CreditsSheet: View {
 
                 Button {
                     dismiss()
-                    app.tab = .profile
-                    app.profilePath = [.invite]
+                    app.tab = .gallery
+                    app.galleryPath = [.settings, .invite]
                 } label: { Label(Copy.inviteForFree, systemImage: "gift") }
                     .buttonStyle(SecondaryButtonStyle())
                     .padding(.top, Spacing.s1)
