@@ -18,6 +18,7 @@ import { buildGlowStrip } from "./_lib/fourcutGlow.js";
 import { SPRITE_CONCEPT_IDS, describeForSprite } from "./_lib/sprite.js";
 import { checkIdentity, inspectImage, checkScene } from "./_lib/qa.js";
 import { runRetouch } from "./_lib/retouch.js";
+import { resolveStudio } from "./_lib/studio.js";
 // 컨셉 원본(프롬프트 포함). **서버가 프롬프트의 출처**여야 한다 — 아래 resolvePrompt 참고.
 import ALL_CONCEPTS from "./_data/concepts.json" with { type: "json" };
 
@@ -990,6 +991,9 @@ async function handleGenerate(req, res, hold) {
     //    DB 테이블도, 스토리지 업로드도 없다. 이 함수 밖으로 나가는 곳은
     //    Gemini/Vertex 호출뿐이며 그건 방침에 고지된 국외이전 경로다.
     faceRefs,
+    // 브루클린 목적 사진(2026-10-09 이식): { purpose, presetId, overrides } + 옷 사진(선택).
+    // 지시문은 서버 카탈로그로만 만든다(api/_lib/studio.js) — 앱은 id·값만 보낸다.
+    studio, outfitBase64, outfitMime,
   } = req.body || {};
 
   // 얼굴 참조 정규화 — 최대 5장(스펙 §1: 필수 3 + 선택 2), 형식 불량은 조용히 버린다.
@@ -1003,7 +1007,11 @@ async function handleGenerate(req, res, hold) {
   const batchCost = BATCH_COST[batchCount];
   // ⚠️ prompt 는 **서버가 정한 값**을 쓴다. 앱이 보낸 건 컨셉을 못 찾을 때만 쓴다.
   //    (아래 로직 전체가 `prompt` 변수를 보므로 여기서 한 번만 정한다)
-  const prompt = resolvePrompt(conceptId, clientPrompt);
+  const hasOutfit = !!studio && typeof outfitBase64 === "string" && !!outfitBase64 && /^image\//.test(outfitMime || "");
+  const st = studio ? resolveStudio(studio, { faceRefCount: faceRefList.length, hasOutfit }) : null;
+  if (st?.error) return res.status(400).json({ error: st.error });
+  const isStudio = !!st;
+  const prompt = isStudio ? st.instruction : resolvePrompt(conceptId, clientPrompt);
   if (!mimeType || !base64 || !prompt) {
     return res
       .status(400)
@@ -1316,7 +1324,9 @@ async function handleGenerate(req, res, hold) {
 
   // cutCount 가 오면 스트립 한 장, 아니면 구버전(컷별) — 구버전 앱 호환
   const isStrip = isFourcut && !!STRIP_GRID[Number(cutCount)];
-  const conceptInstruction = isDressroom
+  const conceptInstruction = isStudio
+    ? st.instruction
+    : isDressroom
     ? dressroomInstruction
     : isFourcut
     ? (isStrip ? stripInstruction : fourcutInstruction)
@@ -1397,7 +1407,7 @@ async function handleGenerate(req, res, hold) {
   // 원인이었다(본인 사진 1장에만 의존). 대신 드레스룸 전용 문구로 "의상이 아니다 /
   // 그 사진들 속 옷은 무시해라"를 명시해 두 서수 체계를 갈라준다.
   const faceClause =
-    faceRefList.length && !skipFacePrecheck
+    faceRefList.length && !skipFacePrecheck && !isStudio
       ? (isDressroom
           ? `\n\nAfter the garment references, the final ${faceRefList.length} reference ` +
             `image(s) at the very END are FACE REFERENCES of the same person from the FIRST ` +
@@ -1434,7 +1444,7 @@ async function handleGenerate(req, res, hold) {
   const wantsCloseup = /close[- ]?up|bust[- ]?up|head[- ]?shot|beauty (shot|portrait)|shoulders[- ]?up/i
     .test(prompt || "");
   const headTiltClause =
-    wantsCloseup && !isIdPhoto && !skipFacePrecheck && !isDressroom && !isFourcut && !isRestore
+    wantsCloseup && !isStudio && !isIdPhoto && !skipFacePrecheck && !isDressroom && !isFourcut && !isRestore
       ? (() => {
           const deg = (2 + Math.random() * 3).toFixed(1);
           const dir = Math.random() < 0.5 ? "left" : "right";
@@ -1491,7 +1501,10 @@ async function handleGenerate(req, res, hold) {
       return inl ? { data: inl.data, mime: inl.mimeType || inl.mime_type || "image/png" } : null;
     } catch (_) { return null; }
   }
-  const instruction = isSprite
+  // 브루클린 지시문은 사진 사실감·얼굴 참조 절까지 자체로 완결돼 있다 — 리미키미 포장을 씌우지 않는다.
+  const instruction = isStudio
+    ? st.instruction
+    : isSprite
     ? prompt + "\n\nSUBJECT DESCRIPTION: " + spriteDesc
     : (skipFacePrecheck ? conceptInstruction : PHOTOREALISM + conceptInstruction + SKIN_FINAL) + headTiltClause + faceClause;
 
@@ -1559,11 +1572,13 @@ async function handleGenerate(req, res, hold) {
             : []),
           // 페이스 프로필 참조는 항상 맨 뒤 블록 (§3 "얼굴 참조는 항상 마지막 블록").
           // 위 faceClause 의 "The final N reference images" 가 이 위치를 가리킨다.
-          ...(faceClause
+          ...(faceClause || isStudio
             ? faceRefList.map((r) => ({
                 inline_data: { mime_type: r.mimeType, data: r.base64 },
               }))
             : []),
+          // 브루클린: 옷 사진은 항상 맨 뒤("LAST image" — studio.js OUTFIT_REF_INSTRUCTION)
+          ...(isStudio && hasOutfit ? [{ inline_data: { mime_type: outfitMime, data: outfitBase64 } }] : []),
         ],
       },
     ],

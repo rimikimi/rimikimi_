@@ -71,6 +71,10 @@
       "destination": "/api/concepts"
     },
     {
+      "source": "/studio-catalog.json",
+      "destination": "/api/concepts?studio=1"
+    },
+    {
       "source": "/api/drops",
       "destination": "/api/concepts?drops=1"
     },
