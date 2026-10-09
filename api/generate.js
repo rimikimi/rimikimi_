@@ -15,7 +15,7 @@ import { saveToGallery } from "./_lib/gallery.js";
 import { buildDressroom, expectedHem, checkHem } from "./_lib/dressroom.js";
 import { buildEditorialStrip } from "./_lib/fourcutEditorial.js";
 import { buildGlowStrip } from "./_lib/fourcutGlow.js";
-import { SPRITE_CONCEPT_IDS, describeForSprite } from "./_lib/sprite.js";
+import { SPRITE_CONCEPT_IDS, describeForSprite, refineSpriteFace } from "./_lib/sprite.js";
 import { checkIdentity, inspectImage, checkScene } from "./_lib/qa.js";
 import { runRetouch } from "./_lib/retouch.js";
 import { resolveStudio } from "./_lib/studio.js";
@@ -1879,6 +1879,7 @@ async function handleGenerate(req, res, hold) {
     }
 
     const images = [];
+    const outs = [];
     for (const r of settled) {
       if (isBusyFailure(r) || !r?.upstream?.ok) continue;
       let j = null;
@@ -1887,8 +1888,18 @@ async function handleGenerate(req, res, hold) {
         .find((x) => x.inlineData || x.inline_data);
       if (!part) continue;
       const inline = part.inlineData || part.inline_data;
-      let rawMime = inline.mimeType || inline.mime_type || "image/png";
-      let rawOut = inline.data;
+      outs.push({ data: inline.data, mime: inline.mimeType || inline.mime_type || "image/png" });
+    }
+    // 픽셀 캐릭터: 얼굴을 손님과 닮게 다시 그린다(api/_lib/sprite.js 2단계). 실패·불합격이면 1단계 그림 그대로.
+    if (isSprite && left() > 35000) {
+      await Promise.all(outs.map(async (o) => {
+        const ref = await refineSpriteFace({ spriteBase64: o.data, photoBase64: base64, spriteDesc, apiKey, timeLeftMs: left() - 5000 });
+        if (ref) { o.data = ref.data; o.mime = ref.mime; }
+      }));
+    }
+    for (const o of outs) {
+      let rawMime = o.mime;
+      let rawOut = o.data;
       // 결제로 만든 것만 깨끗하다 — 원본에 찍어야 갤러리 다운로드로 우회되지 않는다
       if (!useCredit) {
         const wm = await applyWatermark(rawOut, rawMime);
@@ -2106,6 +2117,11 @@ async function handleGenerate(req, res, hold) {
   let rawData = inline.data;
   if (isRestore) {
     rawData = await cropToRatio(rawData, srcAspect(base64, mimeType));
+  }
+  // 픽셀 캐릭터: 얼굴을 손님과 닮게 다시 그린다(api/_lib/sprite.js 2단계). 실패·불합격이면 1단계 그림 그대로.
+  if (isSprite && left() > 35000) {
+    const ref = await refineSpriteFace({ spriteBase64: rawData, photoBase64: base64, spriteDesc, apiKey, timeLeftMs: left() - 5000 });
+    if (ref) { rawData = ref.data; rawMime = ref.mime; }
   }
 
   // 6.4) 워터마크 — 결제(크레딧)로 만든 것만 깨끗하다.
