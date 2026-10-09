@@ -13,13 +13,27 @@ export const SPRITE_CONCEPT_IDS = new Set(["964"]);
 
 const DESCRIBE =
   "Describe the main subject of this photo for a character artist who will draw them as a small game sprite. " +
-  "Reply in plain English, max 90 words, as one paragraph with exactly these parts: " +
+  "If several people are in the photo, describe ONLY the single most prominent one (the largest / most central) and never mention the others. " +
+  "Reply in plain English, max 110 words, as one paragraph with exactly these parts: " +
   "subject type (person / animal / object); for a person: apparent gender presentation, hair length and style, " +
-  "hair colour as a hex code; every visible clothing item top to bottom with its colour as a hex code and notable " +
+  "hair colour as a hex code; skin tone as ONE word from: very fair / fair / light-medium / medium / tan / brown / deep (judge the person's natural skin, not shadows or warm/cool lighting — when unsure pick the lighter neighbour); glasses (none, or frame shape and colour hex); facial hair if any; every visible clothing item top to bottom with its colour as a hex code and notable " +
   "details (knit texture, buttons, belt); shoes with colour hex; bag or accessories with colour hex; pose " +
   "(standing / walking / sitting, what the hands do) and which way the body faces (toward the viewer, three-quarter " +
   "left, three-quarter right). For an animal or object: its kind, colours as hex codes and pose. " +
   "No background, no names, no guesses about identity.";
+
+// 피부톤은 사진에서 hex 로 받으면 조명 따라 들쭉날쭉했다(같은 사진이 #C99E7E / #695046 — 실측 10/10).
+// 단계 단어로 받고, 그리는 모델엔 정해진 색으로 넘긴다 — 단어만 주면 "light-medium" 을 갈색으로 그렸다.
+const SKIN_HEX = [
+  ["very fair", "#FBE3D2"], ["light-medium", "#EDC3A5"], ["fair", "#F6D5BF"], ["medium", "#D9A582"],
+  ["tan", "#B98060"], ["brown", "#8A5A3E"], ["deep", "#5E3B28"],
+];
+function withSkinHex(text) {
+  const m = text.match(/\b(very fair|light-medium|fair|medium|tan|brown|deep)\b(?=[^.;]*skin|\s*skin)|skin(?: tone)?[^.;#]{0,20}?\b(very fair|light-medium|fair|medium|tan|brown|deep)\b/i);
+  const word = (m && (m[1] || m[2]) || "").toLowerCase();
+  const hit = SKIN_HEX.find(([w]) => w === word);
+  return hit ? text + ` Skin colour to use for the sprite: ${hit[1]} (${hit[0]}).` : text;
+}
 
 /** 사진 → 외형 설명. 실패하면 null (호출측이 기존 방식으로 폴백). */
 export async function describeForSprite({ base64, mimeType, apiKey, timeoutMs = 15000 }) {
@@ -43,7 +57,7 @@ export async function describeForSprite({ base64, mimeType, apiKey, timeoutMs = 
     if (!r.ok) return null;
     const j = await r.json();
     const text = (j?.candidates?.[0]?.content?.parts || []).map((p) => p.text || "").join("").trim();
-    return text.length > 20 ? text.slice(0, 1200) : null;
+    return text.length > 20 ? withSkinHex(text.slice(0, 1200)) : null;
   } catch (_) {
     return null;
   } finally {
@@ -63,6 +77,8 @@ export async function describeForSprite({ base64, mimeType, apiKey, timeoutMs = 
 // 실패·시간 부족·검사 불합격 → null (호출측이 1단계 그림을 내보낸다. 사용자에겐 지금보다 나빠질 일이 없다)
 // ============================================================
 
+import { checkIdentity } from "./qa.js";
+
 const REFINE_MODEL = "gemini-3-pro-image";
 const CHECK_MODEL = "gemini-3-flash-preview";
 
@@ -79,7 +95,7 @@ const refinePrompt = (desc) =>
   "head-to-body proportion).\n" +
   "If the sprite in IMAGE 1 wears a hat or cap, it stays exactly as it is; redraw only the face and the hair visible under it.\n" +
   "Never invent anything the person does not have: no glasses unless they clearly wear glasses, no facial hair unless they clearly " +
-  "have it, no new hat or accessory. Keep the hair colour of IMAGE 1. If IMAGE 2 shows several people, use the one whose outfit " +
+  "have it, no new hat or accessory. Keep the hair colour and the skin colour of IMAGE 1 exactly (they already match the person — do not tan, darken or lighten the skin because of the photo's lighting). If IMAGE 2 shows several people, use the one whose outfit " +
   "matches the sprite.\n" +
   "Keep everything else in IMAGE 1 exactly as it is: body, pose, outfit, colours, floor tile, framing, and the solid pure white " +
   "(#FFFFFF) background edge to edge. The output must be a pixel-art sprite, never a photo. Exactly one character, no text.";
@@ -92,13 +108,14 @@ const CHECK =
   "- glasses_changed: glasses appeared or disappeared.\n" +
   "- hat_changed: a hat/cap appeared, disappeared or changed.\n" +
   "- hair_colour_changed: the hair colour clearly changed (e.g. black became brown, grey became dark). Small shading differences do not count.\n" +
+  "- skin_tone_changed: the skin colour of the face or hands is clearly lighter or darker than in image 1 (e.g. pale became tan or brown). Small shading differences do not count.\n" +
   "- outfit_changed: clothing items, their colours, the bag or held objects clearly changed.\n" +
   "- redrawn: the whole sprite was re-made instead of edited — clearly different body proportions (no longer a big-head chibi), a " +
   "clearly different pose, or the isometric floor tile disappeared.\n" +
   "- photographic: any part of image 2 looks like a real photograph or photo background instead of pixel art.\n" +
   "Ignore changes to the face itself, the expression, bangs, small pixel noise and slight shifts in position or scale.\n" +
-  'Reply with JSON only: {"glasses_changed":bool,"hat_changed":bool,"hair_colour_changed":bool,"outfit_changed":bool,"redrawn":bool,"photographic":bool,"reason":"short"}';
-const CHECK_KEYS = ["glasses_changed", "hat_changed", "hair_colour_changed", "outfit_changed", "redrawn", "photographic"];
+  'Reply with JSON only: {"glasses_changed":bool,"hat_changed":bool,"hair_colour_changed":bool,"skin_tone_changed":bool,"outfit_changed":bool,"redrawn":bool,"photographic":bool,"reason":"short"}';
+const CHECK_KEYS = ["glasses_changed", "hat_changed", "hair_colour_changed", "skin_tone_changed", "outfit_changed", "redrawn", "photographic"];
 
 async function shrink(base64, px) {
   const sharp = (await import("sharp")).default;
@@ -120,6 +137,18 @@ async function borderDirt(base64) {
     if (Math.min(data[i], data[i + 1], data[i + 2]) < 225) bad++;
   }
   return bad / n;
+}
+
+// 1K 로 그린 결과를 1단계(2K) 크기로 되돌린다 — 픽셀 그림이라 최근접 확대면 손실이 없다(갤러리 원본 크기 유지).
+async function upscaleTo(base64, likeBase64) {
+  const sharp = (await import("sharp")).default;
+  try {
+    const m = await sharp(Buffer.from(likeBase64, "base64")).metadata();
+    return (await sharp(Buffer.from(base64, "base64")).resize(m.width, m.height, { fit: "fill", kernel: "nearest" })
+      .png().toBuffer()).toString("base64");
+  } catch (_) {
+    return base64;
+  }
 }
 
 async function postJson(model, body, apiKey, timeoutMs) {
@@ -187,11 +216,18 @@ export async function refineSpriteFace({ spriteBase64, photoBase64, spriteDesc, 
       const part = (j?.candidates?.[0]?.content?.parts || []).find((p) => p.inlineData || p.inline_data);
       const inl = part && (part.inlineData || part.inline_data);
       if (!inl?.data) { console.log(`[sprite] 얼굴 다시 그리기 실패(응답 없음) ${attempt}`); continue; }
-      let chk = await changeCheck(spriteSmall, inl.data, apiKey);
+      // ① 1단계와 비교(안경·모자·머리색·옷·통째로 다시 그림·실사·흰 테두리) ② 손님 사진과 비교(피부톤·인종·성별 —
+      //    1단계 비교로는 안 보인다: 1단계 얼굴이 템플릿이라). 그림체 완화판(art) — 판단 불가는 통과.
+      let [chk, idt] = await Promise.all([
+        changeCheck(spriteSmall, inl.data, apiKey),
+        checkIdentity({ refBase64: photoIn, refMime: "image/jpeg", base64: inl.data, mimeType: inl.mimeType || inl.mime_type || "image/png",
+          apiKey, art: true, timeoutMs: 15000 }).catch(() => ({ ok: null })),
+      ]);
       // 검사 모델이 답을 못 한 건 그림 탓이 아니다 — 다시 그리지 말고 검사만 한 번 더.
       if (chk.issue === "판단불가") chk = await changeCheck(spriteSmall, inl.data, apiKey);
+      if (chk.ok && idt.ok === false) chk = { ok: false, issue: "다른 사람 " + (idt.issue || "") };
       console.log(`[sprite] 얼굴 다시 그리기 ${attempt}번째 ${chk.ok ? "통과" : "불합격 " + chk.issue}`);
-      if (chk.ok) return { data: inl.data, mime: inl.mimeType || inl.mime_type || "image/png" };
+      if (chk.ok) return { data: await upscaleTo(inl.data, spriteBase64), mime: "image/png" };
     }
     return null;
   } catch (e) {

@@ -1891,8 +1891,9 @@ async function handleGenerate(req, res, hold) {
       outs.push({ data: inline.data, mime: inline.mimeType || inline.mime_type || "image/png" });
     }
     // 픽셀 캐릭터: 얼굴을 손님과 닮게 다시 그린다(api/_lib/sprite.js 2단계). 실패·불합격이면 1단계 그림 그대로.
-    if (isSprite && left() > 35000) {
-      await Promise.all(outs.map(async (o) => {
+    // 4장씩 — 12장을 한꺼번에 던지면 분당 한도에 걸린다(위 CONCURRENCY 와 같은 이유).
+    for (let i = 0; isSprite && i < outs.length && left() > 35000; i += CONCURRENCY) {
+      await Promise.all(outs.slice(i, i + CONCURRENCY).map(async (o) => {
         const ref = await refineSpriteFace({ spriteBase64: o.data, photoBase64: base64, spriteDesc, apiKey, timeLeftMs: left() - 5000 });
         if (ref) { o.data = ref.data; o.mime = ref.mime; }
       }));
