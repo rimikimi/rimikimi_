@@ -88,20 +88,20 @@ enum LiveFilter {
         "ph16pro": .init(temp: 2, ex: -0.02, con: 0.3, whitePull: 8, sat: 0.1, vib: 0.12, sh: [-2, 0, 4], hi: [4, 2, -2]),
         "ph15pro": .init(temp: 14, tint: 4, ex: 0.03, con: 0.08, fade: 4, whitePull: 14, sat: 0.04, vib: 0.14, sh: [4, 2, 0], hi: [8, 4, -4]),
         "ph14pro": .init(temp: -10, tint: -1, ex: 0.1, con: 0.04, fade: 6, whitePull: 24, sat: 0.2, vib: 0.25, sh: [-2, 2, 8], hi: [0, 2, 6]),
-        "phxs": .init(temp: 18, tint: 6, ex: 0.05, con: -0.1, fade: 16, whitePull: 22, sat: -0.02, vib: 0.1, sh: [8, 4, 0], hi: [10, 5, -6], fx: .init(glow: 0.25)),
+        "phxs": .init(temp: 18, tint: 6, ex: 0.05, con: -0.1, fade: 16, whitePull: 22, sat: -0.02, vib: 0.1, sh: [8, 4, 0], hi: [10, 5, -6]),
         "ph7": .init(temp: 16, tint: -6, ex: 0.03, con: 0.18, fade: 4, whitePull: 4, sat: 0.1, vib: 0.06, sh: [2, 4, -4], hi: [10, 10, -12], fx: .init(grain: 0.12)),
         "ph6s": .init(temp: -14, tint: -8, ex: 0.02, con: 0.2, fade: 2, whitePull: 2, sat: 0.14, vib: 0.04, sh: [-4, 4, 8], hi: [0, 4, 6], fx: .init(grain: 0.14)),
         "ph4s": .init(temp: 26, tint: -6, ex: 0.12, con: 0.32, fade: 8, sat: -0.08, sh: [6, 6, -8], hi: [14, 12, -14], fx: .init(grain: 0.3, vignette: 0.35)),
         "ph3gs": .init(temp: 14, tint: -14, ex: 0.14, con: 0.26, fade: 22, sat: -0.35, vib: -0.05, sh: [-6, 10, 6], hi: [18, 16, -10], fx: .init(grain: 0.55, vignette: 0.45)),
         "sepia": .init(ex: 0.02, con: 0.12, fade: 8, whitePull: 6, sh: [18, 6, -14], hi: [24, 10, -18], bw: [0.3, 0.55, 0.15]),
         "duopink": .init(special: .duotone, c1: [38, 18, 66], c2: [255, 158, 201]),
-        "neon": .init(fx: .init(glow: 0.5), special: .duotone, c1: [24, 8, 66], c2: [90, 255, 240]),
+        "neon": .init(special: .duotone, c1: [24, 8, 66], c2: [90, 255, 240]),
         "thermal": .init(special: .thermal),
         "glitch": .init(special: .glitch),
         "vhs": .init(fx: .init(grain: 0.35), special: .vhs),
         "pixelate": .init(special: .pixelate),
-        "bloom": .init(temp: 8, tint: 2, ex: 0.06, con: -0.06, fade: 16, whitePull: 10, sat: -0.04, vib: 0.18, sh: [6, 4, 0], hi: [14, 10, 2], fx: .init(leak: 0.3, glow: 0.62)),
-        "twinkle": .init(temp: 4, ex: 0.03, con: 0.1, fade: 6, whitePull: 6, sat: 0.06, vib: 0.2, sh: [0, 0, 4], hi: [8, 6, 0], fx: .init(glow: 0.22)),
+        "bloom": .init(temp: 8, tint: 2, ex: 0.06, con: -0.06, fade: 16, whitePull: 10, sat: -0.04, vib: 0.18, sh: [6, 4, 0], hi: [14, 10, 2], fx: .init(leak: 0.3)),
+        "twinkle": .init(temp: 4, ex: 0.03, con: 0.1, fade: 6, whitePull: 6, sat: 0.06, vib: 0.2, sh: [0, 0, 4], hi: [8, 6, 0]),
         "sketch": .init(special: .sketch),
     ]
 
@@ -481,22 +481,25 @@ final class LiveFilterEngine {
     /// 카메라 프레임 → 필터 입힌 이미지 (원점 0,0). 프레임 해상도 그대로 돌린다 — 예전엔 그레인 등
     /// 효과 프리셋을 편집기 격자(긴 변 1080)로 줄였다 늘려서 화면이 초점 나간 것처럼 흐렸다(오너 실기기 2026-10-09).
     /// 칸·반경은 짧은 변 비율이라 해상도가 달라도 같은 모양이고, 그레인 알갱이만 조금 더 곱다.
-    func render(frame: CIImage, key: String, fxScale: Double = 1) -> CIImage {
+    /// intensity: 카메라 세기 슬라이더(0..1, 오너 지시 2026-10-09 "젤 왼쪽으로 가면 기본 카메라") —
+    /// 편집기 "색감" 슬라이더와 같은 식: 색만 원본↔프리셋 사이를 섞는다(= 편집기 색감 0.7×t). 효과는 그대로.
+    func render(frame: CIImage, key: String, intensity: Double = 1) -> CIImage {
         let e = frame.extent
         let img = frame.transformed(by: .init(translationX: -e.minX, y: -e.minY))
             .cropped(to: CGRect(x: 0, y: 0, width: e.width.rounded(.down), height: e.height.rounded(.down)))
-        guard LiveFilter.presets[key] != nil else { return img }
-        return apply(img, key: key, fxScale: fxScale)
+        guard let p = LiveFilter.presets[key] else { return img }
+        let t = min(1, max(0, intensity))
+        if t >= 0.999 { return apply(img, key: key) }
+        if t <= 0.001 { return img }
+        let look = apply(img, key: key, effects: false)
+        let mixed = look.applyingFilter("CIDissolveTransition", parameters: [
+            kCIInputImageKey: img, kCIInputTargetImageKey: look, kCIInputTimeKey: t]).cropped(to: img.extent)
+        guard p.special == nil || p.special == .vhs else { return mixed }
+        return effectsPass(mixed, p)   // 효과(그레인 등)는 그대로 — 슬라이더는 색감만(오너 지시 2026-10-09)
     }
 
-    /// 원점 (0,0)·정수 크기 이미지에 프리셋을 입힌다. effects=false 면 효과 패스(그레인 등)를 뺀다(검증용).
-    /// fxScale: 카메라 "효과" 슬라이더(0..1) — 편집기 효과 슬라이더와 같다(프리셋 효과 값 × 배율).
-    func apply(_ input: CIImage, key: String, effects: Bool = true, fxScale: Double = 1) -> CIImage {
-        guard var p = LiveFilter.presets[key] else { return input }
-        if fxScale != 1 {
-            let k = max(0, fxScale)
-            p.fx.grain *= k; p.fx.vignette *= k; p.fx.leak *= k; p.fx.glow *= k; p.fx.blur *= k; p.fx.lowres *= k
-        }
+    func apply(_ input: CIImage, key: String, effects: Bool = true) -> CIImage {
+        guard let p = LiveFilter.presets[key] else { return input }
         let ext = input.extent
         let W = ext.width, H = ext.height
         let minWH = min(W, H)
@@ -527,7 +530,18 @@ final class LiveFilterEngine {
             img = color(img, p, key: key, ext: ext)
         }
 
-        guard effects, p.fx.any else { return img }
+        guard effects else { return img }
+        return effectsPass(img, p)
+    }
+
+    /// 효과 패스(흐림·저해상도·그레인·비네트·빛샘·뽀샤시) — filters.js 의 효과 단계(applyLook(null, effects)).
+    private func effectsPass(_ input: CIImage, _ p: LiveFilter.Preset) -> CIImage {
+        guard p.fx.any else { return input }
+        let ext = input.extent
+        let W = ext.width, H = ext.height
+        let minWH = min(W, H)
+        let jsRound = { (x: CGFloat) -> CGFloat in (x + 0.5).rounded(.down) }
+        var img = input
         if p.fx.blur > 0 { img = box(img, jsRound(minWH * 0.02 * p.fx.blur) + 1, W, H) }
         if p.fx.lowres > 0 {
             let bs = max(2, jsRound(minWH * p.fx.lowres))

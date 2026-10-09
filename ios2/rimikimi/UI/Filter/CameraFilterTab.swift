@@ -192,12 +192,12 @@ struct CameraFilterTab: View {
         .onChange(of: fxAmount, initial: true) { model.live?.fxAmount = fxAmount }
     }
 
-    /// "효과" 슬라이더 — 고른 필터에 그레인·비네트·뽀샤시 같은 효과가 있을 때만(오너 지시 2026-10-09
-    /// "슬라이더 넣자. 효과 얼만큼 넣을건지"). 편집기 효과 슬라이더와 같은 값이라 찍고 넘어가도 이어진다.
+    /// 색감 슬라이더 — 모든 필터(원본 빼고). 맨 왼쪽 = 기본 카메라 색, 맨 오른쪽 = 필터 색 그대로
+    /// (오너 지시 2026-10-09 "슬라이더는 색감을 조절하는 거"). 효과는 편집기 다음 단계에서 조절한다.
     @ViewBuilder private var fxSlider: some View {
-        if LiveFilter.presets[selected]?.fx.any == true {
+        if selected != "none" {
             HStack(spacing: Spacing.s3) {
-                Text(L.t("효과", "Effect")).font(AppFont.footnote.weight(.bold)).foregroundStyle(.white)
+                Text(L.t("색감", "Color")).font(AppFont.footnote.weight(.bold)).foregroundStyle(.white)
                 Slider(value: $fxAmount, in: 0...1).tint(.white)
                 Text("\(Int((fxAmount * 100).rounded()))").font(AppFont.footnote.weight(.semibold)).monospacedDigit()
                     .foregroundStyle(.white.opacity(0.85)).frame(width: 30, alignment: .trailing)

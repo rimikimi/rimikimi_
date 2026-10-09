@@ -93,7 +93,7 @@ final class LiveFilterRenderer: NSObject, AVCaptureVideoDataOutputSampleBufferDe
         let (front, mir) = lock.withLock { (_front, _mirrored) }
         img = LiveFilter.upright(img, appliedMirror: connection.isVideoMirrored, wantMirror: front && mir)
         lock.withLock { _imageSize = img.extent.size }
-        if key != "none", let engine { img = engine.render(frame: img, key: key, fxScale: fxAmt) }
+        if key != "none", let engine { img = engine.render(frame: img, key: key, intensity: fxAmt) }
 
         // 화면 꽉 채우기(aspectFill) — 기존 미리보기 레이어와 같은 구도
         let e = img.extent
