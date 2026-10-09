@@ -233,6 +233,8 @@ final class BurstCameraModel {
         focus(at: p)
         aeafLocked = true
         if let device = input?.device, (try? device.lockForConfiguration()) != nil {
+            // 잠금 = 그 자리에 맞춘 뒤 고정(.autoExpose 는 맞추고 나면 스스로 .locked 로 바뀐다)
+            if device.isExposureModeSupported(.autoExpose) { device.exposureMode = .autoExpose }
             device.isSubjectAreaChangeMonitoringEnabled = false
             device.unlockForConfiguration()
         }
@@ -246,9 +248,12 @@ final class BurstCameraModel {
             device.focusPointOfInterest = p
             device.focusMode = .autoFocus
         }
-        if device.isExposurePointOfInterestSupported, device.isExposureModeSupported(.autoExpose) {
+        // 노출은 "한 번 맞추고 잠금(.autoExpose)"이 아니라 그 자리 기준 **계속** 맞춤 — 잠긴 상태에선 밝기
+        // 보정(끌기)이 화면에 안 먹었다(오너 실기기 2026-10-09 "슬라이더가 아예 안 되는데"). 기본 카메라도 이렇다.
+        if device.isExposurePointOfInterestSupported {
             device.exposurePointOfInterest = p
-            device.exposureMode = .autoExpose
+            if device.isExposureModeSupported(.continuousAutoExposure) { device.exposureMode = .continuousAutoExposure }
+            else if device.isExposureModeSupported(.autoExpose) { device.exposureMode = .autoExpose }
         }
         device.isSubjectAreaChangeMonitoringEnabled = true
         device.unlockForConfiguration()
@@ -258,11 +263,36 @@ final class BurstCameraModel {
     /// 노출 보정(기본 카메라의 해 아이콘 끌기) — -2 ~ +2 EV.
     private(set) var exposureBias: Float = 0
     func setExposureBias(_ v: Float) {
-        guard let device = input?.device, (try? device.lockForConfiguration()) != nil else { return }
+        guard let device = input?.device else { exposureBias = v; return }
         let b = min(min(device.maxExposureTargetBias, 2), max(max(device.minExposureTargetBias, -2), v))
+        exposureBias = b
+        // 끄는 동안 매 이벤트(초당 60번)마다 장치 설정을 잠갔다 풀면 버벅인다(오너 실기기 2026-10-09
+        // "long press 하고 밝기조절 할 때 버벅거림") — 의미 있게 바뀔 때만 보낸다.
+        guard abs(b - appliedBias) >= 0.04 || b == 0 else { return }
+        applyBias(b, device)
+    }
+    private var appliedBias: Float = 0
+    private func applyBias(_ b: Float, _ device: AVCaptureDevice) {
+        guard (try? device.lockForConfiguration()) != nil else { return }
         device.setExposureTargetBias(b, completionHandler: nil)
         device.unlockForConfiguration()
-        exposureBias = b
+        appliedBias = b
+    }
+
+    /// 밝기 끌기 시작 — AE/AF 잠금 중이면 끄는 동안만 노출을 계속 맞추게 풀어 둔다(잠긴 노출엔 보정이 안 먹고,
+    /// 매번 다시 재면 버벅인다).
+    func beginExposureAdjust() {
+        guard aeafLocked, let device = input?.device, (try? device.lockForConfiguration()) != nil else { return }
+        if device.isExposureModeSupported(.continuousAutoExposure) { device.exposureMode = .continuousAutoExposure }
+        device.unlockForConfiguration()
+    }
+    /// 밝기 끌기 끝 — 마지막 값을 확실히 넣고, 잠금 중이었으면 그 밝기로 맞춘 뒤 다시 고정.
+    func endExposureAdjust() {
+        guard let device = input?.device else { return }
+        applyBias(exposureBias, device)
+        guard aeafLocked, (try? device.lockForConfiguration()) != nil else { return }
+        if device.isExposureModeSupported(.autoExpose) { device.exposureMode = .autoExpose }
+        device.unlockForConfiguration()
     }
 
     private func resumeAutoFocus() {
@@ -276,6 +306,7 @@ final class BurstCameraModel {
         device.setExposureTargetBias(0, completionHandler: nil)
         device.unlockForConfiguration()
         exposureBias = 0
+        appliedBias = 0
     }
     @ObservationIgnored private var areaObserver: NSObjectProtocol?
 

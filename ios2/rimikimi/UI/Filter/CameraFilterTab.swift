@@ -56,6 +56,7 @@ struct CameraFilterTab: View {
                                         // 방향은 처음 한 번만 본다 — 가로로 시작한 건 밝기가 아니다
                                         guard abs(g.translation.height) >= abs(g.translation.width) else { return }
                                         biasAtDragStart = uiBias
+                                        model.beginExposureAdjust()
                                     }
                                     // 화면 높이의 1/3 을 끌면 2EV — 기본 카메라 감각
                                     let per = Float(max(geo.size.height / 3, 200)) / 2
@@ -64,7 +65,10 @@ struct CameraFilterTab: View {
                                     focusMark?.touched = Date()
                                     focusMark?.adjusting = true; focusMark?.dim = false
                                 }
-                                .onEnded { _ in biasAtDragStart = nil; focusMark?.adjusting = false; focusMark?.touched = Date() })
+                                .onEnded { _ in
+                                    if biasAtDragStart != nil { model.endExposureAdjust() }
+                                    biasAtDragStart = nil; focusMark?.adjusting = false; focusMark?.touched = Date()
+                                })
                             // 길게 누르기 = AE/AF 잠금 — 누른 채로 위치를 받으려고 길게 누르기 뒤에 끌기를 잇는다
                             .simultaneousGesture(LongPressGesture(minimumDuration: 0.6)
                                 .sequenced(before: DragGesture(minimumDistance: 0, coordinateSpace: .local))
