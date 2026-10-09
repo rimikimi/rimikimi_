@@ -481,17 +481,22 @@ final class LiveFilterEngine {
     /// 카메라 프레임 → 필터 입힌 이미지 (원점 0,0). 프레임 해상도 그대로 돌린다 — 예전엔 그레인 등
     /// 효과 프리셋을 편집기 격자(긴 변 1080)로 줄였다 늘려서 화면이 초점 나간 것처럼 흐렸다(오너 실기기 2026-10-09).
     /// 칸·반경은 짧은 변 비율이라 해상도가 달라도 같은 모양이고, 그레인 알갱이만 조금 더 곱다.
-    func render(frame: CIImage, key: String) -> CIImage {
+    func render(frame: CIImage, key: String, fxScale: Double = 1) -> CIImage {
         let e = frame.extent
         let img = frame.transformed(by: .init(translationX: -e.minX, y: -e.minY))
             .cropped(to: CGRect(x: 0, y: 0, width: e.width.rounded(.down), height: e.height.rounded(.down)))
         guard LiveFilter.presets[key] != nil else { return img }
-        return apply(img, key: key)
+        return apply(img, key: key, fxScale: fxScale)
     }
 
     /// 원점 (0,0)·정수 크기 이미지에 프리셋을 입힌다. effects=false 면 효과 패스(그레인 등)를 뺀다(검증용).
-    func apply(_ input: CIImage, key: String, effects: Bool = true) -> CIImage {
-        guard let p = LiveFilter.presets[key] else { return input }
+    /// fxScale: 카메라 "효과" 슬라이더(0..1) — 편집기 효과 슬라이더와 같다(프리셋 효과 값 × 배율).
+    func apply(_ input: CIImage, key: String, effects: Bool = true, fxScale: Double = 1) -> CIImage {
+        guard var p = LiveFilter.presets[key] else { return input }
+        if fxScale != 1 {
+            let k = max(0, fxScale)
+            p.fx.grain *= k; p.fx.vignette *= k; p.fx.leak *= k; p.fx.glow *= k; p.fx.blur *= k; p.fx.lowres *= k
+        }
         let ext = input.extent
         let W = ext.width, H = ext.height
         let minWH = min(W, H)

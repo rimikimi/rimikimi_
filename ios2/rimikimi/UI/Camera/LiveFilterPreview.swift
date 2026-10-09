@@ -50,6 +50,13 @@ final class LiveFilterRenderer: NSObject, AVCaptureVideoDataOutputSampleBufferDe
         return mir ? CGPoint(x: v, y: u) : CGPoint(x: v, y: 1 - u)
     }
 
+    private var _fxAmount: Double = 1
+    /// "효과" 슬라이더 값(0..1).
+    var fxAmount: Double {
+        get { lock.withLock { _fxAmount } }
+        set { lock.withLock { _fxAmount = newValue } }
+    }
+
     /// 지금 고른 필터 키. "none"·모르는 키 = 원본 그대로.
     var presetKey: String {
         get { lock.withLock { _presetKey } }
@@ -77,7 +84,7 @@ final class LiveFilterRenderer: NSObject, AVCaptureVideoDataOutputSampleBufferDe
 
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         guard let pb = CMSampleBufferGetImageBuffer(sampleBuffer), let context, let commandQueue else { return }
-        let (key, layer, size) = lock.withLock { (_presetKey, _layer, _drawableSize) }
+        let (key, layer, size, fxAmt) = lock.withLock { (_presetKey, _layer, _drawableSize, _fxAmount) }
         guard let layer, size.width > 0, size.height > 0 else { return }
 
         // 버퍼(P3 등) → 작업 공간 sRGB 로 변환돼 들어온다. 센서 원본(가로)이면 여기서 세운다:
@@ -86,7 +93,7 @@ final class LiveFilterRenderer: NSObject, AVCaptureVideoDataOutputSampleBufferDe
         let (front, mir) = lock.withLock { (_front, _mirrored) }
         img = LiveFilter.upright(img, appliedMirror: connection.isVideoMirrored, wantMirror: front && mir)
         lock.withLock { _imageSize = img.extent.size }
-        if key != "none", let engine { img = engine.render(frame: img, key: key) }
+        if key != "none", let engine { img = engine.render(frame: img, key: key, fxScale: fxAmt) }
 
         // 화면 꽉 채우기(aspectFill) — 기존 미리보기 레이어와 같은 구도
         let e = img.extent

@@ -14,6 +14,7 @@ struct CameraFilterTab: View {
     @State private var biasAtDragStart: Float?
     @State private var lockFired = false
     @State private var uiBias: Float = 0
+    @State private var fxAmount: Double = 1
     struct FocusMark: Equatable { let id = UUID(); let point: CGPoint; var locked = false; var touched = Date(); var adjusting = false; var dim = false }
 
     private var phone: [String] { ["ph16pro", "ph15pro", "ph14pro", "phxs", "ph7", "ph6s", "ph4s", "ph3gs"] }
@@ -157,13 +158,15 @@ struct CameraFilterTab: View {
                 .padding(.horizontal, Spacing.page).padding(.top, Spacing.s2)
                 Spacer()
                 lensRow
+                fxSlider
                 filterStrip
                 HStack {
                     if model.shots.isEmpty {
-                        sideButton(L.t("앨범", "Album"), "photo.on.rectangle") { Task { await app.perform(.filterPick(presetKey: selected)) } }
+                        sideButton(L.t("앨범", "Album"), "photo.on.rectangle") { app.photoPickFxAmount = fxAmount; Task { await app.perform(.filterPick(presetKey: selected)) } }
                     } else {
                         Button {
                             app.photoPickPreset = selected
+                            app.photoPickFxAmount = fxAmount
                             app.finishBurstCamera(model.shots)
                             while !model.shots.isEmpty { model.remove(at: 0) }
                         } label: {
@@ -186,6 +189,23 @@ struct CameraFilterTab: View {
         .onAppear { visible = true; Task { await model.start() }; app.enqueueCoach(Coach.filter) }
         .onDisappear { visible = false; model.stop() }
         .onChange(of: selected, initial: true) { model.live?.presetKey = selected }
+        .onChange(of: fxAmount, initial: true) { model.live?.fxAmount = fxAmount }
+    }
+
+    /// "효과" 슬라이더 — 고른 필터에 그레인·비네트·뽀샤시 같은 효과가 있을 때만(오너 지시 2026-10-09
+    /// "슬라이더 넣자. 효과 얼만큼 넣을건지"). 편집기 효과 슬라이더와 같은 값이라 찍고 넘어가도 이어진다.
+    @ViewBuilder private var fxSlider: some View {
+        if LiveFilter.presets[selected]?.fx.any == true {
+            HStack(spacing: Spacing.s3) {
+                Text(L.t("효과", "Effect")).font(AppFont.footnote.weight(.bold)).foregroundStyle(.white)
+                Slider(value: $fxAmount, in: 0...1).tint(.white)
+                Text("\(Int((fxAmount * 100).rounded()))").font(AppFont.footnote.weight(.semibold)).monospacedDigit()
+                    .foregroundStyle(.white.opacity(0.85)).frame(width: 30, alignment: .trailing)
+            }
+            .padding(.horizontal, Spacing.s4).padding(.vertical, 6)
+            .background(.black.opacity(0.3), in: Capsule())
+            .padding(.horizontal, Spacing.page)
+        }
     }
 
     /// 렌즈 버튼 — 기본 카메라처럼 0.5 · 1 · 2 · 망원(있는 것만). 지금 배율에 가까운 버튼에 실제 배율을 띄운다.

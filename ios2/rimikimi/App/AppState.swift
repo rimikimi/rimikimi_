@@ -192,6 +192,8 @@ final class AppState {
     /// 시스템 사진 선택창 — 필터를 고른 뒤 여기서 사진을 먼저 고른다.
     /// (웹에서 파일창을 자동으로 못 여는 제약 때문. `PhotoPicker` 주석 참고)
     var photoPickPreset: String?     // nil 이면 닫힘
+    /// 카메라 탭 "효과" 슬라이더 값 — 찍고 편집기로 넘길 때 같이 보낸다(편집기 효과 슬라이더가 이 값으로 열린다).
+    var photoPickFxAmount: Double = 1
     var showPhotoPicker = false
     /// 카메라 구현 스위치 — true = 아이폰 기본 카메라(현재), false = 옛 웹뷰 카메라(폴백).
     /// 웹뷰 쪽은 지우지 않고 남겨 둔다(문제가 생기면 한 줄로 되돌릴 수 있게).
@@ -517,8 +519,10 @@ final class AppState {
             return "data:image/jpeg;base64,\(d.base64EncodedString())"
         }
         guard !srcs.isEmpty else { return }
+        let fxAmt = photoPickFxAmount
+        photoPickFxAmount = 1
         webTool = WebTool(url: Config.filterToolURL(mode: "edit", presetKey: preset), title: Copy.decorate,
-                          initialPayload: ["mode": "edit", "srcs": srcs])
+                          initialPayload: ["mode": "edit", "srcs": srcs, "presetKey": preset, "fxAmt": fxAmt])
     }
 
     /// 결과 화면 "다듬기" — 지금 보고 있는 사진을 편집기에 바로 실어 보낸다(사진 선택 화면 생략).
