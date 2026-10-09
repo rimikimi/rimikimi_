@@ -10059,10 +10059,11 @@
  {
   "id": 278,
   "title": "스튜디오 무드",
-  "category": "스튜디오 프로필",
+  "category": "남성",
   "text": "Young person, neatly styled hair with side part, fair flawless complexion, subtle natural makeup, natural confident expression, tailored black (#101010) single-breasted blazer with peaked lapels and single-button closure, fitted at waist showing hourglass silhouette, crisp white (#FFFFFF) button-down dress shirt unbuttoned at collar, matching black tailored straight-leg trousers, minimalist sophisticated business attire, no visible jewelry, standing three-quarter front- facing pose, right hand relaxed at side, left hand tucked into trouser pocket, shoulders squared, direct soft gaze into the camera, poised confident stance, executive power pose, clean seamless light gray (#B3B3B3) studio backdrop, minimalist negative space surrounding subject, centered full-body composition, vertical portrait orientation, soft diffused key lighting from front-left, gentle fill light, subtle rim light separating subject from background, high-end fashion editorial photography, sharp focus throughout, crisp tailoring details visible, fabric texture detail, shot on medium format camera, 85mm prime lens, f/5.6 aperture, ISO 100,",
   "sensitive": false,
   "categories": [
+   "남성",
    "스튜디오 프로필"
   ],
   "title_en": "Studio Mood",
@@ -10073,10 +10074,11 @@
  {
   "id": 277,
   "title": "스튜디오 무드",
-  "category": "스튜디오 프로필",
+  "category": "남성",
   "text": "Early 30s, fair porcelain skin, natural flawless complexion, subtle natural lips, light natural makeup, hair, soft layers, slight volume at crown, #05234d tailored two-piece suit, fitted single-breasted blazer, notch lapels, four-button sleeves, matching slim-cut trousers, white (#FFFFFF) dress shirt or blouse underneath, body turned 3/4 way, arms crossed confidently, chin slightly lowered, calm and warm expression, head turned towards direct camera, eye contact with lens, body shot from upper thigh to head, slight body angle left, #fffaf6 matte studio backdrop, minimalist studio environment, soft warm diffused studio lighting, gentle frontal key light, no harsh shadows on face, warm neutral tones, editorial corporate portrait photography, high- resolution DSLR, 50mm lens, shallow depth of field, sharp facial focus, bokeh on background, photorealistic, professional headshot quality, 4K, ultra-detailed skin texture",
   "sensitive": false,
   "categories": [
+   "남성",
    "스튜디오 프로필"
   ],
   "title_en": "Studio Mood",
@@ -10218,10 +10220,11 @@
  {
   "id": 263,
   "title": "샴페인 토스트 턱시도",
-  "category": "파티 / 이벤트",
+  "category": "남성",
   "text": "Slicked-back hair, distinct brown (#6B4A32) eyes, charming smirk, confident gaze, front-facing pose, head slightly tilted, direct gaze, right arm extended, holding a prominent coupe-style champagne (#E4CFA8) saucer glass towards camera in bokeh, raised in a formal toast, left hand not visible, centered composition, strictly black (#101010) tuxedo suit jacket, black satin shawl lapel, crisp white (#FFFFFF) tuxedo shirt, formal black bow tie, white silk pocket square folded neatly, dark blurred night-time party setting, rich deep blacks, out-of-focus background details, large randomly sized fireworks in blue (#2B5FA8) and yellow (#F2C744), blurred warm bokeh lights, indistinct figures of a crowd, hints of a large balcony or patio, sophisticated and opulent atmosphere, low-key cinematic lighting, warm ambient tones, soft yet defined facial key light, highlights on the subject's face, rich blacks, shallow depth of field, natural film grain, medium shot, high-resolution photograph, focused sharply on the face and the champagne glass, cinematic color grading, rich color saturation, 35mm film quality.",
   "sensitive": false,
   "categories": [
+   "남성",
    "파티 / 이벤트"
   ],
   "title_en": "Champagne Toast Tuxedo"
@@ -10326,16 +10329,13 @@
  {
   "id": 246,
   "title": "컨셉 246",
-  "category": "일상 스냅",
+  "category": "판타지 / 콘셉트",
   "text": "Captured image in the middle of Facetime call with bedtime aesthetics, facetime with a friend in opposite sex named \"baby 💕 \". Dressed in a totally relaxed homewear. Low lighing in the bedroom. Lying in bed, ready to sleep. Iphone screen and apply exact Facetime frame. Low resolution.",
   "sensitive": false,
   "categories": [
-   "일상 스냅"
+   "판타지 / 콘셉트"
   ],
-  "title_en": "Concept 246",
-  "purposes": [
-   "snap"
-  ]
+  "title_en": "Concept 246"
  },
  {
   "id": 245,
@@ -10698,10 +10698,11 @@
  {
   "id": 182,
   "title": "스튜디오 무드",
-  "category": "하이패션 / 화보",
+  "category": "남성",
   "text": "Subject & Attire: Gorgeous male subject in the reference photo, refined facial features, slicked- back wet-look hair, classic black (#101010) tailored tuxedo, satin shawl lapels, crisp white (#FFFFFF) pleated dress shirt, white silk bowtie, luxury silver (#C0C4C9) rings on multiple fingers, minimalist silver bracelet, polished cufflinks, high-fashion chic. Pose: Frontal view, centered, drinking from a transparent crystal lowball glass, glass held to lips, intense direct eye contact, mysterious and confident expression, multiple manicured female hands entering from the periphery, one hand smoothing the subject's hair from the top left, one hand adjusting the lapel from the right, one hand tugging the bottom of the tuxedo vest from the bottom center, interactive and crowded composition. Environment & Composition: Editorial fashion layout, minimalist studio setting, stark solid white background, medium close-up, torso-up framing, centralized subject, cinematic symmetry, surreal multi-arm interaction, high-end commercial aesthetic. Lighting & Photography Style: High-contrast, dramatic key lighting, sharp shadows, soft-box studio illumination, classic film aesthetic, grainy 35mm film texture, high-fashion photography, Vogue editorial style. Setting & Composition: Clean architectural lines, minimalist white wall, depth of field with sharp focus on the subject's eyes and the crystal glass, slightly blurred motion or depth on the surrounding hands to emphasize the subject as the focal point. Technical Specifications: 8k UHD, photorealistic, hyper-detailed skin texture, intricate fabric weave of the tuxedo, sharp focus, ray-traced reflections on jewelry and glass, Hasselblad H6D-400c style, masterwork quality, high-resolution rendering.",
   "sensitive": false,
   "categories": [
+   "남성",
    "하이패션 / 화보"
   ],
   "title_en": "Studio Mood"
