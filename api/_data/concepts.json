@@ -2192,9 +2192,9 @@
   "id": "860",
   "title": "블랙 슈트",
   "title_en": "Black Suit",
-  "category": "하이패션 / 화보",
+  "category": "판타지 / 콘셉트",
   "categories": [
-   "하이패션 / 화보"
+   "판타지 / 콘셉트"
   ],
   "sensitive": false,
   "text": "Likeness: 100% likeness of the person in the reference photo, featuring an intense and unwavering gaze.\nHair: Sleek, hair styled flat and parted to the side, tucked neatly behind the ears. High ponytail.\nFacial Details: Sharp facial features, focused eyes is aiming the gun, and diamond teardrop earrings.\nA stunning woman from the reference photo with refined features and a polished, high-fashion look. Her hair is styled in a sleek, high ponytail with a clean middle part. She is wearing a bespoke, two-piece tailored pantsuit in a vibrant, saturated black (#101010). The blazer features sharp satin peaked lapels, structured shoulders, and a plunging deep-V neckline worn with no undershirt. It is fastened by a single button decorated with diamonds. The matching trousers are high-waisted and slim-fit with a sharp central crease. She completes the look with reflective, metallic silver (#C0C4C9) with crystals, pointed-toe stiletto heels.\nPose\nPrimary Action: A high-tension, dynamic action pose where the subject is pointing a matte-titanium long barrel magnum revolver directly at the camera lens.\nHand Positioning: The gun is held firmly with both hands, extended forward into the immediate foreground to create a dramatic forced perspective.\nBody Language: The subject's body is angled slightly away, with the head tilted forward and eyes looking \"through\" the top of the firearm, conveying a sense of professional aim and serious intent.\nEnvironment & Composition\nBackground: A clean, minimalist, and bright white (#FFFFFF) studio backdrop with no distracting elements.\nFraming: A medium close-up shot that focuses on the subject's face and the reaching arm.\nDepth of Field: Extreme shallow depth of field. The muzzle of the gun in the very front, pointing directly at the camera, is slightly blurred/out of focus due to its proximity to the lens, while the subject’s eyes and face remain in razor-sharp focus.\nLighting & Photography Style\nLighting: High-key studio lighting that is soft and diffused. Even illumination across the subject's face with very soft, natural-looking shadows that define the jawline and nose without being harsh.\nStyle: Professional stock photography or commercial film still. The look is clean, crisp, and high-contrast against the white background.\nAtmosphere: Intense, cinematic, and confrontational.\nSetting & Composition (Refined)\nPerspective: Eye-level shot, creating a direct \"point-blank\" interaction between the subject and the viewer.\nBalance: The subject's face is positioned in the upper left third of the frame, balanced by the gun occupying the lower right foreground.\nTechnical Specifications\nQuality: Photorealistic, 8k resolution, highly detailed skin textures, realistic fabric micro-weaves.\nLens: 50mm or 85mm prime lens simulation to capture realistic facial proportions while allowing for the foreground bokeh on the weapon.\nDetails: Sharp focus on the irises, visible individual hair strands, and metallic texture on the handgun.",
@@ -3960,11 +3960,14 @@
   "category": "남성",
   "categories": [
    "남성",
-   "스튜디오 프로필"
+   "웨딩 / 브라이덜"
   ],
   "text": "Use the attached reference image only for facial identity — the reference shows a man in a suit; preserve exact facial features and face shape, and change the outfit completely to match the scene. man, classic groom studio portrait, SEATED pose, he sits toward the front edge of a worn cognac leather club chair, left forearm resting across his left knee, right hand relaxed on his thigh, shoulders naturally twisted toward camera, leaning slightly forward with an easy warm smile straight into the lens, classy chic dark studio set styled like a gentleman's study, smoked oak paneling, hard slatted light from venetian blinds raking across the wall and floor in bright diagonal stripes, a low brass floor lamp glowing warm in the background, charcoal (#36393D) three-piece wedding suit with the jacket open showing the waistcoat, dark tie, face fully lit by the key slat of light, clearly visible, three-quarter framing from just below eye level, 85mm lens, f/2.8, 1/125s, ISO 400, smoky cool grade with warm lamp accents. Clean full-bleed photograph only: no app interface, no on-screen text, no frame, border, or overlay of any kind.",
   "sensitive": false,
-  "publishAt": "2026-10-12T11:00:00Z"
+  "publishAt": "2026-10-12T11:00:00Z",
+  "purposes": [
+   "wedding"
+  ]
  },
  {
   "id": "718",
@@ -5866,16 +5869,13 @@
   "id": 571,
   "title": "블론드 웨이브 무드",
   "title_en": "Blonde Wave Mood",
-  "category": "스튜디오 프로필",
+  "category": "판타지 / 콘셉트",
   "categories": [
-   "스튜디오 프로필"
+   "판타지 / 콘셉트"
   ],
   "text": "young woman, long flowing blonde hair with soft loose waves and sun-kissed highlights, natural center part, hair cascading past the waist, luminous fair skin, fresh glowy natural makeup, softly defined brows, subtle warm blush (#F3C9C4), glossy nude-pink lips, delicate small stud earrings, fitted black (#101010) ribbed short-sleeve crop top, high-waisted grey (#8A8A8A) tailored trousers, effortless casual-chic styling. standing with body angled away from the camera, torso gently twisted, glancing back over one shoulder toward the lens, soft parted-lip smile, one hand resting near the waistband, relaxed candid posture, modern minimalist loft interior, smooth polished concrete ceiling and floors, matte grey cabinetry, recessed linear lighting, muted greige (#9F988F) palette, softly blurred open-plan kitchen behind, soft diffused natural daylight, gentle warm highlights on the hair, cool grey ambient fill, smooth even skin rendering, lifestyle influencer aesthetic, vertical portrait framing, three-quarter body crop, confident, effortless, serene, understated, quietly glamorous mood, 50mm lens, f/2.0 aperture, ISO 200, shutter speed 1/200s, shallow depth of field, gently blurred background, crisp focus on face and hair",
   "sensitive": false,
-  "publishAt": "2026-10-06T11:00:00Z",
-  "purposes": [
-   "profile"
-  ]
+  "publishAt": "2026-10-06T11:00:00Z"
  },
  {
   "id": 570,
@@ -6756,9 +6756,9 @@
   "id": 507,
   "title": "한옥 다실",
   "title_en": "Hanok Tea Room",
-  "category": "예술 / 클래식",
+  "category": "하이패션 / 화보",
   "categories": [
-   "예술 / 클래식"
+   "하이패션 / 화보"
   ],
   "text": "Moody editorial portrait of the woman from the reference image in a dim traditional hanok tea house at dusk, kneeling at a low wooden table set with a celadon teapot and cups. She pours tea in a slow, focused gesture, steam curling up through a single shaft of warm lantern light, paper hanji doors glowing softly behind her. She wears a modern muted-charcoal linen dress with a mandarin collar, hair in a low twist with a simple pin, calm downcast eyes. Deep shadows with warm amber (#C8791E) highlights, quiet contemplative atmosphere, painterly chiaroscuro light, hyper-realistic skin texture. Clean full-bleed photograph only: no interface, no text, no watermark, no frame, border, or overlay of any kind.",
   "sensitive": false,
@@ -9684,13 +9684,16 @@
  {
   "id": 52,
   "title": "레인 머메이드",
-  "category": "하이패션 / 화보",
+  "category": "웨딩 / 브라이덜",
   "text": "Soft makeup from the reference photo. The photos must be in 8k resolution(9:16)with ultra high definition, her face must have 100% fidelity to the provided reference photo. A full-body photograph of a woman, in the reference image, wearing a white (#FFFFFF) floral lace gown with a corset-style bodice, sweetheart neckline, long sleeves and a mermaid train. Her long wavy hair falls over her shoulders and she has a warm, poised expression. She stands in a luxurious room against golden (#C9A227) floor-to-ceiling drapes, next to an extremely large, modern elaborate crystal grand chandelier casting warm, golden light. To the left is a tall mirror reflecting her back and the drapes. The floor is covered in an opulent patterned rug. The lighting is warm, soft and rich.",
   "sensitive": false,
   "categories": [
-   "하이패션 / 화보"
+   "웨딩 / 브라이덜"
   ],
-  "title_en": "Rain Mermaid"
+  "title_en": "Rain Mermaid",
+  "purposes": [
+   "wedding"
+  ]
  },
  {
   "id": 51,
@@ -9820,11 +9823,11 @@
  {
   "id": 38,
   "title": "니트 룩",
-  "category": "파티 / 이벤트",
+  "category": "세계여행",
   "text": "Soft makeup from the reference photo. The photos must be in 8k resolution(9:16)with ultra high definition, her face must have 100% fidelity to the provided reference photo. Wide shot of a highly detailed photograph capturing a woman in the reference photo, wearing a v-neck #EF5D60 knit dress in a hot air balloon basket. She is riding on a hot air balloon. She smiles softly, gazing out over a vast landscape of green (#3F8F5C) fields, trees and a clear horizon under a bright clear sky with hints of white (#FFFFFF) clouds. Her hair is low ponytail and it’s blowing with wind. Numerous other hot air balloons of various vivid colors and patterns, including patterned and solid colored ones, float in random distances. The light is natural sunlight.",
   "sensitive": false,
   "categories": [
-   "파티 / 이벤트"
+   "세계여행"
   ],
   "title_en": "Knit Look"
  },
@@ -11178,16 +11181,13 @@
  {
   "id": 256,
   "title": "레드 로즈 새틴 가운",
-  "category": "웨딩 / 브라이덜",
+  "category": "하이패션 / 화보",
   "text": "Young woman, straight high ponytail with deep side part, natural elegant makeup, long-sleeved white (#FFFFFF) satin floor-length gown, backless design, large bouquet of deep crimson (#69121C) roses, red (#C0392B) high-heeled sandals with ankle straps, standing sideways, torso turned toward camera, graceful posture, minimalist professional studio, solid soft peach (#FFCBA4) seamless backdrop, full body shot, centered composition, soft diffused studio lighting, high-key photography, gentle shadows, clean aesthetic, photorealistic, 8k resolution, sharp focus, cinematic quality, professional color grading, medium format photography style.",
   "sensitive": false,
   "categories": [
-   "웨딩 / 브라이덜"
+   "하이패션 / 화보"
   ],
-  "title_en": "Red Rose Satin Gown",
-  "purposes": [
-   "wedding"
-  ]
+  "title_en": "Red Rose Satin Gown"
  },
  {
   "id": 258,
