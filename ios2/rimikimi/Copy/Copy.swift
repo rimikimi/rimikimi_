@@ -46,7 +46,7 @@ enum Copy {
     static var settingsTitle: String { L.t("설정", "Settings") }
     static var featureRetouch: String { L.t("말로 고치기", "Fix with words") }
     static var featureRestore: String { L.t("옛날 사진 복원", "Restore old photo") }
-    static var purposeProfile: String { L.t("전문 프로필", "Pro profile") }
+    static var purposeProfile: String { L.t("증명·프로필", "ID · Profile") }
     static var purposeSnap: String { L.t("프사·소개팅", "Profile pic · Dating") }
     static var purposeWedding: String { L.t("웨딩·커플", "Wedding · Couple") }
     static var purposeConcept: String { L.t("컨셉화보", "Concept shoots") }

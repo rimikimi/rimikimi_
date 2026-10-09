@@ -322,7 +322,7 @@ enum StudioTab {
     static func title(_ k: String) -> String {
         switch k {
         case "resume": return L.t("이력서·취업", "Résumé")
-        case "linkedin": return L.t("이직·비즈니스", "Business")
+        case "linkedin": return L.t("전문 프로필", "Professional")
         default: return L.t("배우·모델", "Actor · model")
         }
     }
