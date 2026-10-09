@@ -1,0 +1,58 @@
+{
+ "feature.retouch": {
+  "ko": "말로 고치기",
+  "en": "Fix with words"
+ },
+ "feature.restore": {
+  "ko": "옛날 사진 복원",
+  "en": "Restore old photo"
+ },
+ "purpose.profile": {
+  "ko": "증명·프로필",
+  "en": "ID · Profile"
+ },
+ "purpose.snap": {
+  "ko": "프사·소개팅",
+  "en": "Profile pic · Dating"
+ },
+ "purpose.wedding": {
+  "ko": "웨딩·커플",
+  "en": "Wedding · Couple"
+ },
+ "purpose.concept": {
+  "ko": "컨셉화보 TEST",
+  "en": "Concept shoots"
+ },
+ "segment.today": {
+  "ko": "오늘의 새 컨셉",
+  "en": "New today"
+ },
+ "studioTab.resume": {
+  "ko": "이력서·취업",
+  "en": "Résumé"
+ },
+ "studioTab.linkedin": {
+  "ko": "전문 프로필",
+  "en": "Professional"
+ },
+ "studioTab.audition": {
+  "ko": "배우·모델",
+  "en": "Actor · model"
+ },
+ "weddingTab.concepts": {
+  "ko": "웨딩 컨셉",
+  "en": "Wedding"
+ },
+ "weddingTab.main": {
+  "ko": "본식 드레스",
+  "en": "Ceremony gowns"
+ },
+ "weddingTab.after": {
+  "ko": "2부 드레스",
+  "en": "Reception gowns"
+ },
+ "_comment": {
+  "ko": "앱 이름표 — 키별 ko/en. 앨범 이름은 category.<앨범명> 키로 바꿀 수 있다(예: category.스튜디오 프로필). 앱 2.1.0 build 32+ 가 읽는다.",
+  "en": ""
+ }
+}
