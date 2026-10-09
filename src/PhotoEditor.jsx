@@ -189,7 +189,8 @@ const fxOf = (p) => ({
 // 공통(한 번 고르면 전부 적용)이고 스티커만 사진별이다 — "10장에 같은 필터 입혀서
 // 한 번에 저장"이 배치 모드의 존재 이유라서다.
 // initialPresetKey: 필터 카테고리의 프리셋 카드에서 들어오면 그 룩이 켜진 채 열린다.
-export default function PhotoEditor({ src, srcs, initialPresetKey = "none", filename = "rimikimi", onClose }) {
+// initialFxAmt: 앱 카메라에서 고른 "효과" 슬라이더 값(0..1) — 찍고 넘어와도 그대로 이어진다.
+export default function PhotoEditor({ src, srcs, initialPresetKey = "none", initialFxAmt = 1, filename = "rimikimi", onClose }) {
   const sources = srcs && srcs.length ? srcs : [src];
   const multi = sources.length > 1;
   // 에디터가 떠 있는 동안 앱 루트의 스와이프 제스처(뒤로가기·탭 전환)를 끈다.
@@ -211,7 +212,8 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
   const aiOk = () => { try { return localStorage.getItem(AI_KEY) === "1"; } catch (_) { return false; } };
   const [fitErr, setFitErr] = useState("");
   const [presetKey, setPresetKey] = useState(initialPresetKey);
-  const [fx, setFx] = useState(() => fxOf(presetByKey(initialPresetKey)));
+  const scaledFx = (p, amt) => { const b = fxOf(p); const o = {}; for (const k of Object.keys(b)) o[k] = b[k] * amt; return o; };
+  const [fx, setFx] = useState(() => scaledFx(presetByKey(initialPresetKey), initialFxAmt));
   const [chipGroup, setChipGroup] = useState(() => presetByKey(initialPresetKey).group || "phone");
   // 필터 강도 (오너 지시): %표시 없는 슬라이더, 기본 0.7 = 지금의 풀 프리셋 룩.
   // 1.0 까지 올리면 더 진하게(외삽), 0 이면 원본.
@@ -219,7 +221,7 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
   // 효과 세기 (오너 지시 2026-09-29: 필터 패널에 "색감"·"효과" 슬라이더 2개) — 프리셋에 딸린 효과
   // (그레인·비네트·흐림·뽀샤시…)를 0~1 배로 줄인다. 1 = 프리셋 그대로, 0 = 색감만.
   // strength(색감)는 applyLookWithStrength 가 색 보정에만 쓰고, 효과는 fx 값 자체를 이 배율로 바꿔 둔다.
-  const [fxAmt, setFxAmt] = useState(1);
+  const [fxAmt, setFxAmt] = useState(initialFxAmt);
   const [lens, setLens] = useState(0);
   // 정방향(기울기·세로·가로 원근) — 사진별. geoAuto = 자동 판정 결과(한 번만 돌린다).
   const ZERO_GEO = { tilt: 0, pv: 0, ph: 0 };
@@ -232,9 +234,9 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
   // 사진 전환 직후 옛 룩이 새 사진에 덮어써지는 레이스가 생겨서 명령형으로 간다)
   const defaultLook = () => ({
     presetKey: initialPresetKey,
-    fx: fxOf(presetByKey(initialPresetKey)),
+    fx: scaledFx(presetByKey(initialPresetKey), initialFxAmt),
     strength: 0.7,
-    fxAmt: 1,
+    fxAmt: initialFxAmt,
     lens: 0,   // 렌즈 왜곡 보정 -1..1 (0 = 원본)
     geo: { tilt: 0, pv: 0, ph: 0 },
     geoAuto: null,

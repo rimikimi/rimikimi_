@@ -164,7 +164,7 @@ function FilterPicker({ presetKey, onPicked }) {
   );
 }
 
-function FilterTool({ mode, presetKey, initSrc, initSrcs }) {
+function FilterTool({ mode, presetKey, fxAmt, initSrc, initSrcs }) {
   // 네이티브가 사진을 먼저 고르게 하고 여기로 넘긴다(`srcs`). 그러면 웹에
   // "사진 선택" 중간 화면이 아예 안 뜬다 — 사파리는 사용자 제스처 없는 파일창 열기를
   // 막아서 웹에서 자동으로 여는 건 불가능하다(2026-09-17 실패 확인).
@@ -175,6 +175,7 @@ function FilterTool({ mode, presetKey, initSrc, initSrcs }) {
     <PhotoEditor
       srcs={srcs}
       initialPresetKey={presetKey}
+      initialFxAmt={fxAmt}
       filename="rimikimi_filter"
       onClose={nativeClose}
     />
@@ -193,5 +194,6 @@ export default function ToolEntry() {
   // filter
   const mode = init.mode || params.mode;
   const presetKey = init.presetKey || params.preset || "none";
-  return <FilterTool mode={mode} presetKey={presetKey} initSrc={init.src} initSrcs={init.srcs} />;
+  const fxAmt = typeof init.fxAmt === "number" ? Math.max(0, Math.min(1, init.fxAmt)) : 1;
+  return <FilterTool mode={mode} presetKey={presetKey} fxAmt={fxAmt} initSrc={init.src} initSrcs={init.srcs} />;
 }
