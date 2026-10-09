@@ -217,7 +217,8 @@ final class BurstCameraModel {
     }
 
     private func clampFactor(_ f: CGFloat, _ device: AVCaptureDevice) -> CGFloat {
-        let maxF = min(device.maxAvailableVideoZoomFactor, zoomBase * 15)
+        // 기본 카메라처럼 — 망원이 있으면 15×, 없으면 10× 까지
+        let maxF = min(device.maxAvailableVideoZoomFactor, zoomBase * (lensStops.contains { $0 > 2.01 } ? 15 : 10))
         return min(maxF, max(device.minAvailableVideoZoomFactor, f))
     }
 
@@ -225,7 +226,21 @@ final class BurstCameraModel {
 
     /// 탭한 곳에 초점·노출(기본 카메라처럼). `p` 는 장치 좌표(0~1, 센서 가로 기준).
     /// 장면이 크게 바뀌면 다시 자동으로 돌아간다(`subjectAreaDidChange`).
+    /// 길게 누르기 = AE/AF 잠금(기본 카메라와 같다) — 그 자리에 맞춘 뒤 장면이 바뀌어도 풀리지 않는다.
+    /// 다시 탭하면 풀린다.
+    private(set) var aeafLocked = false
+    func lockFocus(at p: CGPoint) {
+        focus(at: p)
+        aeafLocked = true
+        if let device = input?.device, (try? device.lockForConfiguration()) != nil {
+            device.isSubjectAreaChangeMonitoringEnabled = false
+            device.unlockForConfiguration()
+        }
+        HapticPlayer.longPress()
+    }
+
     func focus(at p: CGPoint) {
+        aeafLocked = false
         guard let device = input?.device, (try? device.lockForConfiguration()) != nil else { return }
         if device.isFocusPointOfInterestSupported, device.isFocusModeSupported(.autoFocus) {
             device.focusPointOfInterest = p
@@ -251,7 +266,7 @@ final class BurstCameraModel {
     }
 
     private func resumeAutoFocus() {
-        guard let device = input?.device, (try? device.lockForConfiguration()) != nil else { return }
+        guard !aeafLocked, let device = input?.device, (try? device.lockForConfiguration()) != nil else { return }
         if device.isFocusModeSupported(.continuousAutoFocus) {
             device.focusPointOfInterest = CGPoint(x: 0.5, y: 0.5); device.focusMode = .continuousAutoFocus
         }

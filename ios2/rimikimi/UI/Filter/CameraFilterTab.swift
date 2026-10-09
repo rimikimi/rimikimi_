@@ -12,7 +12,8 @@ struct CameraFilterTab: View {
     @State private var visible = false
     @State private var focusMark: FocusMark?
     @State private var biasAtDragStart: Float?
-    struct FocusMark: Equatable { let id = UUID(); let point: CGPoint; var touched = Date() }
+    @State private var lockFired = false
+    struct FocusMark: Equatable { let id = UUID(); let point: CGPoint; var locked = false; var touched = Date() }
 
     private var phone: [String] { ["ph16pro", "ph15pro", "ph14pro", "phxs", "ph7", "ph6s", "ph4s", "ph3gs"] }
     private var analog: [String] { FilterTabView.groups.filter { $0.key != "phone" }.flatMap { $0.presets.map(\.key) } }
@@ -48,6 +49,18 @@ struct CameraFilterTab: View {
                                     focusMark?.touched = Date()
                                 }
                                 .onEnded { _ in biasAtDragStart = nil })
+                            // 길게 누르기 = AE/AF 잠금 — 누른 채로 위치를 받으려고 길게 누르기 뒤에 끌기를 잇는다
+                            .simultaneousGesture(LongPressGesture(minimumDuration: 0.6)
+                                .sequenced(before: DragGesture(minimumDistance: 0, coordinateSpace: .local))
+                                .onChanged { v in
+                                    guard case .second(true, let drag?) = v, !lockFired else { return }
+                                    lockFired = true
+                                    if let dp = live.devicePoint(drag.startLocation, in: geo.size) {
+                                        model.lockFocus(at: dp)
+                                        focusMark = FocusMark(point: drag.startLocation, locked: true)
+                                    }
+                                }
+                                .onEnded { _ in lockFired = false })
                             .simultaneousGesture(MagnifyGesture()
                                 .onChanged { model.setZoom(model.zoomAtGestureStart * $0.magnification) }
                                 .onEnded { _ in model.commitZoom() })
@@ -65,6 +78,8 @@ struct CameraFilterTab: View {
                                     .transition(.opacity)
                                     .allowsHitTesting(false)
                                     .task(id: m.touched) {
+                                        // 잠금 중엔 네모를 계속 둔다(기본 카메라와 같음) — 다음 탭에서 풀린다
+                                        guard !m.locked else { return }
                                         try? await Task.sleep(for: .seconds(2))
                                         withAnimation(.easeOut(duration: 0.25)) { if focusMark?.id == m.id { focusMark = nil } }
                                     }
@@ -79,6 +94,14 @@ struct CameraFilterTab: View {
                     .animation(.easeOut(duration: 0.18), value: model.flashOverlay).allowsHitTesting(false)
             }
             VStack(spacing: Spacing.s3) {
+                ZStack {
+                    if model.aeafLocked {
+                        Text(L.t("AE/AF 잠금", "AE/AF LOCK"))
+                            .font(.system(size: 13, weight: .semibold)).foregroundStyle(.black)
+                            .padding(.horizontal, 8).padding(.vertical, 3)
+                            .background(Color.yellow, in: RoundedRectangle(cornerRadius: 4))
+                            .transition(.opacity)
+                    }
                 HStack {
                     if !model.isFront {
                         CircleGlassButton(system: model.flashOn ? "bolt.fill" : "bolt.slash",
@@ -96,6 +119,7 @@ struct CameraFilterTab: View {
                         .buttonStyle(PressScaleButtonStyle())
                         .accessibilityAddTraits(model.frontMirror ? [.isSelected] : [])
                     }
+                }
                 }
                 .padding(.horizontal, Spacing.page).padding(.top, Spacing.s2)
                 Spacer()
@@ -139,11 +163,14 @@ struct CameraFilterTab: View {
                 ForEach(model.lensStops, id: \.self) { stop in
                     let on = stop == near
                     Button { model.jumpZoom(stop) } label: {
+                        // 기본 카메라처럼 한 줄 — 배율이 길어지면(예: 14.7×) 동그라미가 옆으로 늘어난다
                         Text(on ? Self.zoomText(model.zoom, active: true) : Self.zoomText(stop, active: false))
                             .font(.system(size: on ? 13 : 11, weight: .bold)).monospacedDigit()
+                            .lineLimit(1).fixedSize()
                             .foregroundStyle(on ? Color.yellow : Color.white)
-                            .frame(width: on ? 38 : 30, height: on ? 38 : 30)
-                            .background(.black.opacity(0.45), in: Circle())
+                            .padding(.horizontal, on ? 7 : 0)
+                            .frame(minWidth: on ? 38 : 30, minHeight: on ? 38 : 30)
+                            .background(.black.opacity(0.45), in: Capsule())
                     }
                     .buttonStyle(.plain)
                 }
@@ -154,7 +181,7 @@ struct CameraFilterTab: View {
     }
     static func zoomText(_ z: CGFloat, active: Bool) -> String {
         let r = (z * 10).rounded() / 10
-        let s = r == r.rounded() ? String(Int(r)) : (r < 1 ? String(format: ".%d", Int((r * 10).rounded())) : String(format: "%.1f", r))
+        let s = (r == r.rounded() || r >= 10) ? String(Int(r.rounded())) : (r < 1 ? String(format: ".%d", Int((r * 10).rounded())) : String(format: "%.1f", r))
         return active ? s + "×" : s
     }
 
