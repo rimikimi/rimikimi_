@@ -78,6 +78,11 @@ struct GenerateRequest {
     var faceProfile: [(image: UIImage, angle: String)] = []
     /// 커스텀 보정: 사용자가 쓴 "고칠 내용"(아무 언어).
     var retouchText: String? = nil
+    /// 브루클린 목적 사진(이력서·프로필): 세부 조정 값(레시피 키 → 값)과 옷 사진. 룩은 concept.studioPreset.
+    var studioOverrides: [String: Any] = [:]
+    var outfit: UIImage? = nil
+    /// 조세핀 드레스: 신랑도 함께면 신랑 사진(두 번째 사진으로 간다).
+    var groomPhoto: UIImage? = nil
 
     var prompt: String { concept.isFourcut ? "인생네컷" : concept.text }
     var skipFacePrecheck: Bool { concept.isArtTransform }
@@ -183,11 +188,27 @@ final class RimikimiAPI {
             : ImageUtil.jpegPayload(r.photo, maxSide: 1024, quality: 0.85)
         var body: [String: Any] = [
             "mimeType": photo.mimeType, "base64": photo.base64, "prompt": r.prompt,
-            "conceptId": r.concept.id, "conceptTitle": r.concept.title,
+            "conceptTitle": r.concept.title,
             "skipFacePrecheck": r.skipFacePrecheck,
             "count": r.effectiveCount,
             "proSample": false,
         ]
+        // 리미키미 컨셉만 conceptId 를 보낸다. 브루클린 룩·조세핀 드레스는 서버 카탈로그 id 로(지시문은 서버가 만든다).
+        if let preset = r.concept.studioPreset, let purpose = r.concept.studioPurpose {
+            body["studio"] = ["purpose": purpose, "presetId": preset, "overrides": r.studioOverrides]
+            if let o = r.outfit {
+                let p = ImageUtil.jpegPayload(o, maxSide: 896, quality: 0.85)
+                body["outfitMime"] = p.mimeType; body["outfitBase64"] = p.base64
+            }
+        } else if let code = r.concept.dressCode {
+            body["wedding"] = ["dressCode": code]
+            if let g = r.groomPhoto {
+                let p2 = ImageUtil.jpegPayload(g, maxSide: 1024, quality: 0.85)
+                body["mimeType2"] = p2.mimeType; body["base64_2"] = p2.base64
+            }
+        } else {
+            body["conceptId"] = r.concept.id
+        }
         if let partner = r.partnerPhoto, r.concept.isCouple {
             let p2 = ImageUtil.jpegPayload(partner, maxSide: 1024, quality: 0.85)
             body["mimeType2"] = p2.mimeType; body["base64_2"] = p2.base64; body["couple"] = true
@@ -224,7 +245,9 @@ final class RimikimiAPI {
             }
         }
 
-        var req = authed("api/generate", token: token)
+        // 게스트 첫 1장(토큰 없음): 기기 ID 만 보낸다 — 서버가 기기당 1회·미리보기 2장으로 만든다.
+        if token.isEmpty { body["guest"] = ["platform": "ios", "deviceId": GuestDevice.id] }
+        var req = token.isEmpty ? URLRequest(url: Config.apiBase.appendingPathComponent("api/generate")) : authed("api/generate", token: token)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.httpBody = try JSONSerialization.data(withJSONObject: body)

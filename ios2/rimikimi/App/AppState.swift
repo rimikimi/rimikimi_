@@ -50,6 +50,8 @@ enum PendingAction {
     case generate(GenerateRequest)
     /// 여러 컨셉 한 번에(담기 → "N장 만들기"). 컨셉마다 1장씩, 크레딧은 장수만큼 그대로 차감(오너 지시 2026-10-09).
     case generateMany([GenerateRequest])
+    /// 게스트 미리보기에서 고른 1장 받기 — 로그인 뒤 앨범에 저장.
+    case guestReceive(UIImage)
     case filterPick(presetKey: String?)
     case camera
 }
@@ -96,10 +98,25 @@ final class AppState {
     var aiConsentSheet = false
     private var pendingAfterConsent: GenerateRequest?
     private var pendingManyAfterConsent: [GenerateRequest]?
+    private var pendingGuestAfterConsent: GenerateRequest?
+    /// 게스트 첫 1장 화면(만드는 중 → 미리보기 2장 → 받기). nil 이면 닫힘.
+    var guestFlow: GuestFlow?
+    struct GuestFlow: Identifiable {
+        let id = UUID()
+        var title: String
+        var images: [UIImage] = []
+        var error: String?
+    }
     private var pendingManyAfterPurchase: [GenerateRequest]?
 
     // MARK: 여러 장 담기 (오너 지시 2026-10-08 — 카테고리 상관없이 한 번에 최대 8장)
     static let cartMax = 8
+    /// 브루클린 룩 · 조세핀 드레스 카탈로그와 탭별 옵션(세부 조정·옷 사진·신랑 사진).
+    let studio = StudioStore()
+    /// 룩·드레스 크게 보기(리미키미 컨셉은 지금처럼 필름스트립 브라우저).
+    var lookViewer: Concept?
+    /// 크게 보기에서 넘겨 볼 목록 — 격자에서 누를 때 그 격자의 목록을 넣는다(목적 칸·룩·드레스도 필름스트립으로).
+    var browseList: [Concept]?
     private(set) var cart: [Concept] = []
     /// 담은 줄을 홈에서 펼쳤는지(홈에선 작은 배지, 누르면 펼침).
     var cartExpanded = false
@@ -114,6 +131,7 @@ final class AppState {
         guard cart.count < Self.cartMax else { showToast(Copy.cartFull(Self.cartMax)); return false }
         cart.append(c)
         HapticPlayer.selection()
+        if cart.count == 1 { enqueueCoach(Coach.cart) }
         return true
     }
     func removeFromCart(at i: Int) { if cart.indices.contains(i) { cart.remove(at: i) } }
@@ -122,7 +140,16 @@ final class AppState {
     func generateCart() {
         guard !cart.isEmpty else { return }
         guard let photo = userPhoto.image else { cartNeedsPhoto = true; return }
-        let reqs = cart.map { GenerateRequest(concept: $0, photo: photo) }
+        let reqs = cart.map { c -> GenerateRequest in
+            var r = GenerateRequest(concept: c, photo: photo)
+            // 옵션은 그 탭에서 담은 사진에만(이력서·취업 탭의 옷 사진은 이력서·취업 룩에만).
+            if let p = c.studioPurpose {
+                r.studioOverrides = (studio.overrides[p] ?? [:]).mapValues { $0.base }
+                r.outfit = studio.outfit[p]
+            }
+            if c.dressCode != nil { r.groomPhoto = studio.groom }
+            return r
+        }
         requireLogin(reqs.count == 1 ? .generate(reqs[0]) : .generateMany(reqs), message: Copy.loginToSave)
     }
 
@@ -170,7 +197,35 @@ final class AppState {
     /// 편집기·카메라 1단계 웹뷰(SPEC §5).
     var webTool: WebTool?
     /// 첫 실행 가이드 1장 — 실행 시 다른 팝업은 없다.
-    var showGuide = !UserDefaults.standard.bool(forKey: "guide.done.v2")
+    // 2026-10-09 C안: 예전 첫 실행 안내 화면은 없앴다 — 홈 튜토리얼(코치마크)이 대신한다. ATT 는 실행 직후(RimikimiApp).
+    var showGuide = false
+
+    // MARK: 튜토리얼(코치마크)
+    private(set) var coachQueue: [CoachStep] = []
+    private(set) var coachIndex = 0
+    private(set) var coachTotal = 0
+    func startHomeCoach() {
+        guard !Coach.seen("home"), coachQueue.isEmpty else { return }
+        coachQueue = Coach.home(); coachIndex = 0; coachTotal = coachQueue.count
+    }
+    /// 그 기능을 처음 쓸 때 한 번만.
+    func enqueueCoach(_ step: CoachStep) {
+        guard !Coach.seen(step.key), !coachQueue.contains(step) else { return }
+        if coachQueue.isEmpty { coachIndex = 0; coachTotal = 1 }
+        coachQueue.append(step)
+    }
+    func advanceCoach() {
+        guard let s = coachQueue.first else { return }
+        Coach.markSeen(s.key)
+        coachQueue.removeFirst()
+        coachIndex += 1
+        if coachQueue.isEmpty { if coachTotal > 1 { Coach.markSeen("home") }; coachTotal = 0; coachIndex = 0 }
+    }
+    func skipCoach() {
+        coachQueue.forEach { Coach.markSeen($0.key) }
+        Coach.markSeen("home")
+        coachQueue.removeAll(); coachTotal = 0; coachIndex = 0
+    }
     /// 홈 상단 초대 카드 — build 90 실기기 결함 #5(오너 지시): 예전엔 첫 생성 완료 후 1회만 떴는데
     /// 1.x 는 홈 맨 위에 항상 있었다. 이제 사용자가 닫기 전까진 상시 노출하고, 닫으면 그 상태를
     /// `inviteCardDismissedKey` 로 영구 기억한다. 초대는 크레딧이 도는 유일한 통로라 이미 친구를
@@ -250,13 +305,72 @@ final class AppState {
 
     /// 로그인돼 있으면 바로, 아니면 시트를 띄우고 로그인 뒤 이어간다.
     func requireLogin(_ action: PendingAction, message: String? = nil) {
+        if case .generate(let r) = action {
+            AppLog.api.info("requireLogin.generate signed=\(self.auth.isSignedIn) used=\(GuestDevice.used) batchable=\(r.concept.isBatchable) eligible=\(Self.guestEligible(r)) concept=\(r.concept.id, privacy: .public)")
+        }
         if auth.isSignedIn {
             Task { await perform(action) }
+        } else if case .generate(let req) = action, !GuestDevice.used, Self.guestEligible(req) {
+            // 게스트 첫 1장(2026-10-09 C안): 가입 없이 바로 만들어 결과부터 보여 준다. 로그인은 "받기"에서.
+            startGuest(req)
+        } else if case .generateMany = action {
+            pending = action
+            loginMessage = Copy.cartManyNeedsLogin
+            loginSheet = true
         } else {
             pending = action
             loginMessage = message
             loginSheet = true
         }
+    }
+
+    /// 셀카 한 장으로 되는 컨셉·룩·드레스만, 옵션(세부 조정·옷·신랑) 없이 — 서버도 같은 기준(403 needLogin).
+    static func guestEligible(_ r: GenerateRequest) -> Bool {
+        r.concept.isBatchable && r.studioOverrides.isEmpty && r.outfit == nil && r.groomPhoto == nil
+    }
+
+    func startGuest(_ req: GenerateRequest) {
+        guard Self.aiConsentGiven else { pendingGuestAfterConsent = req; aiConsentSheet = true; return }
+        var r = req
+        r.count = 1
+        if r.faceRef == nil, !r.concept.isArtTransform { r.faceRef = userPhoto.image }
+        guestFlow = GuestFlow(title: req.concept.displayTitle)
+        HapticPlayer.commit()
+        AppLog.api.info("guest.start concept=\(req.concept.id, privacy: .public)")
+        Task {
+            do {
+                let res = try await RimikimiAPI.shared.generate(r, token: "")
+                AppLog.api.info("guest.done items=\(res.items.count)")
+                GuestDevice.used = true
+                guestFlow?.images = res.items.map(\.image)
+                HapticPlayer.success()
+                #if DEBUG
+                if !UserDefaults.standard.bool(forKey: "dev.noAds") { AdManager.shared.showInterstitial() }   // 캡처용으로만 끈다
+                #else
+                AdManager.shared.showInterstitial()   // 무료 = 생성 광고 1번(오너 지시 2026-10-07)
+                #endif
+            } catch let e as APIError {
+                AppLog.api.error("guest.failed status=\(e.status) msg=\(e.message, privacy: .public)")
+                if e.status == 403 {
+                    // 이 기기는 이미 첫 1장을 썼다 → 로그인하고 이어서.
+                    GuestDevice.used = true
+                    guestFlow = nil
+                    pending = .generate(req)
+                    loginMessage = e.message
+                    loginSheet = true
+                } else {
+                    guestFlow?.error = e.message
+                }
+            } catch {
+                guestFlow?.error = Copy.errNetwork
+            }
+        }
+    }
+
+    /// 미리보기에서 고른 1장 "받기" — 로그인돼 있으면 바로, 아니면 로그인 뒤 저장(저장 광고 1번).
+    func guestReceive(_ image: UIImage) {
+        if auth.isSignedIn { Task { await perform(.guestReceive(image)) } }
+        else { pending = .guestReceive(image); loginMessage = Copy.guestLogin; loginSheet = true }
     }
 
     /// `AuthStore.signInTick` 이 오르면 호출 — 하던 동작을 이어간다.
@@ -330,6 +444,13 @@ final class AppState {
             clearCart()
             galleryPath.removeAll()
             tab = .myPhotos
+        case .guestReceive(let image):
+            await refreshQuota()
+            await adGateBeforeSave()
+            let ok = await CameraAlbum.save(image)
+            showToast(ok ? Copy.savedToAlbum : Copy.noAlbumPermission)
+            guestFlow = nil
+            clearCart()
         case .filterPick(let presetKey):
             // 사진을 **먼저** 고른다 — 웹의 "사진 선택" 빈 화면을 없애기 위해(오너 지적 2026-09-17).
             photoPickPreset = presetKey ?? "none"
@@ -425,6 +546,7 @@ final class AppState {
         aiConsentSheet = false
         pendingAfterConsent = nil
         pendingManyAfterConsent = nil
+        pendingGuestAfterConsent = nil
         pendingOutpaintAfterConsent = nil
     }
 
@@ -435,6 +557,9 @@ final class AppState {
         if let req = pendingAfterConsent {
             pendingAfterConsent = nil
             Task { await perform(.generate(req)) }
+        } else if let g = pendingGuestAfterConsent {
+            pendingGuestAfterConsent = nil
+            startGuest(g)
         } else if let reqs = pendingManyAfterConsent {
             pendingManyAfterConsent = nil
             Task { await perform(.generateMany(reqs)) }

@@ -10,8 +10,8 @@ struct HomeView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.s4) {
                 HomeHeader()
-                FeatureCards()
-                PurposeGrid()
+                FeatureCards().coachAnchor("cards")
+                PurposeGrid().coachAnchor("purposes")
                 if app.concepts.isLoading && app.concepts.concepts.isEmpty {
                     SkeletonBlock().frame(height: 220).padding(.horizontal, Spacing.page)
                 } else {
@@ -25,6 +25,11 @@ struct HomeView: View {
         .toolbar(.hidden, for: .navigationBar)
         .refreshable { await app.concepts.load() }
         .safeAreaInset(edge: .bottom) { CartBar(compactOnHome: true) }
+        .coachHost()
+        .onAppear {
+            app.startHomeCoach()
+            if !app.cart.isEmpty { app.enqueueCoach(Coach.badge) }
+        }
     }
 }
 

@@ -85,7 +85,7 @@ enum DevRoutes {
             app.tab = .gallery
             let open = {
                 let first = app.concepts.concepts(in: name).first?.id ?? ""
-                app.galleryPath = [.category(name), .browse(category: name, startID: q["id"] ?? first)]
+                app.browseList = nil; app.galleryPath = [.category(name), .browse(category: name, startID: q["id"] ?? first)]
                 if let then = q["then"] {
                     let delay = Double(q["after"] ?? "2") ?? 2
                     DispatchQueue.main.asyncAfter(deadline: .now() + delay) { app.devBrowseJump = then }
@@ -97,6 +97,16 @@ enum DevRoutes {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2.5, execute: open)
             } else {
                 open()
+            }
+        case "/guestdemo":
+            // 게스트 첫 1장 실제 흐름(캡처·검증용) — 샘플 사진 등록 → 프사·소개팅 첫 컨셉 → 만들기.
+            Task { @MainActor in
+                for _ in 0..<40 where app.concepts.concepts.isEmpty { try? await Task.sleep(nanoseconds: 250_000_000) }
+                installSamplePhoto(app)
+                GuestDevice.used = q["reset"] == "1" ? false : GuestDevice.used
+                app.clearCart()
+                if let c = app.concepts.concepts(for: .snap).first(where: { $0.isBatchable }) { app.toggleCart(c) }
+                app.generateCart()
             }
         case "/purpose":
             // 목적 화면으로 바로(캡처·검증용 — 시뮬레이터에서 칸을 탭할 수 없다). key=profile|snap|wedding|concept

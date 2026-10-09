@@ -17,6 +17,13 @@ struct Concept: Identifiable, Hashable, Decodable {
     let sensitive: Bool
     /// 홈 목적 칸(이력서·프로필 / 프사·소개팅 / 웨딩·커플)에 들어가는지 — 서버 데이터가 정한다(빌드 없이 분류를 바꿀 수 있게).
     let purposes: [String]
+    /// 2026-10-09 이식: 리미키미 컨셉이 아닌 담기 항목(브루클린 룩 · 조세핀 드레스)을 같은 격자·담기 줄에 태우려고
+    /// 컨셉 모양을 빌린다. 서버엔 conceptId 대신 studio / wedding 으로 보낸다(RimikimiAPI.generate).
+    var customThumb: URL? = nil
+    var studioPurpose: String? = nil
+    var studioPreset: String? = nil
+    var dressCode: String? = nil
+    var isSynthetic: Bool { studioPreset != nil || dressCode != nil }
 
     enum CodingKeys: String, CodingKey {
         case id, title, title_en, category, categories, text, mode, fourcutStyle, fourcutStyles, pinFeatured, publishAt, sensitive, purposes
@@ -46,6 +53,15 @@ struct Concept: Identifiable, Hashable, Decodable {
         else { publishAt = nil }
         sensitive = (try? c.decode(Bool.self, forKey: .sensitive)) ?? false
         purposes = (try? c.decode([String].self, forKey: .purposes)) ?? []
+    }
+
+    /// 브루클린 룩 · 조세핀 드레스용 — 서버 카탈로그에서 만든다.
+    init(syntheticID: String, title: String, titleEn: String? = nil, thumb: URL?,
+         studioPurpose: String? = nil, studioPreset: String? = nil, dressCode: String? = nil) {
+        id = syntheticID; self.title = title; self.titleEn = titleEn; categories = []; text = ""
+        mode = nil; fourcutStyle = nil; fourcutStyles = nil; pinFeatured = nil; publishAt = nil
+        sensitive = false; purposes = []
+        customThumb = thumb; self.studioPurpose = studioPurpose; self.studioPreset = studioPreset; self.dressCode = dressCode
     }
 
     static let iso: ISO8601DateFormatter = { let f = ISO8601DateFormatter(); f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]; return f }()
@@ -78,9 +94,9 @@ struct Concept: Identifiable, Hashable, Decodable {
         return title
     }
 
-    var thumbURL: URL { Config.thumbURL(id) }
+    var thumbURL: URL { customThumb ?? Config.thumbURL(id) }
     /// 크게 깔리는 자리용 1200px 원본(없으면 `RemoteImage(fallback:)` 이 썸네일로 되돌아간다).
-    var largeURL: URL { Config.largeURL(id) }
+    var largeURL: URL { customThumb ?? Config.largeURL(id) }
     var sortKey: Double { publishAt?.timeIntervalSince1970 ?? (Double(id) ?? 0) }
 
     static func == (a: Concept, b: Concept) -> Bool { a.id == b.id }

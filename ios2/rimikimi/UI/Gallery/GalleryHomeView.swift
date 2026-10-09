@@ -212,6 +212,8 @@ struct CategoryListView: View {
         .background(Color.bg)
         .inlineTitle(Copy.category(name))
         .safeAreaInset(edge: .bottom) { CartBar() }
+        .coachHost()
+        .onAppear { app.enqueueCoach(Coach.grid) }
         .toolbar {
             // 즐겨찾기 앨범 자체엔 별을 달지 않는다(자기 자신을 즐겨찾기 할 수 없다).
             if name != FavoritesStore.albumName {

@@ -55,6 +55,7 @@ enum Copy {
     static func cartMake(_ n: Int) -> String { L.t("\(n)장 만들기", "Create \(n)") }
     static func cartCount(_ n: Int, _ max: Int) -> String { "\(n)/\(max)" }
     static var cartPhotoTitle: String { L.t("내 사진을 먼저 골라 주세요", "Pick your photo first") }
+    static var cartNeedsOptions: String { L.t("이 컨셉은 따로 만들어요 — 눌러서 옵션을 골라 주세요", "This one needs options — tap it to set them up") }
     static var viewLarge: String { L.t("크게 보기", "View") }
     static var startScreen: String { L.t("앱을 켜면 먼저 보일 화면", "Opens to") }
     static var startMake: String { L.t("만들기", "Create") }
@@ -305,6 +306,15 @@ enum Copy {
     static var consentUpload: String { L.t("받는 곳: Google LLC의 Gemini API(미국). 이미지 생성과 결과 품질 확인에만 쓰이고, 광고·학습 등 다른 목적으로 쓰지 않아요.", "Sent to: Google LLC's Gemini API (United States), only to create your image and check its quality — never for ads or any other purpose.") }
     static var consentDevice: String { L.t("보관: 올린 사진은 우리 서버에 저장하지 않고 처리 후 바로 폐기해요. 결과 이미지는 24시간 뒤 자동 삭제되고, 얼굴 스캔 사진은 이 기기에만 저장돼요.", "Storage: your uploads are not stored on our servers and are discarded right after processing. Results are auto-deleted after 24 hours; face-scan photos stay on this device.") }
     static var consentPrivacyLink: String { L.t("개인정보처리방침에서 자세히 보기", "Learn more in our Privacy Policy") }
+    static var consentOwnPhoto: String { L.t("본인 사진이거나, 사진 속 사람에게 동의를 받은 사진이에요.", "It's my photo, or I have consent from the person in it.") }
+    static var consentIDNote: String { L.t("여권·신분증용 사진은 사진관에서 찍어 주세요.", "For passports and ID cards, please use a photo studio.") }
+    static var guestMaking: String { L.t("만드는 중이에요", "Creating") }
+    static var guestPick: String { L.t("마음에 드는 1장을 골라요", "Pick the one you like") }
+    static var guestReceive: String { L.t("이 사진 받기 · 무료", "Get this photo · free") }
+    static var guestAgain: String { L.t("다른 스타일로 다시", "Try another style") }
+    static var guestIdentity: String { L.t("내 얼굴과 같은 사람인지 확인했어요", "Checked it's the same person") }
+    static var guestLogin: String { L.t("사진을 받으려면 로그인해 주세요", "Sign in to get your photo") }
+    static var cartManyNeedsLogin: String { L.t("2장부터는 로그인하고 만들어요 · 첫 1장은 가입 없이", "Sign in to make 2 or more · your first one is free without signing up") }
     static var consentAgree: String { L.t("허용하고 계속", "Allow and continue") }
     static var consentLater: String { L.t("허용 안 함", "Don't allow") }
 

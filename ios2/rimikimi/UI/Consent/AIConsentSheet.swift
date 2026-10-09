@@ -28,6 +28,9 @@ struct AIConsentSheet: View {
                     ConsentRow(icon: "sparkles", text: Copy.consentAI)
                     ConsentRow(icon: "arrow.up.right.circle", text: Copy.consentUpload)
                     ConsentRow(icon: "iphone", text: Copy.consentDevice)
+                    // 2026-10-09 C안: 동의 3개를 한 장으로 — 본인 사진 확인 · 신분증 안내도 여기서(처음 1회).
+                    ConsentRow(icon: "person.crop.circle.badge.checkmark", text: Copy.consentOwnPhoto)
+                    ConsentRow(icon: "person.text.rectangle", text: Copy.consentIDNote)
                 }
 
                 Button {

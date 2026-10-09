@@ -35,7 +35,8 @@ struct ConceptBrowserView: View {
         _currentID = State(initialValue: startID)
     }
 
-    private var items: [Concept] { app.concepts.concepts(in: category) }
+    /// 격자에서 누른 그 목록(목적 칸·브루클린 룩·조세핀 드레스 포함). 없으면 카테고리.
+    private var items: [Concept] { app.browseList ?? app.concepts.concepts(in: category) }
     private var current: Concept? { items.first { $0.id == currentID } }
 
     var body: some View {
@@ -67,12 +68,22 @@ struct ConceptBrowserView: View {
                 .padding(.vertical, Spacing.s3)
 
             if let current {
-                NavigationLink(value: Route.concept(current)) {
-                    Text(Copy.makeWithThisConcept)
+                if current.isSynthetic {
+                    // 브루클린 룩·조세핀 드레스는 옵션 화면이 없다 — 여기서 바로 담는다(길게 누르기와 같다).
+                    Button { _ = app.toggleCart(current) } label: {
+                        Text(app.isInCart(current) ? Copy.a11yRemoveFromCart : L.t("담기", "Pick"))
+                    }
+                    .buttonStyle(PrimaryButtonStyle(isDisabled: false))
+                    .padding(.horizontal, Spacing.page)
+                    .padding(.bottom, Spacing.s4)
+                } else {
+                    NavigationLink(value: Route.concept(current)) {
+                        Text(Copy.makeWithThisConcept)
+                    }
+                    .buttonStyle(PrimaryButtonStyle(isDisabled: false))
+                    .padding(.horizontal, Spacing.page)
+                    .padding(.bottom, Spacing.s4)
                 }
-                .buttonStyle(PrimaryButtonStyle(isDisabled: false))
-                .padding(.horizontal, Spacing.page)
-                .padding(.bottom, Spacing.s4)
             }
         }
         // 아래로 끌면 화면이 따라 내려가며 작아지고, 충분히 내리면 격자로 돌아간다(사진 앱과 같다).
@@ -86,7 +97,7 @@ struct ConceptBrowserView: View {
         .inlineTitle(Copy.category(category))
         .toolbar(.hidden, for: .tabBar)
         .toolbar {
-            if let current {
+            if let current, !current.isSynthetic {
                 ToolbarItem(placement: .topBarTrailing) {
                     FavoriteToolbarButton(isOn: app.favorites.isFavorite(concept: current.id)) {
                         app.favorites.toggle(concept: current.id)

@@ -158,7 +158,7 @@ struct BurstCameraView: View {
 }
 
 /// 셔터 — 흰 원 + 테두리. 누르면 살짝 줄었다 돌아온다.
-private struct ShutterButton: View {
+struct ShutterButton: View {
     var disabled: Bool
     var action: () -> Void
     @State private var pressed = false
@@ -182,7 +182,7 @@ private struct ShutterButton: View {
 }
 
 /// 어두운 유리 원 버튼 — 카메라 화면 위에 얹는 보조 버튼들.
-private struct CircleGlassButton: View {
+struct CircleGlassButton: View {
     var system: String
     var tint: Color = .white
     var action: () -> Void
@@ -199,7 +199,7 @@ private struct CircleGlassButton: View {
 }
 
 /// `AVCaptureVideoPreviewLayer` 를 화면에 채워 그린다.
-private struct CameraPreviewLayer: UIViewRepresentable {
+struct CameraPreviewLayer: UIViewRepresentable {
     let session: AVCaptureSession
     func makeUIView(context: Context) -> V {
         let v = V()

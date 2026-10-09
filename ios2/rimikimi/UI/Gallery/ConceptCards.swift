@@ -176,7 +176,9 @@ struct AlbumsGrid: View {
         if !tiles.isEmpty {
             VStack(alignment: .leading, spacing: 0) {
                 LazyVGrid(columns: columns, spacing: Spacing.s4) {
-                    ForEach(tiles) { AlbumGridTile(tile: $0) }
+                    ForEach(Array(tiles.enumerated()), id: \.element.id) { i, t in
+                        if i == 0 { AlbumGridTile(tile: t).coachAnchor("albums") } else { AlbumGridTile(tile: t) }
+                    }
                 }
                 .padding(.horizontal, Spacing.page)
             }
@@ -200,6 +202,8 @@ struct DensePhotoGrid: View {
     /// 핀치하는 동안엔 셀을 못 누르게 한다 — 손을 뗀 지점이 탭으로 잡혀 엉뚱한 사진이 열렸다
     /// (오너 지적 2026-09-22 "마지막 손가락 지점을 터치로 인식하는거 같음").
     @State private var pinching = false
+    /// 방금 길게 눌러 담은 칸 — 손을 뗄 때 버튼 탭이 한 번 더 들어오는 걸 무시한다.
+    @State private var longPressedID: String?
     /// 잠금 해제 예약. 새 핀치가 시작되면 이전 예약을 **취소**한다 — 안 그러면 앞 핀치가 걸어 둔
     /// 3초 안전장치가 다음 핀치 도중에 터져서 잠금이 풀린다.
     @State private var unlock: DispatchWorkItem?
@@ -272,11 +276,12 @@ struct DensePhotoGrid: View {
                 //    닿는 순간에 이미 끝났기 때문이다. 그래서 **누를 때가 아니라 동작할 때**
                 //    막는다 — 아래 `guard` 는 손을 뗀 시점에 돈다.
                 Button {
+                    // 길게 눌러 담은 직후의 손 떼기는 탭으로 치지 않는다.
+                    if longPressedID == c.id { longPressedID = nil; return }
                     guard !pinching else { return }
-                    // 2026-10-09 개편: 셀카 한 장으로 되는 컨셉은 눌러서 담는다(여러 장 한 번에, 최대 8).
-                    // 상대 사진·옷 사진·컷 수가 필요한 컨셉은 지금처럼 크게 보기 → 옵션 화면.
-                    if c.isBatchable { withAnimation(Motion.easeOut(0.18)) { _ = app.toggleCart(c) } }
-                    else { app.pushRoute(.browse(category: category, startID: c.id)) }
+                    // 탭 = 지금처럼 네이티브 사진 앱식 크게 보기 + 아래 필름스트립(오너 지시 2026-10-09).
+                    app.browseList = concepts
+                    app.pushRoute(.browse(category: category, startID: c.id))
                 } label: {
                     // ⚠️ 미리보기는 무조건 3:4 (오너 지시 2026-09-22). 정방형이면 인물이 잘린다.
                     RemoteImage(url: c.thumbURL, cornerRadius: 0)
@@ -304,13 +309,15 @@ struct DensePhotoGrid: View {
                                                     style: .continuous))
                 }
                 .buttonStyle(.plain)
-                .contextMenu {
-                    Button { app.pushRoute(.browse(category: category, startID: c.id)) } label: { Label(Copy.viewLarge, systemImage: "arrow.up.left.and.arrow.down.right") }
-                    Button { app.favorites.toggle(concept: c.id) } label: {
-                        Label(app.favorites.isFavorite(concept: c.id) ? Copy.favoriteRemove : Copy.favoriteAdd,
-                              systemImage: app.favorites.isFavorite(concept: c.id) ? "star.slash" : "star")
-                    }
-                }
+                .modifier(FirstTileAnchor(on: c.id == concepts.first?.id && n == columnCount))
+                // 길게 누르기 = 담기/빼기(여러 장 한 번에, 최대 8). 상대 사진·옷 사진·컷 수가 필요한 컨셉은
+                // 셀카 한 장으로 못 만들어 담지 않고 알려 준다(탭해서 옵션 화면으로).
+                .simultaneousGesture(LongPressGesture(minimumDuration: 0.35).onEnded { _ in
+                    guard !pinching else { return }
+                    longPressedID = c.id
+                    if c.isBatchable { withAnimation(Motion.easeOut(0.18)) { _ = app.toggleCart(c) } }
+                    else { HapticPlayer.selection(); app.showToast(Copy.cartNeedsOptions) }
+                })
             }
         }
     }
@@ -378,4 +385,10 @@ struct DensePhotoGrid: View {
             ))
         }
     }
+}
+
+/// 튜토리얼 "여러 개 담기"가 가리킬 첫 칸(사라지는 쪽 격자에는 달지 않는다).
+private struct FirstTileAnchor: ViewModifier {
+    var on: Bool
+    func body(content: Content) -> some View { if on { content.coachAnchor("firstTile") } else { content } }
 }

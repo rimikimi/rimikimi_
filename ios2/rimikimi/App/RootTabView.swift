@@ -22,7 +22,7 @@ struct RootTabView: View {
                 }
             }
             Tab(Copy.tabCameraFilter, systemImage: "camera", value: .filter) {
-                NavigationStack { FilterTabView() }
+                NavigationStack { CameraFilterTab() }
             }
             Tab(Copy.tabMyPhotos, systemImage: "photo.on.rectangle", value: .myPhotos) {
                 NavigationStack(path: $app.myPhotosPath) {
@@ -76,7 +76,8 @@ struct RootTabView: View {
             app.push.clearTapKind()
             if kind == "genDone" { app.openGalleryResult(galleryId: galleryId) }
         }
-        .sheet(isPresented: $app.loginSheet) {
+        .fullScreenCover(item: $app.guestFlow) { f in GuestFlowView(initial: f) }
+        .sheet(isPresented: Binding(get: { app.loginSheet && app.guestFlow == nil }, set: { app.loginSheet = $0 })) {
             LoginSheet(message: app.loginMessage)
                 .presentationDetents([.medium, .large])
                 .presentationCornerRadius(Radius.sheet)
