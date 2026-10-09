@@ -44,27 +44,31 @@ let stickerSeq = 1;
 
 /* ---------- 원본 로드 (data URL / 원격 URL 모두) ---------- */
 async function loadSource(src) {
-  let url = src;
-  let revoke = null;
-  if (!/^data:/.test(src)) {
-    // 원격은 fetch→blob 으로 받아야 캔버스가 오염(taint)되지 않는다
-    const r = await fetch(src);
-    if (!r.ok) throw new Error("image fetch " + r.status);
-    const blob = await r.blob();
-    url = URL.createObjectURL(blob);
-    revoke = url;
+  // ⚠️ 화면의 <img> 와 해독을 공유하지 않게 파일(blob)에서 직접 ImageBitmap 으로 푼다.
+  //    iOS 웹뷰는 같은 주소의 이미지를 한 번만 해독해 공유하는데, 여러 장이면 아래 사진 줄이 같은 data URL 을
+  //    작게 띄우고 있어서 new Image() 로 받은 그림을 캔버스에 그리면 빈(투명) 픽셀이 됐다 — 미리보기·필터 칩이
+  //    전부 비던 결함(2026-10-09, 시뮬레이터 앱에서 1장 정상 / 2장 이상 0,0,0,0 확인). ImageBitmap 은 따로 푼 픽셀이다.
+  const r = await fetch(src);
+  if (!r.ok) throw new Error("image fetch " + r.status);
+  const blob = await r.blob();
+  if (typeof createImageBitmap === "function") {
+    try {
+      const bmp = await createImageBitmap(blob, { imageOrientation: "from-image" });
+      return { img: bmp, revoke: null };
+    } catch (_) { /* 아래 <img> 경로로 */ }
   }
+  const url = URL.createObjectURL(blob);
   const img = new Image();
-  img.decoding = "async";
   await new Promise((res, rej) => {
     img.onload = res;
     img.onerror = () => rej(new Error("image decode fail"));
     img.src = url;
   });
-  // onload 뒤에도 해독이 미뤄질 수 있다(iOS) — 첫 그리기 전에 해독을 끝내 둔다.
-  try { if (img.decode) await img.decode(); } catch (_) {}
-  return { img, revoke };
+  return { img, revoke: url };
 }
+/** ImageBitmap·<img> 공통 원본 크기 */
+const natW = (img) => img.naturalWidth || img.width;
+const natH = (img) => img.naturalHeight || img.height;
 
 /* ---------- 날짜 스탬프 6종 (아날로그~디지털, 오너 지시) ----------
    스타일마다 서체·색·포맷·위치가 다르다. 시스템 서체만 쓴다(웹폰트 로드 없음). */
@@ -341,9 +345,9 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
     const hit = cacheRef.current.get(i);
     if (hit) return hit;
     const { img, revoke } = await loadSource(sources[i]);
-    const scale = Math.min(1, PREVIEW_MAX / Math.max(img.naturalWidth, img.naturalHeight));
-    const pw = Math.max(1, Math.round(img.naturalWidth * scale));
-    const ph = Math.max(1, Math.round(img.naturalHeight * scale));
+    const scale = Math.min(1, PREVIEW_MAX / Math.max(natW(img), natH(img)));
+    const pw = Math.max(1, Math.round(natW(img) * scale));
+    const ph = Math.max(1, Math.round(natH(img) * scale));
     const off = document.createElement("canvas");
     off.width = pw; off.height = ph;
     const octx = off.getContext("2d", { willReadFrequently: true });
@@ -364,6 +368,7 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
       const [oldK, oldV] = cacheRef.current.entries().next().value;
       if (oldK === i) break;
       if (oldV.revoke) URL.revokeObjectURL(oldV.revoke);
+      if (oldV.img && oldV.img.close && oldV.img !== fullImgRef.current) oldV.img.close(); // ImageBitmap 메모리 반환
       cacheRef.current.delete(oldK);
     }
     return entry;
@@ -867,7 +872,7 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
       img = loaded.img; revoke = loaded.revoke;
     }
     try {
-      const w = img.naturalWidth, h = img.naturalHeight;
+      const w = natW(img), h = natH(img);
       const c = document.createElement("canvas");
       c.width = w; c.height = h;
       const ctx = c.getContext("2d", { willReadFrequently: true });
@@ -894,6 +899,7 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
       return c.toDataURL("image/jpeg", 0.95);
     } finally {
       if (revoke) URL.revokeObjectURL(revoke);
+      if (!imgIn && img && img.close) img.close(); // 배치 저장: 장마다 푼 ImageBitmap 해제
     }
   }
 
