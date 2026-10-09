@@ -20,6 +20,17 @@ final class BurstCameraModel {
     private let queue = DispatchQueue(label: "burstcamera.session")
     private var input: AVCaptureDeviceInput?
     private var position: AVCaptureDevice.Position = .back
+    /// 지금 전면인지(좌우반전 토글은 전면에서만 보인다).
+    private(set) var isFront = false
+    /// 전면 좌우반전(오너 지시 2026-10-09 "전면카메라에서는 좌우반전 토글로") — 켜면 거울처럼(보이는 대로),
+    /// 끄면 남이 보는 방향. 미리보기·찍힌 사진 둘 다. 기본 켬(지금까지와 같음), 마지막 선택을 기억한다.
+    var frontMirror: Bool = UserDefaults.standard.object(forKey: "camera.frontMirror") as? Bool ?? true {
+        didSet {
+            UserDefaults.standard.set(frontMirror, forKey: "camera.frontMirror")
+            configureOutputConnection()
+            HapticPlayer.selection()
+        }
+    }
     private var delegate: ShotDelegate?
 
     /// 카메라 탭 실시간 필터 — 있으면 미리보기 프레임을 여기로 흘려 필터를 입혀 그린다
@@ -88,9 +99,10 @@ final class BurstCameraModel {
             if c.isVideoRotationAngleSupported(90) { c.videoRotationAngle = 90 }
             if c.isVideoMirroringSupported {
                 c.automaticallyAdjustsVideoMirroring = false
-                c.isVideoMirrored = (position == .front)
+                c.isVideoMirrored = (position == .front && frontMirror)
             }
         }
+        live?.wantMirrored = (position == .front && frontMirror)
     }
 
     // MARK: 동작
@@ -102,6 +114,10 @@ final class BurstCameraModel {
         addInput(for: position)
         configureOutputConnection()
         session.commitConfiguration()
+        isFront = position == .front
+        // 입력을 바꾸면 커밋 때 연결이 새로 생겨 방향·거울 설정이 날아갈 수 있다 — 커밋 뒤에 한 번 더
+        // (전면으로 바꾸면 미리보기가 90° 누워 보이던 결함, 오너 실기기 2026-10-09).
+        configureOutputConnection()
         HapticPlayer.selection()
     }
 

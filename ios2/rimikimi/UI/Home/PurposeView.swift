@@ -19,9 +19,9 @@ struct PurposeView: View {
             guard app.studio.catalog != nil else { return [] }
             return StudioTab.all.map { ($0, StudioTab.title($0)) }
         case .wedding:
-            return [("concepts", L.t("웨딩 컨셉", "Wedding") + " \(app.concepts.concepts(for: .wedding).count)"),
-                    ("main", L.t("본식 드레스", "Ceremony gowns") + " \(app.studio.dressList(kind: "main").count)"),
-                    ("after", L.t("2부 드레스", "Reception gowns") + " \(app.studio.dressList(kind: "after").count)")]
+            return [("concepts", LabelStore.t("weddingTab.concepts", "웨딩 컨셉", "Wedding") + " \(app.concepts.concepts(for: .wedding).count)"),
+                    ("main", LabelStore.t("weddingTab.main", "본식 드레스", "Ceremony gowns") + " \(app.studio.dressList(kind: "main").count)"),
+                    ("after", LabelStore.t("weddingTab.after", "2부 드레스", "Reception gowns") + " \(app.studio.dressList(kind: "after").count)")]
         case .concept:
             let cats = app.concepts.albumTiles.map(\.name).filter { $0 != FavoritesStore.albumName }
             return [("today", Copy.segToday)] + cats.map { ($0, Copy.category($0)) }
@@ -321,9 +321,9 @@ enum StudioTab {
     static let all = ["resume", "linkedin", "audition"]
     static func title(_ k: String) -> String {
         switch k {
-        case "resume": return L.t("이력서·취업", "Résumé")
-        case "linkedin": return L.t("전문 프로필", "Professional")
-        default: return L.t("배우·모델", "Actor · model")
+        case "resume": return LabelStore.t("studioTab.resume", "이력서·취업", "Résumé")
+        case "linkedin": return LabelStore.t("studioTab.linkedin", "전문 프로필", "Professional")
+        default: return LabelStore.t("studioTab.audition", "배우·모델", "Actor · model")
         }
     }
 }

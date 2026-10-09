@@ -44,13 +44,13 @@ enum Copy {
     static var tabMake: String { L.t("만들기", "Create") }
     static var tabCameraFilter: String { L.t("카메라·필터", "Camera") }
     static var settingsTitle: String { L.t("설정", "Settings") }
-    static var featureRetouch: String { L.t("말로 고치기", "Fix with words") }
-    static var featureRestore: String { L.t("옛날 사진 복원", "Restore old photo") }
-    static var purposeProfile: String { L.t("증명·프로필", "ID · Profile") }
-    static var purposeSnap: String { L.t("프사·소개팅", "Profile pic · Dating") }
-    static var purposeWedding: String { L.t("웨딩·커플", "Wedding · Couple") }
-    static var purposeConcept: String { L.t("컨셉화보", "Concept shoots") }
-    static var segToday: String { L.t("오늘의 새 컨셉", "New today") }
+    static var featureRetouch: String { LabelStore.t("feature.retouch", "말로 고치기", "Fix with words") }
+    static var featureRestore: String { LabelStore.t("feature.restore", "옛날 사진 복원", "Restore old photo") }
+    static var purposeProfile: String { LabelStore.t("purpose.profile", "증명·프로필", "ID · Profile") }
+    static var purposeSnap: String { LabelStore.t("purpose.snap", "프사·소개팅", "Profile pic · Dating") }
+    static var purposeWedding: String { LabelStore.t("purpose.wedding", "웨딩·커플", "Wedding · Couple") }
+    static var purposeConcept: String { LabelStore.t("purpose.concept", "컨셉화보", "Concept shoots") }
+    static var segToday: String { LabelStore.t("segment.today", "오늘의 새 컨셉", "New today") }
     static func cartFull(_ n: Int) -> String { L.t("한 번에 \(n)장까지 고를 수 있어요", "You can pick up to \(n) at once") }
     static func cartMake(_ n: Int) -> String { L.t("\(n)장 만들기", "Create \(n)") }
     static func cartCount(_ n: Int, _ max: Int) -> String { "\(n)/\(max)" }
@@ -127,7 +127,7 @@ enum Copy {
         // 즐겨찾기 앨범(`FavoritesStore.albumName`)
         "⭐ 즐겨찾기": "⭐ Favorites",
     ]
-    static func category(_ name: String) -> String { L.ko ? name : (categoryEN[name] ?? name) }
+    static func category(_ name: String) -> String { LabelStore.t("category.\(name)", name, categoryEN[name] ?? name) }
 
     // MARK: 인생네컷 스타일 (서버 `fourcutStyles` 라벨은 한국어 — key 로 영어를 찾는다)
 

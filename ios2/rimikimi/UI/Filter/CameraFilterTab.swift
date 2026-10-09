@@ -34,6 +34,21 @@ struct CameraFilterTab: View {
                     .animation(.easeOut(duration: 0.18), value: model.flashOverlay).allowsHitTesting(false)
             }
             VStack(spacing: Spacing.s3) {
+                if model.isFront {
+                    HStack {
+                        Spacer()
+                        Button { model.frontMirror.toggle() } label: {
+                            Label(L.t("좌우반전", "Mirror"), systemImage: "arrow.left.and.right")
+                                .font(AppFont.footnote.weight(.bold))
+                                .foregroundStyle(model.frontMirror ? Color.black : Color.white)
+                                .padding(.horizontal, 12).frame(height: 34)
+                                .background(model.frontMirror ? Color.white : Color.black.opacity(0.35), in: Capsule())
+                        }
+                        .buttonStyle(PressScaleButtonStyle())
+                        .accessibilityAddTraits(model.frontMirror ? [.isSelected] : [])
+                    }
+                    .padding(.horizontal, Spacing.page).padding(.top, Spacing.s2)
+                }
                 Spacer()
                 filterStrip
                 HStack {

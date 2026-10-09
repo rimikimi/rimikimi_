@@ -149,6 +149,15 @@ final class RimikimiAPI {
         return try JSONDecoder().decode([Season].self, from: data)
     }
 
+    /// 이름표(`/labels.json`) — `LabelStore` 참고.
+    func fetchLabels() async throws -> [String: [String: String]] {
+        var req = URLRequest(url: Config.apiBase.appendingPathComponent("labels.json"))
+        req.cachePolicy = .reloadIgnoringLocalCacheData
+        let (data, resp) = try await session.data(for: req)
+        try Self.check(resp, data)
+        return try JSONDecoder().decode([String: [String: String]].self, from: data)
+    }
+
     func fetchPopular() async throws -> [String] {
         struct R: Decodable { struct P: Decodable { let id: LooseID }; let popular: [P]? }
         let (data, resp) = try await session.data(from: Config.apiBase.appendingPathComponent("api/popular"))

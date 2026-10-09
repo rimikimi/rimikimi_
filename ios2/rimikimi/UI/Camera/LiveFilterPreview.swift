@@ -28,6 +28,13 @@ final class LiveFilterRenderer: NSObject, AVCaptureVideoDataOutputSampleBufferDe
     private var context: CIContext?
     private var engine: LiveFilterEngine?
 
+    private var _wantMirrored = false
+    /// 프레임 연결이 지켜야 할 거울 여부(모델이 정한다). 연결이 새로 생겨 설정이 빠지면 프레임에서 바로잡는다.
+    var wantMirrored: Bool {
+        get { lock.withLock { _wantMirrored } }
+        set { lock.withLock { _wantMirrored = newValue } }
+    }
+
     /// 지금 고른 필터 키. "none"·모르는 키 = 원본 그대로.
     var presetKey: String {
         get { lock.withLock { _presetKey } }
@@ -54,6 +61,14 @@ final class LiveFilterRenderer: NSObject, AVCaptureVideoDataOutputSampleBufferDe
     }
 
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+        // 스스로 바로잡기 — 전·후면 전환 뒤 연결이 새로 생기면 세로(90°)·거울 설정이 빠진 채 프레임이 와서
+        // 미리보기가 누워 보였다(오너 실기기 2026-10-09). 다음 프레임부터 맞게 들어온다.
+        if connection.isVideoRotationAngleSupported(90), connection.videoRotationAngle != 90 { connection.videoRotationAngle = 90 }
+        if connection.isVideoMirroringSupported {
+            let want = wantMirrored
+            if connection.automaticallyAdjustsVideoMirroring { connection.automaticallyAdjustsVideoMirroring = false }
+            if connection.isVideoMirrored != want { connection.isVideoMirrored = want }
+        }
         guard let pb = CMSampleBufferGetImageBuffer(sampleBuffer), let context, let commandQueue else { return }
         let (key, layer, size) = lock.withLock { (_presetKey, _layer, _drawableSize) }
         guard let layer, size.width > 0, size.height > 0 else { return }

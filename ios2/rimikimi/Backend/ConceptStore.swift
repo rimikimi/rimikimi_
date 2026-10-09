@@ -163,6 +163,7 @@ final class ConceptStore {
             loadedFromBundle = true
         }
         if let ids = try? await RimikimiAPI.shared.fetchPopular() { popularIDs = ids }
+        if let t = try? await RimikimiAPI.shared.fetchLabels() { LabelStore.shared.update(t) }
         if let list = try? await RimikimiAPI.shared.fetchSeasons(), !list.isEmpty {
             seasons = list
         } else if seasons.isEmpty {
