@@ -160,7 +160,7 @@ enum Copy {
         "toy": ("토이", "Toy"), "dispo": ("일회용", "Dispo"), "instant": ("인스턴트", "Instant"),
         "sepia": ("세피아", "Sepia"), "duopink": ("듀오 핑크", "Duo Pink"), "neon": ("네온", "Neon"),
         "thermal": ("서모", "Thermal"), "glitch": ("글리치", "Glitch"), "vhs": ("VHS", "VHS"),
-        "pixelate": ("모자이크", "Pixel"), "sketch": ("스케치", "Sketch"),
+        "pixelate": ("모자이크", "Pixel"), "sketch": ("스케치", "Sketch"), "bloom": ("빛번짐", "Bloom"),
     ]
     static func filterName(_ key: String) -> String {
         guard let n = filterNames[key] else { return key }
