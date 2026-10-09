@@ -18,6 +18,22 @@ import CoreImage
 /// ⚠️ 프리셋 표는 filters.js 의 FILM_PRESETS 를 스크립트로 옮긴 것이다. 웹에서 값을 바꾸면 여기도
 ///    다시 뽑아야 한다(scratch/live-filter/genpresets.mjs).
 enum LiveFilter {
+    /// 센서 원본(가로) → 세로로 세운 이미지(원점 0,0). 미리보기 프레임·찍힌 사진 공용(오너 실기기 2026-10-09:
+    /// 전면 미리보기·사진이 90° 누움 — 연결의 회전 설정이 전면 전환 뒤 먹지 않았다. 설정에 기대지 않고 픽셀로 세운다).
+    /// - appliedMirror: 들어온 이미지가 이미 좌우로 뒤집혀 있는지(가로 상태 기준)
+    /// - wantMirror: 결과를 거울(셀카 보이는 대로)로 할지
+    /// 후면·거울 끔 = 시계방향 90°(.right), 거울 = .leftMirrored(= .right 후 좌우 뒤집기). 이미 세로면 거울만 맞춘다.
+    static func upright(_ img: CIImage, appliedMirror: Bool, wantMirror: Bool) -> CIImage {
+        var i = img
+        if i.extent.width > i.extent.height {
+            if appliedMirror { i = i.oriented(.upMirrored) }
+            i = i.oriented(wantMirror ? .leftMirrored : .right)
+        } else if appliedMirror != wantMirror {
+            i = i.oriented(.upMirrored)
+        }
+        return i.transformed(by: .init(translationX: -i.extent.minX, y: -i.extent.minY))
+    }
+
     enum Special { case duotone, thermal, glitch, vhs, pixelate, sketch }
 
     /// 색상 대역(HSL) 조정 한 줄 — c: 중심 색상, w: 반경, h: 색상 이동, s·l: 배율 δ
@@ -76,7 +92,7 @@ enum LiveFilter {
         "ph7": .init(temp: 16, tint: -6, ex: 0.03, con: 0.18, fade: 4, whitePull: 4, sat: 0.1, vib: 0.06, sh: [2, 4, -4], hi: [10, 10, -12], fx: .init(grain: 0.12)),
         "ph6s": .init(temp: -14, tint: -8, ex: 0.02, con: 0.2, fade: 2, whitePull: 2, sat: 0.14, vib: 0.04, sh: [-4, 4, 8], hi: [0, 4, 6], fx: .init(grain: 0.14)),
         "ph4s": .init(temp: 26, tint: -6, ex: 0.12, con: 0.32, fade: 8, sat: -0.08, sh: [6, 6, -8], hi: [14, 12, -14], fx: .init(grain: 0.3, vignette: 0.35, blur: 0.04)),
-        "ph3gs": .init(temp: 14, tint: -14, ex: 0.14, con: 0.26, fade: 22, sat: -0.35, vib: -0.05, sh: [-6, 10, 6], hi: [18, 16, -10], fx: .init(grain: 0.55, vignette: 0.45, lowres: 0.0035)),
+        "ph3gs": .init(temp: 14, tint: -14, ex: 0.14, con: 0.26, fade: 22, sat: -0.35, vib: -0.05, sh: [-6, 10, 6], hi: [18, 16, -10], fx: .init(grain: 0.55, vignette: 0.45)),
         "sepia": .init(ex: 0.02, con: 0.12, fade: 8, whitePull: 6, sh: [18, 6, -14], hi: [24, 10, -18], bw: [0.3, 0.55, 0.15]),
         "duopink": .init(special: .duotone, c1: [38, 18, 66], c2: [255, 158, 201]),
         "neon": .init(fx: .init(glow: 0.5), special: .duotone, c1: [24, 8, 66], c2: [90, 255, 240]),

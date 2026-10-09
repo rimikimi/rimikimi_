@@ -84,12 +84,7 @@ final class LiveFilterRenderer: NSObject, AVCaptureVideoDataOutputSampleBufferDe
         // 후면·거울 끔 = 시계방향 90°(.right), 거울 켠 전면 = .leftMirrored(= .right + 좌우 뒤집기).
         var img = CIImage(cvPixelBuffer: pb)
         let (front, mir) = lock.withLock { (_front, _mirrored) }
-        if img.extent.width > img.extent.height {
-            img = img.oriented(mir ? .leftMirrored : .right)
-        } else if front, mir != connection.isVideoMirrored {
-            img = img.oriented(.upMirrored)   // 혹시 연결이 이미 세워 보냈다면 거울만 맞춘다
-        }
-        img = img.transformed(by: .init(translationX: -img.extent.minX, y: -img.extent.minY))
+        img = LiveFilter.upright(img, appliedMirror: connection.isVideoMirrored, wantMirror: front && mir)
         lock.withLock { _imageSize = img.extent.size }
         if key != "none", let engine { img = engine.render(frame: img, key: key) }
 

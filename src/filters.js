@@ -120,9 +120,8 @@ export const FILM_PRESETS = [
     fx: { grain: 0.3, vignette: 0.35, blur: 0.04 } },
   { key: "ph3gs",   ko: "3GS",    en: "3GS",    group: "phone", // 2009 — 물 빠진 색, 초록·마젠타 쏠림, 흐릿함·굵은 노이즈
     temp: 14, tint: -14, ex: 0.14, con: 0.26, fade: 22, whitePull: 0,  sat: -0.35, vib: -0.05, sh: [-6, 10, 6], hi: [18, 16, -10],
-    // 흐림(blur) 대신 저해상도 — 흐림은 "초점 나간 사진"으로 보였다(오너 2026-10-09 "해상도가 낮은게 아니라
-    // 촛점이 안 맞은거처럼 보임"). 작은 칸 평균으로 3GS 의 굵은 픽셀감을 낸다.
-    fx: { grain: 0.55, vignette: 0.45, lowres: 0.0035 } },
+    // 흐림·픽셀 효과 없음 — 흐림은 초점 나간 사진처럼, 픽셀 칸은 일부러 넣은 모자이크처럼 보였다(오너 2026-10-09).
+    fx: { grain: 0.55, vignette: 0.45 } },
 
   /* ── 재미 (SNOW류 — 특수 렌더 모드, special 필드가 전용 코드 경로를 탄다) ── */
   { key: "sepia",    ko: "세피아",    en: "Sepia", group: "fun",

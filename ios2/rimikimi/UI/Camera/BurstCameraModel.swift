@@ -161,7 +161,14 @@ final class BurstCameraModel {
         // 플래시는 기기가 지원할 때만. 전면은 화면 플래시가 없으므로 요청하지 않는다.
         if output.supportedFlashModes.contains(.on), flashOn, position == .back { s.flashMode = .on }
         s.photoQualityPrioritization = .quality
-        let d = ShotDelegate { [weak self] image in
+        // 찍는 순간의 연결에 세로·거울을 다시 걸고(전면 전환 뒤 빠져 있었다), 그래도 가로로 오면
+        // 받은 뒤 픽셀로 세운다 — 전면 사진이 누워 저장되던 결함(오너 실기기 2026-10-09).
+        let want = position == .front && frontMirror
+        if let c = output.connection(with: .video) {
+            if c.isVideoRotationAngleSupported(90) { c.videoRotationAngle = 90 }
+            if c.isVideoMirroringSupported { c.automaticallyAdjustsVideoMirroring = false; c.isVideoMirrored = want }
+        }
+        let d = ShotDelegate(wantMirror: want) { [weak self] image in
             Task { @MainActor in self?.add(image) }
         }
         delegate = d                 // 콜백이 올 때까지 살려 둔다
@@ -263,11 +270,24 @@ final class BurstCameraModel {
 /// `AVCapturePhotoCaptureDelegate` 는 NSObject 를 요구해서 따로 둔다.
 private final class ShotDelegate: NSObject, AVCapturePhotoCaptureDelegate {
     private let onShot: (UIImage?) -> Void
-    init(onShot: @escaping (UIImage?) -> Void) { self.onShot = onShot }
+    private let wantMirror: Bool
+    private static let ctx = CIContext()
+    init(wantMirror: Bool, onShot: @escaping (UIImage?) -> Void) { self.wantMirror = wantMirror; self.onShot = onShot }
 
     func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto,
                      error: Error?) {
         guard error == nil, let data = photo.fileDataRepresentation() else { onShot(nil); return }
-        onShot(UIImage(data: data))
+        onShot(Self.upright(data, wantMirror: wantMirror) ?? UIImage(data: data))
+    }
+
+    /// EXIF 방향까지 입힌 뒤에도 가로면(= 회전이 안 걸린 것) 픽셀로 세운다. 결과는 방향 정보 없는(.up) 이미지라
+    /// 편집기·저장 어디서도 다시 돌아가지 않는다.
+    static func upright(_ data: Data, wantMirror: Bool) -> UIImage? {
+        guard var ci = CIImage(data: data, options: [.applyOrientationProperty: true]) else { return nil }
+        let exif = (ci.properties[kCGImagePropertyOrientation as String] as? UInt32) ?? 1
+        let appliedMirror = [2, 4, 5, 7].contains(exif)   // EXIF 에 거울이 들어 있었으면 이미 뒤집혀 들어왔다
+        ci = LiveFilter.upright(ci, appliedMirror: appliedMirror, wantMirror: wantMirror)
+        guard let cg = ctx.createCGImage(ci, from: ci.extent) else { return nil }
+        return UIImage(cgImage: cg, scale: 1, orientation: .up)
     }
 }
