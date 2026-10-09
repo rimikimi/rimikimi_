@@ -13,7 +13,12 @@ final class BurstCameraModel {
     private(set) var denied = false
     private(set) var flashOverlay = false
     var flashOn = false
+    /// 화면에 보이는 배율(1 = 와이드). 기본 카메라 앱처럼 0.5×(초광각)까지 내려간다.
     private(set) var zoom: CGFloat = 1
+    /// 렌즈 버튼(0.5 · 1 · 2 · 망원) — 후면에서만. 기기에 있는 렌즈만 나온다.
+    private(set) var lensStops: [CGFloat] = []
+    /// 화면 배율 1× 에 해당하는 장치 배율(초광각 묶음이면 보통 2).
+    private var zoomBase: CGFloat = 1
     private(set) var zoomAtGestureStart: CGFloat = 1
 
     private let output = AVCapturePhotoOutput()
@@ -66,6 +71,12 @@ final class BurstCameraModel {
         }
         configureOutputConnection()
         session.commitConfiguration()
+        if areaObserver == nil {
+            areaObserver = NotificationCenter.default.addObserver(forName: AVCaptureDevice.subjectAreaDidChangeNotification,
+                                                                  object: nil, queue: .main) { [weak self] _ in
+                Task { @MainActor in self?.resumeAutoFocus() }
+            }
+        }
         await run()
     }
 
@@ -81,12 +92,29 @@ final class BurstCameraModel {
     }
 
     private func addInput(for pos: AVCaptureDevice.Position) {
-        guard let device = AVCaptureDevice.default(
-            pos == .front ? .builtInWideAngleCamera : .builtInDualWideCamera, for: .video, position: pos)
-            ?? AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: pos),
-              let i = try? AVCaptureDeviceInput(device: device), session.canAddInput(i) else { return }
+        // 후면은 기본 카메라 앱처럼 렌즈를 묶은 가상 카메라(트리플 → 듀얼와이드 → 듀얼 → 와이드).
+        // 그래야 0.5×(초광각)·망원으로 줌이 이어진다(오너 지시 2026-10-09 "진짜 카메라랑 똑같이, 줌도").
+        let types: [AVCaptureDevice.DeviceType] = pos == .front
+            ? [.builtInWideAngleCamera]
+            : [.builtInTripleCamera, .builtInDualWideCamera, .builtInDualCamera, .builtInWideAngleCamera]
+        let device = types.lazy.compactMap { AVCaptureDevice.default($0, for: .video, position: pos) }.first
+        guard let device, let i = try? AVCaptureDeviceInput(device: device), session.canAddInput(i) else { return }
         session.addInput(i)
         input = i
+        // 초광각이 묶인 가상 카메라는 배율 1.0 = 초광각이라, 화면에 보이는 "1×"(와이드)는 첫 전환 배율이다.
+        let switches = device.virtualDeviceSwitchOverVideoZoomFactors.map { CGFloat(truncating: $0) }
+        let hasUltraWide = device.constituentDevices.contains { $0.deviceType == .builtInUltraWideCamera }
+        zoomBase = hasUltraWide ? (switches.first ?? 1) : 1
+        var stops: [CGFloat] = hasUltraWide ? [0.5, 1, 2] : [1, 2]
+        if let tele = (hasUltraWide ? switches.dropFirst().first : switches.first).map({ $0 / zoomBase }), tele > 2.01 { stops.append(tele) }
+        lensStops = pos == .front ? [] : stops
+        if (try? device.lockForConfiguration()) != nil {
+            device.videoZoomFactor = zoomBase
+            if device.isFocusModeSupported(.continuousAutoFocus) { device.focusMode = .continuousAutoFocus }
+            if device.isExposureModeSupported(.continuousAutoExposure) { device.exposureMode = .continuousAutoExposure }
+            device.isSubjectAreaChangeMonitoringEnabled = true
+            device.unlockForConfiguration()
+        }
         zoom = 1
         zoomAtGestureStart = 1
     }
@@ -95,14 +123,20 @@ final class BurstCameraModel {
     /// 화면에서 본 그대로가 기대값이다.
     /// 실시간 필터 프레임도 같은 방향·거울로 받는다(미리보기 = 찍히는 사진 구도).
     private func configureOutputConnection() {
-        for c in [output.connection(with: .video), videoOutput.connection(with: .video)].compactMap({ $0 }) {
+        if let c = output.connection(with: .video) {
             if c.isVideoRotationAngleSupported(90) { c.videoRotationAngle = 90 }
             if c.isVideoMirroringSupported {
                 c.automaticallyAdjustsVideoMirroring = false
                 c.isVideoMirrored = (position == .front && frontMirror)
             }
         }
-        live?.wantMirrored = (position == .front && frontMirror)
+        // 실시간 필터 프레임은 센서 원본(가로·거울 없음)으로 받고 세로·거울은 렌더러가 직접 입힌다.
+        // 연결에 90° 를 맡겼더니 전면 전환 뒤 적용이 안 돼 미리보기가 누웠다(오너 실기기 2026-10-09, 두 번).
+        if let c = videoOutput.connection(with: .video) {
+            if c.isVideoRotationAngleSupported(0) { c.videoRotationAngle = 0 }
+            if c.isVideoMirroringSupported { c.automaticallyAdjustsVideoMirroring = false; c.isVideoMirrored = false }
+        }
+        live?.setOrientation(front: position == .front, mirrored: position == .front && frontMirror)
     }
 
     // MARK: 동작
@@ -153,15 +187,75 @@ final class BurstCameraModel {
 
     // MARK: 줌
 
+    /// 화면 배율로 줌(핀치 — 손가락을 바로 따라간다).
     func setZoom(_ v: CGFloat) {
         guard let device = input?.device else { return }
-        let maxZoom = min(device.activeFormat.videoMaxZoomFactor, 8)
-        let clamped = min(maxZoom, max(1, v))
+        let f = clampFactor(v * zoomBase, device)
         guard (try? device.lockForConfiguration()) != nil else { return }
-        device.videoZoomFactor = clamped
+        device.videoZoomFactor = f
         device.unlockForConfiguration()
-        zoom = clamped
+        zoom = f / zoomBase
     }
+
+    /// 렌즈 버튼 — 기본 카메라처럼 부드럽게 넘어간다.
+    func jumpZoom(_ v: CGFloat) {
+        guard let device = input?.device else { return }
+        let f = clampFactor(v * zoomBase, device)
+        guard (try? device.lockForConfiguration()) != nil else { return }
+        device.ramp(toVideoZoomFactor: f, withRate: 12)
+        device.unlockForConfiguration()
+        zoom = f / zoomBase
+        zoomAtGestureStart = zoom
+        HapticPlayer.selection()
+    }
+
+    private func clampFactor(_ f: CGFloat, _ device: AVCaptureDevice) -> CGFloat {
+        let maxF = min(device.maxAvailableVideoZoomFactor, zoomBase * 15)
+        return min(maxF, max(device.minAvailableVideoZoomFactor, f))
+    }
+
+    // MARK: 초점·노출
+
+    /// 탭한 곳에 초점·노출(기본 카메라처럼). `p` 는 장치 좌표(0~1, 센서 가로 기준).
+    /// 장면이 크게 바뀌면 다시 자동으로 돌아간다(`subjectAreaDidChange`).
+    func focus(at p: CGPoint) {
+        guard let device = input?.device, (try? device.lockForConfiguration()) != nil else { return }
+        if device.isFocusPointOfInterestSupported, device.isFocusModeSupported(.autoFocus) {
+            device.focusPointOfInterest = p
+            device.focusMode = .autoFocus
+        }
+        if device.isExposurePointOfInterestSupported, device.isExposureModeSupported(.autoExpose) {
+            device.exposurePointOfInterest = p
+            device.exposureMode = .autoExpose
+        }
+        device.isSubjectAreaChangeMonitoringEnabled = true
+        device.unlockForConfiguration()
+        HapticPlayer.selection()
+    }
+
+    /// 노출 보정(기본 카메라의 해 아이콘 끌기) — -2 ~ +2 EV.
+    private(set) var exposureBias: Float = 0
+    func setExposureBias(_ v: Float) {
+        guard let device = input?.device, (try? device.lockForConfiguration()) != nil else { return }
+        let b = min(min(device.maxExposureTargetBias, 2), max(max(device.minExposureTargetBias, -2), v))
+        device.setExposureTargetBias(b, completionHandler: nil)
+        device.unlockForConfiguration()
+        exposureBias = b
+    }
+
+    private func resumeAutoFocus() {
+        guard let device = input?.device, (try? device.lockForConfiguration()) != nil else { return }
+        if device.isFocusModeSupported(.continuousAutoFocus) {
+            device.focusPointOfInterest = CGPoint(x: 0.5, y: 0.5); device.focusMode = .continuousAutoFocus
+        }
+        if device.isExposureModeSupported(.continuousAutoExposure) {
+            device.exposurePointOfInterest = CGPoint(x: 0.5, y: 0.5); device.exposureMode = .continuousAutoExposure
+        }
+        device.setExposureTargetBias(0, completionHandler: nil)
+        device.unlockForConfiguration()
+        exposureBias = 0
+    }
+    @ObservationIgnored private var areaObserver: NSObjectProtocol?
 
     func commitZoom() { zoomAtGestureStart = zoom }
 }

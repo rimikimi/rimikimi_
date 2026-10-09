@@ -26,7 +26,9 @@ enum LiveFilter {
     /// 프리셋 기본 효과(편집기 fxOf) — 트윙클(별빛)은 카메라 칩에 없어서 옮기지 않았다.
     struct FX {
         var grain: Double = 0, vignette: Double = 0, leak: Double = 0, glow: Double = 0, blur: Double = 0
-        var any: Bool { grain > 0 || vignette > 0 || leak > 0 || glow > 0 || blur > 0 }
+        /// 저해상도 칸 크기(짧은 변 대비) — filters.js lowres
+        var lowres: Double = 0
+        var any: Bool { grain > 0 || vignette > 0 || leak > 0 || glow > 0 || blur > 0 || lowres > 0 }
     }
 
     struct Preset {
@@ -74,7 +76,7 @@ enum LiveFilter {
         "ph7": .init(temp: 16, tint: -6, ex: 0.03, con: 0.18, fade: 4, whitePull: 4, sat: 0.1, vib: 0.06, sh: [2, 4, -4], hi: [10, 10, -12], fx: .init(grain: 0.12)),
         "ph6s": .init(temp: -14, tint: -8, ex: 0.02, con: 0.2, fade: 2, whitePull: 2, sat: 0.14, vib: 0.04, sh: [-4, 4, 8], hi: [0, 4, 6], fx: .init(grain: 0.14)),
         "ph4s": .init(temp: 26, tint: -6, ex: 0.12, con: 0.32, fade: 8, sat: -0.08, sh: [6, 6, -8], hi: [14, 12, -14], fx: .init(grain: 0.3, vignette: 0.35, blur: 0.04)),
-        "ph3gs": .init(temp: 14, tint: -14, ex: 0.14, con: 0.26, fade: 22, sat: -0.35, vib: -0.05, sh: [-6, 10, 6], hi: [18, 16, -10], fx: .init(grain: 0.55, vignette: 0.45, blur: 0.08)),
+        "ph3gs": .init(temp: 14, tint: -14, ex: 0.14, con: 0.26, fade: 22, sat: -0.35, vib: -0.05, sh: [-6, 10, 6], hi: [18, 16, -10], fx: .init(grain: 0.55, vignette: 0.45, lowres: 0.0035)),
         "sepia": .init(ex: 0.02, con: 0.12, fade: 8, whitePull: 6, sh: [18, 6, -14], hi: [24, 10, -18], bw: [0.3, 0.55, 0.15]),
         "duopink": .init(special: .duotone, c1: [38, 18, 66], c2: [255, 158, 201]),
         "neon": .init(fx: .init(glow: 0.5), special: .duotone, c1: [24, 8, 66], c2: [90, 255, 240]),
@@ -460,23 +462,14 @@ final class LiveFilterEngine {
         kernels = d
     }
 
-    /// 카메라 프레임 → 필터 입힌 이미지 (원점 0,0). 픽셀 크기에 좌우되는 프리셋은 편집기와 같은
-    /// 긴 변 1080 격자로 줄여서 돌린다(그레인 굵기·블러 반경·모자이크 칸이 편집기와 같아진다).
+    /// 카메라 프레임 → 필터 입힌 이미지 (원점 0,0). 프레임 해상도 그대로 돌린다 — 예전엔 그레인 등
+    /// 효과 프리셋을 편집기 격자(긴 변 1080)로 줄였다 늘려서 화면이 초점 나간 것처럼 흐렸다(오너 실기기 2026-10-09).
+    /// 칸·반경은 짧은 변 비율이라 해상도가 달라도 같은 모양이고, 그레인 알갱이만 조금 더 곱다.
     func render(frame: CIImage, key: String) -> CIImage {
         let e = frame.extent
-        var img = frame.transformed(by: .init(translationX: -e.minX, y: -e.minY))
-        guard let p = LiveFilter.presets[key] else { return img }
-        if p.needsEditorGrid {
-            let long = max(e.width, e.height)
-            if long > LiveFilter.editorLongSide + 0.5 {
-                let k = LiveFilter.editorLongSide / long
-                let W = (e.width * k).rounded(), H = (e.height * k).rounded()
-                img = img.transformed(by: .init(scaleX: W / e.width, y: H / e.height))
-                    .cropped(to: CGRect(x: 0, y: 0, width: W, height: H))
-            }
-        } else {
-            img = img.cropped(to: CGRect(x: 0, y: 0, width: e.width.rounded(.down), height: e.height.rounded(.down)))
-        }
+        let img = frame.transformed(by: .init(translationX: -e.minX, y: -e.minY))
+            .cropped(to: CGRect(x: 0, y: 0, width: e.width.rounded(.down), height: e.height.rounded(.down)))
+        guard LiveFilter.presets[key] != nil else { return img }
         return apply(img, key: key)
     }
 
@@ -515,6 +508,11 @@ final class LiveFilterEngine {
 
         guard effects, p.fx.any else { return img }
         if p.fx.blur > 0 { img = box(img, jsRound(minWH * 0.02 * p.fx.blur) + 1, W, H) }
+        if p.fx.lowres > 0 {
+            let bs = max(2, jsRound(minWH * p.fx.lowres))
+            let h = run("lfBlockH", ext, [img], [img, bs, W, H])
+            img = run("lfBlockV", ext, [h], [h, bs, W, H])
+        }
         if p.fx.grain > 0 || p.fx.vignette > 0 || p.fx.leak > 0 {
             img = run("lfFx", ext, [img], [img, p.fx.grain, p.fx.vignette, p.fx.leak, 7, W, H])
         }

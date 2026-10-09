@@ -10,6 +10,9 @@ struct CameraFilterTab: View {
     @State private var selected = "none"
     @State private var favs: [String] = UserDefaults.standard.stringArray(forKey: "filter.favorites") ?? []
     @State private var visible = false
+    @State private var focusMark: FocusMark?
+    @State private var biasAtDragStart: Float?
+    struct FocusMark: Equatable { let id = UUID(); let point: CGPoint; var touched = Date() }
 
     private var phone: [String] { ["ph16pro", "ph15pro", "ph14pro", "phxs", "ph7", "ph6s", "ph4s", "ph3gs"] }
     private var analog: [String] { FilterTabView.groups.filter { $0.key != "phone" }.flatMap { $0.presets.map(\.key) } }
@@ -26,7 +29,49 @@ struct CameraFilterTab: View {
                 }
             } else {
                 if let live = model.live {
-                    LiveFilterPreview(renderer: live).ignoresSafeArea()
+                    // 기본 카메라처럼 — 탭 = 그 자리 초점·노출, 두 손가락 = 줌(오너 지시 2026-10-09)
+                    GeometryReader { geo in
+                        LiveFilterPreview(renderer: live)
+                            .contentShape(Rectangle())
+                            .onTapGesture(coordinateSpace: .local) { pt in
+                                if let dp = live.devicePoint(pt, in: geo.size) {
+                                    model.focus(at: dp); model.setExposureBias(0)
+                                    focusMark = FocusMark(point: pt)
+                                }
+                            }
+                            // 초점을 잡은 뒤 위아래로 끌면 밝기(노출) — 기본 카메라와 같다
+                            .simultaneousGesture(DragGesture(minimumDistance: 12)
+                                .onChanged { g in
+                                    guard focusMark != nil, abs(g.translation.height) > abs(g.translation.width) else { return }
+                                    if biasAtDragStart == nil { biasAtDragStart = model.exposureBias }
+                                    model.setExposureBias((biasAtDragStart ?? 0) - Float(g.translation.height / 120))
+                                    focusMark?.touched = Date()
+                                }
+                                .onEnded { _ in biasAtDragStart = nil })
+                            .simultaneousGesture(MagnifyGesture()
+                                .onChanged { model.setZoom(model.zoomAtGestureStart * $0.magnification) }
+                                .onEnded { _ in model.commitZoom() })
+                            .overlay(alignment: .topLeading) {
+                                if let m = focusMark {
+                                    HStack(spacing: 6) {
+                                        RoundedRectangle(cornerRadius: 4).stroke(Color.yellow, lineWidth: 1.5)
+                                            .frame(width: 76, height: 76)
+                                        Image(systemName: "sun.max.fill").font(.system(size: 16)).foregroundStyle(Color.yellow)
+                                            .offset(y: CGFloat(-model.exposureBias) * 18)
+                                    }
+                                    .offset(x: 11)   // 해 아이콘 폭만큼 — 네모 가운데가 탭한 자리
+                                    .position(m.point)
+                                    .id(m.id)
+                                    .transition(.opacity)
+                                    .allowsHitTesting(false)
+                                    .task(id: m.touched) {
+                                        try? await Task.sleep(for: .seconds(2))
+                                        withAnimation(.easeOut(duration: 0.25)) { if focusMark?.id == m.id { focusMark = nil } }
+                                    }
+                                }
+                            }
+                    }
+                    .ignoresSafeArea()
                 } else {
                     CameraPreviewLayer(session: model.session).ignoresSafeArea()
                 }
@@ -34,9 +79,13 @@ struct CameraFilterTab: View {
                     .animation(.easeOut(duration: 0.18), value: model.flashOverlay).allowsHitTesting(false)
             }
             VStack(spacing: Spacing.s3) {
-                if model.isFront {
-                    HStack {
-                        Spacer()
+                HStack {
+                    if !model.isFront {
+                        CircleGlassButton(system: model.flashOn ? "bolt.fill" : "bolt.slash",
+                                          tint: model.flashOn ? Color.heartYellow : .white) { model.flashOn.toggle() }
+                    }
+                    Spacer()
+                    if model.isFront {
                         Button { model.frontMirror.toggle() } label: {
                             Label(L.t("좌우반전", "Mirror"), systemImage: "arrow.left.and.right")
                                 .font(AppFont.footnote.weight(.bold))
@@ -47,9 +96,10 @@ struct CameraFilterTab: View {
                         .buttonStyle(PressScaleButtonStyle())
                         .accessibilityAddTraits(model.frontMirror ? [.isSelected] : [])
                     }
-                    .padding(.horizontal, Spacing.page).padding(.top, Spacing.s2)
                 }
+                .padding(.horizontal, Spacing.page).padding(.top, Spacing.s2)
                 Spacer()
+                lensRow
                 filterStrip
                 HStack {
                     if model.shots.isEmpty {
@@ -79,6 +129,33 @@ struct CameraFilterTab: View {
         .onAppear { visible = true; Task { await model.start() }; app.enqueueCoach(Coach.filter) }
         .onDisappear { visible = false; model.stop() }
         .onChange(of: selected, initial: true) { model.live?.presetKey = selected }
+    }
+
+    /// 렌즈 버튼 — 기본 카메라처럼 0.5 · 1 · 2 · 망원(있는 것만). 지금 배율에 가까운 버튼에 실제 배율을 띄운다.
+    @ViewBuilder private var lensRow: some View {
+        if !model.lensStops.isEmpty {
+            let near = model.lensStops.min { abs($0 - model.zoom) < abs($1 - model.zoom) }
+            HStack(spacing: 6) {
+                ForEach(model.lensStops, id: \.self) { stop in
+                    let on = stop == near
+                    Button { model.jumpZoom(stop) } label: {
+                        Text(on ? Self.zoomText(model.zoom, active: true) : Self.zoomText(stop, active: false))
+                            .font(.system(size: on ? 13 : 11, weight: .bold)).monospacedDigit()
+                            .foregroundStyle(on ? Color.yellow : Color.white)
+                            .frame(width: on ? 38 : 30, height: on ? 38 : 30)
+                            .background(.black.opacity(0.45), in: Circle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(5)
+            .background(.black.opacity(0.2), in: Capsule())
+        }
+    }
+    static func zoomText(_ z: CGFloat, active: Bool) -> String {
+        let r = (z * 10).rounded() / 10
+        let s = r == r.rounded() ? String(Int(r)) : (r < 1 ? String(format: ".%d", Int((r * 10).rounded())) : String(format: "%.1f", r))
+        return active ? s + "×" : s
     }
 
     private func sideButton(_ title: String, _ icon: String, _ action: @escaping () -> Void) -> some View {

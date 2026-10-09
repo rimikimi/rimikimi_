@@ -28,11 +28,26 @@ final class LiveFilterRenderer: NSObject, AVCaptureVideoDataOutputSampleBufferDe
     private var context: CIContext?
     private var engine: LiveFilterEngine?
 
-    private var _wantMirrored = false
-    /// 프레임 연결이 지켜야 할 거울 여부(모델이 정한다). 연결이 새로 생겨 설정이 빠지면 프레임에서 바로잡는다.
-    var wantMirrored: Bool {
-        get { lock.withLock { _wantMirrored } }
-        set { lock.withLock { _wantMirrored = newValue } }
+    private var _front = false
+    private var _mirrored = false
+    /// 마지막으로 그린 (세로로 세운) 프레임 크기 — 탭 좌표 → 장치 좌표 변환에 쓴다.
+    private var _imageSize: CGSize = .zero
+
+    /// 프레임은 센서 원본(가로)으로 온다 — 여기서 세로·거울을 입힌다(모델이 정한다).
+    func setOrientation(front: Bool, mirrored: Bool) {
+        lock.withLock { _front = front; _mirrored = mirrored }
+    }
+
+    /// 화면(뷰) 좌표 → 초점용 장치 좌표(0~1, 센서 가로·홈버튼 오른쪽 기준). 화면 꽉 채우기(aspectFill) 반영.
+    func devicePoint(_ pt: CGPoint, in view: CGSize) -> CGPoint? {
+        let (img, mir) = lock.withLock { (_imageSize, _mirrored) }
+        guard img.width > 0, img.height > 0, view.width > 0, view.height > 0 else { return nil }
+        let s = max(view.width / img.width, view.height / img.height)
+        let u = (pt.x - (view.width - img.width * s) / 2) / (img.width * s)   // 세운 화면 가로 0~1
+        let v = (pt.y - (view.height - img.height * s) / 2) / (img.height * s) // 세로 0~1 (위=0)
+        guard (0...1).contains(u), (0...1).contains(v) else { return nil }
+        // 후면·거울 끔 = 시계방향 90°(.right) → 센서 (v, 1-u). 거울 켠 전면 = 전치(.leftMirrored) → (v, u).
+        return mir ? CGPoint(x: v, y: u) : CGPoint(x: v, y: 1 - u)
     }
 
     /// 지금 고른 필터 키. "none"·모르는 키 = 원본 그대로.
@@ -61,20 +76,21 @@ final class LiveFilterRenderer: NSObject, AVCaptureVideoDataOutputSampleBufferDe
     }
 
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
-        // 스스로 바로잡기 — 전·후면 전환 뒤 연결이 새로 생기면 세로(90°)·거울 설정이 빠진 채 프레임이 와서
-        // 미리보기가 누워 보였다(오너 실기기 2026-10-09). 다음 프레임부터 맞게 들어온다.
-        if connection.isVideoRotationAngleSupported(90), connection.videoRotationAngle != 90 { connection.videoRotationAngle = 90 }
-        if connection.isVideoMirroringSupported {
-            let want = wantMirrored
-            if connection.automaticallyAdjustsVideoMirroring { connection.automaticallyAdjustsVideoMirroring = false }
-            if connection.isVideoMirrored != want { connection.isVideoMirrored = want }
-        }
         guard let pb = CMSampleBufferGetImageBuffer(sampleBuffer), let context, let commandQueue else { return }
         let (key, layer, size) = lock.withLock { (_presetKey, _layer, _drawableSize) }
         guard let layer, size.width > 0, size.height > 0 else { return }
 
-        // 버퍼(P3 등) → 작업 공간 sRGB 로 변환돼 들어온다. 연결에서 이미 세로·거울 처리됨.
+        // 버퍼(P3 등) → 작업 공간 sRGB 로 변환돼 들어온다. 센서 원본(가로)이면 여기서 세운다:
+        // 후면·거울 끔 = 시계방향 90°(.right), 거울 켠 전면 = .leftMirrored(= .right + 좌우 뒤집기).
         var img = CIImage(cvPixelBuffer: pb)
+        let (front, mir) = lock.withLock { (_front, _mirrored) }
+        if img.extent.width > img.extent.height {
+            img = img.oriented(mir ? .leftMirrored : .right)
+        } else if front, mir != connection.isVideoMirrored {
+            img = img.oriented(.upMirrored)   // 혹시 연결이 이미 세워 보냈다면 거울만 맞춘다
+        }
+        img = img.transformed(by: .init(translationX: -img.extent.minX, y: -img.extent.minY))
+        lock.withLock { _imageSize = img.extent.size }
         if key != "none", let engine { img = engine.render(frame: img, key: key) }
 
         // 화면 꽉 채우기(aspectFill) — 기존 미리보기 레이어와 같은 구도
