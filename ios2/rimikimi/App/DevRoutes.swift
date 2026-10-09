@@ -125,6 +125,22 @@ enum DevRoutes {
                 app.cartExpanded = q["open"] == "1"
             }
         case "/cameratab": app.tab = .filter
+        case "/myphotos":
+            Task { @MainActor in
+                for _ in 0..<40 where app.concepts.concepts.isEmpty { try? await Task.sleep(nanoseconds: 250_000_000) }
+                let cs = Array(app.concepts.pool.prefix(4))
+                var arr: [[String: Any]] = []
+                for (i, c) in cs.enumerated() { for j in 0..<(i + 1) {
+                    arr.append(["id": "\(i)-\(j)", "conceptId": c.id, "conceptTitle": c.title,
+                                "createdAt": "2026-10-09T0\(9 - i):0\(j):00Z", "url": c.thumbURL.absoluteString])
+                } }
+                if let d = try? JSONSerialization.data(withJSONObject: arr) { app.devFakeGallery = try? JSONDecoder().decode([GalleryItem].self, from: d) }
+                app.tab = .myPhotos
+            }
+        case "/fakeresult":
+            // 3:4 가 아닌 결과가 잘리지 않고 전체로 보이는지(가로 1200×630)
+            app.tab = .gallery
+            app.galleryPath = [.result(ResultPayload(items: [.init(id: "x", image: nil, url: URL(string: "https://rimikimi-app.vercel.app/og.png"), expiresAt: nil)], conceptId: nil, conceptTitle: "테스트"))]
         case "/burstedit":
             // 카메라로 n장 찍고 편집기로 넘긴 상황 재현(12MP 세로) — 필터 칩 썸네일이 비는지 보는 용도.
             installSamplePhoto(app)

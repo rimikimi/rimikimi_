@@ -38,21 +38,7 @@ struct ResultView: View {
                         .font(AppFont.footnote).foregroundStyle(Color.ink2)
                 }
 
-                if needsFit, let img = currentImage {
-                    Button { fitImage = img } label: {
-                        HStack(spacing: Spacing.s2) {
-                            Image(systemName: "aspectratio").foregroundStyle(Color.accent)
-                            Text(Copy.resultNotThreeFour).font(AppFont.calloutEmphasis)
-                            Spacer()
-                            Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold)).foregroundStyle(Color.ink3)
-                        }
-                        .padding(Spacing.s3)
-                        .background(Color.accentTint, in: RoundedRectangle(cornerRadius: Radius.button, style: .continuous))
-                        .contentShape(RoundedRectangle(cornerRadius: Radius.button, style: .continuous))
-                    }
-                    .buttonStyle(PressScaleButtonStyle(scale: 0.985))
-                    .padding(.horizontal, Spacing.page)
-                }
+                // 정방향 맞춤 안내는 뺐다(오너 지시 2026-10-09 "정방향 맞추기는 없애자").
 
                 VStack(spacing: Spacing.s2) {
                     Button(action: saveToAlbum) {
@@ -176,11 +162,13 @@ struct ResultPhoto: View {
     var body: some View {
         let result = override ?? item.image ?? loaded[item.id]
         ZStack {
-            RoundedRectangle(cornerRadius: Radius.card, style: .continuous).fill(Color.fill)
+            // 바탕 칸은 불러오는 동안만 — 사진이 3:4 가 아니어도 남는 자리가 회색 띠로 보이지 않게
+            if result == nil { RoundedRectangle(cornerRadius: Radius.card, style: .continuous).fill(Color.fill) }
             if showingOriginal, let original {
-                Image(uiImage: original).resizable().scaledToFill()
+                Image(uiImage: original).resizable().scaledToFit()
             } else if let img = result {
-                Image(uiImage: img).resizable().scaledToFill()
+                // 결과 전체를 보여준다 — 잘라서 채우지 않는다(오너 지시 2026-10-09 "결과물 전체를 보여줘야 함")
+                Image(uiImage: img).resizable().scaledToFit()
             } else {
                 ProgressView().tint(Color.ink2)
             }

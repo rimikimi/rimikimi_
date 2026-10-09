@@ -250,6 +250,8 @@ final class AppState {
     #if DEBUG
     /// dev/fit 캡처용 — 결과 화면이 뜨면 정방향 맞춤 시트를 바로 연다.
     var devAutoOpenFit = false
+    /// dev/myphotos?fake=1 — 로그인 없이 내 사진 앨범 모양을 캡처하려고 넣는 가짜 갤러리.
+    var devFakeGallery: [GalleryItem]?
     /// 결함 #4 검증 캡처용(`dev/devscrollbottom`) — 탭 루트 화면들이 처음부터 맨 아래로 스크롤된
     /// 상태로 뜨게 한다. 실기기 터치 없이 "스크롤 끝까지 내렸을 때 탭바에 안 가리는지"를 캡처하기 위함.
     /// `RimikimiApp.task` 의 `DevRoutes.handleLaunchArguments` 는 `concepts.load()` 등 여러 await

@@ -8,13 +8,39 @@ struct MyPhotosView: View {
     @State private var error: String?
 
     private let columns = [GridItem(.flexible(), spacing: 6), GridItem(.flexible(), spacing: 6), GridItem(.flexible(), spacing: 6)]
+    private let albumColumns = Array(repeating: GridItem(.flexible(), spacing: Spacing.s2), count: 3)
+
+    private var devFake: Bool {
+        #if DEBUG
+        app.devFakeGallery != nil
+        #else
+        false
+        #endif
+    }
+    struct Album: Identifiable { let id: String; let title: String; let items: [GalleryItem] }
+    /// 컨셉별 묶음 — 최근에 만든 컨셉이 앞, 묶음 안에서도 최신이 앞(표지).
+    private var albums: [Album] {
+        let sorted = items.sorted { ($0.createdAt ?? .distantPast) > ($1.createdAt ?? .distantPast) }
+        var order: [String] = []
+        var groups: [String: [GalleryItem]] = [:]
+        for it in sorted {
+            let k = it.conceptId ?? "_"
+            if groups[k] == nil { order.append(k) }
+            groups[k, default: []].append(it)
+        }
+        return order.map { k in
+            let first = groups[k]!.first!
+            let title = app.concepts.displayTitle(id: first.conceptId, fallback: first.conceptTitle ?? "")
+            return Album(id: k, title: title.isEmpty ? Copy.tabMyPhotos : title, items: groups[k]!)
+        }
+    }
 
     var body: some View {
         ScrollViewReader { proxy in
         ScrollView {
             LazyVStack(spacing: Spacing.s4) {
                 ProgressCard()
-                if !app.auth.isSignedIn {
+                if !app.auth.isSignedIn && !devFake {
                     EmptyState(message: Copy.mineLoginPrompt, actionTitle: Copy.signIn) {
                         app.loginMessage = nil
                         app.loginSheet = true
@@ -27,23 +53,18 @@ struct MyPhotosView: View {
                 } else if items.isEmpty {
                     EmptyState(message: error ?? Copy.mineEmpty, actionTitle: Copy.mineEmptyCta) { app.tab = .gallery }
                 } else {
-                    LazyVGrid(columns: columns, spacing: 6) {
-                        ForEach(items) { item in
-                            NavigationLink(value: Route.result(ResultPayload(
-                                items: [.init(id: item.id, image: nil, url: item.url, expiresAt: item.expiresAt)],
-                                conceptId: item.conceptId, conceptTitle: item.conceptTitle ?? ""))) {
-                                RemoteImage(url: item.url, cornerRadius: Radius.thumb)
-                                    .photoRatio()
-                                    .overlay(alignment: .bottomLeading) {
-                                        if let e = item.expiresAt {
-                                            Text(e, style: .timer)
-                                                .font(AppFont.caption).monospacedDigit()
-                                                .foregroundStyle(.white)
-                                                .padding(.horizontal, 6).padding(.vertical, 3)
-                                                .background(.black.opacity(0.45), in: Capsule())
-                                                .padding(6)
-                                        }
-                                    }
+                    // 홈 앨범처럼 — 같은 컨셉으로 만든 것끼리 묶어 표지·이름·장수(오너 지시 2026-10-09
+                    // "여기도 그냥 앨범처럼 보여주고 카운트만"). 남은 시간 표시는 뺐다.
+                    LazyVGrid(columns: albumColumns, spacing: Spacing.s4) {
+                        ForEach(albums) { album in
+                            NavigationLink {
+                                MyAlbumView(title: album.title, items: album.items)
+                            } label: {
+                                VStack(alignment: .leading, spacing: Spacing.s1) {
+                                    RemoteImage(url: album.items.first?.url, cornerRadius: Radius.card).photoRatio()
+                                    Text(album.title).font(AppFont.cardTitle).foregroundStyle(Color.ink).lineLimit(1)
+                                    Text(Copy.albumCount(album.items.count)).font(AppFont.footnote).foregroundStyle(Color.ink3)
+                                }
                             }
                             .buttonStyle(PressScaleButtonStyle())
                         }
@@ -59,6 +80,7 @@ struct MyPhotosView: View {
         .background(Color.bg)
         .inlineTitle(Copy.tabMyPhotos)
         .task(id: app.auth.session?.userID) { await reload() }
+        .onChange(of: devFake) { _, _ in Task { await reload() } }
         .onChange(of: app.generation.doneTick) { _, _ in
             Task { await reload() }
         }
@@ -91,6 +113,9 @@ struct MyPhotosView: View {
     #endif
 
     private func reload() async {
+        #if DEBUG
+        if let fake = app.devFakeGallery { items = fake; return }
+        #endif
         guard let token = await app.auth.validAccessToken() else { items = []; return }
         loading = true
         defer { loading = false }
@@ -209,5 +234,33 @@ struct ResultThumb: View {
         }
         .frame(width: 48, height: 64)
         .clipShape(RoundedRectangle(cornerRadius: Radius.thumb, style: .continuous))
+    }
+}
+
+/// 내 사진 앨범 하나 — 그 컨셉으로 만든 결과를 3열로. 탭하면 결과 화면.
+struct MyAlbumView: View {
+    @Environment(AppState.self) private var app
+    var title: String
+    var items: [GalleryItem]
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 3)
+
+    var body: some View {
+        ScrollView {
+            LazyVGrid(columns: columns, spacing: 2) {
+                ForEach(items) { item in
+                    NavigationLink(value: Route.result(ResultPayload(
+                        items: [.init(id: item.id, image: nil, url: item.url, expiresAt: item.expiresAt)],
+                        conceptId: item.conceptId, conceptTitle: item.conceptTitle ?? ""))) {
+                        RemoteImage(url: item.url, cornerRadius: Radius.thumb).photoRatio()
+                    }
+                    .buttonStyle(PressScaleButtonStyle())
+                }
+            }
+            .padding(.horizontal, Spacing.page)
+            .padding(.top, Spacing.s2)
+            .padding(.bottom, app.contentBottomPad)
+        }
+        .background(Color.bg)
+        .inlineTitle(title)
     }
 }
