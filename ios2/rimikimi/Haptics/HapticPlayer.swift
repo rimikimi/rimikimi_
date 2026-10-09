@@ -9,7 +9,8 @@ enum HapticPlayer {
     /// 옵션 확정(칩 선택이 실제로 값에 반영될 때).
     static func selection() { UISelectionFeedbackGenerator().selectionChanged() }
     /// 길게 눌러 고르기 — 사진 앱처럼 '툭' 느껴지게(selection 은 너무 약해 안 느껴진다, 오너 지시 2026-10-09).
-    static func longPress() { UIImpactFeedbackGenerator(style: .medium).impactOccurred() }
+    /// medium 은 약하다(오너 2026-10-09 "좀만 더 쎄게") → heavy.
+    static func longPress() { UIImpactFeedbackGenerator(style: .heavy).impactOccurred() }
     static func success() { UINotificationFeedbackGenerator().notificationOccurred(.success) }
     static func warning() { UINotificationFeedbackGenerator().notificationOccurred(.warning) }
 }
