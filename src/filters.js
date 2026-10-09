@@ -108,7 +108,8 @@ export const FILM_PRESETS = [
     temp: -10, tint: -1, ex: 0.1,  con: 0.04, fade: 6,  whitePull: 24, sat: 0.2,   vib: 0.25, sh: [-2, 2, 8],   hi: [0, 2, 6] },
   { key: "phxs",    ko: "XS",     en: "XS",     group: "phone", // 2018 — 첫 스마트 HDR: 평평·주황빛 피부·뽀얀 질감
     temp: 18, tint: 6,  ex: 0.05,  con: -0.1, fade: 16, whitePull: 22, sat: -0.02, vib: 0.1,  sh: [8, 4, 0],    hi: [10, 5, -6],
-    fx: { glow: 0.25 } },
+    // 뽀샤시는 프리셋 기본에서 뺐다 — 편집기 효과 탭에서 직접 켠다(오너 지시 2026-10-09 "뽀샤시는 다 없애")
+  },
   { key: "ph7",     ko: "7",      en: "7",      group: "phone", // 2016 — 노란기 도는 뉴트럴, 중간 대비
     temp: 16, tint: -6, ex: 0.03,  con: 0.18, fade: 4,  whitePull: 4,  sat: 0.1,   vib: 0.06, sh: [2, 4, -4],   hi: [10, 10, -12],
     fx: { grain: 0.12 } },
@@ -131,7 +132,7 @@ export const FILM_PRESETS = [
     special: "duotone", c1: [38, 18, 66], c2: [255, 158, 201] },
   { key: "neon",     ko: "네온",      en: "Neon", group: "fun",
     special: "duotone", c1: [24, 8, 66], c2: [90, 255, 240],
-    fx: { glow: 0.5 } },
+  },
   { key: "thermal",  ko: "서모",      en: "Thermal", group: "fun",
     special: "thermal" },
   { key: "glitch",   ko: "글리치",    en: "Glitch", group: "fun",
@@ -143,11 +144,11 @@ export const FILM_PRESETS = [
   { key: "bloom",    ko: "빛번짐",    en: "Bloom", group: "fun",
     temp: 8, tint: 2, ex: 0.06, con: -0.06, fade: 16, whitePull: 10, sat: -0.04, vib: 0.18,
     sh: [6, 4, 0], hi: [14, 10, 2],
-    fx: { glow: 0.62, leak: 0.3 } },
+    fx: { leak: 0.3 } },
   { key: "twinkle",  ko: "트윙클",    en: "Twinkle", group: "fun",
     temp: 4, tint: 0, ex: 0.03, con: 0.1, fade: 6, whitePull: 6, sat: 0.06, vib: 0.2,
     sh: [0, 0, 4], hi: [8, 6, 0],
-    fx: { twinkle: 0.85, glow: 0.22 } },
+    fx: { twinkle: 0.85 } },
   { key: "sketch",   ko: "스케치",    en: "Sketch", group: "fun",
     special: "sketch" },
 ];

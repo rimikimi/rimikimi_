@@ -190,7 +190,8 @@ const fxOf = (p) => ({
 // 한 번에 저장"이 배치 모드의 존재 이유라서다.
 // initialPresetKey: 필터 카테고리의 프리셋 카드에서 들어오면 그 룩이 켜진 채 열린다.
 // initialFxAmt: 앱 카메라에서 고른 "효과" 슬라이더 값(0..1) — 찍고 넘어와도 그대로 이어진다.
-export default function PhotoEditor({ src, srcs, initialPresetKey = "none", initialFxAmt = 1, filename = "rimikimi", onClose }) {
+// initialStrength: 앱 카메라 세기 슬라이더(0..1 → 색감 0.7×세기)로 찍어 넘어왔을 때.
+export default function PhotoEditor({ src, srcs, initialPresetKey = "none", initialFxAmt = 1, initialStrength = 0.7, filename = "rimikimi", onClose }) {
   const sources = srcs && srcs.length ? srcs : [src];
   const multi = sources.length > 1;
   // 에디터가 떠 있는 동안 앱 루트의 스와이프 제스처(뒤로가기·탭 전환)를 끈다.
@@ -217,7 +218,7 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
   const [chipGroup, setChipGroup] = useState(() => presetByKey(initialPresetKey).group || "phone");
   // 필터 강도 (오너 지시): %표시 없는 슬라이더, 기본 0.7 = 지금의 풀 프리셋 룩.
   // 1.0 까지 올리면 더 진하게(외삽), 0 이면 원본.
-  const [strength, setStrength] = useState(0.7);
+  const [strength, setStrength] = useState(initialStrength);
   // 효과 세기 (오너 지시 2026-09-29: 필터 패널에 "색감"·"효과" 슬라이더 2개) — 프리셋에 딸린 효과
   // (그레인·비네트·흐림·뽀샤시…)를 0~1 배로 줄인다. 1 = 프리셋 그대로, 0 = 색감만.
   // strength(색감)는 applyLookWithStrength 가 색 보정에만 쓰고, 효과는 fx 값 자체를 이 배율로 바꿔 둔다.
@@ -235,7 +236,7 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
   const defaultLook = () => ({
     presetKey: initialPresetKey,
     fx: scaledFx(presetByKey(initialPresetKey), initialFxAmt),
-    strength: 0.7,
+    strength: initialStrength,
     fxAmt: initialFxAmt,
     lens: 0,   // 렌즈 왜곡 보정 -1..1 (0 = 원본)
     geo: { tilt: 0, pv: 0, ph: 0 },
