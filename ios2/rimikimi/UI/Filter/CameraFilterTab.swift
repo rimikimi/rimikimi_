@@ -13,7 +13,8 @@ struct CameraFilterTab: View {
     @State private var focusMark: FocusMark?
     @State private var biasAtDragStart: Float?
     @State private var lockFired = false
-    struct FocusMark: Equatable { let id = UUID(); let point: CGPoint; var locked = false; var touched = Date() }
+    @State private var uiBias: Float = 0
+    struct FocusMark: Equatable { let id = UUID(); let point: CGPoint; var locked = false; var touched = Date(); var adjusting = false; var dim = false }
 
     private var phone: [String] { ["ph16pro", "ph15pro", "ph14pro", "phxs", "ph7", "ph6s", "ph4s", "ph3gs"] }
     private var analog: [String] { FilterTabView.groups.filter { $0.key != "phone" }.flatMap { $0.presets.map(\.key) } }
@@ -36,19 +37,34 @@ struct CameraFilterTab: View {
                             .contentShape(Rectangle())
                             .onTapGesture(coordinateSpace: .local) { pt in
                                 if let dp = live.devicePoint(pt, in: geo.size) {
-                                    model.focus(at: dp); model.setExposureBias(0)
-                                    focusMark = FocusMark(point: pt)
+                                    model.focus(at: dp)
+                                } else {
+                                    #if !DEBUG
+                                    return   // 프레임이 아직 없으면(카메라 준비 전) 무시. 디버그(시뮬레이터)는 표시만 확인용으로 띄운다.
+                                    #endif
                                 }
+                                model.setExposureBias(0); uiBias = 0
+                                focusMark = FocusMark(point: pt)
                             }
-                            // 초점을 잡은 뒤 위아래로 끌면 밝기(노출) — 기본 카메라와 같다
-                            .simultaneousGesture(DragGesture(minimumDistance: 12)
+                            // 밝기 — 기본 카메라처럼 초점을 잡은 뒤엔 화면 **어디서든** 위아래로 끌면 된다.
+                            // 예전엔 네모가 2초 만에 사라져 그 뒤 끌기가 먹지 않았고, 시작 조건(12pt·세로 우세)도 빡빡했다
+                            // (오너 2026-10-09 "터치해서 밝기 조절하는게 좀 어려움").
+                            .simultaneousGesture(DragGesture(minimumDistance: 4)
                                 .onChanged { g in
-                                    guard focusMark != nil, abs(g.translation.height) > abs(g.translation.width) else { return }
-                                    if biasAtDragStart == nil { biasAtDragStart = model.exposureBias }
-                                    model.setExposureBias((biasAtDragStart ?? 0) - Float(g.translation.height / 120))
+                                    guard focusMark != nil else { return }
+                                    if biasAtDragStart == nil {
+                                        // 방향은 처음 한 번만 본다 — 가로로 시작한 건 밝기가 아니다
+                                        guard abs(g.translation.height) >= abs(g.translation.width) else { return }
+                                        biasAtDragStart = uiBias
+                                    }
+                                    // 화면 높이의 1/3 을 끌면 2EV — 기본 카메라 감각
+                                    let per = Float(max(geo.size.height / 3, 200)) / 2
+                                    uiBias = min(2, max(-2, (biasAtDragStart ?? 0) - Float(g.translation.height) / per))
+                                    model.setExposureBias(uiBias)
                                     focusMark?.touched = Date()
+                                    focusMark?.adjusting = true; focusMark?.dim = false
                                 }
-                                .onEnded { _ in biasAtDragStart = nil })
+                                .onEnded { _ in biasAtDragStart = nil; focusMark?.adjusting = false; focusMark?.touched = Date() })
                             // 길게 누르기 = AE/AF 잠금 — 누른 채로 위치를 받으려고 길게 누르기 뒤에 끌기를 잇는다
                             .simultaneousGesture(LongPressGesture(minimumDuration: 0.6)
                                 .sequenced(before: DragGesture(minimumDistance: 0, coordinateSpace: .local))
@@ -56,7 +72,7 @@ struct CameraFilterTab: View {
                                     guard case .second(true, let drag?) = v, !lockFired else { return }
                                     lockFired = true
                                     if let dp = live.devicePoint(drag.startLocation, in: geo.size) {
-                                        model.lockFocus(at: dp)
+                                        model.lockFocus(at: dp); uiBias = 0
                                         focusMark = FocusMark(point: drag.startLocation, locked: true)
                                     }
                                 }
@@ -66,22 +82,35 @@ struct CameraFilterTab: View {
                                 .onEnded { _ in model.commitZoom() })
                             .overlay(alignment: .topLeading) {
                                 if let m = focusMark {
-                                    HStack(spacing: 6) {
+                                    HStack(spacing: 8) {
                                         RoundedRectangle(cornerRadius: 4).stroke(Color.yellow, lineWidth: 1.5)
                                             .frame(width: 76, height: 76)
-                                        Image(systemName: "sun.max.fill").font(.system(size: 16)).foregroundStyle(Color.yellow)
-                                            .offset(y: CGFloat(-model.exposureBias) * 18)
+                                            .opacity(m.dim ? 0.5 : 1)
+                                        // 해 + 세로 줄(기본 카메라) — 끄는 동안 줄이 보이고 해가 줄을 따라 오르내린다
+                                        ZStack {
+                                            if m.adjusting {
+                                                Capsule().fill(Color.yellow.opacity(0.8)).frame(width: 1.5, height: 120)
+                                            }
+                                            Image(systemName: "sun.max.fill").font(.system(size: 18)).foregroundStyle(Color.yellow)
+                                                .padding(3).background(m.adjusting ? Color.black.opacity(0.25) : .clear, in: Circle())
+                                                .offset(y: CGFloat(-uiBias) * 30)
+                                        }
+                                        .frame(width: 24, height: 120)
                                     }
-                                    .offset(x: 11)   // 해 아이콘 폭만큼 — 네모 가운데가 탭한 자리
+                                    .offset(x: 16)   // 해 줄 폭만큼 — 네모 가운데가 탭한 자리
                                     .position(m.point)
                                     .id(m.id)
                                     .transition(.opacity)
                                     .allowsHitTesting(false)
                                     .task(id: m.touched) {
-                                        // 잠금 중엔 네모를 계속 둔다(기본 카메라와 같음) — 다음 탭에서 풀린다
+                                        // 기본 카메라처럼: 손을 떼고 2.5초면 흐려지고(그래도 끌면 밝기 조절), 7초면 사라진다.
+                                        // 잠금 중엔 흐려지기만 하고 남는다 — 다음 탭에서 풀린다.
+                                        guard !m.adjusting else { return }
+                                        try? await Task.sleep(for: .seconds(2.5))
+                                        withAnimation(.easeOut(duration: 0.3)) { if focusMark?.id == m.id { focusMark?.dim = true } }
                                         guard !m.locked else { return }
-                                        try? await Task.sleep(for: .seconds(2))
-                                        withAnimation(.easeOut(duration: 0.25)) { if focusMark?.id == m.id { focusMark = nil } }
+                                        try? await Task.sleep(for: .seconds(4.5))
+                                        withAnimation(.easeOut(duration: 0.3)) { if focusMark?.id == m.id, focusMark?.adjusting == false { focusMark = nil } }
                                     }
                                 }
                             }
