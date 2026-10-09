@@ -120,7 +120,9 @@ export const FILM_PRESETS = [
     fx: { grain: 0.3, vignette: 0.35, blur: 0.04 } },
   { key: "ph3gs",   ko: "3GS",    en: "3GS",    group: "phone", // 2009 — 물 빠진 색, 초록·마젠타 쏠림, 흐릿함·굵은 노이즈
     temp: 14, tint: -14, ex: 0.14, con: 0.26, fade: 22, whitePull: 0,  sat: -0.35, vib: -0.05, sh: [-6, 10, 6], hi: [18, 16, -10],
-    fx: { grain: 0.55, vignette: 0.45, blur: 0.08 } },
+    // 흐림(blur) 대신 저해상도 — 흐림은 "초점 나간 사진"으로 보였다(오너 2026-10-09 "해상도가 낮은게 아니라
+    // 촛점이 안 맞은거처럼 보임"). 작은 칸 평균으로 3GS 의 굵은 픽셀감을 낸다.
+    fx: { grain: 0.55, vignette: 0.45, lowres: 0.0035 } },
 
   /* ── 재미 (SNOW류 — 특수 렌더 모드, special 필드가 전용 코드 경로를 탄다) ── */
   { key: "sepia",    ko: "세피아",    en: "Sepia", group: "fun",
@@ -197,7 +199,7 @@ export function applyLookWithStrength(data, w, h, preset, effects = {}, strength
     }
   }
   // 효과는 항상 원 강도로 (프리셋 위에)
-  if (effects.grain || effects.vignette || effects.leak || effects.blur || effects.shake || effects.glow) {
+  if (effects.grain || effects.vignette || effects.leak || effects.blur || effects.shake || effects.glow || effects.lowres) {
     applyLook(data, w, h, null, effects);
   }
   return data;
@@ -373,9 +375,27 @@ function motionBlurRGBA(data, w, h, amount) {
   }
 }
 
+/* bs×bs 칸마다 평균색으로 채운다 — 모자이크 프리셋·저해상도(lowres) 효과 공용 */
+function blockAverageRGBA(data, w, h, bs) {
+  for (let by = 0; by < h; by += bs) {
+    for (let bx = 0; bx < w; bx += bs) {
+      let sR = 0, sG = 0, sB = 0, n = 0;
+      for (let y = by; y < Math.min(h, by + bs); y++)
+        for (let x = bx; x < Math.min(w, bx + bs); x++) {
+          const k = (y * w + x) * 4; sR += data[k]; sG += data[k + 1]; sB += data[k + 2]; n++;
+        }
+      sR /= n; sG /= n; sB /= n;
+      for (let y = by; y < Math.min(h, by + bs); y++)
+        for (let x = bx; x < Math.min(w, bx + bs); x++) {
+          const k = (y * w + x) * 4; data[k] = sR; data[k + 1] = sG; data[k + 2] = sB;
+        }
+    }
+  }
+}
+
 /* ---------- 메인: 프리셋 + 효과 적용 ----------
    data: ImageData.data (RGBA, 제자리 수정)
-   effects: { grain, vignette, leak, blur(흐림), shake(흔들림), glow(뽀샤시), seed }
+   effects: { grain, vignette, leak, blur(흐림), lowres(저해상도 칸, 짧은 변 대비 칸 크기), shake(흔들림), glow(뽀샤시), seed }
    순서: 흔들림/흐림(기하) → 색·그레인·비네트·빛샘(1패스) → 뽀샤시(블룸, 마지막) */
 export function applyLook(data, w, h, preset, effects = {}) {
   const p = preset && preset.key !== "none" ? preset : null;
@@ -394,24 +414,12 @@ export function applyLook(data, w, h, preset, effects = {}) {
 
   if (shake) motionBlurRGBA(data, w, h, shake);
   if (blur) boxBlurRGBA(data, w, h, Math.round(Math.min(w, h) * 0.02 * blur) + 1);
+  const lowres = effects.lowres || 0;
+  if (lowres) blockAverageRGBA(data, w, h, Math.max(2, Math.round(Math.min(w, h) * lowres)));
 
   // ── 재미(특수 렌더) 프리셋 — 표준 색 파이프라인 대신/이전에 전용 처리 ──
   if (p?.special === "pixelate") {
-    const bs = Math.max(4, Math.round(Math.min(w, h) * 0.02)); // 블록 크기
-    for (let by = 0; by < h; by += bs) {
-      for (let bx = 0; bx < w; bx += bs) {
-        let sR = 0, sG = 0, sB = 0, n = 0;
-        for (let y = by; y < Math.min(h, by + bs); y++)
-          for (let x = bx; x < Math.min(w, bx + bs); x++) {
-            const k = (y * w + x) * 4; sR += data[k]; sG += data[k + 1]; sB += data[k + 2]; n++;
-          }
-        sR /= n; sG /= n; sB /= n;
-        for (let y = by; y < Math.min(h, by + bs); y++)
-          for (let x = bx; x < Math.min(w, bx + bs); x++) {
-            const k = (y * w + x) * 4; data[k] = sR; data[k + 1] = sG; data[k + 2] = sB;
-          }
-      }
-    }
+    blockAverageRGBA(data, w, h, Math.max(4, Math.round(Math.min(w, h) * 0.02))); // 블록 크기
     return data;
   }
   if (p?.special === "sketch") {
