@@ -7,7 +7,6 @@ struct PurposeView: View {
     var key: String
     @State private var segment: String = ""
     @State private var showKnobs = false
-    @State private var pickOutfit = false
     @State private var pickGroom = false
 
     private var purpose: Purpose { Purpose(rawValue: key) ?? .concept }
@@ -18,7 +17,7 @@ struct PurposeView: View {
             // 브루클린 목적 3개(SNS 는 프사·소개팅이 리미키미 일상 스냅이라 넣지 않는다).
             // 탭 이름은 시제품 그대로(오너 확인) — 브루클린 카탈로그 이름(이직·커리어 등)과 다르게 둔다.
             guard app.studio.catalog != nil else { return [] }
-            return [("resume", L.t("이력서·취업", "Résumé")), ("linkedin", L.t("이직·비즈니스", "Business")), ("audition", L.t("배우·모델", "Actor · model"))]
+            return StudioTab.all.map { ($0, StudioTab.title($0)) }
         case .wedding:
             return [("concepts", L.t("웨딩 컨셉", "Wedding") + " \(app.concepts.concepts(for: .wedding).count)"),
                     ("main", L.t("본식 드레스", "Ceremony gowns") + " \(app.studio.dressList(kind: "main").count)"),
@@ -73,11 +72,7 @@ struct PurposeView: View {
         .coachHost()
         .onAppear { app.enqueueCoach(Coach.grid) }
         .sheet(isPresented: $showKnobs) {
-            if purpose == .wedding { DressFilterSheet(kind: current) } else { KnobSheet(purpose: current) }
-        }
-        .sheet(isPresented: $pickOutfit) {
-            PhotoPicker(limit: 1, onPicked: { imgs in pickOutfit = false; if let i = imgs.first { app.studio.outfit[current] = i; app.showToast(L.t("옷 사진이 의상을 정해요", "The outfit photo sets the clothes")) } },
-                        onCancel: { pickOutfit = false }).ignoresSafeArea()
+            DressFilterSheet(kind: current)
         }
         .sheet(isPresented: $pickGroom) {
             PhotoPicker(limit: 1, onPicked: { imgs in pickGroom = false; if let i = imgs.first { app.studio.groom = i } },
@@ -85,19 +80,10 @@ struct PurposeView: View {
         }
     }
 
-    /// 옵션 버튼 — 이력서·프로필: 세부 조정 · 옷 바꾸기 / 웨딩: 필터(드레스 탭) · 신랑도 함께.
+    /// 옵션 버튼 — 웨딩: 필터(드레스 탭) · 신랑도 함께.
     @ViewBuilder private var tools: some View {
-        if purpose == .profile {
-            let n = (app.studio.overrides[current] ?? [:]).count
-            let hasOutfit = app.studio.outfit[current] != nil
-            toolRow {
-                ToolButton(title: L.t("세부 조정", "Fine-tune") + (n > 0 ? " · \(n)" : ""), icon: "slider.horizontal.3", on: n > 0) { showKnobs = true }
-                ToolButton(title: hasOutfit ? L.t("옷 사진 적용 중", "Outfit applied") : L.t("옷 바꾸기", "Change outfit"), icon: "tshirt", on: hasOutfit) {
-                    if hasOutfit { app.studio.outfit[current] = nil } else { pickOutfit = true }
-                }
-            }
-            optionNote(active: n > 0 || hasOutfit)
-        } else if purpose == .wedding {
+        // 전문 프로필의 세부 조정·옷 바꾸기는 여기 없다 — "N장 만들기" 다음 단계(`StudioStepSheet`).
+        if purpose == .wedding {
             let nf = app.studio.filter.values.reduce(0) { $0 + $1.count }
             toolRow {
                 if current != "concepts" {
@@ -112,14 +98,6 @@ struct PurposeView: View {
     private func toolRow<C: View>(@ViewBuilder _ c: () -> C) -> some View {
         HStack(spacing: Spacing.s2) { c() }.padding(.horizontal, Spacing.page).padding(.top, Spacing.s2).padding(.bottom, Spacing.s1)
     }
-    @ViewBuilder private func optionNote(active: Bool) -> some View {
-        if active {
-            let here = app.cart.filter { $0.studioPurpose == current }.count
-            Text(L.t("\(segments.first { $0.key == current }?.title ?? "")에서 담은 \(here)장에만 적용", "Applies to the \(here) picked here"))
-                .font(AppFont.footnote.weight(.semibold)).foregroundStyle(Color.accent)
-                .padding(.horizontal, Spacing.page).padding(.bottom, Spacing.s1)
-        }
-    }
 }
 
 struct ToolButton: View {
@@ -129,10 +107,11 @@ struct ToolButton: View {
             HStack(spacing: 6) { Image(systemName: icon); Text(title).lineLimit(1) }
                 .font(AppFont.bodyEmphasis).foregroundStyle(on ? Color.accent : Color.ink)
                 .frame(maxWidth: .infinity, minHeight: 44)
-                .background(on ? Color.accentTint : Color.card, in: RoundedRectangle(cornerRadius: Radius.button, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: Radius.button, style: .continuous).stroke(on ? Color.accent : Color.separatorLine, lineWidth: 1))
+                .contentShape(Capsule())
         }
-        .buttonStyle(PressScaleButtonStyle())
+        .buttonStyle(.plain)
+        // 리퀴드글래스(오너 지시 2026-10-09 "버튼 디자인 리퀴드글래스에 맞게") — 켜진 건 강조색으로 물든 유리.
+        .glassEffect(on ? .regular.tint(Color.accent.opacity(0.22)).interactive() : .regular.interactive(), in: Capsule())
     }
 }
 
@@ -330,10 +309,86 @@ struct CartBar: View {
         .padding(.horizontal, Spacing.s4)
         .padding(.top, Spacing.s2)
         .padding(.bottom, Spacing.s3)
-        .background(Color.card, in: RoundedRectangle(cornerRadius: Radius.sheet, style: .continuous))
-        .shadow(color: .black.opacity(0.08), radius: 16, y: -4)
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: Radius.sheet, style: .continuous))
         .padding(.horizontal, Spacing.s2)
         .padding(.bottom, Spacing.s1)
         .transition(.move(edge: .bottom).combined(with: .opacity))
+    }
+}
+
+/// 전문 프로필 탭(브루클린 목적). 탭 이름은 시제품 그대로(오너 확인).
+enum StudioTab {
+    static let all = ["resume", "linkedin", "audition"]
+    static func title(_ k: String) -> String {
+        switch k {
+        case "resume": return L.t("이력서·취업", "Résumé")
+        case "linkedin": return L.t("이직·비즈니스", "Business")
+        default: return L.t("배우·모델", "Actor · model")
+        }
+    }
+}
+
+/// "N장 만들기" 다음 단계 — 담은 전문 프로필 룩을 탭별로 묶어 세부 조정·옷 바꾸기를 고른다.
+/// 옵션은 그 탭에서 담은 룩에만 적용된다(`AppState.generateCart`).
+struct StudioStepSheet: View {
+    @Environment(AppState.self) private var app
+    @Environment(\.dismiss) private var dismiss
+    @State private var knobTab: String?
+    @State private var outfitTab: String?
+
+    private var tabs: [String] { StudioTab.all.filter { t in app.cart.contains { $0.studioPurpose == t } } }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: Spacing.s5) {
+                    ForEach(tabs, id: \.self) { t in section(t) }
+                }
+                .padding(.horizontal, Spacing.page).padding(.vertical, Spacing.s4)
+            }
+            .background(Color.bg)
+            .navigationTitle(Copy.purposeProfile).navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button(Copy.close) { dismiss() } } }
+            .safeAreaInset(edge: .bottom) {
+                Button {
+                    dismiss()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { app.generateCart(optionsDone: true) }
+                } label: { Text(Copy.cartMake(app.cart.count)) }
+                .buttonStyle(PrimaryButtonStyle())
+                .padding(.horizontal, Spacing.page).padding(.bottom, Spacing.s2)
+            }
+        }
+        .presentationDetents([.medium, .large])
+        .sheet(item: Binding(get: { knobTab.map(StepTab.init) }, set: { knobTab = $0?.id })) { KnobSheet(purpose: $0.id) }
+        .sheet(item: Binding(get: { outfitTab.map(StepTab.init) }, set: { outfitTab = $0?.id })) { t in
+            PhotoPicker(limit: 1, onPicked: { imgs in
+                outfitTab = nil
+                if let i = imgs.first { app.studio.outfit[t.id] = i }
+            }, onCancel: { outfitTab = nil }).ignoresSafeArea()
+        }
+    }
+
+    private struct StepTab: Identifiable { let id: String }
+
+    @ViewBuilder private func section(_ t: String) -> some View {
+        let n = (app.studio.overrides[t] ?? [:]).count
+        let hasOutfit = app.studio.outfit[t] != nil
+        VStack(alignment: .leading, spacing: Spacing.s2) {
+            Text(StudioTab.title(t)).font(AppFont.headline)
+            ScrollView(.horizontal) {
+                HStack(spacing: Spacing.s2) {
+                    ForEach(app.cart.filter { $0.studioPurpose == t }) { c in
+                        RemoteImage(url: c.thumbURL, cornerRadius: 9).frame(width: 52, height: 68)
+                    }
+                }
+            }
+            .scrollIndicators(.hidden)
+            HStack(spacing: Spacing.s2) {
+                ToolButton(title: L.t("세부 조정", "Fine-tune") + (n > 0 ? " · \(n)" : ""), icon: "slider.horizontal.3", on: n > 0) { knobTab = t }
+                ToolButton(title: hasOutfit ? L.t("옷 사진 적용 중", "Outfit applied") : L.t("옷 바꾸기", "Change outfit"), icon: "tshirt", on: hasOutfit) {
+                    if hasOutfit { app.studio.outfit[t] = nil } else { outfitTab = t }
+                }
+            }
+        }
     }
 }

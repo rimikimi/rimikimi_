@@ -51,7 +51,8 @@ struct CameraFilterTab: View {
                     sideButton(L.t("전환", "Flip"), "arrow.triangle.2.circlepath.camera") { model.flip() }
                 }
                 .padding(.horizontal, Spacing.s5)
-                .padding(.bottom, app.contentBottomPad - 24)
+                // 탭바와 사이가 너무 떴다(오너 지적 2026-10-09 "갭이 넘 큼", 오너 폰 ~94pt) → 셔터 아래와 탭바 위 사이 ~16pt(시뮬레이터 실측).
+                .padding(.bottom, app.contentBottomPad - 104)
             }
         }
         .toolbar(.hidden, for: .navigationBar)

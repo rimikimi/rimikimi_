@@ -137,9 +137,13 @@ final class AppState {
     }
     func removeFromCart(at i: Int) { if cart.indices.contains(i) { cart.remove(at: i) } }
     func clearCart() { cart.removeAll(); cartExpanded = false }
+    /// 전문 프로필 룩을 담았으면 만들기 전에 세부 조정·옷 바꾸기 단계를 한 번 거친다(오너 지시 2026-10-09
+    /// "세부조정이랑 옷 바꾸기는 다음 단계에"). 격자 화면엔 이 버튼들을 두지 않는다.
+    var studioStep = false
     /// "N장 만들기" — 등록 사진으로 담은 컨셉을 한꺼번에 만든다.
-    func generateCart() {
+    func generateCart(optionsDone: Bool = false) {
         guard !cart.isEmpty else { return }
+        if !optionsDone, cart.contains(where: { $0.studioPurpose != nil }) { studioStep = true; return }
         guard let photo = userPhoto.image else { cartNeedsPhoto = true; return }
         let reqs = cart.map { c -> GenerateRequest in
             var r = GenerateRequest(concept: c, photo: photo)

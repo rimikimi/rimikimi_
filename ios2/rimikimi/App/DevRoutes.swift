@@ -124,6 +124,18 @@ enum DevRoutes {
                 app.galleryPath = q["home"] == "1" ? [] : [.purpose(key.rawValue)]
                 app.cartExpanded = q["open"] == "1"
             }
+        case "/cameratab": app.tab = .filter
+        case "/studiostep":
+            // 전문 프로필 룩 n개를 담고 "N장 만들기" → 세부 조정·옷 바꾸기 단계 시트(캡처·검증용).
+            Task { @MainActor in
+                await app.studio.load()
+                app.clearCart()
+                let tab = q["tab"] ?? "resume"
+                for c in (app.studio.catalog?.looks(tab) ?? []).prefix(Int(q["n"] ?? "2") ?? 2) { app.toggleCart(c) }
+                app.tab = .gallery
+                app.galleryPath = [.purpose("profile")]
+                if q["step"] == "1" { try? await Task.sleep(nanoseconds: 800_000_000); app.generateCart() }
+            }
         case "/store": app.tab = .gallery; app.galleryPath = [.settings, .store]
         case "/invite": app.tab = .gallery; app.galleryPath = [.settings, .invite]
         case "/profile": app.tab = .gallery; app.galleryPath = [.settings]

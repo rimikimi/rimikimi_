@@ -125,12 +125,14 @@ struct RootTabView: View {
                 limit: 1,
                 onPicked: { imgs in
                     app.cartNeedsPhoto = false
-                    if let img = imgs.first { app.userPhoto.set(img); app.generateCart() }
+                    if let img = imgs.first { app.userPhoto.set(img); app.generateCart(optionsDone: true) }
                 },
                 onCancel: { app.cartNeedsPhoto = false }
             )
             .ignoresSafeArea()
         }
+        // 전문 프로필 룩을 담고 "N장 만들기" — 세부 조정·옷 바꾸기 단계.
+        .sheet(isPresented: $app.studioStep) { StudioStepSheet() }
         .fullScreenCover(item: $app.webTool) { tool in
             WebToolScreen(url: tool.url, title: tool.title, initialPayload: tool.initialPayload)
         }

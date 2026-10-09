@@ -18,7 +18,7 @@ struct CategoryChip: View {
                 .foregroundStyle(isActive ? Color.white : Color.ink)
                 .contentShape(Capsule())
         }
-        .buttonStyle(PressScaleButtonStyle())
+        .buttonStyle(.plain)
         .accessibilityAddTraits(isActive ? [.isSelected] : [])
     }
 }
@@ -42,11 +42,9 @@ struct OptionChip: View {
             .padding(.horizontal, Spacing.s3 + 2)
             .frame(minWidth: 64)
             .frame(height: subtitle == nil ? ControlHeight.small : 48)
-            .background(isActive ? Color.accentTint : Color.fill, in: RoundedRectangle(cornerRadius: Radius.button, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: Radius.button, style: .continuous)
-                    .strokeBorder(isActive ? Color.accent : Color.clear, lineWidth: 1.5)
-            }
+            // 리퀴드글래스(오너 지시 2026-10-09) — 고른 칩은 강조색으로 물든 유리.
+            .glassEffect(isActive ? .regular.tint(Color.accent.opacity(0.22)).interactive() : .regular.interactive(),
+                         in: Capsule())
             .overlay(alignment: .topTrailing) {
                 if let badge {
                     Text(badge)
@@ -58,7 +56,7 @@ struct OptionChip: View {
                 }
             }
             .foregroundStyle(isActive ? Color.accent : Color.ink)
-            .contentShape(RoundedRectangle(cornerRadius: Radius.button, style: .continuous))
+            .contentShape(Capsule())
         }
         .buttonStyle(PressScaleButtonStyle())
         .accessibilityAddTraits(isActive ? [.isSelected] : [])
