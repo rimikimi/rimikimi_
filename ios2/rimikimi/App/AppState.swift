@@ -126,11 +126,12 @@ final class AppState {
     func cartIndex(_ c: Concept) -> Int? { cart.firstIndex { $0.id == c.id } }
     /// 담기/빼기. 가득 찼으면 false.
     @discardableResult
-    func toggleCart(_ c: Concept) -> Bool {
-        if let i = cartIndex(c) { cart.remove(at: i); HapticPlayer.selection(); return true }
-        guard cart.count < Self.cartMax else { showToast(Copy.cartFull(Self.cartMax)); return false }
+    func toggleCart(_ c: Concept, longPress: Bool = false) -> Bool {
+        let haptic = longPress ? HapticPlayer.longPress : HapticPlayer.selection
+        if let i = cartIndex(c) { cart.remove(at: i); haptic(); return true }
+        guard cart.count < Self.cartMax else { HapticPlayer.warning(); showToast(Copy.cartFull(Self.cartMax)); return false }
         cart.append(c)
-        HapticPlayer.selection()
+        haptic()
         if cart.count == 1 { enqueueCoach(Coach.cart) }
         return true
     }

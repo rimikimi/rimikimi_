@@ -45,7 +45,8 @@ struct PinchColumnsGesture: UIGestureRecognizerRepresentable {
         /// (오너 지적 2026-09-22 "마지막 손가락 포지션을 터치한 걸로 인식하는건 안 고칠거냐").
         func gestureRecognizer(_ g: UIGestureRecognizer,
                                shouldBeRequiredToFailBy other: UIGestureRecognizer) -> Bool {
-            !(other is UIPanGestureRecognizer)
+            // 칸 길게 누르기는 예외 — 핀치 실패(=손 뗄 때)를 기다리면 햅틱·담기가 손 뗄 때로 밀린다.
+            !(other is UIPanGestureRecognizer) && !(other is TileLongPressRecognizer)
         }
     }
 
@@ -77,5 +78,37 @@ struct PinchColumnsGesture: UIGestureRecognizerRepresentable {
         default:
             break
         }
+    }
+}
+
+/// 칸 길게 누르기(담기). SwiftUI `LongPressGesture` 는 위 핀치가 실패할 때(=손 뗄 때)까지 기다려서
+/// 햅틱·담기가 손을 뗄 때 왔다(오너 지적 2026-10-09 "딱 선택 완료되는 그 때", 시뮬레이터 계측으로 확인).
+/// UIKit 길게 누르기는 `.began` 이 **누르고 있는 동안** 시간이 차는 순간 온다. 핀치는 이 인식기만
+/// 기다리지 않게 예외로 둔다(`TileLongPressRecognizer` 로 구분). 탭은 그대로 핀치 실패를 기다린다.
+final class TileLongPressRecognizer: UILongPressGestureRecognizer {}
+
+@available(iOS 18.0, *)
+struct TileLongPressGesture: UIGestureRecognizerRepresentable {
+    var minimumDuration: TimeInterval = 0.35
+    var onPress: () -> Void
+
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        /// 스크롤·핀치와 나란히 — 손가락이 10pt 넘게 움직이면 알아서 실패해 스크롤로 넘어간다.
+        func gestureRecognizer(_ g: UIGestureRecognizer,
+                               shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool { true }
+    }
+
+    func makeCoordinator(converter: CoordinateSpaceConverter) -> Coordinator { Coordinator() }
+
+    func makeUIGestureRecognizer(context: Context) -> TileLongPressRecognizer {
+        let g = TileLongPressRecognizer()
+        g.minimumPressDuration = minimumDuration
+        g.allowableMovement = 10
+        g.delegate = context.coordinator
+        return g
+    }
+
+    func handleUIGestureRecognizerAction(_ recognizer: TileLongPressRecognizer, context: Context) {
+        if recognizer.state == .began { onPress() }
     }
 }

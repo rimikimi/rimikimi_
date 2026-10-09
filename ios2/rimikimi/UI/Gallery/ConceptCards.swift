@@ -275,14 +275,7 @@ struct DensePhotoGrid: View {
                 //    터치한 걸로 인식"). `allowsHitTesting` 을 도중에 꺼도 소용없다. 적중 판정은
                 //    닿는 순간에 이미 끝났기 때문이다. 그래서 **누를 때가 아니라 동작할 때**
                 //    막는다 — 아래 `guard` 는 손을 뗀 시점에 돈다.
-                Button {
-                    // 길게 눌러 담은 직후의 손 떼기는 탭으로 치지 않는다.
-                    if longPressedID == c.id { longPressedID = nil; return }
-                    guard !pinching else { return }
-                    // 탭 = 지금처럼 네이티브 사진 앱식 크게 보기 + 아래 필름스트립(오너 지시 2026-10-09).
-                    app.browseList = concepts
-                    app.pushRoute(.browse(category: category, startID: c.id))
-                } label: {
+                Group {
                     // ⚠️ 미리보기는 무조건 3:4 (오너 지시 2026-09-22). 정방형이면 인물이 잘린다.
                     RemoteImage(url: c.thumbURL, cornerRadius: 0)
                         .photoRatio()
@@ -308,15 +301,27 @@ struct DensePhotoGrid: View {
                         .clipShape(RoundedRectangle(cornerRadius: n == 5 ? 6 : Radius.thumb,
                                                     style: .continuous))
                 }
-                .buttonStyle(.plain)
+                .contentShape(Rectangle())
+                // 탭 = 크게 보기. Button 대신 제스처로 받는다 — Button 안에선 길게 누르기가 손을 뗄 때서야
+                // 끝나 햅틱이 늦었다(오너 지적 2026-10-09, 시뮬레이터 계측으로 확인).
+                .onTapGesture {
+                    // 길게 눌러 담은 직후의 손 떼기는 탭으로 치지 않는다.
+                    if longPressedID == c.id { longPressedID = nil; return }
+                    guard !pinching else { return }
+                    // 탭 = 지금처럼 네이티브 사진 앱식 크게 보기 + 아래 필름스트립(오너 지시 2026-10-09).
+                    app.browseList = concepts
+                    app.pushRoute(.browse(category: category, startID: c.id))
+                }
                 .modifier(FirstTileAnchor(on: c.id == concepts.first?.id && n == columnCount))
                 // 길게 누르기 = 담기/빼기(여러 장 한 번에, 최대 8). 상대 사진·옷 사진·컷 수가 필요한 컨셉은
                 // 셀카 한 장으로 못 만들어 담지 않고 알려 준다(탭해서 옵션 화면으로).
-                .simultaneousGesture(LongPressGesture(minimumDuration: 0.35).onEnded { _ in
+                // 담기·햅틱은 **0.35초가 차는 순간**(손 떼기 전) — `TileLongPressGesture` 주석.
+                .gesture(TileLongPressGesture {
                     guard !pinching else { return }
+                    AppLog.ui.info("cart.longpress.fire \(c.id, privacy: .public)")
                     longPressedID = c.id
-                    if c.isBatchable { withAnimation(Motion.easeOut(0.18)) { _ = app.toggleCart(c) } }
-                    else { HapticPlayer.selection(); app.showToast(Copy.cartNeedsOptions) }
+                    if c.isBatchable { withAnimation(Motion.easeOut(0.18)) { _ = app.toggleCart(c, longPress: true) } }
+                    else { HapticPlayer.warning(); app.showToast(Copy.cartNeedsOptions) }
                 })
             }
         }
