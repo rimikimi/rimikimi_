@@ -6,7 +6,7 @@ import SwiftUI
 struct CameraFilterTab: View {
     @Environment(AppState.self) private var app
     @Environment(\.openURL) private var openURL
-    @State private var model = BurstCameraModel()
+    @State private var model = BurstCameraModel(livePreview: true)   // 고른 필터를 미리보기에 실시간으로
     @State private var selected = "none"
     @State private var favs: [String] = UserDefaults.standard.stringArray(forKey: "filter.favorites") ?? []
     @State private var visible = false
@@ -25,7 +25,11 @@ struct CameraFilterTab: View {
                         .padding(.horizontal, Spacing.page)
                 }
             } else {
-                CameraPreviewLayer(session: model.session).ignoresSafeArea()
+                if let live = model.live {
+                    LiveFilterPreview(renderer: live).ignoresSafeArea()
+                } else {
+                    CameraPreviewLayer(session: model.session).ignoresSafeArea()
+                }
                 Color.white.ignoresSafeArea().opacity(model.flashOverlay ? 0.85 : 0)
                     .animation(.easeOut(duration: 0.18), value: model.flashOverlay).allowsHitTesting(false)
             }
@@ -59,6 +63,7 @@ struct CameraFilterTab: View {
         .coachHost()
         .onAppear { visible = true; Task { await model.start() }; app.enqueueCoach(Coach.filter) }
         .onDisappear { visible = false; model.stop() }
+        .onChange(of: selected, initial: true) { model.live?.presetKey = selected }
     }
 
     private func sideButton(_ title: String, _ icon: String, _ action: @escaping () -> Void) -> some View {

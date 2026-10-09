@@ -22,6 +22,15 @@ final class BurstCameraModel {
     private var position: AVCaptureDevice.Position = .back
     private var delegate: ShotDelegate?
 
+    /// 카메라 탭 실시간 필터 — 있으면 미리보기 프레임을 여기로 흘려 필터를 입혀 그린다
+    /// (`LiveFilterPreview`). 연속 촬영 화면(`BurstCameraView`)은 nil = 지금 그대로.
+    let live: LiveFilterRenderer?
+    private let videoOutput = AVCaptureVideoDataOutput()
+
+    init(livePreview: Bool = false) {
+        live = livePreview ? LiveFilterRenderer() : nil
+    }
+
     // MARK: 세션
 
     func start() async {
@@ -37,6 +46,12 @@ final class BurstCameraModel {
         if session.canAddOutput(output) {
             session.addOutput(output)
             output.maxPhotoQualityPrioritization = .quality
+        }
+        if let live, session.canAddOutput(videoOutput) {
+            videoOutput.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
+            videoOutput.alwaysDiscardsLateVideoFrames = true
+            videoOutput.setSampleBufferDelegate(live, queue: live.queue)
+            session.addOutput(videoOutput)
         }
         configureOutputConnection()
         session.commitConfiguration()
@@ -67,12 +82,14 @@ final class BurstCameraModel {
 
     /// 세로 고정 앱이라 사진도 세로로 나와야 한다. 전면은 보이는 대로(거울) 저장한다 — 셀카는
     /// 화면에서 본 그대로가 기대값이다.
+    /// 실시간 필터 프레임도 같은 방향·거울로 받는다(미리보기 = 찍히는 사진 구도).
     private func configureOutputConnection() {
-        guard let c = output.connection(with: .video) else { return }
-        if c.isVideoRotationAngleSupported(90) { c.videoRotationAngle = 90 }
-        if c.isVideoMirroringSupported {
-            c.automaticallyAdjustsVideoMirroring = false
-            c.isVideoMirrored = (position == .front)
+        for c in [output.connection(with: .video), videoOutput.connection(with: .video)].compactMap({ $0 }) {
+            if c.isVideoRotationAngleSupported(90) { c.videoRotationAngle = 90 }
+            if c.isVideoMirroringSupported {
+                c.automaticallyAdjustsVideoMirroring = false
+                c.isVideoMirrored = (position == .front)
+            }
         }
     }
 
