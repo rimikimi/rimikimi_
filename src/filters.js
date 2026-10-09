@@ -117,7 +117,8 @@ export const FILM_PRESETS = [
     fx: { grain: 0.14 } },
   { key: "ph4s",    ko: "4s",     en: "4s",     group: "phone", // 2011 — 누런 캐스트, 좁은 계조, 노이즈
     temp: 26, tint: -6, ex: 0.12,  con: 0.32, fade: 8,  whitePull: 0,  sat: -0.08, vib: 0,    sh: [6, 6, -8],   hi: [14, 12, -14],
-    fx: { grain: 0.3, vignette: 0.35, blur: 0.04 } },
+    // 흐림 없음 — 일부러 흐리게 하면 초점 나간 사진처럼 보인다(오너 2026-10-09, 3GS 와 같은 이유)
+    fx: { grain: 0.3, vignette: 0.35 } },
   { key: "ph3gs",   ko: "3GS",    en: "3GS",    group: "phone", // 2009 — 물 빠진 색, 초록·마젠타 쏠림, 흐릿함·굵은 노이즈
     temp: 14, tint: -14, ex: 0.14, con: 0.26, fade: 22, whitePull: 0,  sat: -0.35, vib: -0.05, sh: [-6, 10, 6], hi: [18, 16, -10],
     // 흐림·픽셀 효과 없음 — 흐림은 초점 나간 사진처럼, 픽셀 칸은 일부러 넣은 모자이크처럼 보였다(오너 2026-10-09).

@@ -91,7 +91,7 @@ enum LiveFilter {
         "phxs": .init(temp: 18, tint: 6, ex: 0.05, con: -0.1, fade: 16, whitePull: 22, sat: -0.02, vib: 0.1, sh: [8, 4, 0], hi: [10, 5, -6], fx: .init(glow: 0.25)),
         "ph7": .init(temp: 16, tint: -6, ex: 0.03, con: 0.18, fade: 4, whitePull: 4, sat: 0.1, vib: 0.06, sh: [2, 4, -4], hi: [10, 10, -12], fx: .init(grain: 0.12)),
         "ph6s": .init(temp: -14, tint: -8, ex: 0.02, con: 0.2, fade: 2, whitePull: 2, sat: 0.14, vib: 0.04, sh: [-4, 4, 8], hi: [0, 4, 6], fx: .init(grain: 0.14)),
-        "ph4s": .init(temp: 26, tint: -6, ex: 0.12, con: 0.32, fade: 8, sat: -0.08, sh: [6, 6, -8], hi: [14, 12, -14], fx: .init(grain: 0.3, vignette: 0.35, blur: 0.04)),
+        "ph4s": .init(temp: 26, tint: -6, ex: 0.12, con: 0.32, fade: 8, sat: -0.08, sh: [6, 6, -8], hi: [14, 12, -14], fx: .init(grain: 0.3, vignette: 0.35)),
         "ph3gs": .init(temp: 14, tint: -14, ex: 0.14, con: 0.26, fade: 22, sat: -0.35, vib: -0.05, sh: [-6, 10, 6], hi: [18, 16, -10], fx: .init(grain: 0.55, vignette: 0.45)),
         "sepia": .init(ex: 0.02, con: 0.12, fade: 8, whitePull: 6, sh: [18, 6, -14], hi: [24, 10, -18], bw: [0.3, 0.55, 0.15]),
         "duopink": .init(special: .duotone, c1: [38, 18, 66], c2: [255, 158, 201]),
