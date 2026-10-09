@@ -1235,10 +1235,7 @@
   ],
   "sensitive": false,
   "text": "Photorealistic masterpiece, professional photography of the person in the reference photo, short straight dark brown (#463021) hair, soft natural makeup, slender athletic build, off white (#FFFFFF) sleeveless form-fitting turtleneck mini dress, elegant silhouette, barefoot, sitting on a matte black (#101010) cylindrical block, legs tucked toward chest, knees pulled up, holding single long-stemmed pink (#F2A5C0) peony fully bloomed, delicate hands, direct soulful gaze, neutral facial expression, minimalist studio environment, stark white plaster walls, neutral gray (#8A8A8A) concrete floor, spacious interior, soft natural window light from the side, gentle chiaroscuro shadows, cinematic atmosphere, 85mm lens, f/1.8 aperture, shallow depth of field, blurred background, highly detailed skin texture, pores, fine hair strands, RAW photo, 8k resolution, professional photography, Nikon D850, high dynamic range, subtle film grain.",
-  "publishAt": "2026-11-21T11:00:00Z",
-  "purposes": [
-   "profile"
-  ]
+  "publishAt": "2026-11-21T11:00:00Z"
  },
  {
   "id": "934",
@@ -2582,10 +2579,7 @@
   ],
   "sensitive": false,
   "text": "I. Core Attributes and Constraints. Implemented with 100% photorealism. Ensure to keep and maintain the same facial structure, natural dark brown (#463021) hair, soft makeup from the reference photo. The photos must be in 8k resolution(1:1)with ultra high definition, her face must have 100% fidelity to the provided reference photo.\nSubject: A high-contrast vector illustration of the person in the reference photo in a sharp side 3/4 profile.\nHair: Dark hair styled in a sophisticated, low-positioned bun with visible, clean-swept hair texture lines that emphasize the flow and shape of the style.\nAttire: The subject is wearing a dark, high-neck textured garment, such as a ribbed knit sweater, rendered in solid black (#101010) with thin white (#FFFFFF) highlights to show texture.\nAccessories: Large, elegant minimalist earrings consisting of a small stud, a vertical drop, and a long, slender teardrop-shaped pendant.\nPose:\nAngle: A strict 60-degree side profile (right profile) focusing on the clean silhouette of the forehead, nose, lips, and jawline.\nExpression: A calm, poised, and neutral expression with a focused, level gaze.\nPosture: Upright and elegant, showcasing a graceful neck line.\nEnvironment & Composition:\nBackground: A completely stark, solid cyan (#00E5FF), magenta (#E0218A), yellow (#F2C744), black background with zero distractions, creating a clean \"pop art\" or minimalist graphic design aesthetic.\nFraming: A close-up head-and-shoulders shot, centered horizontally to emphasize the balance between the solid black shapes and the white negative space.\nLighting & Photography Style:\nStyle: Black and white vector art, reminiscent of high-end ink illustrations or a \"stencil\" art style.\nContrast: Extreme high contrast with no gray (#8A8A8A) tones or gradients; the image is composed entirely of pure black and pure white.\nShading: Minimalist shading achieved through varying line thickness and strategic solid black fills to define facial contours, eyelashes, and the depth of the hair.\nSetting & Composition:\nBalance: A perfect harmony of bold black shapes against a white canvas, creating a sharp, iconic silhouette that is instantly recognizable.\nFocus: Sharp focus on the outlines of the facial features to ensure a high degree of likeness while maintaining the stylized illustration format.\nTechnical Specifications:\nMedium: Digital vector illustration, 2D flat design, crisp line work. collage of 4 images, 2x2.\nDetails: Ultra-clean edges, no blur, high-resolution rendering, ink drawing aesthetic, minimalist aesthetic, sharp definition. Aspect Ratio 1:1.",
-  "publishAt": "2026-11-11T11:00:00Z",
-  "purposes": [
-   "profile"
-  ]
+  "publishAt": "2026-11-11T11:00:00Z"
  },
  {
   "id": "828",
@@ -10219,10 +10213,7 @@
   "categories": [
    "스트릿 패션"
   ],
-  "title_en": "City Denim",
-  "purposes": [
-   "profile"
-  ]
+  "title_en": "City Denim"
  },
  {
   "id": 263,
@@ -10638,10 +10629,7 @@
   "categories": [
    "판타지 / 콘셉트"
   ],
-  "title_en": "Studio Lace",
-  "purposes": [
-   "profile"
-  ]
+  "title_en": "Studio Lace"
  },
  {
   "id": 200,
@@ -10887,7 +10875,6 @@
   ],
   "title_en": "Night Mood",
   "purposes": [
-   "profile",
    "snap"
   ]
  },
