@@ -61,6 +61,8 @@ async function loadSource(src) {
     img.onerror = () => rej(new Error("image decode fail"));
     img.src = url;
   });
+  // onload 뒤에도 해독이 미뤄질 수 있다(iOS) — 첫 그리기 전에 해독을 끝내 둔다.
+  try { if (img.decode) await img.decode(); } catch (_) {}
   return { img, revoke };
 }
 
@@ -351,7 +353,10 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", file
     const toff = document.createElement("canvas");
     toff.width = tw; toff.height = th;
     const tctx = toff.getContext("2d", { willReadFrequently: true });
-    tctx.drawImage(img, 0, 0, tw, th);
+    // ⚠️ 원본 img 가 아니라 방금 그린 미리보기 캔버스(off)에서 줄인다 — iOS 웹뷰는 여러 장을 한 번에 받으면
+    //    img 해독을 미뤄서, 작은 크기로 그리면 빈(투명) 썸네일이 됐다(카메라 3장 → 필터 칩이 다 비던 결함, 2026-10-09
+    //    시뮬레이터에서 픽셀 0,0,0,0 확인). off 는 이미 그려진 픽셀이라 그럴 일이 없다.
+    tctx.drawImage(off, 0, 0, tw, th);
     const entry = { img, base, thumb: tctx.getImageData(0, 0, tw, th), revoke };
     cacheRef.current.set(i, entry);
     // LRU 3장 초과분 정리
