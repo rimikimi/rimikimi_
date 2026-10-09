@@ -125,6 +125,16 @@ enum DevRoutes {
                 app.cartExpanded = q["open"] == "1"
             }
         case "/cameratab": app.tab = .filter
+        case "/burstedit":
+            // 카메라로 n장 찍고 편집기로 넘긴 상황 재현(12MP 세로) — 필터 칩 썸네일이 비는지 보는 용도.
+            installSamplePhoto(app)
+            if let src = app.userPhoto.image {
+                let w = CGFloat(Double(q["w"] ?? "3024") ?? 3024); let size = CGSize(width: w, height: (w * 4 / 3).rounded())
+                let r = UIGraphicsImageRenderer(size: size, format: { let f = UIGraphicsImageRendererFormat(); f.scale = 1; return f }())
+                let big = r.image { _ in src.draw(in: CGRect(origin: .zero, size: size)) }
+                app.photoPickPreset = q["preset"] ?? "ph6s"
+                app.handlePickedPhotos(Array(repeating: big, count: Int(q["n"] ?? "3") ?? 3))
+            }
         case "/studiostep":
             // 전문 프로필 룩 n개를 담고 "N장 만들기" → 세부 조정·옷 바꾸기 단계 시트(캡처·검증용).
             Task { @MainActor in

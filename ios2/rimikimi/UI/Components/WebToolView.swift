@@ -26,9 +26,9 @@ final class WebBridgeCoordinator: NSObject, WKScriptMessageHandler, WKNavigation
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         #if DEBUG
-        for delay in [0.0, 1.0, 3.0] {
+        for delay in [0.0, 1.0, 3.0, 9.0] {
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak webView] in
-                webView?.evaluateJavaScript("(document.getElementById('root') ? document.getElementById('root').outerHTML : 'NO ROOT').slice(0,500) + '|errs=' + JSON.stringify(window.__rimikimiErrors || [])") { result, error in
+                webView?.evaluateJavaScript("'canv=' + [...document.querySelectorAll('canvas')].slice(0,4).map(c => { let px='?'; try { const d=c.getContext('2d').getImageData(c.width>>1,c.height>>1,1,1).data; px=d.join(','); } catch(e) { px='ERR'+e.message } const r=c.getBoundingClientRect(); return c.width+'x'+c.height+':'+(c.dataset.drawn||'-')+'['+px+']@'+Math.round(r.width)+'x'+Math.round(r.height)+' vis='+getComputedStyle(c).visibility+' op='+getComputedStyle(c).opacity; }).join(' ; ') + '|imgs=' + [...document.images].slice(0,6).map(i => i.naturalWidth+'x'+i.naturalHeight).join(',') + '|errs=' + JSON.stringify((window.__rimikimiErrors || []).slice(-8))") { result, error in
                     AppLog.ui.info("webtool.loaded+\(delay, privacy: .public) \(String(describing: result), privacy: .public) err=\(String(describing: error), privacy: .public)")
                 }
             }
@@ -147,7 +147,9 @@ struct WebToolView: UIViewRepresentable {
         let errScript = WKUserScript(
             source: "window.__rimikimiErrors = []; " +
                 "window.addEventListener('error', e => window.__rimikimiErrors.push((e.message||String(e))+'@'+e.filename+':'+e.lineno)); " +
-                "window.addEventListener('unhandledrejection', e => window.__rimikimiErrors.push('promise:'+String(e.reason)));",
+                "window.addEventListener('unhandledrejection', e => window.__rimikimiErrors.push('promise:'+String(e.reason))); " +
+                // 경고까지(iOS 캔버스 메모리 초과 같은 건 예외가 아니라 콘솔 경고로만 나온다)
+                "['warn','error'].forEach(k => { const o = console[k].bind(console); console[k] = (...a) => { try { window.__rimikimiErrors.push(k+':'+a.map(String).join(' ').slice(0,200)); } catch(_) {} o(...a); }; });",
             injectionTime: .atDocumentStart, forMainFrameOnly: true)
         config.userContentController.addUserScript(errScript)
         #endif
