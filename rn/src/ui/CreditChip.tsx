@@ -21,7 +21,7 @@ export function CreditChip() {
       accessibilityRole="button"
       accessibilityLabel={known ? copy.ui.creditsA11y(label) : copy.profile.credits}
       accessibilityLiveRegion="polite"
-      onPress={() => router.push("/(tabs)/profile")}
+      onPress={() => router.push("/settings")}
       hitSlop={10}
       style={({ pressed }) => [styles.chip, { backgroundColor: pressed ? color.fillPress : color.fill }]}
     >

@@ -53,6 +53,15 @@ export const CATEGORY_EN: Record<string, string> = {
   "📸 인생네컷": "📸 Photo Booth",
   "🪪 증명사진": "🪪 ID Photo",
   "⭐ 즐겨찾기": "⭐ Favorites",
+  // 시즌(iOS Copy.categoryEN 과 같은 표)
+  "🍫 빼빼로데이": "🍫 Pepero Day",
+  "🎄 크리스마스": "🎄 Christmas",
+  "🎊 새해": "🎊 New Year",
+  "🧧 설날": "🧧 Lunar New Year",
+  "💝 발렌타인데이": "💝 Valentine's Day",
+  "🤍 화이트데이": "🤍 White Day",
+  "🌸 벚꽃": "🌸 Cherry Blossoms",
+  "🎞️ 필터": "🎞️ Filter",
 };
 
 /** 카테고리 표시 이름 — 키(한국어)는 그대로 두고 화면에 보일 때만 바꾼다. */

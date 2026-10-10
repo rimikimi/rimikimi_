@@ -18,7 +18,7 @@ const ROUTES: { href: string; title: string }[] = [
   { href: "/(tabs)/gallery", title: "탭: 갤러리" },
   { href: "/(tabs)/filter", title: "탭: 필터" },
   { href: "/(tabs)/photos", title: "탭: 내 사진" },
-  { href: "/(tabs)/profile", title: "탭: 프로필" },
+  { href: "/settings", title: "설정(예전 프로필 탭)" },
   { href: "/guide", title: "첫 실행 가이드" },
   { href: "/store", title: "스토어" },
   { href: "/concept/793", title: "옵션: 드레스룸(793)" },

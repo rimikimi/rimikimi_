@@ -85,12 +85,12 @@ export async function clearRegisteredPhoto(): Promise<void> {
 }
 
 /** 웹 shrinkImage(dataUrl, max, 0.85) 와 같은 결과 — 긴 변 `max` 로 줄인 JPEG base64. */
-export async function encodeForUpload(p: PhotoRef, max = 1024): Promise<EncodedPhoto> {
+export async function encodeForUpload(p: PhotoRef, max = 1024, quality = 0.85): Promise<EncodedPhoto> {
   const w = p.width ?? 0;
   const h = p.height ?? 0;
   const resize = w && h ? (w >= h ? { width: Math.min(max, w) } : { height: Math.min(max, h) }) : { width: max };
   const out = await ImageManipulator.manipulateAsync(p.uri, [{ resize }], {
-    compress: 0.85,
+    compress: quality,
     format: ImageManipulator.SaveFormat.JPEG,
     base64: true,
   });

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Alert, Linking, Pressable, Share, StyleSheet, Switch, TextInput, View } from "react-native";
-import { router, useFocusEffect } from "expo-router";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { Image } from "expo-image";
 import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
@@ -20,6 +20,8 @@ import { disableNotifications, getPermissionState, setupNotifications } from "@/
 import { NOTIFY_ON_KEY, getFlag } from "@/lib/prefs";
 import { clearRegisteredPhoto } from "@/lib/photo";
 import { copy } from "@/lib/copy";
+import { c21 } from "@/lib/copy21";
+import { getStartTab, setStartTab, useApp21 } from "@/lib/app21";
 import { color, radius, space, themedStyles } from "@/theme/tokens";
 
 // ============================================================================
@@ -98,7 +100,37 @@ function InviteSection({ code, token, onClaimed }: { code?: string; token?: stri
   );
 }
 
-export default function ProfileTab() {
+/**
+ * 앱을 켜면 먼저 보일 화면 — 만들기 / 카메라·필터(iOS `StartScreenRow`, 오너 지시 2026-10-09).
+ * iOS 는 메뉴(Picker), 여기선 두 칸 선택(같은 값·같은 키 `ui.startTab`).
+ */
+function StartTabRow() {
+  const [v, setV] = useState<"make" | "camera">("make");
+  useEffect(() => { void getStartTab().then(setV); }, []);
+  const choose = (next: "make" | "camera") => {
+    setV(next);
+    void setStartTab(next);
+    Haptics.selectionAsync().catch(() => undefined);
+  };
+  return (
+    <View style={styles.startRow}>
+      <Text size="body" style={{ flex: 1 }}>{c21.startScreen}</Text>
+      <View style={styles.seg}>
+        {(["make", "camera"] as const).map((k) => (
+          <Pressable key={k} accessibilityRole="button" accessibilityState={{ selected: v === k }} onPress={() => choose(k)} style={[styles.segItem, v === k && styles.segOn]}>
+            <Text size="footnote" weight={v === k ? "semibold" : "medium"} style={{ color: v === k ? color.ink : color.ink2 }}>{k === "make" ? c21.startMake : c21.startCamera}</Text>
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+export default function SettingsScreen() {
+  // ⚠️ DEV 전용 캡처 경로 — `/settings?devConsent=1` 이면 AI 전송 동의 시트를 바로 띄운다(iOS dev/consent).
+  const { devConsent } = useLocalSearchParams<{ devConsent?: string }>();
+  const { devOpenConsent } = useApp21();
+  useEffect(() => { if (__DEV__ && devConsent === "1") devOpenConsent(); }, [devConsent, devOpenConsent]);
   const { session, signOut, requireLogin } = useAuth();
   const { quota, freeLeft, refresh } = useQuota();
   const { photo, setPhoto } = useStore();
@@ -178,7 +210,7 @@ export default function ProfileTab() {
   };
 
   return (
-    <Screen scrollModel="scroll" hasTabBar header={<AppHeader title={copy.profile.title} />} contentStyle={styles.content}>
+    <Screen scrollModel="scroll" header={<AppHeader title={c21.settingsTitle} back right={<View />} />} contentStyle={styles.content}>
       <Card>
         {session ? (
           <View style={styles.me}>
@@ -216,6 +248,11 @@ export default function ProfileTab() {
 
       {/* 초대 */}
       {session ? <InviteSection code={quota?.referralCode} token={token} onClaimed={refresh} /> : null}
+
+      {/* 앱을 켜면 먼저 보일 화면 (2.1) */}
+      <Card padded={false}>
+        <StartTabRow />
+      </Card>
 
       {/* 알림 */}
       <Card padded={false}>
@@ -285,6 +322,10 @@ const styles = themedStyles(() => StyleSheet.create({
   rowTrail: { flexDirection: "row", alignItems: "center", gap: space.s2 },
   rowNote: { paddingHorizontal: space.s4, paddingBottom: space.s3 },
   faceBtns: { flexDirection: "row", gap: space.s2 },
+  startRow: { flexDirection: "row", alignItems: "center", minHeight: 50, paddingHorizontal: space.s4, paddingVertical: space.s2, gap: space.s2 },
+  seg: { flexDirection: "row", padding: 2, borderRadius: radius.btn, backgroundColor: color.fill },
+  segItem: { paddingHorizontal: space.s3, paddingVertical: 6, borderRadius: radius.btn - 2 },
+  segOn: { backgroundColor: color.card },
   sep: { height: StyleSheet.hairlineWidth, backgroundColor: color.line, marginLeft: space.s4 },
   myCode: { alignItems: "center", gap: 2, padding: space.s3, borderRadius: radius.btn, backgroundColor: color.fill },
   codeRow: { flexDirection: "row", alignItems: "center", gap: space.s2 },

@@ -34,7 +34,7 @@ export function InviteCard() {
             <IconClose size={20} color={color.ink3} />
           </Pressable>
         </View>
-        <Button label={copy.invite.cardCta} size="sm" style={{ alignSelf: "flex-start", marginTop: space.s3 }} onPress={() => { done(); router.push("/(tabs)/profile"); }} />
+        <Button label={copy.invite.cardCta} size="sm" style={{ alignSelf: "flex-start", marginTop: space.s3 }} onPress={() => { done(); router.push("/settings"); }} />
       </Card>
     </Animated.View>
   );

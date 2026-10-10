@@ -1,5 +1,5 @@
 // ============================================================
-// 필터 엔진 — 웹 src/filters.js 를 그대로 옮긴 TypeScript 판(2.1 Skia 포팅의 기준).
+// 필터 엔진 — 웹 src/filters.js 를 그대로 옮긴 TypeScript 판(필름·카메라 이름 = 도시+연도, 웹 4ee5a89 와 같게)(2.1 Skia 포팅의 기준).
 // ⚠️ 정본은 웹 파일이다. 여기 수식을 고치면 웹도 같이 고친다(미리보기=저장본 픽셀 동일 원칙).
 // ============================================================
 
@@ -38,7 +38,7 @@ export interface Preset {
   key: string; ko: string; en: string; group?: "film" | "camera" | "fun" | string;
   temp?: number; tint?: number; ex?: number; con?: number; fade?: number; whitePull?: number;
   sat?: number; vib?: number; sh?: number[]; hi?: number[]; bw?: number[]; hsl?: HslBand[];
-  fx?: Effects; special?: "duotone" | "thermal" | "glitch" | "vhs" | "pixelate" | "sketch"; c1?: number[]; c2?: number[];
+  fx?: Effects; special?: "duotone" | "thermal" | "glitch" | "vhs" | "pixelate" | "sketch" | "beauty"; c1?: number[]; c2?: number[];
 }
 export type Pixels = Uint8ClampedArray;
 
@@ -46,67 +46,67 @@ export const FILM_PRESETS: Preset[] = [
   { key: "none",     ko: "원본",      en: "Original" },
 
   /* ── 필름 스톡 (코닥/후지/시네스틸/아그파/일포드 색과학 참고, 이름은 느낌만) ── */
-  { key: "golden",   ko: "골든",      en: "Golden", group: "film", // Kodak Gold 200
+  { key: "golden",   ko: "LA '88",      en: "LA '88", group: "film", // Kodak Gold 200
     temp: 20, tint: 0,  ex: 0.04,  con: 0.18, fade: 10, whitePull: 8,  sat: 0.12,  vib: 0.15, sh: [6, 3, -8],   hi: [12, 9, -12],
     hsl: [{ c: 110, w: 60, h: -18, s: -0.12 }, { c: 30, w: 25, s: 0.08, l: 0.02 }] },
-  { key: "peach",    ko: "피치",      en: "Peach", group: "film", // Portra 400
+  { key: "peach",    ko: "리스본 '98",      en: "Lisbon '98", group: "film", // Portra 400
     temp: 12, tint: 6,  ex: 0.07,  con: 0.08, fade: 14, whitePull: 14, sat: -0.08, vib: 0.25, sh: [4, 2, 0],    hi: [10, 5, -2],
     hsl: [{ c: 30, w: 28, s: -0.06, l: 0.04 }, { c: 110, w: 60, h: -10, s: -0.15 }] },
-  { key: "slide",    ko: "슬라이드",  en: "Slide", group: "film", // Ektachrome
+  { key: "slide",    ko: "코펜하겐 '02",  en: "Copenhagen '02", group: "film", // Ektachrome
     temp: -6, tint: -2, ex: 0,     con: 0.26, fade: 4,  whitePull: 0,  sat: 0.2,   vib: 0.1,  sh: [-3, 0, 8],   hi: [0, 0, 0],
     hsl: [{ c: 225, w: 55, s: 0.25, l: -0.05 }, { c: 120, w: 50, s: 0.1 }] },
-  { key: "retro",    ko: "레트로",    en: "Retro", group: "film", // Kodachrome
+  { key: "retro",    ko: "하바나 '74",    en: "Havana '74", group: "film", // Kodachrome
     temp: 6,  tint: 2,  ex: -0.05, con: 0.32, fade: 2,  whitePull: 4,  sat: 0.18,  vib: 0,    sh: [4, -2, -4],  hi: [6, 2, -6],
     hsl: [{ c: 0, w: 30, s: 0.2, l: -0.06 }, { c: 60, w: 35, h: -10, s: 0.1 }, { c: 220, w: 60, s: -0.15, l: -0.05 }] },
-  { key: "vivid",    ko: "비비드",    en: "Vivid", group: "film", // Velvia
+  { key: "vivid",    ko: "발리 '99",    en: "Bali '99", group: "film", // Velvia
     temp: 0,  tint: 0,  ex: 0,     con: 0.28, fade: 0,  whitePull: 0,  sat: 0.18,  vib: 0.12, sh: [0, -2, 4],   hi: [2, 0, -2],
     hsl: [{ c: 225, w: 60, s: 0.3, l: -0.04 }, { c: 120, w: 55, s: 0.25, l: -0.03 }, { c: 0, w: 25, s: 0.2 }, { c: 30, w: 18, s: -0.1 }] },
-  { key: "green",    ko: "그린",      en: "Green", group: "film", // Superia
+  { key: "green",    ko: "도쿄 '97",      en: "Tokyo '97", group: "film", // Superia
     temp: 4,  tint: -8, ex: 0,     con: 0.15, fade: 8,  whitePull: 6,  sat: 0.1,   vib: 0.12, sh: [0, 6, -2],   hi: [6, 4, -4],
     hsl: [{ c: 120, w: 60, h: 6, s: 0.2, l: -0.03 }, { c: 60, w: 25, h: 20, s: -0.1 }] },
-  { key: "pastel",   ko: "파스텔",    en: "Pastel", group: "film", // Pro 400H
+  { key: "pastel",   ko: "파리 '05",    en: "Paris '05", group: "film", // Pro 400H
     temp: -4, tint: -10, ex: 0.18, con: -0.05, fade: 24, whitePull: 16, sat: -0.15, vib: 0.2,  sh: [-2, 7, 5],   hi: [2, 5, 3],
     hsl: [{ c: 120, w: 70, h: 8, s: -0.2, l: 0.05 }, { c: 220, w: 60, s: -0.15, l: 0.05 }, { c: 30, w: 25, s: -0.08 }] },
-  { key: "cine",     ko: "시네",      en: "Cine", group: "film", // CineStill 800T
+  { key: "cine",     ko: "런던 '93",      en: "London '93", group: "film", // CineStill 800T
     temp: -14, tint: 6, ex: 0,     con: 0.20, fade: 12, whitePull: 6,  sat: 0.05,  vib: 0.1,  sh: [-6, 4, 10],  hi: [14, 2, -4],
     hsl: [{ c: 120, w: 70, h: 55, s: -0.2 }, { c: 220, w: 50, h: -18 }, { c: 30, w: 22, s: 0.05 }],
     fx: { grain: 0.3 } },
-  { key: "newtro",   ko: "뉴트로",    en: "Newtro", group: "film", // Agfa Vista
+  { key: "newtro",   ko: "오사카 '96",    en: "Osaka '96", group: "film", // Agfa Vista
     temp: 8,  tint: 8,  ex: 0,     con: 0.22, fade: 8,  whitePull: 6,  sat: 0.16,  vib: 0,    sh: [6, -2, 0],   hi: [8, 2, -4],
     hsl: [{ c: 0, w: 35, s: 0.15 }, { c: 180, w: 60, s: -0.2 }, { c: 30, w: 20, s: 0.05 }] },
-  { key: "softmono", ko: "소프트 모노", en: "Soft Mono", group: "film", // Ilford HP5
+  { key: "softmono", ko: "로마 '62", en: "Rome '62", group: "film", // Ilford HP5
     ex: 0.05, con: 0.12, fade: 16, whitePull: 12, bw: [0.28, 0.56, 0.16],
     fx: { grain: 0.35 } },
 
   /* ── 카메라 룩 (상징적인 카메라들의 렌더링) ── */
-  { key: "warm",     ko: "웜톤",      en: "Warm", group: "camera", // 캐논풍 스킨톤
+  { key: "warm",     ko: "바르셀로나 '08",      en: "Barcelona '08", group: "camera", // 캐논풍 스킨톤
     temp: 10, tint: 10, ex: 0.08,  con: 0.10, fade: 6,  whitePull: 4,  sat: 0.06,  vib: 0.15, sh: [2, 0, 0],    hi: [9, 2, 2],
     hsl: [{ c: 30, w: 25, l: 0.03 }, { c: 220, w: 50, s: -0.1 }] },
-  { key: "cool",     ko: "쿨톤",      en: "Cool", group: "camera", // 니콘풍 뉴트럴
+  { key: "cool",     ko: "오슬로 '11",      en: "Oslo '11", group: "camera", // 니콘풍 뉴트럴
     temp: -14, tint: -4, ex: 0,    con: 0.16, fade: 6,  whitePull: 4,  sat: 0.04,  vib: 0.1,  sh: [-2, 2, 5],   hi: [0, 2, 5],
     hsl: [{ c: 225, w: 60, s: 0.12 }, { c: 110, w: 50, h: 15, s: -0.08 }] },
-  { key: "vintage",  ko: "빈티지",    en: "Vintage", group: "camera", // 미놀타 90년대 자동카메라
+  { key: "vintage",  ko: "서울 '92",    en: "Seoul '92", group: "camera", // 미놀타 90년대 자동카메라
     temp: 14, tint: 2,  ex: -0.02, con: -0.08, fade: 22, whitePull: 18, sat: -0.15, vib: 0.05, sh: [6, 4, -2],   hi: [8, 6, -6],
     hsl: [{ c: 120, w: 60, h: -25, s: -0.3 }, { c: 220, w: 60, s: -0.25 }, { c: 30, w: 30, s: -0.05, l: 0.03 }],
     fx: { grain: 0.25 } },
-  { key: "docu",     ko: "다큐",      en: "Docu", group: "camera", // 후지 클래식크롬풍
+  { key: "docu",     ko: "베를린 '89",      en: "Berlin '89", group: "camera", // 후지 클래식크롬풍
     temp: -4, tint: 0,  ex: -0.03, con: 0.20, fade: 10, whitePull: 10, sat: -0.28, vib: 0.1,  sh: [0, 2, 6],    hi: [4, 2, -2],
     hsl: [{ c: 220, w: 70, h: -10, s: 0.05 }, { c: 0, w: 30, s: -0.15 }, { c: 30, w: 25, s: -0.12 }] },
-  { key: "mono",     ko: "모노",      en: "Mono", group: "camera", // 라이카 모노크롬풍
+  { key: "mono",     ko: "뉴욕 '59",      en: "New York '59", group: "camera", // 라이카 모노크롬풍
     ex: 0,    con: 0.35, fade: 2,  whitePull: 0,  bw: [0.35, 0.5, 0.15] },
-  { key: "digicam",  ko: "디지캠",    en: "Digicam", group: "camera", // 2000년대 CCD 컴팩트 (Y2K)
+  { key: "digicam",  ko: "시부야 '04",    en: "Shibuya '04", group: "camera", // 2000년대 CCD 컴팩트 (Y2K)
     temp: -8, tint: -2, ex: 0.06,  con: 0.22, fade: 0,  whitePull: 0,  sat: 0.15,  vib: 0.1,  sh: [0, 2, 6],    hi: [4, 4, 10],
     hsl: [{ c: 225, w: 60, s: 0.2 }, { c: 180, w: 40, s: 0.15 }],
     fx: { grain: 0.15 } },
-  { key: "toy",      ko: "토이",      en: "Toy", group: "camera", // 로모/홀가 토이카메라
+  { key: "toy",      ko: "제주 '01",      en: "Jeju '01", group: "camera", // 로모/홀가 토이카메라
     temp: 4,  tint: 6,  ex: 0,     con: 0.3,  fade: 4,  whitePull: 0,  sat: 0.24,  vib: 0,    sh: [0, -4, 8],   hi: [6, 0, -6],
     hsl: [{ c: 225, w: 55, s: 0.3, l: -0.06 }, { c: 0, w: 30, s: 0.15 }],
     fx: { vignette: 0.65, grain: 0.25 } },
-  { key: "dispo",    ko: "일회용",    en: "Dispo", group: "camera", // 일회용 카메라 + 플래시
+  { key: "dispo",    ko: "오키나와 '00",    en: "Okinawa '00", group: "camera", // 일회용 카메라 + 플래시
     temp: 6,  tint: 0,  ex: 0.1,   con: 0.25, fade: 6,  whitePull: 0,  sat: 0.12,  vib: 0.08, sh: [-2, 4, 0],   hi: [10, 8, 2],
     hsl: [{ c: 110, w: 50, h: -8, s: -0.05 }],
     fx: { grain: 0.45, leak: 0.12 } },
-  { key: "instant",  ko: "인스턴트",  en: "Instant", group: "camera", // 폴라로이드 인화지 색
+  { key: "instant",  ko: "마이애미 '84",  en: "Miami '84", group: "camera", // 폴라로이드 인화지 색
     temp: -2, tint: -6, ex: 0.06,  con: -0.06, fade: 20, whitePull: 14, sat: -0.12, vib: 0.08, sh: [-4, 6, 4],   hi: [6, 4, -2],
     hsl: [{ c: 120, w: 60, h: 10, s: -0.15, l: 0.03 }],
     fx: { grain: 0.2 } },
@@ -123,7 +123,8 @@ export const FILM_PRESETS: Preset[] = [
     temp: -10, tint: -1, ex: 0.1,  con: 0.04, fade: 6,  whitePull: 24, sat: 0.2,   vib: 0.25, sh: [-2, 2, 8],   hi: [0, 2, 6] },
   { key: "phxs",    ko: "XS",     en: "XS",     group: "phone", // 2018 — 첫 스마트 HDR: 평평·주황빛 피부·뽀얀 질감
     temp: 18, tint: 6,  ex: 0.05,  con: -0.1, fade: 16, whitePull: 22, sat: -0.02, vib: 0.1,  sh: [8, 4, 0],    hi: [10, 5, -6],
-    fx: { glow: 0.25 } },
+    // 뽀샤시는 프리셋 기본에서 뺐다 — 편집기 효과 탭에서 직접 켠다(웹 filters.js 2026-10-09 "뽀샤시는 다 없애")
+  },
   { key: "ph7",     ko: "7",      en: "7",      group: "phone", // 2016 — 노란기 도는 뉴트럴, 중간 대비
     temp: 16, tint: -6, ex: 0.03,  con: 0.18, fade: 4,  whitePull: 4,  sat: 0.1,   vib: 0.06, sh: [2, 4, -4],   hi: [10, 10, -12],
     fx: { grain: 0.12 } },
@@ -132,19 +133,25 @@ export const FILM_PRESETS: Preset[] = [
     fx: { grain: 0.14 } },
   { key: "ph4s",    ko: "4s",     en: "4s",     group: "phone", // 2011 — 누런 캐스트, 좁은 계조, 노이즈
     temp: 26, tint: -6, ex: 0.12,  con: 0.32, fade: 8,  whitePull: 0,  sat: -0.08, vib: 0,    sh: [6, 6, -8],   hi: [14, 12, -14],
-    fx: { grain: 0.3, vignette: 0.35, blur: 0.04 } },
+    // 흐림 없음 — 일부러 흐리게 하면 초점 나간 사진처럼 보인다(웹 filters.js 2026-10-09)
+    fx: { grain: 0.3, vignette: 0.35 } },
   { key: "ph3gs",   ko: "3GS",    en: "3GS",    group: "phone", // 2009 — 물 빠진 색, 초록·마젠타 쏠림, 흐릿함·굵은 노이즈
     temp: 14, tint: -14, ex: 0.14, con: 0.26, fade: 22, whitePull: 0,  sat: -0.35, vib: -0.05, sh: [-6, 10, 6], hi: [18, 16, -10],
-    fx: { grain: 0.55, vignette: 0.45, blur: 0.08 } },
+    // 흐림·픽셀 효과 없음(웹 filters.js 2026-10-09)
+    fx: { grain: 0.55, vignette: 0.45 } },
 
   /* ── 재미 (SNOW류 — 특수 렌더 모드, special 필드가 전용 코드 경로를 탄다) ── */
+  // 인플 — 얼굴 피부 보정(뷰티). 색 LUT 대신 beautyRGBA(웹 filters.js)를 탄다. 강도 = 색감 슬라이더(0 = 원본).
+  // 이 TS 판은 픽셀 처리를 하지 않는다(카메라 미리보기는 네이티브 셰이더, 저장은 웹 편집기) — 이름·분류만.
+  { key: "infl",     ko: "인플",      en: "Influencer", group: "fun",
+    special: "beauty" },
   { key: "sepia",    ko: "세피아",    en: "Sepia", group: "fun",
     ex: 0.02, con: 0.12, fade: 8, whitePull: 6, bw: [0.3, 0.55, 0.15], sh: [18, 6, -14], hi: [24, 10, -18] },
   { key: "duopink",  ko: "듀오 핑크", en: "Duo Pink", group: "fun",
     special: "duotone", c1: [38, 18, 66], c2: [255, 158, 201] },
   { key: "neon",     ko: "네온",      en: "Neon", group: "fun",
     special: "duotone", c1: [24, 8, 66], c2: [90, 255, 240],
-    fx: { glow: 0.5 } },
+  },
   { key: "thermal",  ko: "서모",      en: "Thermal", group: "fun",
     special: "thermal" },
   { key: "glitch",   ko: "글리치",    en: "Glitch", group: "fun",
@@ -153,6 +160,11 @@ export const FILM_PRESETS: Preset[] = [
     special: "vhs", fx: { grain: 0.35 } },
   { key: "pixelate", ko: "모자이크",  en: "Pixel", group: "fun",
     special: "pixelate" },
+  // 빛번짐 — 웹 filters.js 와 같은 값(2.1 카메라 필터 줄 "재미" 맨 끝, iOS build 42).
+  { key: "bloom",    ko: "빛번짐",    en: "Bloom", group: "fun",
+    temp: 8, tint: 2, ex: 0.06, con: -0.06, fade: 16, whitePull: 10, sat: -0.04, vib: 0.18,
+    sh: [6, 4, 0], hi: [14, 10, 2],
+    fx: { leak: 0.3 } },
   { key: "sketch",   ko: "스케치",    en: "Sketch", group: "fun",
     special: "sketch" },
 ];

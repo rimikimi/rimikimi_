@@ -8,7 +8,7 @@ import { Text } from "./Text";
 import { Spinner } from "./Spinner";
 import { Button } from "./Button";
 import { IconClose } from "./icons";
-import { conceptTitle, thumbUrl } from "@/lib/concepts";
+import { conceptThumb, conceptTitle } from "@/lib/concepts";
 import { useGeneration, type Job } from "@/lib/generation";
 import { copy } from "@/lib/copy";
 import { color, radius, space, themedStyles } from "@/theme/tokens";
@@ -30,7 +30,7 @@ function ProgressCard({ job }: { job: Job }) {
   const { dismiss } = useGeneration();
   const done = job.status === "done";
   const failed = job.status === "failed";
-  const thumb = done && job.images[0] ? job.images[0].uri : thumbUrl(job.concept.id);
+  const thumb = done && job.images[0] ? job.images[0].uri : conceptThumb(job.concept);
   const open = () => router.push({ pathname: "/result/[jobId]", params: { jobId: job.id } });
 
   return (

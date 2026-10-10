@@ -40,6 +40,8 @@ interface AuthValue {
   /** 로그인 시트 상태(루트 레이아웃이 그린다) */
   sheetOpen: boolean;
   sheetReason: LoginReason | null;
+  /** 시트에 보일 문구(iOS `loginMessage`) — 있으면 사유 문구 대신 이걸 보인다. */
+  sheetMessage: string | null;
   busy: Provider | null;
   error: string | null;
   closeSheet: () => void;
@@ -49,7 +51,7 @@ interface AuthValue {
    * 로그인돼 있으면 즉시 action. 아니면 시트를 띄우고 로그인 성공 시 action 을 이어서 실행.
    * `route` 는 프로세스가 죽었다 살아났을 때 돌아갈 화면(expo-router href).
    */
-  requireLogin: (reason: LoginReason, action: () => void | Promise<void>, route?: string) => void;
+  requireLogin: (reason: LoginReason, action: () => void | Promise<void>, route?: string, message?: string) => void;
   /** 부팅 시 살아남은 복귀 경로 — index.tsx 가 한 번 읽고 지운다 */
   takePendingRoute: () => Promise<string | null>;
 }
@@ -89,6 +91,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetReason, setSheetReason] = useState<LoginReason | null>(null);
+  const [sheetMessage, setSheetMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState<Provider | null>(null);
   const [error, setError] = useState<string | null>(null);
   const pending = useRef<Pending | null>(null);
@@ -126,7 +129,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (p) setTimeout(() => { void p.action(); }, 0);
   }, [session?.user?.id]);
 
-  const requireLogin = useCallback<AuthValue["requireLogin"]>((reason, action, route) => {
+  const requireLogin = useCallback<AuthValue["requireLogin"]>((reason, action, route, message) => {
     if (session?.user?.id) { void action(); return; }
     pending.current = { reason, action, route };
     if (route) {
@@ -134,6 +137,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     setError(null);
     setSheetReason(reason);
+    setSheetMessage(message ?? null);
     setSheetOpen(true);
   }, [session?.user?.id]);
 
@@ -206,8 +210,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo<AuthValue>(
-    () => ({ session, loading, sheetOpen, sheetReason, busy, error, closeSheet, signIn, signOut, requireLogin, takePendingRoute }),
-    [session, loading, sheetOpen, sheetReason, busy, error, closeSheet, signIn, signOut, requireLogin, takePendingRoute]
+    () => ({ session, loading, sheetOpen, sheetReason, sheetMessage, busy, error, closeSheet, signIn, signOut, requireLogin, takePendingRoute }),
+    [session, loading, sheetOpen, sheetReason, sheetMessage, busy, error, closeSheet, signIn, signOut, requireLogin, takePendingRoute]
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

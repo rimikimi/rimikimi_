@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Alert, Linking, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { Image } from "expo-image";
@@ -11,7 +11,7 @@ import { Button } from "@/ui/Button";
 import { ConceptRail } from "@/ui/ConceptCard";
 import { IconDownload, IconFlag, IconShare, IconWand } from "@/ui/icons";
 import { FitSheet } from "@/ui/FitSheet";
-import { needsFit } from "@/lib/fit";
+import { setEditorPayload } from "@/lib/editorPayload";
 import { useSaveAdGate } from "@/lib/saveAdGate";
 import { useGeneration, type ResultImage } from "@/lib/generation";
 import { useStore } from "@/lib/store";
@@ -53,7 +53,6 @@ export default function Result() {
   // 정방향 맞춤 — 잘라 맞춘 결과로 표시 이미지를 바꾼다(원본은 서버 갤러리에 그대로).
   const [fitted, setFitted] = useState<Record<number, string>>({});
   const [fitOpen, setFitOpen] = useState(false);
-  const [fitAsked, setFitAsked] = useState(false);
 
   const job = findJob(jobId);
   const images: ResultImage[] = useMemo(
@@ -61,13 +60,7 @@ export default function Result() {
     [job, url, fitted]
   );
 
-  // 3:4 가 아니면(복원 컨셉 등) 한 번 제안한다.
-  useEffect(() => {
-    const first = images[0];
-    if (!first || fitAsked || first.uri.startsWith("data:")) return;
-    setFitAsked(true);
-    needsFit(first.uri).then((yes) => { if (yes) setFitOpen(true); });
-  }, [images, fitAsked]);
+  // 정방향 맞춤 안내는 뺐다(iOS 2.1, 오너 지시 2026-10-09 "정방향 맞추기는 없애자").
   const concept = job ? byId(job.concept.id) ?? job.concept : byId(conceptId) ?? (title ? { id: conceptId ?? "", title } : undefined);
   const img = images[idx];
   const w = width - space.screen * 2;
@@ -123,7 +116,8 @@ export default function Result() {
       </Pressable>
     } />} contentStyle={styles.content}>
       {img ? (
-        <Image source={{ uri: img.uri }} style={{ width: w, height: h, borderRadius: radius.card, backgroundColor: color.mat }} contentFit="cover" transition={duration.enter} />
+        // 결과 전체를 보여준다 — 잘라서 채우지 않는다(iOS 2.1, 오너 지시 2026-10-09 "결과물 전체를 보여줘야 함").
+        <Image source={{ uri: img.uri }} style={{ width: w, height: h, borderRadius: radius.card }} contentFit="contain" transition={duration.enter} />
       ) : (
         <View style={[styles.empty, { width: w, height: h }]}><Text tone="muted">{copy.progress.fail}</Text></View>
       )}
@@ -141,18 +135,30 @@ export default function Result() {
         </ScrollView>
       ) : null}
 
+      {/* iOS 2.1 배치: 앨범 저장(주) → 다듬기 · 공유 → 한 장 더 */}
+      <Button label={copy.result.saveAlbum} full loading={saving} disabled={!img} leading={<IconDownload size={20} color={color.accentOn} />} onPress={() => { void save(); }} />
       <View style={styles.actions}>
-        <Button label={copy.result.saveAlbum} variant="secondary" loading={saving} leading={<IconDownload size={20} color={color.ink} />} onPress={() => { void save(); }} style={styles.action} />
+        <View style={{ flex: 1 }}>
         <Button
+          full
           label={copy.result.edit}
           variant="secondary"
+          disabled={!img}
           leading={<IconWand size={20} color={color.ink} />}
-          onPress={() => router.push({ pathname: "/editor", params: img?.uri.startsWith("data:") ? {} : { img: img?.uri ?? "" } })}
+          onPress={() => {
+            if (!img) return;
+            // 지금 보고 있는 사진을 편집기에 바로 실어 보낸다(사진 선택 화면 생략, iOS openEditor).
+            if (img.uri.startsWith("data:")) { setEditorPayload({ mode: "edit", src: img.uri }); router.push("/editor"); }
+            else router.push({ pathname: "/editor", params: { img: img.uri } });
+          }}
           style={styles.action}
         />
-        <Button label={copy.result.share} variant="secondary" leading={<IconShare size={20} color={color.ink} />} onPress={() => { void share(); }} style={styles.action} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Button full label={copy.result.share} variant="secondary" disabled={!img} leading={<IconShare size={20} color={color.ink} />} onPress={() => { void share(); }} style={styles.action} />
+        </View>
       </View>
-      <Button label={copy.result.oneMore} full onPress={oneMore} />
+      {concept ? <Button label={copy.result.oneMore} variant="secondary" full onPress={oneMore} /> : null}
 
       {similar.length ? (
         <View style={styles.similar}>

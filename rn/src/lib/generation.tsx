@@ -1,13 +1,13 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { AppState } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { router } from "expo-router";
 import * as Haptics from "expo-haptics";
 import { ApiError, fetchGallery, generateImage, type GenerateMeta, type GalleryItem } from "./api";
 import { useAuth } from "./auth";
 import { useQuota } from "./quota";
 import { encodeForUpload, type EncodedPhoto, type PhotoRef } from "./photo";
-import { RESULT_W, RESULT_H, fitResultToRatio, fitResultToSize, fileRatio } from "./fitToSize";
-import { type Concept, ID_BGS, buildIdPhotoPrompt, conceptTitle, isArtOnly, isIdPhoto, isRestoreConcept } from "./concepts";
+import { type Concept, ID_BGS, buildIdPhotoPrompt, conceptTitle, isArtOnly, isIdPhoto, isRestoreConcept, isRetouch } from "./concepts";
 import { getPushToken } from "./push";
 import { showInterstitial } from "./ads";
 import { loadProfileRefs } from "./faceProfile";
@@ -71,6 +71,19 @@ export interface JobInput {
   /** 증명사진: 정장색 키 + 배경 hex (concepts.ts ID_SUITS/ID_BGS) */
   idSuit?: string;
   idBg?: string;
+  // ── 2.1 (iOS GenerateRequest) ──
+  /** 커스텀 보정: 고칠 내용 */
+  retouchText?: string;
+  /** 브루클린 룩: 그 탭의 세부 조정 값(레시피 키 → 값) + 옷 사진 */
+  studioOverrides?: Record<string, unknown>;
+  outfit?: PhotoRef | null;
+  /** 조세핀 드레스: 신랑 사진 */
+  groom?: PhotoRef | null;
+  /**
+   * 끝나면 결과 화면을 자동으로 띄울지(iOS GenerationCoordinator.start autoPresent).
+   * 한 장 만들기 = true, "N장 만들기"(여러 컨셉 한 번에) = false — 내 사진에 쌓이기만 한다(iOS silentJobs).
+   */
+  autoPresent?: boolean;
 }
 
 interface PendingMarker { jobId: string; startedAt: number; conceptId: string | number; conceptTitle: string; count: number }
@@ -294,9 +307,18 @@ export function GenerationProvider({ children }: { children: React.ReactNode }) 
       if (!token) { patch(id, { status: "failed", error: copy.errors.needLogin }); return; }
       await writePendingGen({ jobId: id, startedAt, conceptId: concept.id, conceptTitle: conceptTitle(concept), count });
       try {
-        const photo = await encodeForUpload(input.photo, 1024);
+        // 커스텀 보정은 결과가 "원본 + 고친 부분"이라 올린 사진 해상도가 곧 결과 해상도다 → 크게(2048·0.9) 보낸다(iOS 와 같다).
+        const photo = isRetouch(concept) ? await encodeForUpload(input.photo, 2048, 0.9) : await encodeForUpload(input.photo, 1024);
         // 1.x 와 동일: 이 기기의 푸시 토큰(완료 알림용) + 페이스 프로필 앵커(있을 때만, 요청 1회용).
         const meta: GenerateMeta = { id: concept.id, title: concept.title, pushToken: getPushToken() };
+        if (concept.studioPreset && concept.studioPurpose) {
+          meta.studio = { purpose: concept.studioPurpose, presetId: concept.studioPreset, overrides: input.studioOverrides ?? {} };
+          if (input.outfit) meta.outfit = await encodeForUpload(input.outfit, 896);
+        } else if (concept.dressCode) {
+          meta.wedding = { dressCode: concept.dressCode };
+          if (input.groom) meta.groom = await encodeForUpload(input.groom, 1024);
+        }
+        if (isRetouch(concept) && input.retouchText?.trim()) meta.retouchText = input.retouchText.trim().slice(0, 1000);
         let promptText = concept.text || "";
         if (!isArtOnly(concept)) {
           try { meta.faceRefs = await loadProfileRefs(); } catch { meta.faceRefs = []; }
@@ -327,13 +349,11 @@ export function GenerationProvider({ children }: { children: React.ReactNode }) 
           }
         }
         const r = await generateImage(token, photo, promptText, meta);
-        // 웹과 동일한 결과 재크롭(fitToSize/fitToRatio) — 표시·저장·공유 전에 1회 적용.
-        // keepRatio(사진 복원) 만 원본 비율로 크롭, 그 외(인생네컷·묶음·증명사진 포함)는 768×1024.
-        const ratio = meta.keepRatio ? (await fileRatio(input.photo.uri)) ?? RESULT_W / RESULT_H : null;
-        const fitOne = (dataUrl: string) => (ratio ? fitResultToRatio(dataUrl, ratio) : fitResultToSize(dataUrl));
+        // 2.1: 결과는 서버가 준 그대로 — 잘라서 채우지 않는다(iOS 와 같다, 오너 지시 2026-10-09
+        //      "결과물 전체를 보여줘야 함"). 예전엔 768×1024 로 다시 잘라 가장자리가 잘렸다.
         const images: ResultImage[] = r.batch
-          ? await Promise.all(r.batch.map(async (b) => ({ uri: await fitOne(b.imageDataUrl), galleryId: b.galleryId, galleryExpiresAt: b.galleryExpiresAt })))
-          : [{ uri: await fitOne(r.imageDataUrl), galleryId: r.galleryId, galleryExpiresAt: r.galleryExpiresAt }];
+          ? r.batch.map((b) => ({ uri: b.imageDataUrl, galleryId: b.galleryId, galleryExpiresAt: b.galleryExpiresAt }))
+          : [{ uri: r.imageDataUrl, galleryId: r.galleryId, galleryExpiresAt: r.galleryExpiresAt }];
         await clearPendingGen(id);
         if (!mine()) return; // 그새 로그아웃·계정 전환 — 결과를 다음 사람에게 보이지 않는다
         patch(id, { status: "done", images });
@@ -341,6 +361,10 @@ export function GenerationProvider({ children }: { children: React.ReactNode }) 
         void noteDone();
         if (images[0]) void setLastDoneJob({ jobId: id, conceptId: String(concept.id), title: conceptTitle(concept), url: images[0].uri });
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
+        // 한 장 만들기만 결과 화면을 바로 띄운다(iOS 와 같다). 여러 장 담기는 내 사진에만 쌓인다.
+        if (input.autoPresent && images[0]) {
+          try { router.push({ pathname: "/result/[jobId]", params: { jobId: id } }); } catch { /* 화면 전환 실패는 카드로 남는다 */ }
+        }
         // 무료 사용자 → 생성이 끝난 뒤 전면광고 1회 (1.x src/PortraitStudio.jsx 와 같은 자리·같은 조건).
         // ⚠️ await 금지 — 광고가 늦거나 실패해도 이 흐름이 여기서 멈추면 안 된다.
         if (showAds) void showInterstitial();

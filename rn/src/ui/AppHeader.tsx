@@ -43,7 +43,7 @@ export function AppHeader({ title, back, right }: { title?: string; back?: boole
           {right ?? (
             <>
               <CreditChip />
-              <Pressable accessibilityRole="button" accessibilityLabel={copy.tabs.profile} hitSlop={8} onPress={() => router.push("/(tabs)/profile")} style={styles.avatar}>
+              <Pressable accessibilityRole="button" accessibilityLabel={copy.tabs.profile} hitSlop={8} onPress={() => router.push("/settings")} style={styles.avatar}>
                 {avatar ? (
                   <Image source={{ uri: avatar }} style={styles.avatarImg} contentFit="cover" />
                 ) : (

@@ -43,12 +43,12 @@ const ORDER: { p: Provider; label: string }[] = [
 ];
 
 export function LoginSheet() {
-  const { sheetOpen, sheetReason, busy, error, closeSheet, signIn } = useAuth();
+  const { sheetOpen, sheetReason, sheetMessage, busy, error, closeSheet, signIn } = useAuth();
   const reason = sheetReason === "filter" ? copy.login.reasonFilter : sheetReason === "camera" ? copy.login.reasonCamera : copy.login.reasonMake;
   return (
     <Sheet open={sheetOpen} onClose={closeSheet}>
       <View style={styles.logo}><Logo height={30} /></View>
-      <Text size="callout" tone="muted" center>{sheetReason ? reason : copy.login.tagline}</Text>
+      <Text size="callout" tone="muted" center>{sheetMessage ?? (sheetReason ? reason : copy.login.tagline)}</Text>
       <View style={styles.buttons}>
         {ORDER.map(({ p, label }) => {
           const b = BRAND[p];
