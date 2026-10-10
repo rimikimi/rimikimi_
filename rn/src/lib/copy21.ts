@@ -51,6 +51,21 @@ export function label(key: string, ko: string, en: string): string {
   return v ? v : t(ko, en);
 }
 
+/**
+ * 서버 이름표의 켜기/끄기 값 — `{"filterPass.enabled": true}` 처럼 그냥 true 여도 되고,
+ * 다른 키와 같은 모양(`{ko:"true"}` · `{enabled:true}` · `{value:true}`)이어도 된다. 없거나 못 받으면 false.
+ */
+export function labelFlag(key: string): boolean {
+  const raw = (labelTable as Record<string, unknown>)[key];
+  const yes = (v: unknown) => v === true || v === "true" || v === 1 || v === "1";
+  if (yes(raw)) return true;
+  if (raw && typeof raw === "object") {
+    const o = raw as Record<string, unknown>;
+    return yes(o.enabled) || yes(o.value) || yes(o.ko) || yes(o.en);
+  }
+  return false;
+}
+
 export const c21 = {
   // 탭
   get tabMake() { return t("만들기", "Create"); },
@@ -170,6 +185,23 @@ export const c21 = {
   get consentPrivacyLink() { return t("개인정보처리방침에서 자세히 보기", "Learn more in our Privacy Policy"); },
   get consentAgree() { return t("허용하고 계속", "Allow and continue"); },
   get consentLater() { return t("허용 안 함", "Don't allow"); },
+  // 필터 이용권(scratchpad filterpass_spec.md) — "무료 체험"을 구독과 묶어 쓰지 않는다.
+  get fpTitle() { return t("필터 이용권", "Filter Pass"); },
+  get fpLeadExpired() { return t("무료로 쓰는 3일이 끝났어요. 이용권으로 모든 필터를 계속 저장하고 공유해 보세요.", "Your 3 free days are over. Get a pass to keep saving and sharing with every filter."); },
+  get fpLead() { return t("폰카·필름·카메라·재미·인플 필터를 전부 저장하고 공유할 수 있어요. 처음 3일은 무료로 써 보세요.", "Save and share with every Phone, Film, Camera, Fun and Beauty filter. Use them all free for your first 3 days."); },
+  get fpAnnual() { return t("1년", "1 year"); },
+  get fpMonthly() { return t("1개월", "1 month"); },
+  get fpLifetime() { return t("평생", "Lifetime"); },
+  get fpAnnualNote() { return t("1년마다 자동 갱신", "Renews every year"); },
+  get fpMonthlyNote() { return t("매월 자동 갱신", "Renews every month"); },
+  get fpLifetimeNote() { return t("한 번 결제하고 계속 사용", "Pay once, keep forever"); },
+  get fpBest() { return t("추천", "Best value"); },
+  get fpPlusFree() { return t("rimikimi+ 구독 중이면 모든 필터가 무료예요", "rimikimi+ members get every filter free"); },
+  get fpLegal() { return t("1년·1개월 이용권은 구독이에요. 표시된 기간마다 자동 갱신되며 Google Play 계정으로 결제돼요. 기간 종료 24시간 전까지 해지하지 않으면 갱신되고, Google Play 설정에서 언제든 관리·해지할 수 있어요. 평생 이용권은 한 번만 결제해요.", "The 1-year and 1-month passes are subscriptions that renew automatically each period and are billed to your Google Play account. They renew unless you cancel at least 24 hours before the period ends; manage or cancel anytime in Google Play settings. The lifetime pass is a one-time purchase."); },
+  get fpDone() { return t("이용권이 적용됐어요", "Your pass is active"); },
+  get fpRestoreNone() { return t("복원할 이용권이 없어요", "No pass to restore"); },
+  get fpLocked() { return t("잠김", "Locked"); },
+  fpDaysLeft: (n: number) => (isKo ? `무료 이용 ${n}일 남음` : `${n} free day${n === 1 ? "" : "s"} left`),
   // 코치마크
   get coachSkip() { return t("건너뛰기", "Skip"); },
   get coachGotIt() { return t("알겠어요", "Got it"); },

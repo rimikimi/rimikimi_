@@ -11,23 +11,26 @@ import { CartBar } from "@/ui/CartBar";
 import { CoachAnchor, CoachHost } from "@/ui/Coach";
 import { IconClockBack, IconGear, IconPencilLine } from "@/ui/icons21";
 import { FavoriteBadge } from "@/ui/FavoriteBits";
+import { ConceptRail } from "@/ui/ConceptCard";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { useQuota } from "@/lib/quota";
 import { Coach, useApp21 } from "@/lib/app21";
 import { c21 } from "@/lib/copy21";
+import { copy } from "@/lib/copy";
 import { conceptThumb, isRestoreConcept, isRetouch } from "@/lib/concepts";
 import { PURPOSES, albumName, albumTiles, purposeCover, purposeTitle, type AlbumTile } from "@/lib/home21";
 import { chrome, color, radius, space, themedStyles } from "@/theme/tokens";
 
 // ============================================================================
 // 만들기 탭(홈) — iOS 2.1 `HomeView.swift` 와 같은 구성(오너 지시 2026-10-09, docs/ux-v3 C안).
-// 로고 · 크레딧 · ⚙︎ → "말로 고치기 / 옛날 사진 복원" 카드 → 목적 4칸 → 컨셉 앨범 3열.
+// 로고 · 크레딧 · ⚙︎ → "말로 고치기 / 옛날 사진 복원" 카드 → 목적 4칸(4번째 = 드레스룸)
+// → 추천 · 새로 나왔어요(NEW) 가로 슬라이드 → "컨셉화보" 제목 + 컨셉 앨범 3열.
 // 설명 글은 넣지 않는다(오너: "앱 안에 텍스트가 불필요하게 많으면 복잡해 보임").
 // ============================================================================
 
 export default function HomeTab() {
-  const { concepts, loading, reload, seasons, favoriteCategories, favoriteConcepts, isFavoriteCategory } = useStore();
+  const { concepts, loading, reload, seasons, favoriteCategories, favoriteConcepts, isFavoriteCategory, home } = useStore();
   const { cart, startHomeCoach, enqueueCoach, labelsVersion } = useApp21();
   const insets = useSafeAreaInsets();
   const [refreshing, setRefreshing] = useState(false);
@@ -47,6 +50,11 @@ export default function HomeTab() {
   useEffect(() => { if (concepts.length) startHomeCoach(); }, [concepts.length, startHomeCoach]);
 
   const tileW = Math.floor((width - space.screen * 2 - space.s2 * 2) / 3);
+  // 추천·새로 나왔어요 가로 슬라이드(iOS HomeView 2026-10-10) — 카드 폭·간격은 iOS CardMetrics(160/390, 10).
+  const railW = Math.round((width * 160) / 390);
+  // 사진 복원·말로 고치기는 위 카드에 있으니 추천에서 뺀다(오너 2026-10-10, iOS 와 같다)
+  const featured = useMemo(() => (home?.featured ?? []).filter((c) => !isRestoreConcept(c) && !isRetouch(c)), [home]);
+  const newest = home?.newest ?? [];
 
   return (
     <View style={styles.root}>
@@ -62,12 +70,20 @@ export default function HomeTab() {
         {loading && !concepts.length ? (
           <View style={styles.center}><Spinner size={28} color={color.accent} /></View>
         ) : (
-          <View style={styles.albums}>
-            {tiles.map((t, i) => {
-              const tile = <AlbumGridTile key={t.name} tile={t} width={tileW} fav={isFavoriteCategory(t.name)} />;
-              return i === 0 ? <CoachAnchor key={t.name} id="albums">{tile}</CoachAnchor> : tile;
-            })}
-          </View>
+          <>
+            {/* 예전 리미키미 홈처럼 추천·새로 나왔어요, 그 아래 컨셉화보(앨범)가 쭉 — 4번째 목적 칸을 드레스룸으로 바꾸면서 */}
+            <View style={styles.rails}>
+              <ConceptRail title={copy.home.featured} items={featured} cardWidth={railW} gap={10} />
+              <ConceptRail title={copy.home.newest} items={newest} cardWidth={railW} gap={10} isNew />
+            </View>
+            <Text size="headline" style={styles.sectionTitle} accessibilityRole="header">{c21.purposeConcept}</Text>
+            <View style={styles.albums}>
+              {tiles.map((t, i) => {
+                const tile = <AlbumGridTile key={t.name} tile={t} width={tileW} fav={isFavoriteCategory(t.name)} />;
+                return i === 0 ? <CoachAnchor key={t.name} id="albums">{tile}</CoachAnchor> : tile;
+              })}
+            </View>
+          </>
         )}
       </ScrollView>
       <CartBar compactOnHome hasTabBar />
@@ -199,6 +215,8 @@ const styles = themedStyles(() => StyleSheet.create({
     backgroundColor: color.card, borderRadius: radius.card, borderWidth: 1, borderColor: color.line,
   },
   purposeEmpty: { width: 38, height: 48, borderRadius: 8, backgroundColor: color.mat },
+  rails: { gap: space.s4 },
+  sectionTitle: { paddingHorizontal: space.screen, marginTop: space.s1 },
   albums: { flexDirection: "row", flexWrap: "wrap", columnGap: space.s2, rowGap: space.s4, paddingHorizontal: space.screen },
   favBadge: { position: "absolute", top: space.s2, right: space.s2 },
   center: { paddingVertical: space.s7, alignItems: "center" },

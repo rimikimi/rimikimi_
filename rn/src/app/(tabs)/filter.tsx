@@ -13,7 +13,7 @@ import { Text } from "@/ui/Text";
 import { Button } from "@/ui/Button";
 import { CoachAnchor, CoachHost } from "@/ui/Coach";
 import { IconCameraFlip, IconFlash, IconImage } from "@/ui/icons";
-import { IconFilm, IconMirror, IconPhone, IconStarFill, IconSun } from "@/ui/icons21";
+import { IconFilm, IconLock, IconMirror, IconPhone, IconStarFill, IconSun } from "@/ui/icons21";
 import { LiveCameraView, detectFaces, type LiveCameraHandle, type LiveReady } from "@/ui/LiveCamera";
 import { Coach, useApp21 } from "@/lib/app21";
 import { c21 } from "@/lib/copy21";
@@ -21,6 +21,7 @@ import { isKo } from "@/lib/locale";
 import { pickPhotos } from "@/lib/photo";
 import { saveFileToAlbum } from "@/lib/nativeMedia";
 import { setEditorPayload } from "@/lib/editorPayload";
+import { isPaidFilter, startFilterTrialIfNeeded, useFilterAccess } from "@/lib/iap";
 import { presetByKey } from "@/filters";
 import { chrome, space } from "@/theme/tokens";
 
@@ -33,6 +34,8 @@ import { chrome, space } from "@/theme/tokens";
 //    7초면 사라진다. 길게 누르기 = AE/AF 잠금. 두 손가락 = 줌 + 렌즈 버튼(있는 것만). 플래시. 전면 좌우반전(기본 켬, 기억).
 //  · 촬영은 연속(최대 10장) → "완료 n" = 전부 앨범에 저장하고 고른 필터로 편집기에(색감 = 0.7×슬라이더).
 //    로그인 없이 쓴다.
+//  · 필터 이용권(scratchpad filterpass_spec.md, 원격 스위치 filterPass.enabled): 잠겨 있으면 원본 말고 모든 칩에
+//    작은 자물쇠. 미리보기·찍기는 막지 않는다 — 막는 곳은 편집기 저장·공유뿐. 원본 아닌 필터를 처음 고르면 3일 무료 시작.
 // ============================================================================
 
 const MAX_SHOTS = 10;
@@ -78,7 +81,13 @@ export default function CameraFilterTab() {
   }, [focused, perm, requestPerm]);
   useEffect(() => { if (focused) enqueueCoach(Coach.filter()); }, [focused, enqueueCoach]);
 
-  const [selected, setSelected] = useState("none");
+  const [selected, setSelectedState] = useState("none");
+  const access = useFilterAccess();
+  const lockPaid = access.enabled && !access.unlocked;
+  const setSelected = useCallback((k: string) => {
+    setSelectedState(k);
+    if (isPaidFilter(k)) void startFilterTrialIfNeeded();
+  }, []);
   const [favs, setFavs] = useState<string[]>([]);
   const [fxAmount, setFxAmount] = useState(1);
   const [facing, setFacing] = useState<"back" | "front">("back");
@@ -342,13 +351,13 @@ export default function CameraFilterTab() {
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.stripScroll} contentContainerStyle={styles.strip}>
             <Chip k="none" label={c21.original} on={selected === "none"} onPress={setSelected} onLong={toggleFav} />
             {/* 인플(뷰티) — 원본 바로 다음(iOS 4e81f98) */}
-            <Chip k="infl" label={filterName("infl")} on={selected === "infl"} onPress={setSelected} onLong={toggleFav} />
+            <Chip k="infl" label={filterName("infl")} on={selected === "infl"} onPress={setSelected} onLong={toggleFav} locked={lockPaid} />
             {favs.length ? <View style={styles.groupMark}><IconStarFill size={16} color="#F5C518" /></View> : null}
-            {favs.map((k) => <Chip key={`f_${k}`} k={k} label={filterName(k)} on={selected === k} onPress={setSelected} onLong={toggleFav} />)}
+            {favs.map((k) => <Chip key={`f_${k}`} k={k} label={filterName(k)} on={selected === k} onPress={setSelected} onLong={toggleFav} locked={lockPaid} />)}
             <View style={styles.groupMark}><IconPhone size={16} color="rgba(255,255,255,0.7)" /></View>
-            {PHONE.map((k) => <Chip key={k} k={k} label={filterName(k)} on={selected === k} onPress={setSelected} onLong={toggleFav} />)}
+            {PHONE.map((k) => <Chip key={k} k={k} label={filterName(k)} on={selected === k} onPress={setSelected} onLong={toggleFav} locked={lockPaid} />)}
             <View style={styles.groupMark}><IconFilm size={16} color="rgba(255,255,255,0.7)" /></View>
-            {ANALOG.map((k) => <Chip key={k} k={k} label={filterName(k)} on={selected === k} onPress={setSelected} onLong={toggleFav} />)}
+            {ANALOG.map((k) => <Chip key={k} k={k} label={filterName(k)} on={selected === k} onPress={setSelected} onLong={toggleFav} locked={lockPaid} />)}
           </ScrollView>
         </CoachAnchor>
         <View style={styles.controls}>
@@ -385,16 +394,18 @@ export default function CameraFilterTab() {
   );
 }
 
-function Chip({ k, label, on, onPress, onLong }: { k: string; label: string; on: boolean; onPress: (k: string) => void; onLong: (k: string) => void }) {
+function Chip({ k, label, on, onPress, onLong, locked }: { k: string; label: string; on: boolean; onPress: (k: string) => void; onLong: (k: string) => void; locked?: boolean }) {
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ selected: on }}
+      accessibilityHint={locked ? c21.fpLocked : undefined}
       onPress={() => { onPress(k); Haptics.selectionAsync().catch(() => {}); }}
       onLongPress={() => onLong(k)}
       delayLongPress={400}
       style={[styles.chip, on && styles.chipOn]}
     >
+      {locked ? <IconLock size={11} color={on ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.75)"} /> : null}
       <Text size="footnote" weight="bold" style={{ color: on ? "#000000" : "#FFFFFF" }}>{label}</Text>
     </Pressable>
   );
@@ -459,7 +470,7 @@ const styles = StyleSheet.create({
   stripScroll: { flexGrow: 0, height: 40, alignSelf: "stretch" },
   strip: { paddingHorizontal: space.screen, gap: space.s2, alignItems: "center" },
   groupMark: { paddingHorizontal: 2 },
-  chip: { height: 32, paddingHorizontal: 12, borderRadius: 16, backgroundColor: "rgba(255,255,255,0.14)", alignItems: "center", justifyContent: "center" },
+  chip: { height: 32, paddingHorizontal: 12, borderRadius: 16, backgroundColor: "rgba(255,255,255,0.14)", flexDirection: "row", gap: 4, alignItems: "center", justifyContent: "center" },
   chipOn: { backgroundColor: "#FFFFFF" },
   controls: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", alignSelf: "stretch", paddingHorizontal: space.s5 },
   side: { width: 64, alignItems: "center", gap: 4 },
