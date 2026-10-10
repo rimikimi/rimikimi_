@@ -14,6 +14,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import CameraStudio from "./CameraStudio";
 import PhotoEditor from "./PhotoEditor";
 import { isRimikimiWebView, nativeSaveToAlbum, nativeShareImage, nativeClose } from "./nativeBridge";
+import { initFilterAccess } from "./filterAccess";
 
 function useToolParams() {
   const [p] = useState(() => {
@@ -200,5 +201,7 @@ export default function ToolEntry() {
   const strength = typeof init.strength === "number" ? Math.max(0, Math.min(1.4, init.strength)) : 0.7;
   // 인플(뷰티) — 앱이 Vision 으로 찾은 사진별 얼굴 사각형(없으면 null → 편집기가 피부색으로 추정)
   const faces = Array.isArray(init.faces) ? init.faces : null;
+  // 필터 이용권 상태(앱이 준 값, 없으면 구버전 앱 → 잠그지 않음)
+  initFilterAccess(init);
   return <FilterTool mode={mode} presetKey={presetKey} fxAmt={fxAmt} strength={strength} initSrc={init.src} initSrcs={init.srcs} initFaces={faces} />;
 }

@@ -63,6 +63,18 @@ export function nativeClose() {
   try { window.webkit.messageHandlers.rimikimi.postMessage({ type: "close" }); } catch (_) {}
 }
 
+/* ---------- 필터 이용권 (2026-10-10, scratchpad filterpass_spec.md) ---------- */
+/** 유료 필터를 처음 적용했다고 알림 — 네이티브가 3일 무료 이용을 시작한다(이미 시작했으면 무시). */
+export function nativeFilterUsed() {
+  if (!isRimikimiWebView()) return;
+  try { window.webkit.messageHandlers.rimikimi.postMessage({ type: "filterUsed" }); } catch (_) {}
+}
+/** 잠긴 상태에서 유료 필터로 저장·공유하려 할 때 네이티브 결제 시트를 연다. 결과는 window.__rimikimiFilterAccess 로 온다. */
+export function nativeOpenPaywall() {
+  if (!isRimikimiWebView()) return;
+  try { window.webkit.messageHandlers.rimikimi.postMessage({ type: "paywall" }); } catch (_) {}
+}
+
 /** 구매/생성 등으로 크레딧이 바뀌었을 수 있을 때 `/api/quota` 재조회 요청. */
 export function nativeRefreshCredits() {
   if (!isRimikimiWebView()) return Promise.resolve({ ok: false });

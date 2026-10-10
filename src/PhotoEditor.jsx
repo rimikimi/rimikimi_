@@ -16,7 +16,8 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { FILM_PRESETS, presetByKey, applyLook, applyLookWithStrength, applyGeometry, autoStraighten } from "./filters";
-import { isNative, nativeSaveToAlbum } from "./nativeBridge";
+import { isNative, nativeSaveToAlbum, nativeOpenPaywall } from "./nativeBridge";
+import { useFilterAccess, isLocked, isPaidPreset, markFilterUsed, trialDaysLeft } from "./filterAccess";
 import { shareImage } from "./share";
 import { t, getLang } from "./i18n";
 import { supabase } from "./supabaseClient";
@@ -297,6 +298,9 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
   // 인스타 스토리식 문구 입력 — 사진 위에서 바로 친다. null 이면 닫힘.
   const [composing, setComposing] = useState(null);   // null | {} | 기존 겹
   const [busy, setBusy] = useState(null); // "save" | "share" | null
+  const access = useFilterAccess();
+  const passLocked = isLocked(access);
+  const [passPrompt, setPassPrompt] = useState(false); // 웹 단독: "앱에서 이용권" 안내
   const [saveProg, setSaveProg] = useState(""); // 배치 저장 진행 "3/10"
   const [toast, setToast] = useState("");
   const toastTimer = useRef(null);
@@ -930,8 +934,19 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
   }
 
   // 저장 — 1장이면 그 장, 여러 장이면 전부(같은 룩, 사진별 스티커) 순차 저장
+  // 필터 이용권 — 잠긴 상태에서 유료 필터가 적용된 사진을 저장·공유하려 하면 결제 시트(앱) / 앱 안내(웹)
+  function needsPass(indices) {
+    if (!isLocked(access)) return false;
+    return indices.some((i) => isPaidPreset(lookOf(i).presetKey));
+  }
+  function openPass() {
+    hap.warn();
+    if (isNative()) { nativeOpenPaywall(); return; }
+    setPassPrompt(true);
+  }
   async function handleSave() {
     if (busy) return;
+    if (needsPass(sources.map((_, i) => i))) { openPass(); return; }
     setBusy("save");
     try {
       await new Promise((r) => setTimeout(r, 30)); // busy 표시가 먼저 그려지게
@@ -959,6 +974,7 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
   // 공유는 지금 보고 있는 사진 1장만 — 10장짜리 공유 시트는 대부분의 앱이 버벅인다
   async function handleShare() {
     if (busy) return;
+    if (needsPass([idx])) { openPass(); return; }
     setBusy("share");
     try {
       await new Promise((r) => setTimeout(r, 30));
@@ -1010,6 +1026,16 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
         />
       )}
       {toast && <div style={ES.toast} className="pe-toast" onClick={() => setToast("")}>{toast}</div>}
+      {passPrompt && (
+        <div style={ES.passBack} onClick={() => setPassPrompt(false)}>
+          <div style={ES.passCard} onClick={(e) => e.stopPropagation()}>
+            <div style={{ fontSize: 17, fontWeight: 800 }}>{getLang() === "ko" ? "이 필터는 이용권이 필요해요" : "This filter needs a Filter Pass"}</div>
+            <div style={{ fontSize: 14, opacity: 0.75, lineHeight: 1.5 }}>{getLang() === "ko" ? "리미키미 앱에서 이용권으로 모든 필터를 계속 쓸 수 있어요. 원본은 언제나 무료예요." : "Keep using every filter with a Filter Pass in the rimikimi app. Original is always free."}</div>
+            <a href="/download" style={ES.passBtn}>{getLang() === "ko" ? "앱 받기" : "Get the app"}</a>
+            <button type="button" style={ES.passClose} onClick={() => setPassPrompt(false)}>{getLang() === "ko" ? "닫기" : "Close"}</button>
+          </div>
+        </div>
+      )}
 
       {/* 휴지통 — 겹을 끌면 나타나고, 그 위에서 손을 떼면 지워진다(인스타와 같은 삭제).
           state 를 쓰지 않는다: 드래그 중 리렌더를 막으려고 ref 로 style 만 만진다. */}
@@ -1201,6 +1227,9 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
                 </button>
               )}
             </div>
+            {trialDaysLeft(access) > 0 && (isNative() ? access.known : true) && passLocked === false && access.trialEndsAt && !access.unlocked && (
+              <div style={ES.passNote}>{getLang() === "ko" ? `필터 무료 이용 ${trialDaysLeft(access)}일 남음` : `${trialDaysLeft(access)} days of free filters left`}</div>
+            )}
             <div style={ES.chipScroll}>
               {FILM_PRESETS.filter((p) => p.key === "none" || p.group === chipGroup).map((p) => (
                 // key 에 ready 를 넣는 이유: 사진 전환 시 디코드가 끝난 "뒤"에 캔버스를
@@ -1212,12 +1241,14 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
                     hap.tap();
                     // 프리셋 기본 효과까지 원탭 적용, 색감은 기본값(0.7 = 표준 룩)·효과는 1(프리셋 그대로)로 리셋
                     updateLook({ presetKey: p.key, fx: fxOf(p), strength: 0.7, fxAmt: 1 });
+                    markFilterUsed(p.key);
                   }}
                 >
                   <canvas
                     ref={(el) => thumbCanvasCb(el, p.key)}
                     style={{ ...ES.filterThumb, ...(presetKey === p.key ? ES.filterThumbOn : null) }}
                   />
+                  {passLocked && isPaidPreset(p.key) && <span style={ES.lockBadge} aria-hidden="true">🔒</span>}
                   <span style={{ ...ES.filterName, ...(presetKey === p.key ? ES.filterNameOn : null) }}>
                     {getLang() === "ko" ? p.ko : p.en}
                   </span>
@@ -1612,7 +1643,7 @@ const ES = {
   },
   filterChip: {
     flex: "0 0 auto", display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
-    border: "none", background: "transparent", padding: 0, cursor: "pointer",
+    border: "none", background: "transparent", padding: 0, cursor: "pointer", position: "relative",
   },
   filterChipOn: {},
   filterThumb: {
@@ -1620,6 +1651,12 @@ const ES = {
     boxShadow: "0 0 0 1px rgba(255,255,255,.08)",
   },
   filterThumbOn: { boxShadow: "0 0 0 2px #fff" },
+  lockBadge: { position: "absolute", top: 4, right: 4, fontSize: 11, lineHeight: 1, padding: "3px 4px", borderRadius: 8, background: "rgba(0,0,0,.55)", pointerEvents: "none" },
+  passNote: { fontSize: 12, color: "rgba(255,255,255,.62)", padding: "2px 16px 6px" },
+  passBack: { position: "fixed", inset: 0, background: "rgba(0,0,0,.55)", display: "grid", placeItems: "center", zIndex: 50, padding: 24 },
+  passCard: { width: "100%", maxWidth: 360, background: "#1b1815", color: "#fff", borderRadius: 20, padding: "22px 20px", display: "flex", flexDirection: "column", gap: 12 },
+  passBtn: { display: "block", textAlign: "center", padding: "13px 0", borderRadius: 14, background: "#fff", color: "#191512", fontWeight: 800, textDecoration: "none" },
+  passClose: { border: 0, background: "transparent", color: "rgba(255,255,255,.7)", fontSize: 14, padding: 6, cursor: "pointer" },
   filterName: { fontSize: 10.5, fontWeight: 700, color: "rgba(255,255,255,.55)", whiteSpace: "nowrap" },
   filterNameOn: { color: "#fff" },
   strengthRow: { padding: "8px 18px 0" },

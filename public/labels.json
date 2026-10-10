@@ -58,5 +58,8 @@
  "purpose.dressroom": {
   "ko": "드레스룸",
   "en": "Dressing room"
+ },
+ "filterPass": {
+  "enabled": "false"
  }
 }
