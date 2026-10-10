@@ -25,7 +25,10 @@ import { perUnitKrw, perUnitUsd, packDiscountPercent } from "./packPricing";
 import { loadProfileRefs, getProfileMeta } from "./faceProfile";
 import FaceProfileSheet, { FaceProfileCard } from "./FaceProfileSheet";
 import * as hap from "./haptics";
-import { useIsDesktop, useDkTheme, DesktopNav, DesktopHome, DesktopPanel, DesktopFooter, DK, DK_CSS } from "./DesktopShell";
+import { useIsDesktop, useDkTheme, DesktopNav, DesktopPanel, DesktopFooter, DK, DK_CSS } from "./DesktopShell";
+import {
+  useDkData, MakeHome, PurposePage, CartBar, StudioStepPanel, MyJobs, MyAlbumsGrid, groupAlbums, CART_MAX, DK_MAKE_CSS,
+} from "./DesktopMake";
 
 // ── 퍼널 계측: signup 은 로그인 이벤트만으로 구분 불가(OAuth 도 최초 1회는 SIGNED_IN) —
 // user.created_at 과 last_sign_in_at 이 아주 가까우면(첫 로그인) signup 으로 판정한다.
@@ -614,6 +617,19 @@ async function generateImage(accessToken, dataUrl, promptText, conceptMeta = {})
     base64_2 = m2[2];
   }
 
+  // 브루클린 룩(이력서·프로필): 옷 사진은 의상 디테일만 필요해 896px (앱 RimikimiAPI.generate 와 같다)
+  let outfit = null;
+  if (conceptMeta.studio && conceptMeta.outfit) {
+    let u;
+    try { u = await shrinkImage(conceptMeta.outfit, 896, 0.85); } catch (_) { u = conceptMeta.outfit; }
+    const om = u.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
+    if (om) outfit = { outfitMime: om[1], outfitBase64: om[2] };
+  }
+  // 리미키미 컨셉만 conceptId 를 보낸다. 브루클린 룩·조세핀 드레스는 서버 카탈로그 id 로(지시문은 서버가 만든다).
+  const target = conceptMeta.studio ? { studio: conceptMeta.studio, ...(outfit || {}) }
+    : conceptMeta.wedding ? { wedding: conceptMeta.wedding }
+    : { conceptId: conceptMeta.id };
+
   let res;
   try {
     res = await fetch("/api/generate", {
@@ -624,9 +640,9 @@ async function generateImage(accessToken, dataUrl, promptText, conceptMeta = {})
       },
       body: JSON.stringify({
         mimeType, base64, prompt: promptText,
-        // 커플: 두 번째 참조 사진 (없으면 필드 자체를 안 보냄)
-        ...(base64_2 ? { mimeType2, base64_2, couple: true } : {}),
-        conceptId: conceptMeta.id, conceptTitle: conceptMeta.title,
+        // 커플: 두 번째 참조 사진 (없으면 필드 자체를 안 보냄). 조세핀 드레스의 신랑 사진은 couple 표시 없이 두 번째 사진으로만.
+        ...(base64_2 ? { mimeType2, base64_2, ...(conceptMeta.wedding ? {} : { couple: true }) } : {}),
+        ...target, conceptTitle: conceptMeta.title,
         skipFacePrecheck: !!conceptMeta.skipFacePrecheck,
         // 증명사진: 선택한 정장/배경 (서버가 프롬프트 조립)
         idSuit: conceptMeta.idSuit, idBg: conceptMeta.idBg, idBgName: conceptMeta.idBgName,
@@ -1566,6 +1582,110 @@ export default function PortraitStudio() {
   const canGenerate = !blocked && (unlimited || canGenerateFree || credits > 0);
   // 무료 사용자(관리자·유료크레딧 보유자 제외)에게만 광고 노출
   const showAds = quotaLoaded && !unlimited && credits === 0;
+
+  // ── PC 웹 "만들기"(앱 2026-10-09 개편과 같은 구조 — DesktopMake.jsx) ──
+  // dkView: 홈 | 목적 화면 | 앨범. screen 은 그대로 "gallery" 이고 그 안에서 바뀐다(옵션·결과 화면에서 돌아오면 보던 곳으로).
+  const [dkView, setDkView] = useState({ kind: "home" });
+  const dkData = useDkData();
+  // 여러 장 담기(최대 8, 앱 AppState.cart). 로그인 왕복(OAuth 리다이렉트)에도 남도록 sessionStorage 에 둔다.
+  // 옷 사진·신랑 사진(studio)은 크고 일회성이라 저장하지 않는다 — 리다이렉트 뒤엔 다시 골라야 한다.
+  const DK_CART_KEY = "rimikimi_dk_cart";
+  const [cart, setCart] = useState(() => {
+    try { const v = JSON.parse(sessionStorage.getItem(DK_CART_KEY) || "[]"); return Array.isArray(v) ? v.slice(0, CART_MAX) : []; } catch (_) { return []; }
+  });
+  useEffect(() => { try { sessionStorage.setItem(DK_CART_KEY, JSON.stringify(cart)); } catch (_) {} }, [cart]);
+  // 탭(목적)마다 따로 기억하는 옵션 — 그 탭에서 담은 룩에만 적용(앱 StudioStore). filter = 웨딩 드레스 거르기.
+  const [studio, setStudio] = useState({ overrides: {}, outfit: {}, groom: null, filter: {} });
+  const [showStudioStep, setShowStudioStep] = useState(false);
+  const [cartJobs, setCartJobs] = useState([]); // 내 사진 진행 카드 {id, item, status, error}
+  const [galleryTick, setGalleryTick] = useState(0);
+  // 담은 걸 만들려다 사진을 여기서 새로 골랐으면 옵션 화면과 같은 동의 체크를 받는다
+  const [cartPickedPhoto, setCartPickedPhoto] = useState(false);
+  const [cartConsent, setCartConsent] = useState(false);
+  const isBatchable = useCallback((c) => !isCoupleConcept(c) && !isDressroom(c) && !isFourcut(c)
+    && !(isArtConcept(c) && !isDressroom(c)) && !isRetouchConcept(c), []);
+  function flash(msg, ms = 3000) { setPayToast(msg); setTimeout(() => setPayToast(""), ms); }
+  function toggleCart(it) {
+    const i = cart.findIndex((c) => String(c.id) === String(it.id));
+    if (i >= 0) { hap.tap(); setCart(cart.filter((_, k) => k !== i)); return; }
+    if (cart.length >= CART_MAX) {
+      flash(getLang() === "en" ? `You can pick up to ${CART_MAX} at once` : `한 번에 ${CART_MAX}장까지 고를 수 있어요`, 2400);
+      return;
+    }
+    hap.tap();
+    // 컨셉은 판정·제목에 필요한 것만(sessionStorage 용량)
+    const slim = it.studioPreset || it.dressCode ? it
+      : { id: it.id, title: it.title, title_en: it.title_en, categories: it.categories, category: it.category, mode: it.mode };
+    setCart([...cart, slim]);
+  }
+  // "N장 만들기" — 앱 AppState.generateCart 와 같은 순서:
+  //   (1) 전문 프로필 룩이 있으면 세부 조정·옷 바꾸기 단계 → (2) 내 사진 → (3) 로그인 → (4) 크레딧
+  function generateCart(optionsDone = false) {
+    if (!cart.length) return;
+    if (!optionsDone && cart.some((c) => c.studioPurpose)) { setShowStudioStep(true); return; }
+    setShowStudioStep(false);
+    if (!photo) {
+      setCartPickedPhoto(true);
+      setCartConsent(false);
+      flash(t("home.needPhoto"), 2600);
+      pickPhoto("profile");
+      return;
+    }
+    if (cartPickedPhoto && !cartConsent) { flash(t("opt.needConsent"), 2600); return; }
+    if (!session) { setShowLoginSheet(true); return; }
+    // 여러 장은 크레딧 전용(서버 묶음 규칙·앱과 같다) — 장수만큼 있어야 한다. 1장은 무료 한도도 된다.
+    const enough = unlimited || (cart.length > 1 ? (!blocked && credits >= cart.length) : canGenerate);
+    if (!enough) {
+      if (PAYMENTS_ENABLED) openStore();
+      else flash("오늘 무료 횟수를 다 썼어요. 친구를 초대하면 크레딧을 받을 수 있어요 🙂", 3500);
+      return;
+    }
+    runCart(cart);
+  }
+  async function runCart(items) {
+    const token = session?.access_token;
+    const base = Date.now();
+    const jobs = items.map((it, i) => ({ id: `cj_${base}_${i}`, item: it, status: "running", error: null }));
+    setCartJobs((cur) => [...jobs, ...cur]);
+    const snap = studio; // 지금 고른 옵션으로 고정(진행 중에 바꿔도 이번 요청엔 안 섞인다)
+    setCart([]);
+    setCartPickedPhoto(false);
+    setNavDir("fwd");
+    setScreen("mygallery");
+    hap.bump();
+    const setJob = (id, patch) => setCartJobs((cur) => cur.map((j) => (j.id === id ? { ...j, ...patch } : j)));
+    // 동시에 다 던지면 서버(Vertex) 분당 한도에 걸린다 — 0.7초씩 띄워 보낸다(앱과 같다).
+    await Promise.all(jobs.map(async (job, i) => {
+      await new Promise((r) => setTimeout(r, i * 700));
+      const it = job.item;
+      const meta = { title: it.title, count: 1 };
+      if (it.studioPreset) {
+        meta.studio = { purpose: it.studioPurpose, presetId: it.studioPreset, overrides: snap.overrides?.[it.studioPurpose] || {} };
+        if (snap.outfit?.[it.studioPurpose]) meta.outfit = snap.outfit[it.studioPurpose];
+      } else if (it.dressCode) {
+        meta.wedding = { dressCode: it.dressCode };
+        if (snap.groom) meta.photo2 = snap.groom;
+      } else {
+        meta.id = it.id;
+      }
+      try {
+        const r = await generateImage(token, photo, it.studioPreset || it.dressCode ? "" : (it.text || ""), meta);
+        setJob(job.id, { status: "done" });
+        if (typeof r.unlimited === "boolean") setUnlimited(r.unlimited);
+        if (typeof r.quotaUsed === "number") setFreeUsed(r.quotaUsed);
+        track("generate", { engine: r.engine || null, concept: meta.id ?? it.id, cart: items.length });
+      } catch (err) {
+        setJob(job.id, { status: "failed", error: err?.message || "이미지 생성에 실패했어요." });
+      } finally {
+        setGalleryTick((n) => n + 1);
+        setRefreshTick((n) => n + 1);
+      }
+    }));
+    noteGeneration();
+  }
+  // 웹 개발 서버 전용 — 로그인 없이 내 사진 앨범을 보려고(?devFakeGallery=1). 빌드에선 import.meta.env.DEV 가 false 라 통째로 빠진다.
+  const conceptById = useMemo(() => new Map(concepts.map((c) => [String(c.id), c])), [concepts]);
+  const devFakeGallery = import.meta.env.DEV && typeof location !== "undefined" && /[?&]devFakeGallery=1/.test(location.search);
 
   // 어느 사진 슬롯에 저장할지를 ref 로 결정 (handleFile 이 한 input 을 공유하기 때문)
   const photoTargetRef = useRef("profile"); // "profile" | "art"
@@ -2659,7 +2779,7 @@ export default function PortraitStudio() {
       onTouchCancel={endDrag}
     >
       <style>{CSS}</style>
-      {isDesk && <style>{DK_CSS}</style>}
+      {isDesk && <style>{DK_CSS + DK_MAKE_CSS}</style>}
 
       {/* 사진 업로드 input — 어느 화면에서든 fileRef.current?.click() 으로 호출 가능 */}
       <input
@@ -2715,19 +2835,18 @@ export default function PortraitStudio() {
           Logo={Logo}
           theme={dkTheme}
           onTheme={toggleDkTheme}
-          active={screen === "mygallery" ? "mine" : screen !== "gallery" ? null
-            : activeCat === t("filter.cat") ? "filter" : activeCat === "🪄 매직 부스" ? "booth" : activeCat === "📸 인생네컷" ? "fourcut" : "concepts"}
-          onNav={(k, top) => {
-            if (k === "mine") { if (session) setScreen("mygallery"); else setShowLoginSheet(true); return; }
-            setActiveCat(k === "booth" ? "🪄 매직 부스" : k === "fourcut" ? "📸 인생네컷" : k === "filter" ? t("filter.cat") : "전체");
-            if (k === "concepts" && top) setQuery("");
+          active={screen === "mygallery" ? "mine" : screen !== "gallery" ? null : activeCat === t("filter.cat") ? "camera" : "make"}
+          onNav={(k) => {
+            // 앱 탭과 같은 3개: 만들기(홈·목적·앨범) / 카메라·필터(기존 필터 화면 그대로) / 내 사진
+            if (k === "mine") { if (session || devFakeGallery) setScreen("mygallery"); else setShowLoginSheet(true); return; }
+            setActiveCat(k === "camera" ? t("filter.cat") : "전체");
+            setQuery("");
+            if (k === "make") setDkView({ kind: "home" });
             popTo("gallery");
             if (mainRef.current) mainRef.current.scrollTop = 0;
           }}
-          query={query}
-          setQuery={setQuery}
-          chipLabel={quotaLoaded ? (unlimited ? "∞" : blocked ? t("header.blocked") : `🎟️ ${credits}`) : null}
-          onChip={PAYMENTS_ENABLED ? openStore : shareInvite}
+          chipLabel={!session ? t("profile.guest.cta") : quotaLoaded ? (unlimited ? "∞" : blocked ? t("header.blocked") : `🎟️ ${credits}`) : null}
+          onChip={!session ? () => setShowLoginSheet(true) : PAYMENTS_ENABLED ? openStore : shareInvite}
           photo={photo}
           onProfile={() => setScreen("profile")}
         />
@@ -2771,19 +2890,36 @@ export default function PortraitStudio() {
         })()}
         {isDesk && screen === "gallery" && activeCat !== t("filter.cat") && (
           <>
-            <DesktopHome
-              pool={visiblePool}
-              categories={categories}
-              activeCat={activeCat}
-              setActiveCat={(c) => { setActiveCat(c); const el = document.getElementById("dk-browse"); if (el && mainRef.current) mainRef.current.scrollTop = Math.max(0, el.offsetTop - 90); }}
-              query={query}
-              list={filtered.slice(0, visibleCount)}
-              total={filtered.length}
-              visibleCount={visibleCount}
-              onShowMore={() => setVisibleCount((c) => c + PAGE_SIZE)}
-              onPick={pickPrompt}
-              filterCatName={t("filter.cat")}
-            />
+            {dkView.kind === "home" ? (
+              <MakeHome
+                pool={visiblePool}
+                labels={dkData.labels}
+                seasons={dkData.seasons}
+                isFeature={isFeatureConcept}
+                retouch={visiblePool.find(isRetouchConcept)}
+                restore={visiblePool.find((p) => String(p.id) === "408") || visiblePool.find(isRestoreConcept)}
+                onOpenConcept={pickPrompt}
+                onPurpose={(key) => { setDkView({ kind: "purpose", key }); if (mainRef.current) mainRef.current.scrollTop = 0; }}
+                onAlbum={(name) => { setDkView({ kind: "album", name }); if (mainRef.current) mainRef.current.scrollTop = 0; }}
+              />
+            ) : (
+              <PurposePage
+                view={dkView}
+                pool={visiblePool}
+                labels={dkData.labels}
+                seasons={dkData.seasons}
+                catalog={dkData.catalog}
+                dresses={dkData.dresses}
+                isFeature={isFeatureConcept}
+                isBatchable={isBatchable}
+                cart={cart}
+                onToggle={toggleCart}
+                onOpenConcept={pickPrompt}
+                studio={studio}
+                setStudio={setStudio}
+                onBack={() => { setDkView({ kind: "home" }); if (mainRef.current) mainRef.current.scrollTop = 0; }}
+              />
+            )}
             <DesktopFooter isKorea={IS_KOREA} />
           </>
         )}
@@ -2873,7 +3009,43 @@ export default function PortraitStudio() {
             onLoginRequest={() => setShowLoginSheet(true)}
           />
         )}
-        {screen === "mygallery" && dkWrap(null,
+        {isDesk && screen === "gallery" && activeCat !== t("filter.cat") && (
+          <CartBar
+            cart={cart}
+            onRemove={(i) => setCart((cur) => cur.filter((_, k) => k !== i))}
+            onMake={() => generateCart(false)}
+            consentNeeded={cartPickedPhoto && !!photo}
+            consent={cartConsent}
+            setConsent={setCartConsent}
+            consentText={t("step2.consent")}
+          />
+        )}
+        {isDesk && showStudioStep && (
+          <StudioStepPanel
+            cart={cart}
+            labels={dkData.labels}
+            catalog={dkData.catalog}
+            studio={studio}
+            setStudio={setStudio}
+            onClose={() => setShowStudioStep(false)}
+            onMake={() => generateCart(true)}
+          />
+        )}
+        {screen === "mygallery" && isDesk && (
+          <MyGalleryScreen
+            desk
+            accessToken={session?.access_token}
+            devFake={devFakeGallery ? visiblePool : null}
+            conceptById={conceptById}
+            jobs={cartJobs}
+            onDismissJob={(id) => setCartJobs((cur) => cur.filter((j) => j.id !== id))}
+            reloadTick={galleryTick}
+            onBack={() => { setDkView({ kind: "home" }); popTo("gallery"); }}
+            onShared={() => setRefreshTick((n) => n + 1)}
+            onLoginRequest={() => setShowLoginSheet(true)}
+          />
+        )}
+        {screen === "mygallery" && !isDesk && dkWrap(null,
           <MyGalleryScreen
             accessToken={session?.access_token}
             onBack={() => popTo("gallery")} // 빈 상태 "컨셉 선택하러 가기"(2.0: 뒤로 버튼 없음 — 탭 화면)
@@ -3576,7 +3748,11 @@ function LangSelector() {
 /* ============================================================
    내 갤러리 (24시간 보관)
    ============================================================ */
-function MyGalleryScreen({ accessToken, onBack, onShared, onLoginRequest }) {
+function MyGalleryScreen({
+  accessToken, onBack, onShared, onLoginRequest,
+  // PC 웹(앱 MyPhotosView): 컨셉별 앨범 · 진행 카드 · 담은 것 완성 때마다 다시 불러오기. devFake = 개발 서버 전용 가짜 목록.
+  desk = false, devFake = null, conceptById = null, jobs = null, onDismissJob, reloadTick = 0,
+}) {
   const [items, setItems] = useState(null); // null=로딩, []=빈, [...]=있음
   const [error, setError] = useState(null);
   const [tick, setTick] = useState(0); // 1초마다 남은시간 갱신
@@ -3600,6 +3776,21 @@ function MyGalleryScreen({ accessToken, onBack, onShared, onLoginRequest }) {
 
   // 갤러리 로드
   useEffect(() => {
+    if (import.meta.env.DEV && devFake) {
+      // 개발 서버 전용 — 컨셉 표지로 가짜 결과를 만든다(빌드에선 import.meta.env.DEV=false 라 이 블록이 통째로 빠진다)
+      const now = Date.now();
+      const pick = devFake.filter((c) => !c.mode).slice(0, 7);
+      const fake = [];
+      pick.forEach((c, i) => {
+        for (let k = 0; k < (i % 3) + 1; k++) fake.push({
+          id: 900000 + i * 10 + k, conceptId: c.id, conceptTitle: c.title, url: `/large/${c.id}.webp`,
+          createdAt: new Date(now - (i * 3 + k) * 3600e3).toISOString(), expiresAt: new Date(now + (20 - i) * 3600e3).toISOString(),
+        });
+      });
+      fake.push({ id: 990001, conceptId: 0, conceptTitle: "네이비 정장", url: "https://picbox.rimikimi.com/thumbs/p_id_navy.webp", createdAt: new Date(now - 30 * 60e3).toISOString(), expiresAt: new Date(now + 23 * 3600e3).toISOString() });
+      setItems(fake);
+      return;
+    }
     if (!accessToken) return;
     let cancelled = false;
     fetch("/api/gallery", {
@@ -3618,7 +3809,7 @@ function MyGalleryScreen({ accessToken, onBack, onShared, onLoginRequest }) {
         if (!cancelled) setError(e?.message || "네트워크 오류");
       });
     return () => { cancelled = true; };
-  }, [accessToken]);
+  }, [accessToken, reloadTick, devFake]);
 
   // "저장" — 공유 시트 없이 바로 사진첩에 저장(네이티브) / 앵커 다운로드(웹).
   // 성공 시에만 저장 표시 + 만료 알림 취소.
@@ -3729,6 +3920,93 @@ function MyGalleryScreen({ accessToken, onBack, onShared, onLoginRequest }) {
   }
   const [viewing, setViewing] = useState(null); // 2.0: 탭하면 크게 보기 + 동작(앱 결과 화면 자리)
   const cur = viewing && (items || []).find((x) => x.id === viewing);
+  const [album, setAlbum] = useState(null); // PC: 연 앨범 key
+  const viewer = cur && (
+    <div style={desk ? { ...O.viewerBack, alignItems: "center" } : O.viewerBack} onClick={() => setViewing(null)}>
+      <div style={desk ? { ...O.viewerCard, borderRadius: 20, maxWidth: 520 } : O.viewerCard} onClick={(e) => e.stopPropagation()}>
+        <div style={O.viewerHead}>
+          <div style={O.viewerTitle}>{(conceptById && cur.conceptId && conceptById.get(String(cur.conceptId)) ? localizedTitle(conceptById.get(String(cur.conceptId))) : cur.conceptTitle) || `컨셉 ${cur.conceptId}`}</div>
+          <button type="button" style={O.inviteX} aria-label={t("common.close")} onClick={() => setViewing(null)}>
+            <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>
+          </button>
+        </div>
+        <div style={O.viewerImgWrap}>
+          {cur.url && <img src={cur.url} alt="" style={{ ...O.thumbImg, objectFit: "contain" }} />}
+        </div>
+        <div style={O.viewerActions}>
+          <button type="button" style={{ ...O.makeBtn, flex: 1, ...(saved.has(cur.id) ? O.makeBtnOff : null) }} onClick={() => handleSave(cur)}>
+            {saved.has(cur.id) ? t("gallery.action.saved") : t("gallery.action.save")}
+          </button>
+        </div>
+        <div style={O.viewerActions}>
+          <button type="button" style={{ ...O.smallBtn, flex: 1, height: 44 }} disabled={!cur.url}
+            onClick={() => { hap.tap(); setEditor({ src: cur.url, filename: `rimikimi_${cur.conceptId || cur.id}` }); }}>{t("edit.btn")}</button>
+          <button type="button" style={{ ...O.smallBtn, flex: 1, height: 44 }} disabled={sharingId === cur.id}
+            onClick={() => handleShare(cur)}>{t("gallery.action.share")}</button>
+          <button type="button" style={{ ...O.smallBtn, flex: 1, height: 44, color: ACCENT }}
+            onClick={() => handleDelete(cur.id)}>{t("gallery.action.delete")}</button>
+        </div>
+      </div>
+    </div>
+  );
+
+  // PC 웹 — 앱 MyPhotosView 와 같다: 진행 카드 → 컨셉별 앨범(표지·이름·N장, 남은 시간 표시 없음) → 앨범 안 3:4 격자
+  if (desk) {
+    const has = !!(accessToken || devFake);
+    const albums = groupAlbums(items || [], conceptById);
+    const open = album && albums.find((a) => a.key === album);
+    const D = { page: { maxWidth: 1440, margin: "0 auto", padding: "32px 56px 120px", fontFamily: FONT, color: DK.tx },
+      h1: { fontSize: 30, fontWeight: 800, letterSpacing: "-0.03em", margin: 0 },
+      row: { display: "flex", alignItems: "center", gap: 14, marginBottom: 22 },
+      back: { width: 40, height: 40, borderRadius: 12, border: `1px solid ${DK.line}`, background: DK.s1, color: DK.tx, cursor: "pointer", display: "grid", placeItems: "center" },
+      empty: { padding: "80px 0", textAlign: "center", color: DK.mu, fontSize: 17, display: "flex", flexDirection: "column", alignItems: "center", gap: 18 },
+      btn: { height: 48, padding: "0 24px", borderRadius: 14, border: 0, background: DK.ac, color: "#fff", fontSize: 16, fontWeight: 800, cursor: "pointer", fontFamily: FONT },
+      grid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))", gap: 8 },
+      tile: { position: "relative", aspectRatio: "3 / 4", borderRadius: 12, overflow: "hidden", background: DK.s1, border: 0, padding: 0, cursor: "zoom-in" },
+      skel: { aspectRatio: "3 / 4", borderRadius: 16, background: DK.s1 } };
+    return (
+      <div style={D.page}>
+        {toast && <div style={S.payToast} onClick={() => setToast("")}>{toast}</div>}
+        <div style={D.row}>
+          {open && (
+            <button type="button" className="dkBtn" style={D.back} onClick={() => setAlbum(null)} aria-label={t("opt.back")}>
+              <svg width="11" height="18" viewBox="0 0 12 20" aria-hidden="true"><path d="M10 2L2 10l8 8" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            </button>
+          )}
+          <h1 style={D.h1}>{open ? open.title : t("mine.title")}</h1>
+        </div>
+        <MyJobs jobs={jobs} onDismiss={onDismissJob} />
+        {!has ? (
+          <div style={D.empty}>
+            <div>{t("gallery.loginRequired")}</div>
+            <button type="button" className="dkBtn" style={D.btn} onClick={onLoginRequest}>{t("profile.guest.cta")}</button>
+          </div>
+        ) : error ? (
+          <div style={D.empty}>{error}</div>
+        ) : items === null ? (
+          <div style={D.grid}>{Array.from({ length: 6 }).map((_, i) => <div key={i} style={D.skel} />)}</div>
+        ) : items.length === 0 ? (
+          <div style={D.empty}>
+            <div>{t("gallery.empty")}</div>
+            <button type="button" className="dkBtn" style={D.btn} onClick={onBack}>{t("gallery.emptyCta")}</button>
+          </div>
+        ) : open ? (
+          <div style={D.grid}>
+            {open.items.map((it) => (
+              <button key={it.id} type="button" className="dkBtn" style={D.tile} onClick={() => setViewing(it.id)} aria-label={open.title}>
+                {it.url && <img src={it.url} alt="" loading="lazy" style={O.thumbImg} />}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <MyAlbumsGrid albums={albums} onOpen={setAlbum} />
+        )}
+        {viewer}
+        {editor && <PhotoEditor src={editor.src} filename={editor.filename} onClose={() => setEditor(null)} />}
+      </div>
+    );
+  }
+
   return (
     <div className="fade">
       {toast && (
@@ -3786,34 +4064,7 @@ function MyGalleryScreen({ accessToken, onBack, onShared, onLoginRequest }) {
         </div>
       )}
 
-      {cur && (
-        <div style={O.viewerBack} onClick={() => setViewing(null)}>
-          <div style={O.viewerCard} onClick={(e) => e.stopPropagation()}>
-            <div style={O.viewerHead}>
-              <div style={O.viewerTitle}>{cur.conceptTitle || `컨셉 ${cur.conceptId}`}</div>
-              <button type="button" style={O.inviteX} aria-label={t("common.close")} onClick={() => setViewing(null)}>
-                <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>
-              </button>
-            </div>
-            <div style={O.viewerImgWrap}>
-              {cur.url && <img src={cur.url} alt="" style={{ ...O.thumbImg, objectFit: "contain" }} />}
-            </div>
-            <div style={O.viewerActions}>
-              <button type="button" style={{ ...O.makeBtn, flex: 1, ...(saved.has(cur.id) ? O.makeBtnOff : null) }} onClick={() => handleSave(cur)}>
-                {saved.has(cur.id) ? t("gallery.action.saved") : t("gallery.action.save")}
-              </button>
-            </div>
-            <div style={O.viewerActions}>
-              <button type="button" style={{ ...O.smallBtn, flex: 1, height: 44 }} disabled={!cur.url}
-                onClick={() => { hap.tap(); setEditor({ src: cur.url, filename: `rimikimi_${cur.conceptId || cur.id}` }); }}>{t("edit.btn")}</button>
-              <button type="button" style={{ ...O.smallBtn, flex: 1, height: 44 }} disabled={sharingId === cur.id}
-                onClick={() => handleShare(cur)}>{t("gallery.action.share")}</button>
-              <button type="button" style={{ ...O.smallBtn, flex: 1, height: 44, color: ACCENT }}
-                onClick={() => handleDelete(cur.id)}>{t("gallery.action.delete")}</button>
-            </div>
-          </div>
-        </div>
-      )}
+      {viewer}
       {editor && (
         <PhotoEditor src={editor.src} filename={editor.filename} onClose={() => setEditor(null)} />
       )}
