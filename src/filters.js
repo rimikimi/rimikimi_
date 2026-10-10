@@ -651,6 +651,9 @@ export const INFL = {
   feather: 1 / 60,               // 마스크 페더 σ (얼굴 폭 대비)
   glowS: 0.032,                  // 글로우 번짐 σ (얼굴 폭 대비)
   edgeLo: 45, edgeHi: 95,        // |고주파 뺀 원본 − base| (RGB 합) 이 이만큼이면 구조로 보고 보정을 뺀다
+  // 톤(밝기·홍조·글로우)은 얼굴만이 아니라 목·귀·이마까지 피부 전체에 — 얼굴만 하면 "얼굴만 붕 떠 있음"(오너 2026-10-10)
+  tcy: 0.75, trx: 1.0, try_: 1.35, // 톤 타원 = 얼굴 사각형 기준 중심 y·반경 배율(아래로 목까지)
+  smooth: 0.7, lift: 0.07, red: 0.14, glow: 0.22,
 };
 const ss = (e0, e1, x) => { const t = x <= e0 ? 0 : x >= e1 ? 1 : (x - e0) / (e1 - e0); return t * t * (3 - 2 * t); };
 /** 피부 가능성 0..1 — OpenCV YCrCb inRange (Y≥40, 133≤Cr≤178, 77≤Cb≤130) 을 ±4 부드럽게(영상에서 깜빡임 방지) */
@@ -766,10 +769,11 @@ export function beautyRGBA(data, w, h, amount, faces) {
   if (!F.length) return data;
   const fw = Math.max(...F.map((f) => f.w));
   const ell = F.map((f) => ({ cx: f.x + f.w / 2, cy: f.y + INFL.cy * f.h, rx: INFL.rx * f.w, ry: INFL.ry * f.h }));
-  // 처리 영역(ROI) = 타원들 + 여유
+  const tel = F.map((f) => ({ cx: f.x + f.w / 2, cy: f.y + INFL.tcy * f.h, rx: INFL.trx * f.w, ry: INFL.try_ * f.h }));
+  // 처리 영역(ROI) = 톤 타원들(더 넓다) + 여유
   const pad = fw * 0.12;
   let x0 = w, y0 = h, x1 = 0, y1 = 0;
-  for (const e of ell) { x0 = Math.min(x0, e.cx - e.rx - pad); x1 = Math.max(x1, e.cx + e.rx + pad); y0 = Math.min(y0, e.cy - e.ry - pad); y1 = Math.max(y1, e.cy + e.ry + pad); }
+  for (const e of tel) { x0 = Math.min(x0, e.cx - e.rx - pad); x1 = Math.max(x1, e.cx + e.rx + pad); y0 = Math.min(y0, e.cy - e.ry - pad); y1 = Math.max(y1, e.cy + e.ry + pad); }
   x0 = Math.max(0, Math.floor(x0)); y0 = Math.max(0, Math.floor(y0)); x1 = Math.min(w, Math.ceil(x1)); y1 = Math.min(h, Math.ceil(y1));
   if (x1 - x0 < 4 || y1 - y0 < 4) return data;
   const RW = x1 - x0, RH = y1 - y0;
@@ -782,15 +786,17 @@ export function beautyRGBA(data, w, h, amount, faces) {
       sr[c] += data[i]; sg[c] += data[i + 1]; sb[c] += data[i + 2]; cnt[c]++; } }
   for (let c = 0; c < ww * wh; c++) { const n = cnt[c] || 1; sr[c] /= n; sg[c] /= n; sb[c] /= n; }
   // ── 마스크 (피부 × 타원) → 페더
-  let mask = new Float32Array(ww * wh);
+  // mask = 스무딩(얼굴, 경계를 넓게 풀어서), tmask = 톤(얼굴+목·귀·이마 피부)
+  let mask = new Float32Array(ww * wh), tmask = new Float32Array(ww * wh);
   for (let j = 0; j < wh; j++) for (let i = 0; i < ww; i++) {
     const X = x0 + (i + 0.5) / s, Y = y0 + (j + 0.5) / s;
-    let reg = 0;
-    for (const e of ell) { const dx = (X - e.cx) / e.rx, dy = (Y - e.cy) / e.ry; const r = 1 - ss(0.7, 1, dx * dx + dy * dy); if (r > reg) reg = r; }
-    const c = j * ww + i;
-    mask[c] = reg > 0 ? reg * skinWeight(sr[c], sg[c], sb[c]) : 0;
+    let reg = 0, treg = 0;
+    for (const e of ell) { const dx = (X - e.cx) / e.rx, dy = (Y - e.cy) / e.ry; const r = 1 - ss(0.35, 1, dx * dx + dy * dy); if (r > reg) reg = r; }
+    for (const e of tel) { const dx = (X - e.cx) / e.rx, dy = (Y - e.cy) / e.ry; const r = 1 - ss(0.45, 1, dx * dx + dy * dy); if (r > treg) treg = r; }
+    const c = j * ww + i, sk = skinWeight(sr[c], sg[c], sb[c]);
+    mask[c] = reg * sk; tmask[c] = treg * sk;
   }
-  mask = gaussPlanes([mask], ww, wh, INFL.feather * fw * s)[0];
+  [mask, tmask] = gaussPlanes([mask, tmask], ww, wh, INFL.feather * 2.5 * fw * s);
   // ── bilateral (작업 격자, 마스크 있는 칸만) — 9×9 탭, 반경 1.5σ
   const sigS = INFL.sigS * fw * s, R = Math.max(1, Math.ceil(1.5 * sigS)), sigC = 22 + 18 * a;
   const offs = []; for (let t = -4; t <= 4; t++) offs.push(Math.round((t * R) / 4));
@@ -816,8 +822,18 @@ export function beautyRGBA(data, w, h, amount, faces) {
   // ── 원해상도 고주파 (ROI 만)
   const pr = new Float32Array(RW * RH), pg = new Float32Array(RW * RH), pb = new Float32Array(RW * RH);
   for (let y = 0; y < RH; y++) for (let x = 0; x < RW; x++) { const i = ((y + y0) * w + x + x0) * 4, c = y * RW + x; pr[c] = data[i]; pg[c] = data[i + 1]; pb[c] = data[i + 2]; }
-  const [lr, lg, lb] = gaussPlanes([pr, pg, pb], RW, RH, INFL.detail * fw);
-  const keep = 0.55 - 0.3 * a, lift = 0.10 * a, red = 1 - 0.18 * a, gl = 0.35 * a;
+  // 고주파 분리(가우시안)는 스무딩이 들어가는 얼굴 타원 근처만 — 톤만 들어가는 목·귀는 원본 그대로를 쓴다(속도)
+  let fx0 = RW, fy0 = RH, fx1 = 0, fy1 = 0;
+  for (const e of ell) { fx0 = Math.min(fx0, e.cx - e.rx - pad - x0); fx1 = Math.max(fx1, e.cx + e.rx + pad - x0); fy0 = Math.min(fy0, e.cy - e.ry - pad - y0); fy1 = Math.max(fy1, e.cy + e.ry + pad - y0); }
+  fx0 = Math.max(0, Math.floor(fx0)); fy0 = Math.max(0, Math.floor(fy0)); fx1 = Math.min(RW, Math.ceil(fx1)); fy1 = Math.min(RH, Math.ceil(fy1));
+  const lr = pr.slice(), lg = pg.slice(), lb = pb.slice();
+  if (fx1 - fx0 > 2 && fy1 - fy0 > 2) {
+    const FW = fx1 - fx0, FH = fy1 - fy0, qr = new Float32Array(FW * FH), qg = new Float32Array(FW * FH), qb = new Float32Array(FW * FH);
+    for (let y = 0; y < FH; y++) for (let x = 0; x < FW; x++) { const c = (y + fy0) * RW + x + fx0, q = y * FW + x; qr[q] = pr[c]; qg[q] = pg[c]; qb[q] = pb[c]; }
+    const [gr, gg, gb] = gaussPlanes([qr, qg, qb], FW, FH, INFL.detail * fw);
+    for (let y = 0; y < FH; y++) for (let x = 0; x < FW; x++) { const c = (y + fy0) * RW + x + fx0, q = y * FW + x; lr[c] = gr[q]; lg[c] = gg[q]; lb[c] = gb[q]; }
+  }
+  const keep = 0.55 - 0.3 * a, lift = INFL.lift * a, red = 1 - INFL.red * a, gl = INFL.glow * a;
   // 작업 격자 양선형 — 열·행마다 (칸 번호, 비율)을 미리 구해 둔다(칸 중심 기준, 가장자리 클램프)
   const axis = (n, cells) => { const ix = new Int32Array(n), t = new Float32Array(n);
     for (let q = 0; q < n; q++) { let f = (q + 0.5) * s - 0.5; f = f < 0 ? 0 : f > cells - 1 ? cells - 1 : f;
@@ -828,31 +844,32 @@ export function beautyRGBA(data, w, h, amount, faces) {
   const bil = (arr) => arr[c00] * wa + arr[c00 + dx1] * wb + arr[c00 + dy1] * wc + arr[c00 + dy1 + dx1] * wd;
   // 마스크가 있는 칸의 범위만 돈다
   let cx0 = ww, cx1 = -1, cy0 = wh, cy1 = -1;
-  for (let j = 0; j < wh; j++) for (let i = 0; i < ww; i++) if (mask[j * ww + i] >= 0.002) { if (i < cx0) cx0 = i; if (i > cx1) cx1 = i; if (j < cy0) cy0 = j; if (j > cy1) cy1 = j; }
+  for (let j = 0; j < wh; j++) for (let i = 0; i < ww; i++) if (tmask[j * ww + i] >= 0.002 || mask[j * ww + i] >= 0.002) { if (i < cx0) cx0 = i; if (i > cx1) cx1 = i; if (j < cy0) cy0 = j; if (j > cy1) cy1 = j; }
   if (cx1 < 0) return data;
   const X0 = Math.max(0, Math.floor((cx0 - 1) / s)), X1 = Math.min(RW, Math.ceil((cx1 + 2) / s));
   const Y0 = Math.max(0, Math.floor((cy0 - 1) / s)), Y1 = Math.min(RH, Math.ceil((cy1 + 2) / s));
   for (let y = Y0; y < Y1; y++) { const rv = IV[y] * ww, tv = TV[y];
     for (let x = X0; x < X1; x++) { const tu = TU[x];
       c00 = rv + IU[x]; wa = (1 - tu) * (1 - tv); wb = tu * (1 - tv); wc = (1 - tu) * tv; wd = tu * tv;
-      const m0 = bil(mask); if (m0 < 0.002) continue;
+      const m0 = bil(mask), t0 = bil(tmask); if (m0 < 0.002 && t0 < 0.002) continue;
       const c = y * RW + x, i = ((y + y0) * w + x + x0) * 4;
       // 원해상도 피부 게이트 — 눈(흰자·홍채·속눈썹)·눈썹·입술 경계처럼 피부색이 아닌 픽셀은 덜 건드린다
-      const mSkin = m0 * (0.1 + 0.9 * skinWeight(lr[c], lg[c], lb[c]));
+      const skG = 0.1 + 0.9 * skinWeight(lr[c], lg[c], lb[c]);
+      const mSkin = m0 * skG, tm = t0 * skG;
       const r = pr[c], g = pg[c], b = pb[c];
       const baR = bil(bR), baG = bil(bG), baB = bil(bB);
       // 굵은 구조(속눈썹·쌍꺼풀 선·눈썹·콧구멍)는 저해상도 base 와 크게 달라 — 그만큼 보정을 뺀다(잡티는 덜 달라서 남는다)
       const dev = Math.abs(lr[c] - baR) + Math.abs(lg[c] - baG) + Math.abs(lb[c] - baB);
       const m = mSkin * (1 - ss(INFL.edgeLo, INFL.edgeHi, dev));
-      let sR = baR + (r - lr[c]) * keep, sG = baG + (g - lg[c]) * keep, sB = baB + (b - lb[c]) * keep;
-      // 밝게(Y) + 붉은기 빼기(Cr) — YCbCr 에서
-      let Y = 0.299 * sR + 0.587 * sG + 0.114 * sB;
-      const cb = (sB - Y) * 0.564, cr = (sR - Y) * 0.713 * red;
-      Y = Y + (255 - Y) * lift * ss(60, 130, Y); // 어두운 선(속눈썹·눈썹·콧구멍)은 안 띄운다 — 깊이 유지
-      sR = Y + 1.403 * cr; sB = Y + 1.773 * cb; sG = (Y - 0.299 * sR - 0.114 * sB) / 0.587;
-      const k = Math.min(1, m * 0.85 * a);
-      let oR = r + (sR - r) * k, oG = g + (sG - g) * k, oB = b + (sB - b) * k;
-      const gm = gl * m;
+      // ① 스무딩(얼굴만)
+      const k = Math.min(1, m * INFL.smooth * a);
+      let oR = r + (baR + (r - lr[c]) * keep - r) * k, oG = g + (baG + (g - lg[c]) * keep - g) * k, oB = b + (baB + (b - lb[c]) * keep - b) * k;
+      // ② 톤(피부 전체): 밝게(Y) + 붉은기 빼기(Cr) — YCbCr 에서
+      let Y = 0.299 * oR + 0.587 * oG + 0.114 * oB;
+      const cb = (oB - Y) * 0.564, cr = (oR - Y) * 0.713 * (1 - (1 - red) * tm);
+      Y = Y + (255 - Y) * lift * tm * ss(60, 130, Y); // 어두운 선(속눈썹·눈썹·콧구멍)은 안 띄운다 — 깊이 유지
+      oR = Y + 1.403 * cr; oB = Y + 1.773 * cb; oG = (Y - 0.299 * oR - 0.114 * oB) / 0.587;
+      const gm = gl * tm;
       oR = 255 - ((255 - oR) * (255 - bil(gR) * gm)) / 255;
       oG = 255 - ((255 - oG) * (255 - bil(gG) * gm)) / 255;
       oB = 255 - ((255 - oB) * (255 - bil(gB) * gm)) / 255;

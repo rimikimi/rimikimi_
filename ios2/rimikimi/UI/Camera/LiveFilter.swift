@@ -74,6 +74,9 @@ enum LiveFilter {
         static let work = 140.0                        // 작업 격자에서 얼굴 폭(칸)
         static let sigS = 0.044, detail = 0.0013, feather = 1.0 / 60, glowS = 0.032
         static let edgeLo = 45.0, edgeHi = 95.0
+        // 톤(밝기·홍조·글로우)은 목·귀·이마 피부까지 — 얼굴만 하면 "얼굴만 붕 떠 있음"(오너 2026-10-10)
+        static let tcy = 0.75, trx = 1.0, try_ = 1.35
+        static let smooth = 0.7, lift = 0.07, red = 0.14, glow = 0.22
     }
 
     /// 얼굴 사각형(정규화, **아래가 원점** = CI 좌표) — 정지 사진·검증용 동기 검출. 실시간은 렌더러가 띄엄띄엄 돌린다.
@@ -505,20 +508,23 @@ extern "C" [[stitchable]] float4 lfInflDown(coreimage::sampler src, float inv, f
 }
 
 //@kernel
-// 인플 ② 마스크 = 피부색 × 얼굴 타원(최대 3개, 원해상도 좌표·아래가 원점) — r 채널
-extern "C" [[stitchable]] float4 lfInflMask(coreimage::sampler small, float s, float4 e0, float4 e1, float4 e2, float count,
-                                coreimage::destination dest) {
+// 인플 ② 마스크 — r = 스무딩(피부 × 얼굴 타원), g = 톤(피부 × 목·귀까지 넓은 타원). 최대 3얼굴, 원해상도·아래가 원점
+extern "C" [[stitchable]] float4 lfInflMask(coreimage::sampler small, float s, float4 e0, float4 e1, float4 e2,
+                                float4 t0, float4 t1, float4 t2, float count, coreimage::destination dest) {
     float2 dc = dest.coord();
     float2 X = dc / s;
-    float reg = 0.0;
+    float reg = 0.0, treg = 0.0;
     for (int k = 0; k < 3; k++) {
         if (float(k) >= count) break;
         float4 e = k == 0 ? e0 : (k == 1 ? e1 : e2);
+        float4 t = k == 0 ? t0 : (k == 1 ? t1 : t2);
         float2 d = (X - e.xy) / e.zw;
-        reg = max(reg, 1.0 - smoothstep(0.7, 1.0, dot(d, d)));
+        reg = max(reg, 1.0 - smoothstep(0.35, 1.0, dot(d, d)));
+        float2 dt = (X - t.xy) / t.zw;
+        treg = max(treg, 1.0 - smoothstep(0.45, 1.0, dot(dt, dt)));
     }
-    float m = reg > 0.0 ? reg * lf_skin(small.sample(small.transform(dc)).rgb * 255.0) : 0.0;
-    return float4(m, m, m, 1.0);
+    float sk = lf_skin(small.sample(small.transform(dc)).rgb * 255.0);
+    return float4(reg * sk, treg * sk, 0.0, 1.0);
 }
 
 //@kernel
@@ -578,24 +584,27 @@ extern "C" [[stitchable]] float4 lfInfl(coreimage::sampler src, coreimage::sampl
     float2 dc = dest.coord();
     float4 o4 = src.sample(src.transform(dc));
     float2 p = dc * s;
-    float m0 = lf_clampSample(mask, p, ww, wh).r;
-    if (m0 < 0.002) return o4;
+    float4 mk = lf_clampSample(mask, p, ww, wh);
+    float m0 = mk.r, t0 = mk.g;
+    if (m0 < 0.002 && t0 < 0.002) return o4;
     float3 v = o4.rgb * 255.0;
     float3 l = blurD.sample(blurD.transform(dc)).rgb * 255.0;
-    float mSkin = m0 * (0.1 + 0.9 * lf_skin(l));
+    float skG = 0.1 + 0.9 * lf_skin(l);
+    float mSkin = m0 * skG, tm = t0 * skG;
     float3 ba = lf_clampSample(base, p, ww, wh).rgb * 255.0;
     float3 dv = abs(l - ba);
     float m = mSkin * (1.0 - smoothstep(edgeLo, edgeHi, dv.r + dv.g + dv.b));
-    float3 sm = ba + (v - l) * (0.55 - 0.3 * a);
-    float Y = lf_lum(sm);
-    float cb = (sm.b - Y) * 0.564, cr = (sm.r - Y) * 0.713 * (1.0 - 0.18 * a);
-    Y = Y + (255.0 - Y) * 0.10 * a * smoothstep(60.0, 130.0, Y);
+    // ① 스무딩(얼굴만)
+    float k = min(1.0, m * 0.7 * a);
+    float3 o = v + (ba + (v - l) * (0.55 - 0.3 * a) - v) * k;
+    // ② 톤(피부 전체) — filters.js INFL.lift/red/glow 와 같은 값
+    float Y = lf_lum(o);
+    float cb = (o.b - Y) * 0.564, cr = (o.r - Y) * 0.713 * (1.0 - 0.14 * a * tm);
+    Y = Y + (255.0 - Y) * 0.07 * a * tm * smoothstep(60.0, 130.0, Y);
     float r = Y + 1.403 * cr, b = Y + 1.773 * cb;
-    float g = (Y - 0.299 * r - 0.114 * b) / 0.587;
-    float k = min(1.0, m * 0.85 * a);
-    float3 o = v + (float3(r, g, b) - v) * k;
+    o = float3(r, (Y - 0.299 * r - 0.114 * b) / 0.587, b);
     float3 gl = lf_clampSample(glow, p, ww, wh).rgb * 255.0;
-    o = 255.0 - ((255.0 - o) * (255.0 - gl * (0.35 * a * m))) / 255.0;
+    o = 255.0 - ((255.0 - o) * (255.0 - gl * (0.22 * a * tm))) / 255.0;
     return lf_out(lf_floorq(o));
 }
 """#
@@ -716,14 +725,17 @@ final class LiveFilterEngine {
         guard let fw = F.map(\.width).max(), fw >= 8 else { return img }
         // 타원(원해상도, 아래가 원점) — 웹(위가 원점)의 cy = 위 + 0.45h 를 뒤집으면 maxY - 0.45h
         let ell = F.map { CIVector(x: $0.midX, y: $0.maxY - I.cy * $0.height, z: I.rx * $0.width, w: I.ry * $0.height) }
+        let tel = F.map { CIVector(x: $0.midX, y: $0.maxY - I.tcy * $0.height, z: I.trx * $0.width, w: I.try_ * $0.height) }
         let s = min(1, I.work / fw)
         let ww = (W * s).rounded(.up), wh = (H * s).rounded(.up)
         let sExt = CGRect(x: 0, y: 0, width: ww, height: wh)
         let small = run("lfInflDown", sExt, [img], [img, 1 / s, min(8, (1 / s).rounded(.up)), W, H])
         let zero = CIVector(x: -1e6, y: -1e6, z: 1, w: 1)
         var mask = run("lfInflMask", sExt, [small], [small, s, ell[0], ell.count > 1 ? ell[1] : zero,
-                                                    ell.count > 2 ? ell[2] : zero, CGFloat(ell.count)])
-        mask = gauss(mask, I.feather * fw * s, ww, wh)
+                                                    ell.count > 2 ? ell[2] : zero,
+                                                    tel[0], tel.count > 1 ? tel[1] : zero, tel.count > 2 ? tel[2] : zero,
+                                                    CGFloat(ell.count)])
+        mask = gauss(mask, I.feather * 2.5 * fw * s, ww, wh)
         let sigS = I.sigS * fw * s
         let base = run("lfInflBilat", sExt, [small, mask], [small, mask, sigS, max(1, (1.5 * sigS).rounded(.up)), 22 + 18 * a, ww, wh])
         let glow = gauss(run("lfInflHi", sExt, [base], [base]), I.glowS * fw * s, ww, wh)
