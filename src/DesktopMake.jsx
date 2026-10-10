@@ -187,11 +187,13 @@ export function MakeHome({ pool, labels, seasons, isFeature, onOpenConcept, onPu
       </div>
       <div style={W.purposes}>
         {PURPOSES.map((p) => {
-          const cover = coverFor(pool, p.key, isFeature);
+          // 네 번째 칸은 컨셉화보 대신 드레스룸 — 누르면 드레스룸 컨셉 바로(앱과 같다, 오너 2026-10-10)
+          const dress = p.key === "concept" ? pool.find((c) => c.mode === "dressroom") : null;
+          const cover = dress || coverFor(pool, p.key, isFeature);
           return (
-            <button key={p.key} type="button" className="dkBtn" style={W.purpose} onClick={() => onPurpose(p.key)}>
+            <button key={p.key} type="button" className="dkBtn" style={W.purpose} onClick={() => (dress ? onOpenConcept(dress) : onPurpose(p.key))}>
               <span style={W.pCover}>{cover && <img src={thumbOf(cover)} alt="" style={W.img} />}</span>
-              <span style={W.pTitle}>{lbl(labels, p.lk, p.ko, p.en)}</span>
+              <span style={W.pTitle}>{dress ? lbl(labels, "purpose.dressroom", "드레스룸", "Dressing room") : lbl(labels, p.lk, p.ko, p.en)}</span>
             </button>
           );
         })}
