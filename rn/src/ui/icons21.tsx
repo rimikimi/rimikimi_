@@ -97,3 +97,11 @@ export const IconSun = ({ size = 24, color = "currentColor" }: IconProps) => (
     </G>
   </Svg>
 );
+/** 자물쇠(필터 이용권 잠김) — 몸통은 채움, 고리는 선. */
+// 칩 안 작은 배지라 표준 크기(16~32) 밖(11~12)도 받는다.
+export const IconLock = ({ size = 24, color = "currentColor" }: { size?: number; color?: string }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Rect x={4.5} y={10.5} width={15} height={11} rx={2.5} fill={color} />
+    <Path d="M8 10.5V7a4 4 0 0 1 8 0v3.5" stroke={color} strokeWidth={2.4} strokeLinecap="round" />
+  </Svg>
+);

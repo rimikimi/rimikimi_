@@ -38,23 +38,40 @@ export function ConceptCard({ concept, width, onPress }: { concept: Concept; wid
   );
 }
 
-/** 가로 줄 — 제목(+더보기) 아래 카드들. 큰 줄(추천·새로 나왔어요)은 카드 폭 150, 카테고리 줄은 120. */
-export function ConceptRail({ title, items, big, onMore }: { title: string; items: Concept[]; big?: boolean; onMore?: () => void }) {
-  const w = big ? 150 : 120;
+/**
+ * 가로 줄 — 제목(+더보기) 아래 카드들. 큰 줄(추천·새로 나왔어요)은 카드 폭 150, 카테고리 줄은 120.
+ * 홈(2.1)은 iOS `ConceptRail` 치수 그대로 — cardWidth = 화면폭×160/390, 간격 10, 아래 18, isNew = 빨간 NEW 배지.
+ */
+export function ConceptRail({ title, items, big, onMore, isNew, cardWidth, gap }: {
+  title: string; items: Concept[]; big?: boolean; onMore?: () => void; isNew?: boolean; cardWidth?: number; gap?: number;
+}) {
+  const w = cardWidth ?? (big ? 150 : 120);
   if (!items.length) return null;
   return (
     <View style={styles.rail}>
       <View style={styles.railHead}>
-        <Text size="headline">{title}</Text>
+        <View style={styles.titleRow} accessibilityRole="header">
+          <Text size="headline">{title}</Text>
+          {isNew ? <NewBadge /> : null}
+        </View>
         {onMore ? (
           <Pressable accessibilityRole="button" onPress={onMore} hitSlop={8}>
             <Text size="footnote" tone="muted">{copy.home.more}</Text>
           </Pressable>
         ) : null}
       </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.railRow} overScrollMode="never">
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.railRow, gap != null && { gap }]} overScrollMode="never">
         {items.map((c) => <ConceptCard key={String(c.id)} concept={c} width={w} />)}
       </ScrollView>
+    </View>
+  );
+}
+
+/** NEW — 빨간 작은 배지(iOS NewBadge: 11/700, 모서리 5, 강조색 배경). */
+export function NewBadge() {
+  return (
+    <View style={styles.newBadge} accessibilityLabel="NEW">
+      <Text size="caption" weight="bold" style={styles.newText}>NEW</Text>
     </View>
   );
 }
@@ -62,5 +79,8 @@ export function ConceptRail({ title, items, big, onMore }: { title: string; item
 const styles = themedStyles(() => StyleSheet.create({
   rail: { gap: space.s3 },
   railHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: space.screen },
+  titleRow: { flexDirection: "row", alignItems: "center", gap: space.s2 },
+  newBadge: { backgroundColor: color.accent, borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2 },
+  newText: { color: "#FFFFFF", fontSize: 11, lineHeight: 14, letterSpacing: 0.4 },
   railRow: { paddingHorizontal: space.screen, gap: space.s3 },
 }));

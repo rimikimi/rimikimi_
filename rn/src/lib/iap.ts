@@ -1,9 +1,12 @@
+import { useEffect, useSyncExternalStore } from "react";
 import { Platform } from "react-native";
-import Purchases, { PRODUCT_CATEGORY, PURCHASES_ERROR_CODE, type CustomerInfo, type PurchasesStoreProduct } from "react-native-purchases";
+import * as SecureStore from "expo-secure-store";
+import Purchases, { PACKAGE_TYPE, PRODUCT_CATEGORY, PURCHASES_ERROR_CODE, type CustomerInfo, type PurchasesPackage, type PurchasesStoreProduct } from "react-native-purchases";
 import { getRcApiKey } from "./env";
 import { iapGrant, ApiError } from "./api";
 import { IAP_PRODUCTS, PRODUCT_IDS, baseProductId, isSubscription } from "./packs";
 import { copy } from "./copy";
+import { labelFlag, labelsVersionSubscribe } from "./copy21";
 
 // ============================================================================
 // IAP — RevenueCat (react-native-purchases). 1.x src/iap.js 흐름 그대로:
@@ -190,4 +193,222 @@ export async function grantWithRetry(token: string, productId: string, transacti
     return;
   }
   throw new ApiError(copy.store.grantLate, 202);
+}
+
+// ============================================================================
+// 필터 이용권(Filter Pass) — 공통 계약서 scratchpad filterpass_spec.md (2026-10-10).
+//
+//   unlocked = entitlement("filters") active
+//           || (trialStart != nil && now < trialStart + 3일)
+//   trialStart = 원본이 아닌 필터를 처음 적용한 시각(카메라 필터 줄 또는 편집기 `filterUsed`).
+//
+// · 원격 스위치: 서버 이름표 `/labels.json` 의 `filterPass.enabled`(기본 false, 오너 2026-10-10).
+//   꺼져 있으면 잠금·결제 시트 없음, 편집기 payload 는 filtersUnlocked=true. trialStart 도 기록하지 않는다
+//   (스위치를 켠 날부터 각자 3일이 시작되게 — 켜자마자 기존 사용자가 전부 잠기지 않게).
+// · trialStart 가 아직 없으면(한 번도 안 써 봄) 잠그지 않는다 — 처음 쓰는 순간 3일이 시작된다.
+// · Android 는 SecureStore 에 둔다 → 재설치하면 초기화(계약서의 알려진 한계).
+// · rimikimi+ 구독자는 무료 — RevenueCat entitlement 에 plus 상품이 묶여 있지만, 대시보드 설정 전이어도
+//   되게 클라에서도 plus 구독을 본다.
+// · dev 라우트 /dev/filterpass?state=… 가 상태를 강제한다(스위치도 켠다).
+// ============================================================================
+
+export const FILTER_ENTITLEMENT = "filters";
+export const FILTER_OFFERING = "filters";
+export const FILTER_FLAG_KEY = "filterPass.enabled";
+const TRIAL_KEY = "filterpass.trialStart";
+const TRIAL_MS = 3 * 24 * 60 * 60 * 1000;
+const FILTER_PRODUCTS = ["rimikimi.filter.lifetime", "rimikimi.filter.annual", "rimikimi.filter.monthly"];
+
+export type FilterDevState = "trial" | "expired" | "unlocked" | "plus";
+export type FilterAccessSource = "off" | "entitlement" | "plus" | "trial" | "notStarted" | "locked";
+export interface FilterAccess {
+  /** 원격 스위치(또는 dev 강제)가 켜져 있나 — false 면 잠금·결제 없음. */
+  enabled: boolean;
+  unlocked: boolean;
+  /** 3일 무료가 끝나는 시각(ISO). 시작 전·이용권 보유·스위치 꺼짐이면 null. */
+  trialEndsAt: string | null;
+  source: FilterAccessSource;
+  devState: FilterDevState | null;
+}
+
+let fpTrialStart: number | null = null;
+let fpTrialLoaded = false;
+let fpEntitled = false;
+let fpPlus = false;
+let fpDev: { state: FilterDevState; trialStart: number | null; entitled: boolean; plus: boolean } | null = null;
+let fpListenerOn = false;
+const fpListeners = new Set<() => void>();
+
+function computeFilterAccess(): FilterAccess {
+  const devState = fpDev?.state ?? null;
+  const enabled = !!fpDev || labelFlag(FILTER_FLAG_KEY);
+  if (!enabled) return { enabled, unlocked: true, trialEndsAt: null, source: "off", devState };
+  const entitled = fpDev ? fpDev.entitled : fpEntitled;
+  const plus = fpDev ? fpDev.plus : fpPlus;
+  const ts = fpDev ? fpDev.trialStart : fpTrialStart;
+  if (entitled) return { enabled, unlocked: true, trialEndsAt: null, source: "entitlement", devState };
+  if (plus) return { enabled, unlocked: true, trialEndsAt: null, source: "plus", devState };
+  if (ts == null) return { enabled, unlocked: true, trialEndsAt: null, source: "notStarted", devState };
+  const end = ts + TRIAL_MS;
+  if (Date.now() < end) return { enabled, unlocked: true, trialEndsAt: new Date(end).toISOString(), source: "trial", devState };
+  return { enabled, unlocked: false, trialEndsAt: new Date(end).toISOString(), source: "locked", devState };
+}
+
+let fpSnap: FilterAccess = computeFilterAccess();
+function fpNotify() {
+  const next = computeFilterAccess();
+  const same = next.enabled === fpSnap.enabled && next.unlocked === fpSnap.unlocked && next.trialEndsAt === fpSnap.trialEndsAt
+    && next.source === fpSnap.source && next.devState === fpSnap.devState;
+  if (same) return;
+  fpSnap = next;
+  fpListeners.forEach((f) => f());
+}
+labelsVersionSubscribe(() => { fpNotify(); if (fpSnap.enabled) void refreshFilterAccess(); });
+
+/** 지금 상태(동기). */
+export function getFilterAccess(): FilterAccess { fpNotify(); return fpSnap; }
+/** 유료 필터를 저장·공유해도 되나. 스위치가 꺼져 있으면 항상 true. */
+export function hasFilterAccess(): boolean { return getFilterAccess().unlocked; }
+/** 원본(none)은 언제나 무료. */
+export function isPaidFilter(key: string | null | undefined): boolean { return !!key && key !== "none"; }
+
+function applyCustomerInfo(info: CustomerInfo | null | undefined) {
+  if (!info) return;
+  try {
+    const subs = (info.activeSubscriptions || []).map(baseProductId);
+    const bought = (info.allPurchasedProductIdentifiers || []).map(baseProductId);
+    fpEntitled = !!info.entitlements?.active?.[FILTER_ENTITLEMENT]
+      || subs.some((id) => FILTER_PRODUCTS.includes(id))
+      || bought.includes("rimikimi.filter.lifetime");
+    fpPlus = subs.some((id) => id.startsWith("rimikimi.sub.plus."));
+  } catch { /* 형식이 이상하면 그대로 */ }
+  fpNotify();
+}
+
+async function loadTrialStart() {
+  if (fpTrialLoaded) return;
+  try {
+    const v = await SecureStore.getItemAsync(TRIAL_KEY);
+    const n = v ? Number(v) : NaN;
+    fpTrialStart = Number.isFinite(n) && n > 0 ? n : null;
+  } catch { /* 없음 */ }
+  fpTrialLoaded = true;
+}
+
+/** SecureStore(trialStart) + RevenueCat(customerInfo) 를 다시 읽는다. 스위치가 꺼져 있으면 RevenueCat 은 안 부른다. */
+export async function refreshFilterAccess(): Promise<FilterAccess> {
+  await loadTrialStart();
+  fpNotify();
+  if (!fpSnap.enabled || fpDev || !iapAvailable()) return fpSnap;
+  try {
+    if (!_configured) await initIap(); // 게스트도 카메라를 쓴다 — 익명 RevenueCat 으로(로그인하면 logIn 이 합친다)
+    if (!_configured) return fpSnap;
+    if (!fpListenerOn) {
+      fpListenerOn = true;
+      Purchases.addCustomerInfoUpdateListener((info) => applyCustomerInfo(info));
+    }
+    applyCustomerInfo(await withTimeout(Purchases.getCustomerInfo(), 15000, copy.errors.productQuery));
+  } catch (e) {
+    setDiag("customerInfo", e);
+  }
+  return fpSnap;
+}
+
+/** 원본이 아닌 필터를 적용했다 — 3일 무료를 아직 시작 안 했으면 지금 시작. 스위치가 꺼져 있으면 아무것도 안 한다. */
+export async function startFilterTrialIfNeeded(): Promise<FilterAccess> {
+  await loadTrialStart();
+  fpNotify();
+  if (!fpSnap.enabled || fpDev || fpTrialStart != null) return fpSnap;
+  fpTrialStart = Date.now();
+  try { await SecureStore.setItemAsync(TRIAL_KEY, String(fpTrialStart)); } catch { /* 기기 저장 실패 — 이번 실행 동안만 */ }
+  fpNotify();
+  return fpSnap;
+}
+
+/** dev 전용 — 상태 강제(스위치도 켠다). null = 강제 해제(실제 상태로). */
+export function setFilterDevState(state: FilterDevState | null) {
+  if (!__DEV__) return;
+  const day = 24 * 60 * 60 * 1000;
+  fpDev = state == null ? null : {
+    state,
+    trialStart: state === "trial" ? Date.now() - day : state === "expired" ? Date.now() - 4 * day : null,
+    entitled: state === "unlocked",
+    plus: state === "plus",
+  };
+  fpNotify();
+}
+
+/** 카메라 줄·편집기·dev 화면이 같은 상태를 본다. 처음 쓸 때 한 번 다시 읽는다. */
+export function useFilterAccess(): FilterAccess {
+  const snap = useSyncExternalStore(
+    (fn) => { fpListeners.add(fn); return () => { fpListeners.delete(fn); }; },
+    () => fpSnap,
+  );
+  useEffect(() => { void refreshFilterAccess(); }, []);
+  return snap;
+}
+
+export type FilterPlan = "annual" | "monthly" | "lifetime";
+export interface FilterPackage { plan: FilterPlan; priceString: string; _pkg: PurchasesPackage }
+/** 상품을 못 불러왔을 때 보여 줄 원화 참고가(오너 결정 가격). */
+export const FILTER_PLAN_KRW: Record<FilterPlan, number> = { annual: 4900, monthly: 1900, lifetime: 9900 };
+export const FILTER_PLAN_ORDER: FilterPlan[] = ["annual", "monthly", "lifetime"];
+
+function planOf(p: PurchasesPackage): FilterPlan | null {
+  if (p.packageType === PACKAGE_TYPE.ANNUAL) return "annual";
+  if (p.packageType === PACKAGE_TYPE.MONTHLY) return "monthly";
+  if (p.packageType === PACKAGE_TYPE.LIFETIME) return "lifetime";
+  const id = baseProductId(p.product?.identifier || "");
+  if (id === "rimikimi.filter.annual") return "annual";
+  if (id === "rimikimi.filter.monthly") return "monthly";
+  if (id === "rimikimi.filter.lifetime") return "lifetime";
+  return null;
+}
+
+/** RevenueCat offering "filters" 의 3개 상품(연간 → 월간 → 평생). 못 불러오면 []. */
+export async function getFilterPackages(): Promise<FilterPackage[]> {
+  if (!iapAvailable()) return [];
+  try {
+    if (!_configured && !(await initIap())) return [];
+    const offerings = await withTimeout(Purchases.getOfferings(), 15000, copy.errors.productQuery);
+    const off = offerings?.all?.[FILTER_OFFERING];
+    const list = (off?.availablePackages || [])
+      .map((pkg) => ({ plan: planOf(pkg), pkg }))
+      .filter((x): x is { plan: FilterPlan; pkg: PurchasesPackage } => !!x.plan)
+      .map(({ plan, pkg }) => ({ plan, priceString: pkg.product?.priceString || "", _pkg: pkg }));
+    if (!list.length) setDiag("offering(filters)", new Error(copy.errors.noProducts));
+    return FILTER_PLAN_ORDER.map((pl) => list.find((x) => x.plan === pl)).filter((x): x is FilterPackage => !!x);
+  } catch (e) {
+    setDiag("offering(filters)", e);
+    return [];
+  }
+}
+
+/** 이용권 결제 — 크레딧 적립(/api/iap/grant)은 부르지 않는다. 결과는 entitlement 로만 판단. */
+export async function purchaseFilterPackage(p: FilterPackage): Promise<{ cancelled: true } | { cancelled?: false; unlocked: boolean }> {
+  if (!iapAvailable()) throw Object.assign(new Error(copy.store.unavailable), { code: "UNAVAILABLE" });
+  if (purchaseLock) return { cancelled: true };
+  purchaseLock = true;
+  try {
+    const r = await withTimeout(Purchases.purchasePackage(p._pkg), 180000, copy.errors.pay);
+    applyCustomerInfo(r.customerInfo);
+    return { unlocked: hasFilterAccess() };
+  } catch (e) {
+    const err = e as { code?: string; userCancelled?: boolean; message?: string };
+    if (err?.userCancelled || err?.code === PURCHASES_ERROR_CODE.PURCHASE_CANCELLED_ERROR || err?.code === "1" || /cancel/i.test(err?.message || "")) {
+      return { cancelled: true };
+    }
+    setDiag("purchaseFilter", e);
+    throw e;
+  } finally {
+    purchaseLock = false;
+  }
+}
+
+/** 구매 복원 → 이용권(또는 plus)이 있으면 unlocked. */
+export async function restoreFilterAccess(): Promise<{ unlocked: boolean; error?: string }> {
+  const r = await restoreIap();
+  if (!r.restored) return { unlocked: false, error: r.error };
+  applyCustomerInfo(r.customerInfo);
+  return { unlocked: hasFilterAccess() };
 }
