@@ -54,5 +54,9 @@
  "_comment": {
   "ko": "앱 이름표 — 키별 ko/en. 앨범 이름은 category.<앨범명> 키로 바꿀 수 있다(예: category.스튜디오 프로필). 앱 2.1.0 build 32+ 가 읽는다.",
   "en": ""
+ },
+ "purpose.dressroom": {
+  "ko": "드레스룸",
+  "en": "Dressing room"
  }
 }

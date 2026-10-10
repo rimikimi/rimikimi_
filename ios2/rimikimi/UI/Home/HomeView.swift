@@ -147,11 +147,16 @@ struct PurposeGrid: View {
     var body: some View {
         LazyVGrid(columns: columns, spacing: Spacing.s3) {
             ForEach(Purpose.allCases, id: \.self) { p in
-                Button { app.pushRoute(.purpose(p.rawValue)) } label: {
+                // 네 번째 칸은 컨셉화보 대신 드레스룸(오너 2026-10-10) — 누르면 드레스룸 컨셉 화면으로 바로.
+                // 드레스룸 컨셉이 아직 안 불러와졌으면 예전처럼 컨셉화보 목적 화면.
+                let dress = p == .concept ? app.concepts.concepts.first(where: { $0.isDressroom }) : nil
+                Button {
+                    if let dress { app.pushRoute(.concept(dress)) } else { app.pushRoute(.purpose(p.rawValue)) }
+                } label: {
                     HStack(spacing: Spacing.s3) {
-                        RemoteImage(url: app.concepts.cover(for: p)?.thumbURL, cornerRadius: 8)
+                        RemoteImage(url: (dress ?? app.concepts.cover(for: p))?.thumbURL, cornerRadius: 8)
                             .frame(width: 38, height: 48)
-                        Text(p.title).font(AppFont.bodyEmphasis).foregroundStyle(Color.ink)
+                        Text(dress != nil ? Copy.purposeDressroom : p.title).font(AppFont.bodyEmphasis).foregroundStyle(Color.ink)
                             .lineLimit(1).minimumScaleFactor(0.85)
                         Spacer(minLength: 0)
                     }

@@ -50,6 +50,7 @@ enum Copy {
     static var purposeSnap: String { LabelStore.t("purpose.snap", "프사·소개팅", "Profile pic · Dating") }
     static var purposeWedding: String { LabelStore.t("purpose.wedding", "웨딩·커플", "Wedding · Couple") }
     static var purposeConcept: String { LabelStore.t("purpose.concept", "컨셉화보", "Concept shoots") }
+    static var purposeDressroom: String { LabelStore.t("purpose.dressroom", "드레스룸", "Dressing room") }
     static var segToday: String { LabelStore.t("segment.today", "오늘의 새 컨셉", "New today") }
     static func cartFull(_ n: Int) -> String { L.t("한 번에 \(n)장까지 고를 수 있어요", "You can pick up to \(n) at once") }
     static func cartMake(_ n: Int) -> String { L.t("\(n)장 만들기", "Create \(n)") }
