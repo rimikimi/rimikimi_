@@ -124,7 +124,7 @@ enum DevRoutes {
                 app.galleryPath = q["home"] == "1" ? [] : [.purpose(key.rawValue)]
                 app.cartExpanded = q["open"] == "1"
             }
-        case "/cameratab": app.tab = .filter
+        case "/cameratab": app.devStripAnchorX = q["x"].flatMap(Double.init); app.tab = .filter
         case "/myphotos":
             Task { @MainActor in
                 for _ in 0..<40 where app.concepts.concepts.isEmpty { try? await Task.sleep(nanoseconds: 250_000_000) }

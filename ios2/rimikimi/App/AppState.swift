@@ -260,6 +260,8 @@ final class AppState {
     /// 뒤에 실행돼 GalleryHomeView 가 이미 첫 렌더(스크롤 위치 확정)를 끝낸 뒤라 `.defaultScrollAnchor`
     /// 가 안 먹는다 — 그래서 여기 `init()` 에서 launch argument 를 동기적으로 직접 읽는다.
     var devScrollToBottom = ProcessInfo.processInfo.arguments.contains { $0.contains("devscrollbottom") }
+    /// dev/cameratab?x=0.6 — 필터 줄 처음 스크롤 위치(긴 필터 이름 잘림 확인용, 시뮬레이터는 스와이프가 안 먹는다).
+    var devStripAnchorX: Double?
     #endif
 
     struct WebTool: Identifiable {

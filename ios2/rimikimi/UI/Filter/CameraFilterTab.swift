@@ -264,6 +264,9 @@ struct CameraFilterTab: View {
             .padding(.horizontal, Spacing.page)
         }
         .scrollIndicators(.hidden)
+        #if DEBUG
+        .defaultScrollAnchor(app.devStripAnchorX.map { UnitPoint(x: $0, y: 0.5) } ?? .leading)
+        #endif
         .coachAnchor("filterStrip")
     }
     private func groupMark(_ icon: String, tint: Color = .white.opacity(0.7)) -> some View {
