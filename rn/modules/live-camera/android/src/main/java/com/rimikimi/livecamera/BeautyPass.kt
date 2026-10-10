@@ -23,7 +23,7 @@ class BeautyPass {
     const val SIG_S = 0.044f; const val DETAIL = 0.0013f; const val FEATHER = 1f / 60f; const val GLOW_S = 0.032f
     // 인플 v2(e243434) — 톤(밝기·홍조·글로우)은 목·귀·이마 피부까지 넓은 타원. 스무딩은 얼굴만.
     const val TCY = 0.75f; const val TRX = 1.0f; const val TRY = 1.35f
-    const val SMOOTH = 0.7f; const val LIFT = 0.07f; const val RED = 0.14f; const val GLOW = 0.22f
+    const val SMOOTH = 0.7f; const val LIFT = 0.13f; const val RED = 0.18f; const val GLOW = 0.30f
 
     private const val COMMON = """
 precision highp float;

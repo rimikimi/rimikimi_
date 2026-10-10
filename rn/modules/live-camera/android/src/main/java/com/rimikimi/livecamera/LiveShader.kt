@@ -176,14 +176,14 @@ vec3 beauty(vec2 up, vec3 v, float a) {
   // ① 스무딩(얼굴만) — INFL.smooth 0.7
   float k = min(1.0, m * 0.7 * a);
   vec3 o = v + (ba + (v - l) * (0.55 - 0.3 * a) - v) * k;
-  // ② 톤(목·귀·이마 피부까지) — INFL.lift 0.07 / red 0.14 / glow 0.22
+  // ② 톤(목·귀·이마 피부까지) — INFL.lift 0.13 / red 0.18 / glow 0.30
   float Y = luma(o);
-  float cb = (o.b - Y) * 0.564, cr = (o.r - Y) * 0.713 * (1.0 - 0.14 * a * tm);
-  Y = Y + (255.0 - Y) * 0.07 * a * tm * smoothstep(60.0, 130.0, Y);
+  float cb = (o.b - Y) * 0.564, cr = (o.r - Y) * 0.713 * (1.0 - 0.18 * a * tm);
+  Y = Y + (255.0 - Y) * 0.13 * a * tm * smoothstep(60.0, 130.0, Y);
   float r = Y + 1.403 * cr, b = Y + 1.773 * cb;
   o = vec3(r, (Y - 0.299 * r - 0.114 * b) / 0.587, b);
   vec3 gl = gsamp(uGlowT, up).rgb * 255.0;
-  return 255.0 - ((255.0 - o) * (255.0 - gl * (0.22 * a * tm))) / 255.0;
+  return 255.0 - ((255.0 - o) * (255.0 - gl * (0.30 * a * tm))) / 255.0;
 }
 vec3 thermal(float t) {
   t = clamp(t, 0.0, 1.0) * 5.0;

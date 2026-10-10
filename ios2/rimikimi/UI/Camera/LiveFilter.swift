@@ -76,7 +76,7 @@ enum LiveFilter {
         static let edgeLo = 45.0, edgeHi = 95.0
         // 톤(밝기·홍조·글로우)은 목·귀·이마 피부까지 — 얼굴만 하면 "얼굴만 붕 떠 있음"(오너 2026-10-10)
         static let tcy = 0.75, trx = 1.0, try_ = 1.35
-        static let smooth = 0.7, lift = 0.07, red = 0.14, glow = 0.22
+        static let smooth = 0.7, lift = 0.13, red = 0.18, glow = 0.30
     }
 
     /// 얼굴 사각형(정규화, **아래가 원점** = CI 좌표) — 정지 사진·검증용 동기 검출. 실시간은 렌더러가 띄엄띄엄 돌린다.
@@ -599,12 +599,12 @@ extern "C" [[stitchable]] float4 lfInfl(coreimage::sampler src, coreimage::sampl
     float3 o = v + (ba + (v - l) * (0.55 - 0.3 * a) - v) * k;
     // ② 톤(피부 전체) — filters.js INFL.lift/red/glow 와 같은 값
     float Y = lf_lum(o);
-    float cb = (o.b - Y) * 0.564, cr = (o.r - Y) * 0.713 * (1.0 - 0.14 * a * tm);
-    Y = Y + (255.0 - Y) * 0.07 * a * tm * smoothstep(60.0, 130.0, Y);
+    float cb = (o.b - Y) * 0.564, cr = (o.r - Y) * 0.713 * (1.0 - 0.18 * a * tm);
+    Y = Y + (255.0 - Y) * 0.13 * a * tm * smoothstep(60.0, 130.0, Y);
     float r = Y + 1.403 * cr, b = Y + 1.773 * cb;
     o = float3(r, (Y - 0.299 * r - 0.114 * b) / 0.587, b);
     float3 gl = lf_clampSample(glow, p, ww, wh).rgb * 255.0;
-    o = 255.0 - ((255.0 - o) * (255.0 - gl * (0.22 * a * tm))) / 255.0;
+    o = 255.0 - ((255.0 - o) * (255.0 - gl * (0.30 * a * tm))) / 255.0;
     return lf_out(lf_floorq(o));
 }
 """#
