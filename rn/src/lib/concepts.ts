@@ -29,6 +29,15 @@ export interface Concept {
   fourcutStyle?: string;
   fourcutStyles?: FourcutStyle[];
   pinFeatured?: number;
+  /** 홈 목적 칸(profile / snap / wedding)에 들어가는지 — 서버 데이터가 정한다(iOS `Concept.purposes`). */
+  purposes?: string[];
+  // ── 2.1 이식: 리미키미 컨셉이 아닌 담기 항목(브루클린 룩 · 조세핀 드레스)을 같은 격자·담기 줄에 태우려고
+  //    컨셉 모양을 빌린다(iOS `Concept(syntheticID:)`). 서버엔 conceptId 대신 studio / wedding 으로 보낸다.
+  /** 합성 항목의 썸네일(절대 URL). 있으면 /thumbs/{id}.webp 대신 이걸 쓴다. */
+  thumb?: string;
+  studioPurpose?: string;
+  studioPreset?: string;
+  dressCode?: string;
 }
 
 export const GARMENT_MAX = 5;
@@ -129,6 +138,23 @@ export function buildIdPhotoPrompt(suitKey: string, bgHex: string, bgName: strin
 }
 
 export const ID_DISCLAIMER = copy.options.idphoto.disclaimer;
+/** 커스텀 보정(매직 부스) — 사진 + 고칠 내용을 글로 받아 그 부분만 고친다(iOS `isRetouch`). */
+export function isRetouch(c?: Concept | null): boolean { return c?.mode === "retouch"; }
+export function isSynthetic(c?: Concept | null): boolean { return !!c && (!!c.studioPreset || !!c.dressCode); }
+/**
+ * 셀카 한 장만으로 만들 수 있어 여러 장 담기에 넣을 수 있는지 — 상대 사진·옷 사진·컷 수·글 입력이
+ * 필요한 컨셉은 옵션 화면으로(iOS `Concept.isBatchable`).
+ */
+export function isBatchable(c: Concept): boolean {
+  return !isCoupleConcept(c) && !isDressroom(c) && !isFourcut(c) && !isArtOnly(c) && !isRetouch(c);
+}
+/** 화면용 썸네일 — 합성 항목은 카탈로그 썸네일, 나머지는 /thumbs/{id}.webp. */
+export function conceptThumb(c: Concept): string { return c.thumb || thumbUrl(c.id); }
+/** 크게 보이는 자리(1200px). 없으면 RemoteImage 쪽에서 썸네일로 물러선다. */
+export function conceptLarge(c: Concept): string { return c.thumb || `${getEnv().apiBase}/large/${c.id}.webp`; }
+/** 증명사진은 목록에서 뺀다(iOS `ConceptStore.pool`, 웹과 동일). */
+export function conceptPool(all: Concept[]): Concept[] { return all.filter((c) => !isIdPhoto(c)); }
+
 export function isFourcut(c?: Concept | null): boolean { return !!c && (c.mode === "fourcut" || /인생네컷/.test(c.title || "")); }
 export function isRestoreConcept(c?: Concept | null): boolean { return !!c && (Number(c.id) === 408 || /복원|restor/i.test(c.title || "")); }
 export function isFeatureConcept(c: Concept): boolean { return isArtConcept(c) || isIdPhoto(c) || isFourcut(c); }
@@ -181,7 +207,8 @@ export function thumbUrl(id: number | string): string {
 
 export async function loadConcepts(): Promise<{ concepts: Concept[]; source: "remote" | "bundled" }> {
   try {
-    const r = await fetch(`${getEnv().apiBase}/concepts.json`, { cache: "no-cache" });
+    // caps — 이 앱이 아는 새 기능. `requires` 가 붙은 컨셉(커스텀 보정 등)은 이게 있어야 목록에 온다(iOS 와 같다).
+    const r = await fetch(`${getEnv().apiBase}/concepts.json?caps=retouch`, { cache: "no-cache" });
     const data = (await r.json()) as unknown;
     if (Array.isArray(data) && data.length) return { concepts: data as Concept[], source: "remote" };
   } catch {

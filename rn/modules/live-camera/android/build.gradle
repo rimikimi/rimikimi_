@@ -1,0 +1,23 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'com.rimikimi'
+version = '1.0.0'
+
+android {
+  namespace "com.rimikimi.livecamera"
+  defaultConfig {
+    versionCode 1
+    versionName '1.0.0'
+  }
+}
+
+dependencies {
+  // expo-camera 가 이미 쓰는 CameraX 와 같은 판(1.6.0) — 그쪽은 implementation 이라 여기서 다시 적는다.
+  def camerax_version = "1.6.0"
+  implementation "androidx.camera:camera-core:${camerax_version}"
+  implementation "androidx.camera:camera-camera2:${camerax_version}"
+  implementation "androidx.camera:camera-lifecycle:${camerax_version}"
+}

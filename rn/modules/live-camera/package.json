@@ -1,0 +1,7 @@
+{
+  "name": "live-camera",
+  "version": "1.0.0",
+  "private": true,
+  "description": "rimikimi 2.1 카메라·필터 탭 — CameraX + GLES 실시간 필터 미리보기(안드로이드 전용 로컬 모듈)",
+  "main": "index.ts"
+}

@@ -145,6 +145,19 @@ export interface GenerateMeta {
   proSample?: boolean;
   pushToken?: string | null;
   faceRefs?: (EncodedPhoto & { angle?: string })[];
+  // ── 2.1 (iOS RimikimiAPI.generate 와 같은 키) ──
+  /** 브루클린 목적 사진: 룩 id + 세부 조정 값(레시피 키 → 값). 있으면 conceptId 를 보내지 않는다. */
+  studio?: { purpose: string; presetId: string; overrides: Record<string, unknown> };
+  /** 브루클린 옷 바꾸기 사진 */
+  outfit?: EncodedPhoto;
+  /** 조세핀 드레스 코드. 있으면 conceptId 를 보내지 않는다. */
+  wedding?: { dressCode: string };
+  /** 신랑도 함께 — 두 번째 사진(mimeType2/base64_2)으로 가지만 couple 플래그는 붙이지 않는다. */
+  groom?: EncodedPhoto;
+  /** 커스텀 보정: 고칠 내용(아무 언어, 1000자까지) */
+  retouchText?: string;
+  /** 게스트 첫 1장(토큰 없음): 기기 ID 만 보낸다 — 서버가 기기당 1회·미리보기 2장으로 만든다. */
+  guest?: { platform: "android"; deviceId: string };
 }
 
 /** 페이스 프로필 앵커 생성(1.x faceProfile.requestAnchor) — 서버는 셀카를 저장하지 않는다. */
@@ -230,14 +243,20 @@ export interface GenerateResult {
  * fetch 자체가 던지면 `networkFail` — 서버 판정을 못 받은 것이므로 호출부는 갤러리를 폴링한다.
  */
 export async function generateImage(token: string, photo: EncodedPhoto, promptText: string, meta: GenerateMeta): Promise<GenerateResult> {
-  if (!token) throw new ApiError(copy.errors.needLogin, 401);
+  if (!token && !meta.guest) throw new ApiError(copy.errors.needLogin, 401);
   const garments = meta.garments && meta.garments.length ? meta.garments.slice(0, 5) : null;
+  // 리미키미 컨셉만 conceptId 를 보낸다. 브루클린 룩·조세핀 드레스는 서버 카탈로그 id 로(지시문은 서버가 만든다).
+  const target = meta.studio
+    ? { studio: meta.studio, ...(meta.outfit ? { outfitMime: meta.outfit.mimeType, outfitBase64: meta.outfit.base64 } : {}) }
+    : meta.wedding
+      ? { wedding: meta.wedding, ...(meta.groom ? { mimeType2: meta.groom.mimeType, base64_2: meta.groom.base64 } : {}) }
+      : { conceptId: meta.id };
   const body = {
     mimeType: photo.mimeType,
     base64: photo.base64,
     prompt: promptText,
     ...(meta.photo2 ? { mimeType2: meta.photo2.mimeType, base64_2: meta.photo2.base64, couple: true } : {}),
-    conceptId: meta.id,
+    ...target,
     conceptTitle: meta.title,
     skipFacePrecheck: !!meta.skipFacePrecheck,
     idSuit: meta.idSuit,
@@ -248,17 +267,20 @@ export async function generateImage(token: string, photo: EncodedPhoto, promptTe
     count: meta.count,
     cutCount: meta.cutCount,
     ...(garments ? { garments, dressStyle: meta.dressStyle } : {}),
+    ...(meta.retouchText ? { retouchText: meta.retouchText.slice(0, 1000) } : {}),
     proSample: !!meta.proSample,
     ...(meta.pushToken ? { pushToken: meta.pushToken } : {}),
     lang: isKo ? "ko" : "en", // 완료 알림 문구 언어
     ...(meta.faceRefs && meta.faceRefs.length ? { faceRefs: meta.faceRefs } : {}),
+    ...(meta.guest ? { guest: meta.guest } : {}),
   };
 
   let res: Response;
   try {
     res = await fetch(`${getEnv().apiBase}/api/generate`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", ...auth(token) },
+      // 게스트는 Authorization 없이(iOS: token 이 비면 authed 를 안 쓴다).
+      headers: { "Content-Type": "application/json", ...(token ? auth(token) : {}) },
       body: JSON.stringify(body),
     });
   } catch {

@@ -15,6 +15,10 @@ import { installPushHandlers, setupNotifications } from "@/lib/push";
 import { initAds } from "@/lib/ads";
 import { usePushResultRouting } from "@/lib/pushRouting";
 import { LoginSheet } from "@/ui/LoginSheet";
+import { App21Provider } from "@/lib/app21";
+import { GuestFlowOverlay } from "@/ui/GuestFlow";
+import { StudioStepSheet } from "@/ui/StudioSheets";
+import { ConsentSheet } from "@/ui/ConsentSheet";
 import { CreditSheet } from "@/ui/CreditSheet";
 import { Text } from "@/ui/Text";
 import { envProblem } from "@/lib/env";
@@ -91,6 +95,7 @@ export default function RootLayout() {
             <StoreProvider>
               <CreditGateProvider>
               <GenerationProvider>
+              <App21Provider>
                 <PushRouting />
                 <StatusBar style="auto" />
                 <Stack
@@ -108,6 +113,8 @@ export default function RootLayout() {
                   <Stack.Screen name="result/[jobId]" options={{ animation: "slide_from_right", animationDuration: transitions.stepForward.duration }} />
                   <Stack.Screen name="category/[name]" options={{ animation: "slide_from_right", animationDuration: transitions.stepForward.duration }} />
                   <Stack.Screen name="store" options={{ animation: "slide_from_right", animationDuration: transitions.stepForward.duration }} />
+                  <Stack.Screen name="settings" options={{ animation: "slide_from_right", animationDuration: transitions.stepForward.duration }} />
+                  <Stack.Screen name="purpose/[key]" options={{ animation: "slide_from_right", animationDuration: transitions.stepForward.duration }} />
                   <Stack.Screen name="camera" options={{ presentation: "modal", animationDuration: transitions.sheetIn.duration }} />
                   <Stack.Screen name="face-scan" options={{ presentation: "modal", animationDuration: transitions.sheetIn.duration }} />
                   <Stack.Screen name="editor" options={{ presentation: "modal", animationDuration: transitions.sheetIn.duration }} />
@@ -115,9 +122,15 @@ export default function RootLayout() {
                   <Stack.Screen name="dev/index" />
                   <Stack.Screen name="dev/[name]" options={{ animation: "slide_from_right" }} />
                 </Stack>
+                {/* 2.1: 전문 프로필 "N장 만들기" 다음 단계 · 게스트 첫 1장 화면 */}
+                <StudioStepSheet />
+                <GuestFlowOverlay />
+                {/* 제3자 AI 전송 고지 — 첫 만들기 전 1회(iOS AIConsentSheet) */}
+                <ConsentSheet />
                 {/* 로그인 시트 · 크레딧 부족 시트 — 어느 화면에서든 띄운다. 스택 위에 그린다. */}
                 <LoginSheet />
                 <CreditSheet />
+              </App21Provider>
               </GenerationProvider>
               </CreditGateProvider>
             </StoreProvider>

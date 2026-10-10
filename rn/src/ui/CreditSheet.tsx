@@ -22,7 +22,7 @@ export function CreditSheet() {
       <Card padded={false}>
         <Pressable
           accessibilityRole="button"
-          onPress={() => { gate.close(); router.push("/(tabs)/profile"); }}
+          onPress={() => { gate.close(); router.push("/settings"); }}
           style={({ pressed }) => [styles.invite, pressed && { backgroundColor: color.fill }]}
         >
           <View style={{ flex: 1, gap: 2 }}>

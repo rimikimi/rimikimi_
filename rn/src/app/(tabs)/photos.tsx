@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Alert, Pressable, RefreshControl, StyleSheet, View, useWindowDimensions } from "react-native";
-import { router, useFocusEffect } from "expo-router";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { Image } from "expo-image";
 import { Screen } from "@/ui/Screen";
 import { AppHeader } from "@/ui/AppHeader";
@@ -16,31 +16,35 @@ import { useStore } from "@/lib/store";
 import { conceptTitle } from "@/lib/concepts";
 import { color, radius, space, themedStyles } from "@/theme/tokens";
 import { duration } from "@/theme/motion";
+import { c21 } from "@/lib/copy21";
+import { devFakeGallery } from "@/lib/myAlbums";
 
-// 내 사진 — 서버 갤러리 그리드(/api/gallery, Bearer) + 맨 위 진행 카드(SPEC §2).
+// 내 사진 — 서버 갤러리(/api/gallery, Bearer) + 맨 위 진행 카드(SPEC §2).
+// 2.1(iOS MyPhotosView 63895f8): 앨범 없이 결과 전부를 최신순 3열 한 격자로. 탭 = 결과 화면. 남은 시간 표시 없음.
 
 export default function PhotosTab() {
   const { session, requireLogin } = useAuth();
+  // ⚠️ DEV 전용 캡처 경로 — `/(tabs)/photos?fake=1` 이면 로그인 없이 가짜 앨범(iOS dev/myphotos?fake=1).
+  const { fake } = useLocalSearchParams<{ fake?: string }>();
+  const devFake = __DEV__ && fake === "1";
   const token = session?.access_token;
   const { jobs } = useGeneration();
   const { byId } = useStore();
-  // 제목은 컨셉 목록에서 찾아 언어에 맞게(영어면 title_en). 목록에 없으면 서버가 준 제목.
-  const titleOf = (it: { conceptId?: string | number | null; conceptTitle?: string | null }) =>
-    conceptTitle(byId(it.conceptId ?? undefined)) || it.conceptTitle || "";
   const [items, setItems] = useState<GalleryItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const { width } = useWindowDimensions();
 
   const load = useCallback(async () => {
+    if (devFake) { setItems(devFakeGallery()); return; }
     if (!token) { setItems(null); return; }
     try {
       setError(null);
       setItems(await fetchGallery(token));
-    } catch (e) {
-      setError((e as Error)?.message || copy.photos.loadFail);
+    } catch {
+      setError(c21.mineLoadFailed);
     }
-  }, [token]);
+  }, [token, devFake]);
 
   useEffect(() => { void load(); }, [load]);
   // 탭에 돌아올 때, 그리고 진행 중이던 작업이 끝났을 때 다시 읽는다.
@@ -48,7 +52,8 @@ export default function PhotosTab() {
   useFocusEffect(useCallback(() => { void load(); }, [load, doneCount]));
 
   const cols = 3;
-  const w = Math.floor((width - space.screen * 2 - space.s1 * (cols - 1)) / cols);
+  const w = Math.floor((width - space.screen * 2 - 2 * (cols - 1)) / cols);
+  const flat = items ? [...items].sort((x, y) => Date.parse(y.createdAt || "") - Date.parse(x.createdAt || "")) : [];
 
   const onDelete = (it: GalleryItem) => {
     Alert.alert(copy.photos.deleteConfirm, undefined, [
@@ -61,19 +66,21 @@ export default function PhotosTab() {
     ]);
   };
 
+
+
   return (
     <Screen
       scrollModel="scroll"
       hasTabBar
-      header={<AppHeader title={copy.photos.title} />}
+      header={<AppHeader title={c21.tabMyPhotos} right={<View />} />}
       refreshControl={<RefreshControl refreshing={refreshing} tintColor={color.accent} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />}
     >
       {/* 로그인한 사람의 카드만. 로그아웃 상태에서 앞사람 카드가 보이던 것(2026-09-23 스윕) */}
       {session ? <ProgressCards /> : null}
-      {!session ? (
+      {!session && !devFake ? (
         <View style={styles.empty}>
-          <Text tone="muted" center>{copy.photos.loginRequired}</Text>
-          <Button label={copy.profile.login} variant="secondary" onPress={() => requireLogin("make", () => undefined)} />
+          <Text tone="muted" center>{c21.mineLoginPrompt}</Text>
+          <Button label={c21.signIn} variant="secondary" onPress={() => requireLogin("make", () => undefined)} />
         </View>
       ) : error ? (
         <View style={styles.empty}>
@@ -84,26 +91,29 @@ export default function PhotosTab() {
         <View style={styles.empty}><Spinner size={28} color={color.accent} /></View>
       ) : items.length === 0 && !jobs.length ? (
         <View style={styles.empty}>
-          <Text tone="muted" center>{copy.photos.empty}</Text>
-          <Button label={copy.photos.emptyCta} variant="secondary" onPress={() => router.push("/(tabs)/gallery")} />
+          <Text tone="muted" center>{c21.mineEmpty}</Text>
+          <Button label={c21.mineEmptyCta} variant="secondary" onPress={() => router.push("/(tabs)/gallery")} />
         </View>
       ) : (
-        <>
-          <View style={styles.grid}>
-            {items.map((it) => (
+        <View style={styles.grid}>
+          {/* 2.1(iOS 63895f8, 오너 지시): 앨범으로 묶지 않는다 — 결과 전부를 최신순 3열 한 격자로,
+              누르면 그 결과 화면으로 바로. 길게 누르면 지우기(안드로이드 2.0 동작 유지). */}
+          {flat.map((it) => {
+            const title = conceptTitle(byId(it.conceptId ?? undefined)) || it.conceptTitle || "";
+            return (
               <Pressable
                 key={it.id}
                 accessibilityRole="button"
-                accessibilityLabel={titleOf(it) || copy.ui.photo}
-                onPress={() => router.push({ pathname: "/result/[jobId]", params: { jobId: `gallery:${it.id}`, url: it.url ?? "", conceptId: String(it.conceptId ?? ""), title: titleOf(it) } })}
+                accessibilityLabel={title || c21.tabMyPhotos}
+                onPress={() => router.push({ pathname: "/result/[jobId]", params: { jobId: `gallery:${it.id}`, url: it.url ?? "", conceptId: String(it.conceptId ?? ""), title } })}
                 onLongPress={() => onDelete(it)}
-                style={({ pressed }) => [{ width: w, height: Math.round((w * 4) / 3) }, pressed && { opacity: 0.85 }]}
+                style={({ pressed }) => [pressed && { opacity: 0.85 }]}
               >
                 <Image source={{ uri: it.url ?? undefined }} style={[styles.thumb, { width: w, height: Math.round((w * 4) / 3) }]} contentFit="cover" transition={duration.enter} />
               </Pressable>
-            ))}
-          </View>
-        </>
+            );
+          })}
+        </View>
       )}
     </Screen>
   );
@@ -111,6 +121,6 @@ export default function PhotosTab() {
 
 const styles = themedStyles(() => StyleSheet.create({
   empty: { paddingVertical: space.s7, paddingHorizontal: space.s5, alignItems: "center", gap: space.s4 },
-  grid: { flexDirection: "row", flexWrap: "wrap", gap: space.s1, paddingHorizontal: space.screen },
-  thumb: { borderRadius: radius.thumb - 4, backgroundColor: color.mat },
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: 2, paddingHorizontal: space.screen },
+  thumb: { borderRadius: radius.thumb, backgroundColor: color.mat },
 }));

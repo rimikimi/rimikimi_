@@ -4,17 +4,20 @@ import { router, useLocalSearchParams } from "expo-router";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Screen } from "@/ui/Screen";
 import { AppHeader } from "@/ui/AppHeader";
 import { Button } from "@/ui/Button";
 import { Text } from "@/ui/Text";
 import { Thumb, photoHeight } from "@/ui/Thumb";
 import { FavoriteStarButton } from "@/ui/FavoriteBits";
+import { ConceptOptionsView } from "@/ui/ConceptOptions";
 import { useStore } from "@/lib/store";
-import { conceptTitle, conceptsIn, thumbUrl, type Concept } from "@/lib/concepts";
+import { conceptTitle, conceptsIn, conceptThumb, isSynthetic, type Concept } from "@/lib/concepts";
+import { useApp21 } from "@/lib/app21";
+import { c21, t } from "@/lib/copy21";
 import { categoryLabel } from "@/lib/locale";
-import { copy } from "@/lib/copy";
-import { color, radius, space } from "@/theme/tokens";
+import { chrome, color, radius, space } from "@/theme/tokens";
 import { ease } from "@/theme/motion";
 
 // 카테고리 안의 사진을 훑어보는 화면 — 큰 사진 + 아래 필름스트립(네이티브 사진 앱 방식).
@@ -24,6 +27,10 @@ import { ease } from "@/theme/motion";
 //  · 아래로 끌어내리면 화면이 따라 내려가며 작아지고 격자로 돌아간다.
 //  · 필름스트립을 끌면 큰 사진이 따라 바뀌고(스크러빙), 큰 사진을 넘겨도 스트립이 따라온다.
 //  · 열자마자 **선택한 칸이 가운데**에 온다.
+//  · 만들기(사진 고르기·옵션·만들기 버튼)도 이 화면 아래에 붙는다 — iOS d76446f(오너 2026-10-10 "두 개 한 페이지로").
+//    큰 사진은 화면 높이의 50% 이내라 사진 고르기 칸까지 첫 화면에 들어오고, 옵션이 더 있으면 아래가 살짝 보인다.
+//    끌어 닫기는 **큰 사진 영역에만** 건다(화면 전체에 걸면 옵션을 스크롤할 때마다 화면이 끌려 움직인다).
+//    브루클린 룩·조세핀 드레스(옵션 화면 없음)는 예전처럼 큰 사진 + 담기.
 
 const STRIP_W = 52;
 const STRIP_GAP = 8;
@@ -31,13 +38,16 @@ const STRIP_GAP = 8;
 const DISMISS_Y = 140;
 
 export default function BrowseScreen() {
-  const { name, start } = useLocalSearchParams<{ name: string; start?: string }>();
+  // list=1 → 격자에서 누른 그 목록(목적 칸·브루클린 룩·조세핀 드레스 포함, iOS `app.browseList`). 없으면 카테고리.
+  const { name, start, list } = useLocalSearchParams<{ name: string; start?: string; list?: string }>();
   const { concepts, favoriteConcepts, isFavoriteConcept, toggleFavoriteConcept } = useStore();
-  const { width } = useWindowDimensions();
+  const { browseList, cartIndex, toggleCart } = useApp21();
+  const { width, height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
 
   const items = useMemo(
-    () => conceptsIn(concepts, name ?? "", favoriteConcepts),
-    [concepts, name, favoriteConcepts],
+    () => (list === "1" && browseList ? browseList : conceptsIn(concepts, name ?? "", favoriteConcepts)),
+    [list, browseList, concepts, name, favoriteConcepts],
   );
   const startIndex = Math.max(0, items.findIndex((c) => String(c.id) === String(start)));
   const [index, setIndex] = useState(startIndex < 0 ? 0 : startIndex);
@@ -188,30 +198,17 @@ export default function BrowseScreen() {
     return { transform: [{ translateY: dragY.value }, { scale: 1 - p * 0.14 }], opacity: 1 - p * 0.35 };
   });
 
-  const bigH = photoHeight(width);
+  const merged = !!current && !isSynthetic(current);
+  // 큰 사진 높이 — 3:4 를 화면 폭에 맞추되, 합친 화면에선 (상단 바 아래) 화면 높이의 50%를 넘지 않게(iOS pagerHeight).
+  const bigH = merged
+    ? Math.min(photoHeight(width), Math.round((height - insets.top - chrome.headerH) * 0.5))
+    : photoHeight(width);
+  const bigW = Math.min(width, Math.round((bigH * 3) / 4));
 
-  return (
-    <Screen
-      scrollModel="fixed"
-      header={
-        <AppHeader
-          title={categoryLabel(name ?? "")}
-          back
-          right={
-            current ? (
-              <FavoriteStarButton
-                on={isFavoriteConcept(current.id)}
-                onPress={() => toggleFavoriteConcept(current.id)}
-              />
-            ) : (
-              <View />
-            )
-          }
-        />
-      }
-    >
+  const top = (
+    <View>
       <GestureDetector gesture={drag}>
-        <Animated.View style={[styles.body, sheet]}>
+        <Animated.View style={sheet}>
           <FlatList
             ref={pager}
             data={items}
@@ -228,9 +225,13 @@ export default function BrowseScreen() {
             onScrollToIndexFailed={() => {}}
             // 미리보기는 전부 3:4 — 큰 사진도 예외가 아니다.
             renderItem={({ item }) => (
-              <Thumb uri={thumbUrl(item.id)} width={width} height={bigH} rounded={0} />
+              <View style={{ width, height: bigH, alignItems: "center" }}>
+                <Thumb uri={conceptThumb(item)} width={bigW} height={bigH} rounded={bigW < width ? radius.card : 0} />
+              </View>
             )}
           />
+        </Animated.View>
+      </GestureDetector>
 
           {current ? (
             <Text size="headline" numberOfLines={1} style={styles.title}>
@@ -264,7 +265,7 @@ export default function BrowseScreen() {
               <Pressable accessibilityRole="button" accessibilityLabel={conceptTitle(item)} onPress={() => jump(i)}>
                 <View style={{ marginRight: STRIP_GAP }}>
                   {/* 필름스트립 칸도 3:4 (오너 지시). 안 고른 칸을 흐리게 하지 않는다 — 사진 앱도 안 한다. */}
-                  <Thumb uri={thumbUrl(item.id)} width={STRIP_W} rounded={radius.thumb - 2} />
+                  <Thumb uri={conceptThumb(item)} width={STRIP_W} rounded={radius.thumb - 2} />
                   {/* ⚠️ 테두리를 `borderWidth` 로 주면 안 된다. 칸이 4px 넓어져서 실제 배치가
                       `getItemLayout` 이 말한 크기와 어긋나고, 뒤로 갈수록 그 오차가 쌓여 고른 칸이
                       화면 밖으로 밀린다(54번째에서 216px 어긋났다 — 실측). 자리를 안 먹는 덧그림으로. */}
@@ -273,18 +274,37 @@ export default function BrowseScreen() {
               </Pressable>
             )}
           />
+    </View>
+  );
 
-          {current ? (
-            <View style={styles.cta}>
-              <Button
-                label={copy.ui.makeThis}
-                full
-                onPress={() => router.push({ pathname: "/concept/[id]", params: { id: String(current.id) } })}
-              />
-            </View>
-          ) : null}
-        </Animated.View>
-      </GestureDetector>
+  if (merged) {
+    return <ConceptOptionsView concept={current} top={top} navTitle={categoryLabel(name ?? "")} />;
+  }
+
+  return (
+    <Screen
+      scrollModel="fixed"
+      header={
+        <AppHeader
+          title={categoryLabel(name ?? "")}
+          back
+          right={<View />}
+        />
+      }
+    >
+      <View style={styles.body}>
+        {top}
+        {current ? (
+          <View style={styles.cta}>
+            {/* 브루클린 룩·조세핀 드레스는 옵션 화면이 없다 — 여기서 바로 담는다(길게 누르기와 같다). */}
+            <Button
+              label={cartIndex(current) >= 0 ? c21.a11yRemoveFromCart : t("담기", "Pick")}
+              full
+              onPress={() => { toggleCart(current); }}
+            />
+          </View>
+        ) : null}
+      </View>
     </Screen>
   );
 }

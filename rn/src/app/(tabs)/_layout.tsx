@@ -1,15 +1,14 @@
 import React, { useEffect, useState } from "react";
 import { Keyboard, Pressable, StyleSheet, View } from "react-native";
-import { Tabs, router } from "expo-router";
+import { Tabs } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { Glass } from "@/ui/Screen";
 import { Text } from "@/ui/Text";
-import { IconCamera, IconFilter, IconGallery, IconGrid, IconUser, type IconProps } from "@/ui/icons";
-import { useAuth } from "@/lib/auth";
-import { copy } from "@/lib/copy";
+import { IconCamera, IconGallery, IconSparkle, type IconProps } from "@/ui/icons";
+import { c21 } from "@/lib/copy21";
 import { chrome, color, radius, shadow, space, themedStyles } from "@/theme/tokens";
-import { CARD_PRESS_SCALE, PRESS_SCALE, duration, ease } from "@/theme/motion";
+import { CARD_PRESS_SCALE, duration, ease } from "@/theme/motion";
 
 // ============================================================================
 // FIXED bottom tab bar, self-made (Justin 셸의 글라스 알약 + SPEC §2 5슬롯).
@@ -20,14 +19,14 @@ import { CARD_PRESS_SCALE, PRESS_SCALE, duration, ease } from "@/theme/motion";
 //   · 카메라 버튼은 탭이 아니다 — (로그인) → 카메라 모달을 연다(SPEC §3)
 // ============================================================================
 
-type Route = "gallery" | "filter" | "photos" | "profile";
-const LEFT: { name: Route; label: string; Icon: React.ComponentType<IconProps> }[] = [
-  { name: "gallery", label: copy.tabs.gallery, Icon: IconGallery },
-  { name: "filter", label: copy.tabs.filter, Icon: IconFilter },
-];
-const RIGHT: typeof LEFT = [
-  { name: "photos", label: copy.tabs.photos, Icon: IconGrid },
-  { name: "profile", label: copy.tabs.profile, Icon: IconUser },
+// 2.1 개편(iOS RootTabView, 오너 지시 2026-10-09): 탭 3개 — 만들기 · 카메라·필터 · 내 사진.
+// 프로필은 홈 ⚙︎(설정)로. 가운데 떠 있는 카메라 원도 없앴다 — 카메라는 "카메라·필터" 탭 안에 있다.
+// (라우트 이름은 예전 그대로 둔다 — 푸시·딥링크·dev 프리뷰가 이 이름을 본다.)
+type Route = "gallery" | "filter" | "photos";
+const TABS: { name: Route; label: () => string; Icon: React.ComponentType<IconProps> }[] = [
+  { name: "gallery", label: () => c21.tabMake, Icon: IconSparkle },
+  { name: "filter", label: () => c21.tabCameraFilter, Icon: IconCamera },
+  { name: "photos", label: () => c21.tabMyPhotos, Icon: IconGallery },
 ];
 
 interface TabBarProps {
@@ -48,14 +47,16 @@ function useKeyboardOpen(): boolean {
 function TabBar({ state, navigation }: TabBarProps) {
   const insets = useSafeAreaInsets();
   const keyboardOpen = useKeyboardOpen();
-  const { requireLogin } = useAuth();
   if (keyboardOpen) return null;
   const current = state.routes[state.index]?.name;
+  // 카메라 탭은 화면 전체가 검은 뷰파인더라 바도 어둡게(기본 카메라 앱처럼).
+  const dark = current === "filter";
 
-  const item = (def: (typeof LEFT)[number]) => (
+  const item = (def: (typeof TABS)[number]) => (
     <TabItem
       key={def.name}
-      label={def.label}
+      dark={dark}
+      label={def.label()}
       Icon={def.Icon}
       focused={current === def.name}
       onPress={() => { if (current !== def.name) navigation.navigate(def.name); }}
@@ -64,25 +65,25 @@ function TabBar({ state, navigation }: TabBarProps) {
 
   return (
     <View style={[styles.floatWrap, { paddingBottom: insets.bottom + chrome.tabBarBottom }]} pointerEvents="box-none">
-      <View style={styles.barBase}>
-        <Glass style={styles.bar}>
-          <View style={styles.row} accessibilityRole="tablist">
-            {LEFT.map(item)}
-            {/* 가운데 자리 — 카메라 원이 위로 떠 있으므로 바 안에는 빈 칸만 둔다 */}
-            <View style={styles.item} />
-            {RIGHT.map(item)}
+      <View style={[styles.barBase, dark && styles.barBaseDark]}>
+        {dark ? (
+          <View style={[styles.bar, styles.barDark]}>
+            <View style={styles.row} accessibilityRole="tablist">{TABS.map(item)}</View>
           </View>
-        </Glass>
+        ) : (
+          <Glass style={styles.bar}>
+            <View style={styles.row} accessibilityRole="tablist">{TABS.map(item)}</View>
+          </Glass>
+        )}
       </View>
-      <CameraButton onPress={() => requireLogin("camera", () => router.push("/camera"), "/camera")} />
     </View>
   );
 }
 
-function TabItem({ label, Icon, focused, onPress }: { label: string; Icon: React.ComponentType<IconProps>; focused: boolean; onPress: () => void }) {
+function TabItem({ label, Icon, focused, onPress, dark }: { label: string; Icon: React.ComponentType<IconProps>; focused: boolean; onPress: () => void; dark?: boolean }) {
   const scale = useSharedValue(1);
   const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
-  const tint = focused ? color.accent : color.ink2;
+  const tint = focused ? color.accent : dark ? "rgba(255,255,255,0.72)" : color.ink2;
   return (
     <Animated.View style={[styles.item, style]}>
       <Pressable
@@ -102,25 +103,6 @@ function TabItem({ label, Icon, focused, onPress }: { label: string; Icon: React
   );
 }
 
-function CameraButton({ onPress }: { onPress: () => void }) {
-  const scale = useSharedValue(1);
-  const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
-  return (
-    <Animated.View style={[styles.cameraWrap, style]} pointerEvents="box-none">
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={copy.tabs.camera}
-        onPressIn={() => { scale.value = withTiming(PRESS_SCALE, { duration: duration.press, easing: ease.out }); }}
-        onPressOut={() => { scale.value = withTiming(1, { duration: duration.pressRelease, easing: ease.out }); }}
-        onPress={onPress}
-        style={styles.camera}
-      >
-        <IconCamera size={28} color={color.accentOn} />
-      </Pressable>
-    </Animated.View>
-  );
-}
-
 export default function TabsLayout() {
   return (
     <Tabs
@@ -130,7 +112,6 @@ export default function TabsLayout() {
       <Tabs.Screen name="gallery" />
       <Tabs.Screen name="filter" />
       <Tabs.Screen name="photos" />
-      <Tabs.Screen name="profile" />
     </Tabs>
   );
 }
@@ -139,23 +120,10 @@ const styles = themedStyles(() => StyleSheet.create({
   floatWrap: { position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: chrome.tabBarSide, alignItems: "center" },
   // 유리 아래 불투명 베이스 — 어두운 사진 그리드 위에서 바가 묻히지 않게.
   barBase: { width: "100%", borderRadius: radius.pill, backgroundColor: color.card, overflow: "hidden", ...shadow.float },
+  barBaseDark: { backgroundColor: "#1C1C1E" },
+  barDark: { borderColor: "rgba(255,255,255,0.12)" },
   bar: { width: "100%", borderRadius: radius.pill, borderWidth: StyleSheet.hairlineWidth, borderColor: color.line, overflow: "hidden" },
   row: { flexDirection: "row", height: chrome.tabBarH, paddingHorizontal: space.s2 },
   item: { flex: 1 },
   pressable: { flex: 1, minHeight: 48, alignItems: "center", justifyContent: "center", gap: 3 },
-  cameraWrap: {
-    position: "absolute",
-    alignSelf: "center",
-    // 바 위쪽 가장자리에서 14 위로. floatWrap 의 paddingBottom 은 부모 기준이라 bottom 값으로 계산한다.
-    bottom: chrome.tabBarH + chrome.tabBarBottom + chrome.cameraLift - chrome.cameraD / 2,
-  },
-  camera: {
-    width: chrome.cameraD,
-    height: chrome.cameraD,
-    borderRadius: radius.pill,
-    backgroundColor: color.cameraBg,
-    alignItems: "center",
-    justifyContent: "center",
-    ...shadow.camera,
-  },
 }));
