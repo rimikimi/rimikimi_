@@ -59,18 +59,14 @@ struct MyPhotosView: View {
                 } else if items.isEmpty {
                     EmptyState(message: error ?? Copy.mineEmpty, actionTitle: Copy.mineEmptyCta) { app.tab = .gallery }
                 } else {
-                    // 홈 앨범처럼 — 같은 컨셉으로 만든 것끼리 묶어 표지·이름·장수(오너 지시 2026-10-09
-                    // "여기도 그냥 앨범처럼 보여주고 카운트만"). 남은 시간 표시는 뺐다.
-                    LazyVGrid(columns: albumColumns, spacing: Spacing.s4) {
-                        ForEach(albums) { album in
-                            NavigationLink {
-                                MyAlbumView(title: album.title, items: album.items)
-                            } label: {
-                                VStack(alignment: .leading, spacing: Spacing.s1) {
-                                    RemoteImage(url: album.items.first?.url, cornerRadius: Radius.card).photoRatio()
-                                    Text(album.title).font(AppFont.cardTitle).foregroundStyle(Color.ink).lineLimit(1)
-                                    Text(Copy.albumCount(album.items.count)).font(AppFont.footnote).foregroundStyle(Color.ink3)
-                                }
+                    // 앨범으로 묶지 않고 사진 앱처럼 최신순 격자로 전부 펼친다(2026-10-10 오너 "2장 이상도 그냥 여기서는
+                    // 다 펼쳐서", "하나 생성한 것도"). 사진을 누르면 바로 그 사진(결과 화면).
+                    LazyVGrid(columns: columns, spacing: 6) {
+                        ForEach(items.sorted { ($0.createdAt ?? .distantPast) > ($1.createdAt ?? .distantPast) }) { it in
+                            NavigationLink(value: Route.result(ResultPayload(
+                                items: [.init(id: it.id, image: nil, url: it.url, expiresAt: it.expiresAt)],
+                                conceptId: it.conceptId, conceptTitle: it.conceptTitle ?? ""))) {
+                                RemoteImage(url: it.url, cornerRadius: Radius.thumb).photoRatio()
                             }
                             .buttonStyle(PressScaleButtonStyle())
                         }
@@ -106,6 +102,7 @@ struct MyPhotosView: View {
         #endif
         }
     }
+
 
     #if DEBUG
     /// `GalleryHomeView.devRepeatScrollToBottom` 과 같은 이유(`LazyVGrid` 레이아웃 수렴 여러 프레임 필요).
