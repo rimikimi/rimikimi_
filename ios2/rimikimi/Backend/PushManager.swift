@@ -82,6 +82,26 @@ final class PushManager: NSObject {
         HapticPlayer.selection()
     }
 
+    /// 첫 생성 때 한 번 — 알림 권한을 아직 안 물었으면 묻는다(오너 2026-10-10 "왜 푸시알림 안 옴": 2.x 는 설정 토글을
+    /// 켜야만 물어서, 대부분 사용자가 완료·새 컨셉 알림을 하나도 못 받았다). 허용하면 새 컨셉 알림도 같이 켠다.
+    /// 완료 알림은 이번 요청에 실릴 FCM 토큰이 필요하니 토큰을 잠깐(최대 3초) 기다린다.
+    func askOnFirstGenerate() async {
+        guard configured else { return }
+        let status = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
+        guard status == .notDetermined else { return }
+        let granted = (try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound])) ?? false
+        await refreshAuthorization()
+        guard granted else { return }
+        UIApplication.shared.registerForRemoteNotifications()
+        newConceptAlerts = true
+        UserDefaults.standard.set(true, forKey: "push.newConcept.v1")
+        syncDropTopic()
+        for _ in 0..<15 where fcmToken == nil {
+            if let t = try? await Messaging.messaging().token() { fcmToken = t; break }
+            try? await Task.sleep(nanoseconds: 200_000_000)
+        }
+    }
+
     /// `drop_p540` = UTC+9. 서버 규칙과 동일. 영어 기기는 `drop_p540_en`(서버가 영어 문구로 보냄).
     static var dropTopic: String { topic(ko: L.ko) }
     static func topic(ko: Bool) -> String {

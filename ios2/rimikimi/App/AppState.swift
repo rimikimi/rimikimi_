@@ -424,6 +424,7 @@ final class AppState {
             }
             lastRequest = req
             HapticPlayer.commit()
+            await push.askOnFirstGenerate()
             generation.start(req, token: token, pushToken: push.fcmToken)
             // 홈으로 복귀 + 내 사진 진행 카드 (SPEC §3).
             galleryPath.removeAll()
@@ -446,6 +447,7 @@ final class AppState {
                 if reqs[i].faceProfile.isEmpty { reqs[i].faceProfile = faceProfile.ordered.map { ($0.image, $0.angle.rawValue) } }
             }
             HapticPlayer.commit()
+            await push.askOnFirstGenerate()
             lastRequest = reqs.last
             // 동시에 다 던지면 서버(Vertex) 분당 한도에 걸린다 — 조금씩 띄워 보낸다(서버도 429 백오프가 있다).
             for (i, r) in reqs.enumerated() {
