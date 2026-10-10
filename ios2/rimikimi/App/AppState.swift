@@ -448,7 +448,8 @@ final class AppState {
             // 동시에 다 던지면 서버(Vertex) 분당 한도에 걸린다 — 조금씩 띄워 보낸다(서버도 429 백오프가 있다).
             for (i, r) in reqs.enumerated() {
                 if i > 0 { try? await Task.sleep(nanoseconds: 700_000_000) }
-                generation.start(r, token: token, pushToken: push.fcmToken)
+                // 결과는 내 사진 앨범에 쌓기만 — 한 장 끝날 때마다 결과 화면이 끼어들지 않게.
+                generation.start(r, token: token, pushToken: push.fcmToken, autoPresent: false)
             }
             clearCart()
             galleryPath.removeAll()

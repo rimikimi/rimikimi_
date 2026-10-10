@@ -134,6 +134,11 @@ enum DevRoutes {
                     arr.append(["id": "\(i)-\(j)", "conceptId": c.id, "conceptTitle": c.title,
                                 "createdAt": "2026-10-09T0\(9 - i):0\(j):00Z", "url": c.thumbURL.absoluteString])
                 } }
+                // 드레스·룩은 서버에 conceptId 0 으로 저장된다 — 이름이 다르면 앨범도 따로여야 한다.
+                for (j, t) in ["M3 머메이드", "M10 볼가운"].enumerated() {
+                    arr.append(["id": "dress-\(j)", "conceptId": 0, "conceptTitle": t,
+                                "createdAt": "2026-10-09T10:0\(j):00Z", "url": cs.first?.thumbURL.absoluteString ?? ""])
+                }
                 if let d = try? JSONSerialization.data(withJSONObject: arr) { app.devFakeGallery = try? JSONDecoder().decode([GalleryItem].self, from: d) }
                 app.tab = .myPhotos
             }

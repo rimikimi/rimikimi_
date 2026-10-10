@@ -107,10 +107,15 @@ final class GenerationCoordinator {
 
     // MARK: 시작
 
-    func start(_ request: GenerateRequest, token: String, pushToken: String? = nil) {
+    /// 여러 장 한 번에(담기 → N장 만들기)로 시작한 작업 — 끝나도 결과 화면을 자동으로 열지 않는다.
+    /// 오너(2026-10-10): "2장 결과물이 그냥 내 사진에 떠야" — 한 장씩 끝날 때마다 결과 화면이 끼어들었다.
+    private var silentJobs: Set<String> = []
+
+    func start(_ request: GenerateRequest, token: String, pushToken: String? = nil, autoPresent: Bool = true) {
         // ⚠️ 여기에 "이미 돌고 있으면 return" 을 다시 넣지 말 것. 그게 이 파일을 고친 이유다.
         let job = Job(conceptId: request.concept.id, conceptTitle: request.concept.title,
                       startedAt: Date(), count: request.displayCount)
+        if !autoPresent { silentJobs.insert(job.id) }
         addMarker(job)
         // 매직 부스(올린 사진을 변환)는 결과 화면에서 길게 눌러 원본과 비교한다 — 원본은 기기에만 둔다.
         if request.concept.isArtTransform { OriginalStore.saveForJob(job.id, image: request.photo) }
@@ -128,8 +133,10 @@ final class GenerationCoordinator {
             OriginalStore.link(jobId: job.id, to: items.map(\.id))
             removeMarker(job.id)
             setPhase(job.id, .done(items))
-            pendingPresentation = items
-            pendingPresentationJob = job
+            if silentJobs.remove(job.id) == nil {
+                pendingPresentation = items
+                pendingPresentationJob = job
+            }
             lastDoneWasLive = true
             doneTick &+= 1
             AppLog.api.info("gen.done concept=\(job.conceptId, privacy: .public) items=\(items.count)")
@@ -186,8 +193,10 @@ final class GenerationCoordinator {
                 OriginalStore.link(jobId: job.id, to: items.map(\.id))
                 removeMarker(job.id)
                 setPhase(job.id, .done(items))
-                pendingPresentation = items
-                pendingPresentationJob = job
+                if silentJobs.remove(job.id) == nil {
+                    pendingPresentation = items
+                    pendingPresentationJob = job
+                }
                 lastDoneWasLive = false      // 복구로 되찾은 결과 — 광고는 띄우지 않는다
                 doneTick &+= 1
                 HapticPlayer.success()

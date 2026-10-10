@@ -23,8 +23,14 @@ struct MyPhotosView: View {
         let sorted = items.sorted { ($0.createdAt ?? .distantPast) > ($1.createdAt ?? .distantPast) }
         var order: [String] = []
         var groups: [String: [GalleryItem]] = [:]
+        // 드레스·프로필 룩은 서버에 컨셉 번호 0 으로 저장된다 — 번호로만 묶으면 다른 드레스끼리 한 앨범이 되고
+        // 이름은 첫 장 것이 붙었다(2026-10-10 오너: M3·M10 이 "M10 볼가운" 하나로). 번호가 없으면 이름으로 묶는다.
+        func key(_ it: GalleryItem) -> String {
+            if let id = it.conceptId, !id.isEmpty, id != "0" { return id }
+            return "t:" + (it.conceptTitle ?? "")
+        }
         for it in sorted {
-            let k = it.conceptId ?? "_"
+            let k = key(it)
             if groups[k] == nil { order.append(k) }
             groups[k, default: []].append(it)
         }
