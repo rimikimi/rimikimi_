@@ -29,6 +29,8 @@ const arg = (name, def) => {
 const DRY = argv.includes("--dry");
 const TRACK = arg("track", "internal");
 const NOTES = arg("notes", "");
+// --rollout 0.2 → 단계적 출시(20%). 없으면 전체(completed). 나중에 Play 콘솔이나 play-promote 로 100% 로 올린다.
+const ROLLOUT = arg("rollout", "") ? Number(arg("rollout", "")) : null;
 const NOTES_EN = arg("notes-en", "");   // 영문 릴리즈 노트(en-US) — 기기 언어가 영어인 사용자에게 보인다
 const RELEASE_NOTES = [
   ...(NOTES ? [{ language: "ko-KR", text: NOTES }] : []),
@@ -118,7 +120,7 @@ await api("PUT", `${BASE}/edits/${edit.id}/tracks/${TRACK}`, {
     track: TRACK,
     releases: [{
       versionCodes: [String(uploaded.versionCode)],
-      status: "completed",
+      ...(ROLLOUT && ROLLOUT > 0 && ROLLOUT < 1 ? { status: "inProgress", userFraction: ROLLOUT } : { status: "completed" }),
       ...(RELEASE_NOTES.length ? { releaseNotes: RELEASE_NOTES } : {}),
     }],
   },
