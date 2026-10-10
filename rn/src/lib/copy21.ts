@@ -68,6 +68,7 @@ export const c21 = {
   get purposeSnap() { return label("purpose.snap", "프사·소개팅", "Profile pic · Dating"); },
   get purposeWedding() { return label("purpose.wedding", "웨딩·커플", "Wedding · Couple"); },
   get purposeConcept() { return label("purpose.concept", "컨셉화보", "Concept shoots"); },
+  get purposeDressroom() { return label("purpose.dressroom", "드레스룸", "Dressing room"); },
   get segToday() { return label("segment.today", "오늘의 새 컨셉", "New today"); },
   albumCount: (n: number) => (isKo ? `${n}장` : `${n}`),
   category: (name: string, en: string) => label(`category.${name}`, name, en),

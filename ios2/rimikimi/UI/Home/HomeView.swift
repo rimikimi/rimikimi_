@@ -15,6 +15,15 @@ struct HomeView: View {
                 if app.concepts.isLoading && app.concepts.concepts.isEmpty {
                     SkeletonBlock().frame(height: 220).padding(.horizontal, Spacing.page)
                 } else {
+                    // 예전 리미키미 홈처럼 추천·새로 나왔어요 가로 슬라이드, 그 아래 컨셉화보(앨범)가 쭉 — 오너 2026-10-10
+                    // (컨셉화보 목적 칸을 드레스룸으로 바꾸면서 컨셉화보는 홈 아래로 펼쳤다).
+                    VStack(alignment: .leading, spacing: 0) {
+                        // 사진 복원·말로 고치기는 위 카드에 있으니 추천에서 뺀다(오너 2026-10-10)
+                        ConceptRail(title: Copy.featured, concepts: app.concepts.featured.filter { !$0.isRestore && !$0.isRetouch })
+                        ConceptRail(title: Copy.newArrivals, concepts: app.concepts.newest, isNew: true)
+                    }
+                    Text(Copy.purposeConcept).font(AppFont.headline).tracking(Tracking.headline)
+                        .foregroundStyle(Color.ink).padding(.horizontal, Spacing.page).padding(.top, Spacing.s2)
                     AlbumsGrid(tiles: app.concepts.albumTiles)
                 }
             }

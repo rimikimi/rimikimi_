@@ -131,16 +131,20 @@ function PurposeGrid() {
   return (
     <View style={styles.purposes}>
       {PURPOSES.map((p) => {
-        const cover = purposeCover(concepts, p);
+        // 네 번째 칸은 컨셉화보 대신 드레스룸 — 누르면 드레스룸 컨셉 바로(iOS 와 같다, 오너 2026-10-10)
+        const dress = p === "concept" ? concepts.find((c) => c.mode === "dressroom") : undefined;
+        const cover = dress ?? purposeCover(concepts, p);
         return (
           <Pressable
             key={p}
             accessibilityRole="button"
-            onPress={() => router.push({ pathname: "/purpose/[key]", params: { key: p } })}
+            onPress={() => dress
+              ? router.push({ pathname: "/concept/[id]", params: { id: String(dress.id) } })
+              : router.push({ pathname: "/purpose/[key]", params: { key: p } })}
             style={({ pressed }) => [styles.purpose, { width: w, transform: [{ scale: pressed ? 0.97 : 1 }] }]}
           >
             {cover ? <Thumb uri={conceptThumb(cover)} width={38} height={48} rounded={8} /> : <View style={styles.purposeEmpty} />}
-            <Text size="body" weight="semibold" numberOfLines={1} style={{ flexShrink: 1 }}>{purposeTitle(p)}</Text>
+            <Text size="body" weight="semibold" numberOfLines={1} style={{ flexShrink: 1 }}>{dress ? c21.purposeDressroom : purposeTitle(p)}</Text>
           </Pressable>
         );
       })}
