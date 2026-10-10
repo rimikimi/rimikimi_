@@ -199,17 +199,12 @@ struct WebToolScreen: View {
                 .ignoresSafeArea()
                 .background(Color.black)
         } else {
-            NavigationStack {
-                web
-                    .ignoresSafeArea(edges: .bottom)
-                    .background(Color.bg)
-                    .inlineTitle(title)
-                    .toolbar {
-                        ToolbarItem(placement: .topBarLeading) {
-                            Button(Copy.close) { dismiss() }
-                        }
-                    }
-            }
+            // 편집기(다듬기·꾸미기): 웹 상단의 X 가 `close` 브리지로 닫는다 — 네이티브 "닫기" 줄은 X 와 중복이라 없앴다
+            // (오너 2026-10-10 "닫기랑 x랑 중복이니까 닫기 없애"). 상태바 아래(위쪽 안전 영역)는 비워 두고
+            // 편집기 배경(#0f0d0b)으로 칠해 이어 보이게 한다.
+            web
+                .ignoresSafeArea(edges: .bottom)
+                .background(Color(red: 15 / 255, green: 13 / 255, blue: 11 / 255).ignoresSafeArea())
         }
     }
 }
