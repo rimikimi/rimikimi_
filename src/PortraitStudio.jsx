@@ -3950,11 +3950,10 @@ function MyGalleryScreen({
     </div>
   );
 
-  // PC 웹 — 앱 MyPhotosView 와 같다: 진행 카드 → 컨셉별 앨범(표지·이름·N장, 남은 시간 표시 없음) → 앨범 안 3:4 격자
+  // PC 웹 — 앱 MyPhotosView 와 같다: 진행 카드 → 최신순 3:4 격자(앨범 없음), 누르면 바로 사진
   if (desk) {
     const has = !!(accessToken || devFake);
-    const albums = groupAlbums(items || [], conceptById);
-    const open = album && albums.find((a) => a.key === album);
+    const open = null; // 앨범 화면은 없앴다(2026-10-10) — 뒤로 버튼·제목 분기는 그대로 두되 항상 목록
     const D = { page: { maxWidth: 1440, margin: "0 auto", padding: "32px 56px 120px", fontFamily: FONT, color: DK.tx },
       h1: { fontSize: 30, fontWeight: 800, letterSpacing: "-0.03em", margin: 0 },
       row: { display: "flex", alignItems: "center", gap: 14, marginBottom: 22 },
@@ -3990,16 +3989,15 @@ function MyGalleryScreen({
             <div>{t("gallery.empty")}</div>
             <button type="button" className="dkBtn" style={D.btn} onClick={onBack}>{t("gallery.emptyCta")}</button>
           </div>
-        ) : open ? (
+        ) : (
+          // 앨범으로 묶지 않고 최신순으로 전부 펼친다 — 누르면 바로 그 사진(오너 2026-10-10, 앱 63895f8 과 같다)
           <div style={D.grid}>
-            {open.items.map((it) => (
-              <button key={it.id} type="button" className="dkBtn" style={D.tile} onClick={() => setViewing(it.id)} aria-label={open.title}>
+            {[...items].sort((x, y) => Date.parse(y.createdAt || 0) - Date.parse(x.createdAt || 0)).map((it) => (
+              <button key={it.id} type="button" className="dkBtn" style={D.tile} onClick={() => setViewing(it.id)} aria-label={it.conceptTitle || t("mine.title")}>
                 {it.url && <img src={it.url} alt="" loading="lazy" style={O.thumbImg} />}
               </button>
             ))}
           </div>
-        ) : (
-          <MyAlbumsGrid albums={albums} onOpen={setAlbum} />
         )}
         {viewer}
         {editor && <PhotoEditor src={editor.src} filename={editor.filename} onClose={() => setEditor(null)} />}
