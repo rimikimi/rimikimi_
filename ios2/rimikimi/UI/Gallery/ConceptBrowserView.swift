@@ -9,7 +9,7 @@ import SwiftUI
 ///    확대 중에는 좌우 넘김이 잠긴다(사진 앱과 같다).
 ///  · 아래 필름스트립을 **끌면 사진이 따라 바뀐다**(스크러빙). 큰 사진을 넘겨도 필름스트립이 따라온다.
 ///    두 방향 모두 `scrollPosition` 하나로 묶여 있어 한쪽만 도는 일이 없다.
-/// 실제 "만들기"는 여기서 하지 않고 `ConceptOptionsView` 로 넘긴다 — 이 화면은 훑어보기 전용.
+/// 만들기(사진 고르기·옵션·만들기 버튼)도 이 화면 아래에 붙는다 — `ConceptOptionsView(top:)` 로 합쳤다(2026-10-10).
 struct ConceptBrowserView: View {
     @Environment(AppState.self) private var app
     @Environment(\.dismiss) private var dismiss
@@ -40,6 +40,54 @@ struct ConceptBrowserView: View {
     private var current: Concept? { items.first { $0.id == currentID } }
 
     var body: some View {
+        GeometryReader { geo in
+            Group {
+                if let current, !current.isSynthetic {
+                    // 훑어보기 + 만들기 한 화면(오너 2026-10-10 "두 개 한 페이지로 합쳐줘. 하나에서 보이게, 아님 밑에 조금이라도
+                    // 보여서 스크롤 하는 화면이라는 걸 알 수 있도록"). 큰 사진을 화면 높이의 ~절반으로 줄여 사진 고르기 칸까지
+                    // 첫 화면에 들어오게 하고, 옵션이 더 있으면 그 아래가 살짝 보인다. 만들기 버튼은 아래에 고정.
+                    ConceptOptionsView(concept: current, top: AnyView(browseTop(pagerHeight: pagerHeight(geo.size))),
+                                       navTitle: Copy.category(category))
+                } else {
+                    VStack(spacing: 0) {
+                        browseTop(pagerHeight: nil)
+                        if let current {
+                            // 브루클린 룩·조세핀 드레스는 옵션 화면이 없다 — 여기서 바로 담는다(길게 누르기와 같다).
+                            Button { _ = app.toggleCart(current) } label: {
+                                Text(app.isInCart(current) ? Copy.a11yRemoveFromCart : L.t("담기", "Pick"))
+                            }
+                            .buttonStyle(PrimaryButtonStyle(isDisabled: false))
+                            .padding(.horizontal, Spacing.page)
+                            .padding(.bottom, Spacing.s4)
+                        }
+                    }
+                    .inlineTitle(Copy.category(category))
+                    .toolbar(.hidden, for: .tabBar)
+                }
+            }
+        }
+        .onChange(of: currentID) { old, _ in
+            guard old != nil else { return }
+            zoomedIn = false            // 사진이 바뀌면 확대는 풀린다(사진 앱과 같다)
+        }
+        // 캡처·검증용 — 시뮬레이터에선 좌우 스와이프를 못 하니, 이걸로 사진을 넘긴 셈 치고
+        // 필름스트립이 제대로 따라오는지 본다.
+        .onChange(of: app.devBrowseJump) { _, id in
+            guard let id, items.contains(where: { $0.id == id }) else { return }
+            currentID = id
+            app.devBrowseJump = nil
+        }
+    }
+
+    /// 큰 사진 높이 — 3:4 를 화면 폭에 맞추되 화면 높이의 50%를 넘지 않게(그래야 아래 사진 칸이 첫 화면에 들어온다).
+    private func pagerHeight(_ size: CGSize) -> CGFloat {
+        min(size.width / CardMetrics.aspect, size.height * 0.5)
+    }
+
+    /// 큰 사진 페이저 + 컨셉명 + 필름스트립. 아래로 끌어 닫기는 **이 영역에만** 건다 — 화면 전체에 걸면
+    /// 아래 옵션을 스크롤할 때마다 화면이 같이 끌려 움직인다.
+    @ViewBuilder
+    private func browseTop(pagerHeight: CGFloat?) -> some View {
         VStack(spacing: 0) {
             TabView(selection: $currentID) {
                 ForEach(items) { c in
@@ -54,6 +102,12 @@ struct ConceptBrowserView: View {
             .tabViewStyle(.page(indexDisplayMode: .never))
             // 확대 중에는 페이지 넘김을 막는다 — 사진 앱도 확대 상태에서는 끌면 사진이 움직인다.
             .scrollDisabled(zoomedIn)
+            .frame(height: pagerHeight)
+            // 아래로 끌면 화면이 따라 내려가며 작아지고, 충분히 내리면 격자로 돌아간다(사진 앱과 같다).
+            .offset(y: dragY)
+            .scaleEffect(1 - dismissProgress * 0.14, anchor: .center)
+            .animation(.interactiveSpring(response: 0.28, dampingFraction: 0.86), value: dragY)
+            .simultaneousGesture(dismissDrag)
 
             if let current {
                 Text(current.displayTitle)
@@ -66,55 +120,6 @@ struct ConceptBrowserView: View {
 
             filmstrip
                 .padding(.vertical, Spacing.s3)
-
-            if let current {
-                if current.isSynthetic {
-                    // 브루클린 룩·조세핀 드레스는 옵션 화면이 없다 — 여기서 바로 담는다(길게 누르기와 같다).
-                    Button { _ = app.toggleCart(current) } label: {
-                        Text(app.isInCart(current) ? Copy.a11yRemoveFromCart : L.t("담기", "Pick"))
-                    }
-                    .buttonStyle(PrimaryButtonStyle(isDisabled: false))
-                    .padding(.horizontal, Spacing.page)
-                    .padding(.bottom, Spacing.s4)
-                } else {
-                    NavigationLink(value: Route.concept(current)) {
-                        Text(Copy.makeWithThisConcept)
-                    }
-                    .buttonStyle(PrimaryButtonStyle(isDisabled: false))
-                    .padding(.horizontal, Spacing.page)
-                    .padding(.bottom, Spacing.s4)
-                }
-            }
-        }
-        // 아래로 끌면 화면이 따라 내려가며 작아지고, 충분히 내리면 격자로 돌아간다(사진 앱과 같다).
-        // ⚠️ 시스템 확대 전환(`.zoom`)에도 끌어 닫기가 딸려 있지만 이 화면은 가로 페이저가 제스처를
-        //    먼저 가져가 실제로는 안 먹었다(오너 지적 2026-09-22) — 그래서 여기서 직접 구현한다.
-        .offset(y: dragY)
-        .scaleEffect(1 - dismissProgress * 0.14, anchor: .center)
-        .background(Color.bg.opacity(1 - dismissProgress * 0.35).ignoresSafeArea())
-        .animation(.interactiveSpring(response: 0.28, dampingFraction: 0.86), value: dragY)
-        .simultaneousGesture(dismissDrag)
-        .inlineTitle(Copy.category(category))
-        .toolbar(.hidden, for: .tabBar)
-        .toolbar {
-            if let current, !current.isSynthetic {
-                ToolbarItem(placement: .topBarTrailing) {
-                    FavoriteToolbarButton(isOn: app.favorites.isFavorite(concept: current.id)) {
-                        app.favorites.toggle(concept: current.id)
-                    }
-                }
-            }
-        }
-        .onChange(of: currentID) { old, _ in
-            guard old != nil else { return }
-            zoomedIn = false            // 사진이 바뀌면 확대는 풀린다(사진 앱과 같다)
-        }
-        // 캡처·검증용 — 시뮬레이터에선 좌우 스와이프를 못 하니, 이걸로 사진을 넘긴 셈 치고
-        // 필름스트립이 제대로 따라오는지 본다.
-        .onChange(of: app.devBrowseJump) { _, id in
-            guard let id, items.contains(where: { $0.id == id }) else { return }
-            currentID = id
-            app.devBrowseJump = nil
         }
     }
 

@@ -7,6 +7,10 @@ struct ConceptOptionsView: View {
     @Environment(AppState.self) private var app
     @Environment(\.zoomNamespace) private var zoomNS
     var concept: Concept
+    /// 컨셉 훑어보기 화면(ConceptBrowserView)에 합쳐 넣을 때 — 맨 위 미리보기 대신 이걸(큰 사진 페이저 + 필름스트립) 둔다.
+    /// 오너(2026-10-10): "이거 두 개 한 페이지로 합쳐줘".
+    var top: AnyView? = nil
+    var navTitle: String? = nil
 
     @State private var batchCount = 1
     @State private var fourcutCount = 4
@@ -37,11 +41,15 @@ struct ConceptOptionsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.s4) {
-                // 히어로도 거의 화면 폭 — 400px 썸네일은 여기서 뭉갠다(오너 지적 2026-09-22).
-                RemoteImage(url: concept.largeURL, cornerRadius: Radius.card, fallback: concept.thumbURL)
-                    .photoRatio()
-                    .padding(.horizontal, Spacing.page)
-                    .padding(.top, Spacing.s2)
+                if let top {
+                    top
+                } else {
+                    // 히어로도 거의 화면 폭 — 400px 썸네일은 여기서 뭉갠다(오너 지적 2026-09-22).
+                    RemoteImage(url: concept.largeURL, cornerRadius: Radius.card, fallback: concept.thumbURL)
+                        .photoRatio()
+                        .padding(.horizontal, Spacing.page)
+                        .padding(.top, Spacing.s2)
+                }
 
                 if concept.isArtTransform {
                     PhotoSlotCard(title: concept.isRetouch ? Copy.retouchPhotoTitle : Copy.artTitle,
@@ -88,9 +96,9 @@ struct ConceptOptionsView: View {
         .scrollIndicators(.hidden)
         .scrollDismissesKeyboard(.interactively)
         .background(Color.bg)
-        .inlineTitle(concept.displayTitle)
+        .inlineTitle(navTitle ?? concept.displayTitle)
         .toolbar(.hidden, for: .tabBar)
-        .zoomDestination("concept:" + concept.id, in: zoomNS)
+        .zoomDestination("concept:" + concept.id, in: top == nil ? zoomNS : nil)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 FavoriteToolbarButton(isOn: app.favorites.isFavorite(concept: concept.id)) {
@@ -110,6 +118,10 @@ struct ConceptOptionsView: View {
             .padding(.horizontal, Spacing.page)
             .padding(.top, Spacing.s3)
             .padding(.bottom, Spacing.s2)
+        }
+        // 합친 화면에서 다른 컨셉으로 넘기면 네컷 스타일 기본값을 그 컨셉 것으로(고른 사진·장수는 그대로 둔다)
+        .onChange(of: concept.id) { _, _ in
+            fourcutStyleKey = concept.fourcutStyle.flatMap { k in styles.first { $0.key == k }?.key } ?? styles.first?.key ?? "cute"
         }
         .onAppear {
             if fourcutStyleKey.isEmpty {
