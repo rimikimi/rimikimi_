@@ -26,6 +26,12 @@ final class LabelStore {
         if let d = try? JSONEncoder().encode(t) { UserDefaults.standard.set(d, forKey: Self.cacheKey) }
     }
 
+    /// 기능 스위치 — `{"filterPass": {"enabled": "true"}}` 처럼. 없거나 못 받으면 `fallback`.
+    static func flag(_ key: String, _ field: String = "enabled", fallback: Bool = false) -> Bool {
+        guard let v = shared.table[key]?[field]?.lowercased() else { return fallback }
+        return v == "true" || v == "1" || v == "on"
+    }
+
     /// 서버 표에 값이 있으면 그것, 없으면 기본 문구.
     static func t(_ key: String, _ ko: String, _ en: String) -> String {
         if let v = shared.table[key]?[L.ko ? "ko" : "en"], !v.isEmpty { return v }

@@ -155,7 +155,25 @@ final class RimikimiAPI {
         req.cachePolicy = .reloadIgnoringLocalCacheData
         let (data, resp) = try await session.data(for: req)
         try Self.check(resp, data)
-        return try JSONDecoder().decode([String: [String: String]].self, from: data)
+        // 느슨하게 읽는다 — 값이 문자열이 아닌 항목(예: 기능 스위치 `"filterPass": {"enabled": true}`)이 섞여도
+        // 표 전체가 깨지지 않게. 불리언·숫자는 문자열("true"/"false"/"1")로 바꿔 담는다.
+        // ⚠️ 옛 빌드(≤48)는 엄격 디코드라 서버 값은 문자열("false")로 둘 것.
+        guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw APIError(message: "labels.json is not an object")
+        }
+        var out: [String: [String: String]] = [:]
+        for (k, v) in root {
+            guard let dict = v as? [String: Any] else { continue }
+            var row: [String: String] = [:]
+            for (lk, lv) in dict {
+                if let s = lv as? String { row[lk] = s }
+                else if let n = lv as? NSNumber {
+                    row[lk] = CFGetTypeID(n) == CFBooleanGetTypeID() ? (n.boolValue ? "true" : "false") : n.stringValue
+                }
+            }
+            out[k] = row
+        }
+        return out
     }
 
     func fetchPopular() async throws -> [String] {

@@ -162,12 +162,180 @@ final class StoreManager {
     func hasActiveSubscription() async -> Bool {
         guard available, configured else { return false }
         guard let info = try? await Purchases.shared.customerInfo() else { return false }
-        return !info.activeSubscriptions.isEmpty
+        // ⚠️ 필터 이용권(월·연) 구독은 광고 제거가 아니다 — rimikimi+ 상품만 센다(2026-10-10 필터 이용권 추가).
+        return info.activeSubscriptions.contains { Self.plusIDs.contains($0) }
     }
+    static var plusIDs: Set<String> { Set(subs.map(\.id)) }
 
     func restore() async -> Bool {
         guard available, configured else { return false }
-        do { _ = try await Purchases.shared.restorePurchases(); return true }
+        do { let info = try await Purchases.shared.restorePurchases(); applyFilterAccess(info); return true }
         catch { lastError = error.localizedDescription; return false }
     }
+
+    // MARK: 필터 이용권 (계약서 filterpass_spec.md)
+    //
+    // unlocked = entitlement("filters") 활성 || trialStart == nil(아직 시작 전 = 3일 자격) || now < trialStart + 3일.
+    // 상품은 크레딧과 무관 — 서버 지급(iapGrant)을 부르지 않는다. 로그인도 필요 없다(카메라 탭은 로그인 없이 쓴다).
+
+    struct FilterPlan: Identifiable, Hashable {
+        enum Kind: String { case lifetime, annual, monthly }
+        let kind: Kind
+        var id: String { "rimikimi.filter.\(kind.rawValue)" }
+        var priceString: String?
+        /// 스토어 가격을 못 받았을 때만 쓰는 KRW 정가(오너 결정 2026-10-10).
+        var krw: Int { switch kind { case .lifetime: 9900; case .annual: 4900; case .monthly: 1900 } }
+        var displayPrice: String { priceString ?? Copy.krw(krw) }
+        var isSubscription: Bool { kind != .lifetime }
+        /// 오퍼링(또는 상품)이 실제로 로드됐는지 — 아니면 버튼을 막는다.
+        var purchasable: Bool { priceString != nil }
+    }
+
+    /// `free` = 원격 스위치가 꺼져 있음(지금 기본) — 필터 전부 무료, 잠금·결제·3일 계산 없음.
+    enum FilterAccess: Equatable { case free, locked, trial, pass, plus }
+
+    /// 원격 스위치 `labels.json` → `"filterPass": {"enabled": "true"}`(오너 2026-10-10: 꺼 둔 채로 출시, 앱 업데이트 없이 켠다).
+    /// dev 라우트가 상태를 강제하면 켜진 것으로 본다.
+    var filterPassEnabled: Bool { devFilterState != nil || devForceEnabled || LabelStore.flag("filterPass") }
+    /// 캡처용(`/dev/filterpass?state=on`) — 상태는 강제하지 않고 스위치만 켠다(실제 규칙 그대로).
+    var devForceEnabled = false
+
+    static let filterTrialDays: Double = 3
+    static let filterEntitlement = "filters"
+    static let filterOffering = "filters"
+
+    private(set) var filterPlans: [FilterPlan] = [.init(kind: .annual), .init(kind: .monthly), .init(kind: .lifetime)]
+    private var filterPackages: [FilterPlan.Kind: Package] = [:]
+    private var filterProducts: [FilterPlan.Kind: StoreProduct] = [:]
+    private(set) var filterPlansLoading = false
+    private(set) var filterPlansError: String?
+    private(set) var filterPurchasing: String?
+    /// RevenueCat 기준 — entitlement `filters` 또는 rimikimi+ 구독(대시보드 매핑이 아직이어도 plus 는 열어 둔다).
+    private(set) var filterEntitled = false
+    private(set) var filterViaPlus = false
+    /// 처음 3일 시작 시각(키체인).
+    private(set) var trialStart: Date? = FilterPassKeychain.readTrialStart()
+    /// 캡처용 강제 상태(`/dev/filterpass`). 키체인은 건드리지 않는다. 릴리스에선 항상 nil.
+    var devFilterState: FilterAccess?
+    var devTrialEndsAt: Date?
+
+    var trialEndsAt: Date? {
+        if let d = devFilterState { return (d == .trial || d == .locked) ? devTrialEndsAt : nil }
+        guard filterPassEnabled else { return nil }
+        // 아직 시작 전이면 "지금 시작하면" 끝나는 때(저장하지 않음) — 시작 전 = 3일 자격이 있다는 뜻이지 잠금이 아니다.
+        return (trialStart ?? Date()).addingTimeInterval(Self.filterTrialDays * 86_400)
+    }
+    var filterAccess: FilterAccess {
+        if let d = devFilterState { return d }
+        guard filterPassEnabled else { return .free }
+        if filterEntitled { return filterViaPlus ? .plus : .pass }
+        if let end = trialEndsAt, Date() < end { return .trial }
+        return .locked
+    }
+    var filtersUnlocked: Bool { filterAccess != .locked }
+    /// 처음 3일 남은 날(올림). 3일 중이 아니면 nil.
+    var trialDaysLeft: Int? {
+        guard filterAccess == .trial, let end = trialEndsAt else { return nil }
+        return max(1, Int((end.timeIntervalSinceNow / 86_400).rounded(.up)))
+    }
+    /// 편집기 `__rimikimiInit` 에 싣는 값 — trialEndsAt 은 이용권/plus 면 null, 3일을 시작한 적 없으면 null.
+    var filterInitPayload: [String: Any] {
+        let unlocked = filtersUnlocked
+        var end: Any = NSNull()
+        if filterAccess == .trial || filterAccess == .locked, let e = trialEndsAt {
+            end = ISO8601DateFormatter().string(from: e)
+        }
+        return ["filtersUnlocked": unlocked, "trialEndsAt": end]
+    }
+
+    /// 원본이 아닌 필터를 처음 적용했을 때(카메라 줄 선택 / 편집기 `filterUsed`). 이미 시작했으면 그대로.
+    func startFilterTrialIfNeeded() {
+        // 스위치가 꺼져 있는 동안은 3일을 세지 않는다 — 켜진 뒤 처음 쓴 순간부터.
+        guard filterPassEnabled, devFilterState == nil || devForceEnabled, trialStart == nil else { return }
+        let now = Date()
+        FilterPassKeychain.writeTrialStart(now)
+        trialStart = now
+        AppLog.api.info("filterpass.trial.start")
+    }
+
+    #if DEBUG
+    func debugResetTrial() { FilterPassKeychain.debugClear(); trialStart = nil }
+    #endif
+
+    /// 캐시된 CustomerInfo 로 이용권 상태 갱신 — 실행·로그인·앱 활성화 때.
+    func refreshFilterAccess() async {
+        guard available, configured else { return }
+        guard let info = try? await Purchases.shared.customerInfo() else { return }
+        applyFilterAccess(info)
+    }
+
+    private func applyFilterAccess(_ info: CustomerInfo) {
+        let ent = info.entitlements[Self.filterEntitlement]?.isActive == true
+        let plus = info.activeSubscriptions.contains { Self.plusIDs.contains($0) }
+        let ownsFilter = info.activeSubscriptions.contains { $0.hasPrefix("rimikimi.filter.") }
+            || info.nonSubscriptions.contains { $0.productIdentifier == "rimikimi.filter.lifetime" }
+        filterEntitled = ent || plus || ownsFilter
+        filterViaPlus = plus && !ownsFilter
+    }
+
+    /// 오퍼링 `filters`(lifetime/annual/monthly). 없으면 상품 ID 로 직접 받는다. 둘 다 없으면 KRW 정가로 보여 주고 버튼은 막는다.
+    func loadFilterPlans() async {
+        guard available else { filterPlansError = Copy.payNotReady; return }
+        if !configured { configure(userID: nil) }
+        filterPlansLoading = true
+        defer { filterPlansLoading = false }
+        if let off = try? await Purchases.shared.offerings().offering(identifier: Self.filterOffering) {
+            for pkg in off.availablePackages {
+                let kind: FilterPlan.Kind?
+                switch pkg.packageType {
+                case .lifetime: kind = .lifetime
+                case .annual: kind = .annual
+                case .monthly: kind = .monthly
+                default: kind = FilterPlan.Kind.allCases.first { pkg.storeProduct.productIdentifier == "rimikimi.filter.\($0.rawValue)" }
+                }
+                if let kind { filterPackages[kind] = pkg; filterProducts[kind] = pkg.storeProduct }
+            }
+        }
+        if filterProducts.count < 3 {
+            let ids = FilterPlan.Kind.allCases.map { "rimikimi.filter.\($0.rawValue)" }
+            for p in await Purchases.shared.products(ids) {
+                if let k = FilterPlan.Kind.allCases.first(where: { "rimikimi.filter.\($0.rawValue)" == p.productIdentifier }), filterProducts[k] == nil {
+                    filterProducts[k] = p
+                }
+            }
+        }
+        filterPlans = filterPlans.map { var x = $0; x.priceString = filterProducts[$0.kind]?.localizedPriceString; return x }
+        filterPlansError = filterProducts.isEmpty ? Copy.filterPassNotLoaded : nil
+        AppLog.api.info("filterpass.plans offering=\(self.filterPackages.keys.map(\.rawValue).sorted(), privacy: .public) products=\(self.filterProducts.keys.map(\.rawValue).sorted(), privacy: .public)")
+        await refreshFilterAccess()
+    }
+
+    /// 구매 — 열렸으면 true, 취소면 false, 실패면 throw.
+    func purchaseFilter(_ plan: FilterPlan) async throws -> Bool {
+        guard available else { throw APIError(message: Copy.payNotReady) }
+        guard filterPurchasing == nil else { return false }
+        if !configured { configure(userID: nil) }
+        filterPurchasing = plan.id
+        defer { filterPurchasing = nil }
+        let result: PurchaseResultData
+        if let pkg = filterPackages[plan.kind] { result = try await Purchases.shared.purchase(package: pkg) }
+        else if let product = filterProducts[plan.kind] { result = try await Purchases.shared.purchase(product: product) }
+        else { throw APIError(message: Copy.storeProductMissing) }
+        if result.userCancelled { return false }
+        applyFilterAccess(result.customerInfo)
+        // 대시보드 entitlement 매핑이 늦어도 방금 산 상품이면 연다.
+        if !filterEntitled { filterEntitled = true; filterViaPlus = false }
+        HapticPlayer.success()
+        return true
+    }
+
+    /// 구매 복원 — 복원 뒤 열렸으면 true.
+    func restoreFilters() async -> Bool {
+        guard available else { return false }
+        if !configured { configure(userID: nil) }
+        do { applyFilterAccess(try await Purchases.shared.restorePurchases()); return filterEntitled }
+        catch { filterPlansError = error.localizedDescription; return false }
+    }
 }
+
+extension StoreManager.FilterPlan.Kind: CaseIterable {}

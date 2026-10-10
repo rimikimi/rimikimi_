@@ -188,7 +188,11 @@ struct CameraFilterTab: View {
         .coachHost()
         .onAppear { visible = true; Task { await model.start() }; app.enqueueCoach(Coach.filter) }
         .onDisappear { visible = false; model.stop() }
-        .onChange(of: selected, initial: true) { model.live?.presetKey = selected }
+        .onChange(of: selected, initial: true) {
+            model.live?.presetKey = selected
+            // 필터 이용권 — 원본이 아닌 필터를 처음 고르면 처음 3일이 시작된다(스위치가 켜져 있을 때만).
+            if selected != "none" { app.store.startFilterTrialIfNeeded() }
+        }
         .onChange(of: fxAmount, initial: true) { model.live?.fxAmount = fxAmount }
     }
 
@@ -277,7 +281,17 @@ struct CameraFilterTab: View {
     }
     private func chip(_ key: String, _ title: String) -> some View {
         let on = selected == key
-        return Text(title).font(AppFont.footnote.weight(.bold)).foregroundStyle(on ? .black : .white)
+        // 필터 이용권 잠금 — 원본은 절대 안 잠근다. 찍기는 막지 않는다(저장은 편집기에서 막힌다).
+        let locked = key != "none" && !app.store.filtersUnlocked
+        return HStack(spacing: 4) {
+            Text(title)
+            if locked {
+                Image(systemName: "lock.fill").font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(on ? Color.black.opacity(0.55) : Color.white.opacity(0.7))
+                    .accessibilityLabel(Copy.filterPassLocked)
+            }
+        }
+            .font(AppFont.footnote.weight(.bold)).foregroundStyle(on ? .black : .white)
             .padding(.horizontal, 12).frame(height: 32)
             .background(on ? Color.white : Color.white.opacity(0.14), in: Capsule())
             .onTapGesture { selected = key; HapticPlayer.selection() }

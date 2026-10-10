@@ -19,6 +19,10 @@ import UIKit
 ///                                             동의 플래그를 지워 "다시 1회 뜨는지" 재확인용.
 ///   com.rimikimi.app://dev/systemcamera  실제 카메라 플로우(SystemCameraPicker) 강제 표시(캡처용).
 ///                                        시뮬레이터엔 카메라가 없어 사진 보관함으로 자동 대체됨.
+///   com.rimikimi.app://dev/filterpass?state=trial|expired|unlocked|plus|off[&open=camera|sheet|editor]
+///        필터 이용권 상태 강제(원격 스위치도 켠 것으로 본다, 키체인은 안 건드림). off = 강제 해제(서버 스위치 그대로).
+///        state=on = 스위치만 켜고 실제 규칙대로(키체인 trialStart 사용; reset=1 이면 지우고 시작 전 상태로).
+///        open=sheet 결제 시트 · editor 샘플 사진으로 편집기(+sheet=1 이면 편집기 위에 시트) · 기본 camera 탭.
 ///   com.rimikimi.app://dev/lang?set=system|ko|en[&after=<초>]  프로필 "언어" 행과 같은 길로 언어 전환(캡처용 — 메뉴를 탭할 수 없다).
 @MainActor
 enum DevRoutes {
@@ -196,6 +200,33 @@ enum DevRoutes {
                 installSamplePhoto(app)
                 if let img = app.userPhoto.image { app.openEditor(image: img) }
             default: app.webTool = .init(url: Config.filterToolURL(mode: "pick", presetKey: q["preset"]), title: "필터")
+            }
+        case "/filterpass":
+            #if DEBUG
+            if q["reset"] == "1" { app.store.debugResetTrial() }
+            #endif
+            app.store.devForceEnabled = false
+            switch q["state"] ?? "expired" {
+            case "on": app.store.devFilterState = nil; app.store.devForceEnabled = true
+            case "trial": app.store.devFilterState = .trial; app.store.devTrialEndsAt = Date().addingTimeInterval(2 * 86_400 - 60)
+            case "expired": app.store.devFilterState = .locked; app.store.devTrialEndsAt = Date().addingTimeInterval(-86_400)
+            case "unlocked": app.store.devFilterState = .pass; app.store.devTrialEndsAt = nil
+            case "plus": app.store.devFilterState = .plus; app.store.devTrialEndsAt = nil
+            default: app.store.devFilterState = nil; app.store.devTrialEndsAt = nil
+            }
+            AppLog.ui.info("dev.filterpass state=\(q["state"] ?? "-", privacy: .public) enabled=\(app.store.filterPassEnabled) unlocked=\(app.store.filtersUnlocked) payload=\(String(describing: app.store.filterInitPayload), privacy: .public)")
+            switch q["open"] ?? "camera" {
+            case "sheet": app.webTool = nil; app.galleryPath = []; app.filterPassSheet = true
+            case "editor":
+                installSamplePhoto(app)
+                if let img = app.userPhoto.image {
+                    app.photoPickPreset = q["preset"] ?? "ph6s"
+                    app.handlePickedPhotos([img])
+                }
+                if q["sheet"] == "1" {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { app.filterPassSheet = true }
+                }
+            default: app.devStripAnchorX = q["x"].flatMap(Double.init); app.tab = .filter
             }
         case "/guide": app.showGuide = true
         case "/guidedone": app.finishGuide()

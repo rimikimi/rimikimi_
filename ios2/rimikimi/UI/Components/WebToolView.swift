@@ -11,6 +11,8 @@ import UIKit
 ///   - "share"          payload.dataUrl(base64) → UIActivityViewController.
 ///   - "close"          웹뷰 닫기(네이티브 "다듬기·공유" 화면으로 되돌아간다는 뜻이 아니라, 이 화면 자체를 닫음).
 ///   - "refreshCredits" 생성/구매 등으로 크레딧이 바뀌었을 수 있으니 `/api/quota` 갱신 요청.
+///   - "paywall"        잠긴 유료 필터로 저장·공유하려 함 → 필터 이용권 시트. 열리면 `window.__rimikimiFilterAccess({unlocked:true})`.
+///   - "filterUsed"     유료 필터를 처음 적용함 → 처음 3일 시작(이미 시작했으면 무시). filterpass_spec.md
 /// 네이티브 → 웹 응답: `window.__rimikimiResolve(id, result)`.
 /// 웹 쪽 대응은 `src/nativeBridge.js` 의 `isRimikimiWebView()`/`wkCall` — 1.x 가 Capacitor 로 부르던
 /// `nativeSaveToAlbum`/`nativeShare`/`nativeShareImage` 와 같은 반환 모양(`{ok}` / `{error}`)을 맞췄다.
@@ -41,6 +43,8 @@ final class WebBridgeCoordinator: NSObject, WKScriptMessageHandler, WKNavigation
     var onClose: (() -> Void)?
     var onRefreshCredits: (() -> Void)?
     var onSaved: (() -> Void)?
+    var onPaywall: (() -> Void)?
+    var onFilterUsed: (() -> Void)?
     /// 앨범에 저장하기 직전에 기다릴 일(무료 사용자 광고). 없으면 바로 저장.
     var beforeSave: (() async -> Void)?
 
@@ -54,6 +58,8 @@ final class WebBridgeCoordinator: NSObject, WKScriptMessageHandler, WKNavigation
         case "share": share(payload: payload, id: id)
         case "close": onClose?()
         case "refreshCredits": onRefreshCredits?(); resolve(id, ["ok": true])
+        case "paywall": DispatchQueue.main.async { self.onPaywall?() }; resolve(id, ["ok": true])
+        case "filterUsed": DispatchQueue.main.async { self.onFilterUsed?() }; resolve(id, ["ok": true])
         default: break
         }
     }
@@ -127,6 +133,10 @@ struct WebToolView: UIViewRepresentable {
     var onRefreshCredits: () -> Void
     var onSaved: () -> Void
     var beforeSave: (() async -> Void)? = nil
+    var onPaywall: (() -> Void)? = nil
+    var onFilterUsed: (() -> Void)? = nil
+    /// 네이티브 → 웹 호출용(결제 성공 뒤 `__rimikimiFilterAccess`). makeUIView 가 웹뷰를 넣는다.
+    var handle: WebViewHandle? = nil
 
     func makeCoordinator() -> WebBridgeCoordinator {
         let c = WebBridgeCoordinator()
@@ -135,6 +145,8 @@ struct WebToolView: UIViewRepresentable {
         c.onRefreshCredits = onRefreshCredits
         c.onSaved = onSaved
         c.beforeSave = beforeSave
+        c.onPaywall = onPaywall
+        c.onFilterUsed = onFilterUsed
         return c
     }
 
@@ -160,6 +172,7 @@ struct WebToolView: UIViewRepresentable {
         view.navigationDelegate = context.coordinator
         view.uiDelegate = context.coordinator
         context.coordinator.webView = view
+        handle?.webView = view
         view.load(URLRequest(url: url))
         return view
     }
@@ -171,6 +184,12 @@ struct WebToolView: UIViewRepresentable {
     }
 }
 
+/// SwiftUI 쪽에서 웹뷰에 JS 를 부르기 위한 손잡이.
+final class WebViewHandle {
+    weak var webView: WKWebView?
+    func eval(_ js: String) { DispatchQueue.main.async { [weak self] in self?.webView?.evaluateJavaScript(js) } }
+}
+
 struct WebToolScreen: View {
     var url: URL
     var title: String
@@ -180,16 +199,37 @@ struct WebToolScreen: View {
     var chromeless: Bool = false
     @Environment(AppState.self) private var app
     @Environment(\.dismiss) private var dismiss
+    @State private var handle = WebViewHandle()
+
+    /// 편집기 초기 데이터 + 필터 이용권 상태(filtersUnlocked, trialEndsAt ISO|null). 스위치가 꺼져 있으면 unlocked=true·null.
+    private var payloadWithAccess: [String: Any]? {
+        var p = initialPayload ?? [:]
+        p.merge(app.store.filterInitPayload) { _, new in new }
+        return p
+    }
 
     private var web: some View {
         WebToolView(
             url: url,
-            initialPayload: initialPayload,
+            initialPayload: payloadWithAccess,
             onClose: { dismiss() },
             onRefreshCredits: { Task { await app.refreshQuota() } },
             onSaved: { HapticPlayer.success(); app.showToast(Copy.savedToPhotos) },
-            beforeSave: { await app.adGateBeforeSave() }
+            beforeSave: { await app.adGateBeforeSave() },
+            onPaywall: { app.openFilterPass() },
+            onFilterUsed: { app.store.startFilterTrialIfNeeded() },
+            handle: handle
         )
+        .sheet(isPresented: bindingSheet) {
+            FilterPassSheet(onUnlocked: {
+                handle.eval("window.__rimikimiFilterAccess && window.__rimikimiFilterAccess({unlocked:true})")
+            })
+            .presentationDetents([.large])
+            .presentationCornerRadius(Radius.sheet)
+        }
+    }
+    private var bindingSheet: Binding<Bool> {
+        Binding(get: { app.filterPassSheet }, set: { app.filterPassSheet = $0 })
     }
 
     var body: some View {

@@ -455,6 +455,25 @@ enum Copy {
     static var badgeLowest: String { L.t("가장 저렴", "Best price") }
     static var payNotReady: String { L.t("결제가 아직 준비되지 않았어요.", "Payments aren't ready yet.") }
     static var storeNoProducts: String { L.t("스토어가 상품 0개를 반환했어요. 잠시 후 다시 시도해 주세요.", "The store returned no products. Please try again in a moment.") }
+    // MARK: 필터 이용권 (filterpass_spec.md — '무료 체험'을 구독과 묶어 쓰지 않는다)
+    static var filterPassTitle: String { L.t("필터 이용권", "Filter Pass") }
+    static var filterPassSubtitle: String { L.t("폰카·필름·카메라·재미·인플 필터를 전부 저장하고 공유해요.", "Save and share every filter — phone, film, camera, fun and beauty.") }
+    static var filterPassFreeLine: String { L.t("원본은 언제나 무료예요. 처음 3일은 모든 필터를 무료로 써 보세요.", "Original is always free. Try every filter free for your first 3 days.") }
+    static func filterPassDaysLeft(_ n: Int) -> String { L.ko ? "무료 이용 \(n)일 남음" : (n == 1 ? "1 free day left" : "\(n) free days left") }
+    static var filterPassEnded: String { L.t("처음 3일이 끝났어요. 이용권으로 계속 쓸 수 있어요.", "Your first 3 days are over. Keep going with a pass.") }
+    static var filterPassActive: String { L.t("필터 이용권을 쓰고 있어요. 모든 필터가 열려 있어요.", "Your Filter Pass is active. Every filter is unlocked.") }
+    static var filterPassPlus: String { L.t("rimikimi+ 구독 중이라 모든 필터가 무료예요.", "You're on rimikimi+, so every filter is free.") }
+    static var filterPassAnnual: String { L.t("연간", "Yearly") }
+    static var filterPassMonthly: String { L.t("월간", "Monthly") }
+    static var filterPassLifetime: String { L.t("평생", "Lifetime") }
+    static var filterPassAnnualLine: String { L.t("1년마다 자동 갱신", "Renews every year") }
+    static var filterPassMonthlyLine: String { L.t("1개월마다 자동 갱신", "Renews every month") }
+    static var filterPassLifetimeLine: String { L.t("한 번 결제, 계속 사용", "Pay once, keep forever") }
+    static var filterPassBest: String { L.t("추천", "Best value") }
+    static var filterPassUnlocked: String { L.t("모든 필터가 열렸어요", "Every filter is unlocked") }
+    static var filterPassNotLoaded: String { L.t("스토어에서 가격을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.", "Couldn't load prices from the store. Please try again in a moment.") }
+    static var filterPassNothingToRestore: String { L.t("복원할 필터 이용권이 없어요.", "No Filter Pass to restore.") }
+    static var filterPassLocked: String { L.t("이용권 필요", "Pass needed") }
     static var storeProductMissing: String { L.t("스토어에서 상품을 찾지 못했어요.", "Couldn't find this product in the store.") }
 
     // MARK: 친구 초대

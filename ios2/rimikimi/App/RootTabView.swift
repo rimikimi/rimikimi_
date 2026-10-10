@@ -133,6 +133,12 @@ struct RootTabView: View {
         }
         // 전문 프로필 룩을 담고 "N장 만들기" — 세부 조정·옷 바꾸기 단계.
         .sheet(isPresented: $app.studioStep) { StudioStepSheet() }
+        // 필터 이용권 — 편집기가 떠 있을 땐 WebToolScreen 쪽 시트가 띄운다.
+        .sheet(isPresented: Binding(get: { app.filterPassSheet && app.webTool == nil }, set: { app.filterPassSheet = $0 })) {
+            FilterPassSheet()
+                .presentationDetents([.large])
+                .presentationCornerRadius(Radius.sheet)
+        }
         .fullScreenCover(item: $app.webTool) { tool in
             WebToolScreen(url: tool.url, title: tool.title, initialPayload: tool.initialPayload)
         }

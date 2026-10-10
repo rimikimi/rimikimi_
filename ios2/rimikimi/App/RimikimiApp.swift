@@ -30,6 +30,7 @@ struct RimikimiApp: App {
                     app.generation.resumeIfNeeded()
                     await app.refreshQuota()
                     if let uid = app.auth.session?.userID { await app.store.logIn(userID: uid) }
+                    await app.store.refreshFilterAccess()
                     #if DEBUG
                     DevRoutes.handleLaunchArguments(app: app)
                     #endif
@@ -57,7 +58,7 @@ struct RimikimiApp: App {
                         // 실행 직후 .task 시점엔 아직 .active 가 아니면 ATT 가 조용히 건너뛰어진다 → 활성화될 때 다시 시도(이미 물었으면 즉시 반환).
                         if !app.showGuide { TrackingPrompt.requestOnceAfterFirstResult(delay: 1.0) }
                         app.generation.resumeIfNeeded()
-                        Task { await app.refreshQuota(); await app.push.refreshAuthorization() }
+                        Task { await app.refreshQuota(); await app.push.refreshAuthorization(); await app.store.refreshFilterAccess() }
                     }
                 }
                 // 첫 실행 가이드 1장 — 시트가 아니라 전체 화면, 다른 팝업과 겹치지 않는다.

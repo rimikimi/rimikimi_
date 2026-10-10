@@ -200,7 +200,7 @@ struct CreditsSheet: View {
 /// 이용약관·개인정보처리방침 링크 — 두 구매 화면(StoreView·CreditsSheet) 공통.
 /// Apple 3.1.2 는 구독을 파는 화면에 약관·개인정보 링크가 있어야 한다고 요구한다
 /// (컴플라이언스 리뷰로 발견: 이전엔 프로필 화면에만 있었다).
-private struct LegalLinksRow: View {
+struct LegalLinksRow: View {
     // ⚠️ 재검증으로 발견(2026-09-19): `CreditsSheet` 에서 쓰일 때 `app.webTool`(fullScreenCover)은
     // 이미 떠 있는 시트 위로는 못 뜬다(같은 프레젠터, UIKit 은 모달 1개 제한) — 조용히 무시된다.
     // 시스템 브라우저(`openURL`)는 시트든 푸시 화면이든 항상 동작해 양쪽 다 안전하다.

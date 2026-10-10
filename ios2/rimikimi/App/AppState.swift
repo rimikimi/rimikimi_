@@ -203,6 +203,14 @@ final class AppState {
     static let useBurstCamera = true
     /// 편집기·카메라 1단계 웹뷰(SPEC §5).
     var webTool: WebTool?
+    /// 필터 이용권 결제 시트(filterpass_spec.md). 편집기(fullScreenCover)가 떠 있으면 `WebToolScreen` 이,
+    /// 아니면 `RootTabView` 가 띄운다 — 모달은 한 프레젠터에 하나뿐이라 두 군데에 붙인다.
+    /// 원격 스위치(`labels.json` filterPass.enabled)가 꺼져 있으면 열지 않는다.
+    var filterPassSheet = false
+    func openFilterPass() {
+        guard store.filterPassEnabled else { return }
+        filterPassSheet = true
+    }
     /// 첫 실행 가이드 1장 — 실행 시 다른 팝업은 없다.
     // 2026-10-09 C안: 예전 첫 실행 안내 화면은 없앴다 — 홈 튜토리얼(코치마크)이 대신한다. ATT 는 실행 직후(RimikimiApp).
     var showGuide = false
