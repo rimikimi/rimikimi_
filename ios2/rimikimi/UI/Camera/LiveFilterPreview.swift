@@ -3,6 +3,7 @@ import AVFoundation
 import CoreImage
 import Metal
 import QuartzCore
+import Vision
 
 /// 카메라 탭 실시간 필터 미리보기 — 카메라 프레임(`AVCaptureVideoDataOutput`)을 받아
 /// `LiveFilterEngine` 으로 고른 필터를 입히고 `CAMetalLayer` 에 바로 그린다(오너 지시 2026-10-09).
@@ -50,6 +51,31 @@ final class LiveFilterRenderer: NSObject, AVCaptureVideoDataOutputSampleBufferDe
         return mir ? CGPoint(x: v, y: u) : CGPoint(x: v, y: 1 - u)
     }
 
+    // 인플(뷰티) 얼굴 추적 — Vision 은 무거워서 4프레임에 한 번, 따로 낮은 큐에서 **한 번에 하나만** 돌린다
+    // (CIImage 가 카메라 버퍼를 붙잡고 있으므로 여러 개 쌓지 않는다). 그 사이 프레임은 마지막 사각형을 쓴다.
+    private let faceQueue = DispatchQueue(label: "livefilter.faces", qos: .utility)
+    private var frameNo = 0                     // 프레임 큐 전용
+    private var _faceBusy = false
+    private var _faces: [CGRect] = []           // 정규화·아래가 원점(세운 프레임 기준)
+    private var _facesSeen = Date.distantPast
+
+    /// 새 검출 결과 반영 — 놓치면 0.5초 동안 마지막 사각형을 유지(깜빡임 방지),
+    /// 찾으면 이전 사각형과 섞어(새 것 50%) 떨림을 줄인다.
+    private func updateFaces(_ found: [CGRect]) {
+        lock.withLock {
+            _faceBusy = false
+            guard !found.isEmpty else { return }
+            _faces = found.map { f in
+                guard let old = _faces.min(by: { hypot($0.midX - f.midX, $0.midY - f.midY) < hypot($1.midX - f.midX, $1.midY - f.midY) }),
+                      hypot(old.midX - f.midX, old.midY - f.midY) < f.width * 0.5 else { return f }
+                let k: CGFloat = 0.5
+                return CGRect(x: old.minX + (f.minX - old.minX) * k, y: old.minY + (f.minY - old.minY) * k,
+                              width: old.width + (f.width - old.width) * k, height: old.height + (f.height - old.height) * k)
+            }
+            _facesSeen = Date()
+        }
+    }
+
     private var _fxAmount: Double = 1
     /// "효과" 슬라이더 값(0..1).
     var fxAmount: Double {
@@ -93,7 +119,23 @@ final class LiveFilterRenderer: NSObject, AVCaptureVideoDataOutputSampleBufferDe
         let (front, mir) = lock.withLock { (_front, _mirrored) }
         img = LiveFilter.upright(img, appliedMirror: connection.isVideoMirrored, wantMirror: front && mir)
         lock.withLock { _imageSize = img.extent.size }
-        if key != "none", let engine { img = engine.render(frame: img, key: key, intensity: fxAmt) }
+        var faces: [CGRect]? = nil
+        if key == LiveFilter.beautyKey {
+            frameNo &+= 1
+            let start = lock.withLock { () -> Bool in
+                guard frameNo % 4 == 1, !_faceBusy else { return false }
+                _faceBusy = true; return true
+            }
+            if start {
+                let probe = img
+                faceQueue.async { [weak self] in
+                    let found = LiveFilter.detectFaces(probe, context: context)
+                    self?.updateFaces(found)
+                }
+            }
+            faces = lock.withLock { Date().timeIntervalSince(_facesSeen) < 0.5 ? _faces : [] }
+        }
+        if key != "none", let engine { img = engine.render(frame: img, key: key, intensity: fxAmt, faces: faces) }
 
         // 화면 꽉 채우기(aspectFill) — 기존 미리보기 레이어와 같은 구도
         let e = img.extent
@@ -149,6 +191,34 @@ struct LiveFilterPreview: UIViewRepresentable {
             let size = CGSize(width: (bounds.width * scale).rounded(), height: (bounds.height * scale).rounded())
             metalLayer.drawableSize = size
             renderer?.setDrawableSize(size)
+        }
+    }
+}
+
+/// 인플(뷰티) — 고른/찍은 사진의 얼굴 사각형을 편집기(웹 filters.js beautyRGBA)에 넘길 형태로.
+/// 정규화 [x, y, w, h], **위가 원점**, 화면에 보이는 방향 기준(편집기 <img> 는 EXIF 방향을 적용해 그린다 —
+/// 그래서 Vision 에도 UIImage 방향을 같이 준다). 얼굴이 없으면 [] → 편집기가 자체(피부색) 추정으로 넘어간다.
+enum FaceRects {
+    static func normalizedTopLeft(_ img: UIImage) -> [[Double]] {
+        guard let cg = img.cgImage else { return [] }
+        let req = VNDetectFaceRectanglesRequest()
+        try? VNImageRequestHandler(cgImage: cg, orientation: orientation(img.imageOrientation), options: [:]).perform([req])
+        let boxes: [CGRect] = (req.results ?? []).map(\.boundingBox).sorted { $0.width > $1.width }
+        return boxes.prefix(3).map { (b: CGRect) -> [Double] in
+            [Double(b.minX), Double(1 - b.maxY), Double(b.width), Double(b.height)]
+        }
+    }
+    private static func orientation(_ o: UIImage.Orientation) -> CGImagePropertyOrientation {
+        switch o {
+        case .up: return .up
+        case .down: return .down
+        case .left: return .left
+        case .right: return .right
+        case .upMirrored: return .upMirrored
+        case .downMirrored: return .downMirrored
+        case .leftMirrored: return .leftMirrored
+        case .rightMirrored: return .rightMirrored
+        @unknown default: return .up
         }
     }
 }

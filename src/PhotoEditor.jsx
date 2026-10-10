@@ -191,7 +191,9 @@ const fxOf = (p) => ({
 // initialPresetKey: 필터 카테고리의 프리셋 카드에서 들어오면 그 룩이 켜진 채 열린다.
 // initialFxAmt: 앱 카메라에서 고른 "효과" 슬라이더 값(0..1) — 찍고 넘어와도 그대로 이어진다.
 // initialStrength: 앱 카메라 세기 슬라이더(0..1 → 색감 0.7×세기)로 찍어 넘어왔을 때.
-export default function PhotoEditor({ src, srcs, initialPresetKey = "none", initialFxAmt = 1, initialStrength = 0.7, filename = "rimikimi", onClose }) {
+// initialFaces: 앱(iOS)이 Vision 으로 찾은 사진별 얼굴 사각형 [[[x,y,w,h],…],…] (정규화·위가 원점) — 인플(뷰티) 전용.
+//   카메라 미리보기와 같은 얼굴 영역을 쓰려고 받는다. 없으면 filters.js 가 피부색으로 추정한다.
+export default function PhotoEditor({ src, srcs, initialPresetKey = "none", initialFxAmt = 1, initialStrength = 0.7, initialFaces = null, filename = "rimikimi", onClose }) {
   const sources = srcs && srcs.length ? srcs : [src];
   const multi = sources.length > 1;
   // 에디터가 떠 있는 동안 앱 루트의 스와이프 제스처(뒤로가기·탭 전환)를 끈다.
@@ -298,6 +300,14 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
   const [saveProg, setSaveProg] = useState(""); // 배치 저장 진행 "3/10"
   const [toast, setToast] = useState("");
   const toastTimer = useRef(null);
+  // 인플 얼굴 사각형 — 원본 좌표라서 기울기·원근·렌즈 보정을 켰거나 잘라/채워 맞춤으로 사진이 바뀌면 못 쓴다
+  // (그땐 undefined → filters.js 자체 추정).
+  const facesStaleRef = useRef(new Set());
+  const facesFor = (i, lensV, g) => {
+    const f = initialFaces && initialFaces[i];
+    if (!Array.isArray(f) || facesStaleRef.current.has(i) || lensV || (g && (g.tilt || g.pv || g.ph))) return undefined;
+    return f.filter((r) => Array.isArray(r) && r.length === 4).map(([x, y, w, h]) => ({ x, y, w, h }));
+  };
 
   const fullImgRef = useRef(null);   // 활성 사진의 원본 <img> (내보내기용)
   const revokeRef = useRef(null);
@@ -443,11 +453,11 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
       const copy = new ImageData(new Uint8ClampedArray(base.data), w, h);
       // 기하 보정(정방향·렌즈)은 룩보다 먼저, 한 번의 리샘플로
       if (lens || geo.tilt || geo.pv || geo.ph) applyGeometry(copy.data, w, h, { ...geo, lens });
-      applyLookWithStrength(copy.data, w, h, presetByKey(presetKey), { ...fx, seed: GRAIN_SEED }, strength);
+      applyLookWithStrength(copy.data, w, h, presetByKey(presetKey), { ...fx, seed: GRAIN_SEED, faces: facesFor(idx, lens, geo) }, strength);
       ctx.putImageData(copy, 0, 0);
       if (dateStyle !== "none") drawDateStamp(ctx, w, h, dateStyle);
     });
-  }, [presetKey, fx, dateStyle, peeking, strength, lens, geo]);
+  }, [presetKey, fx, dateStyle, peeking, strength, lens, geo, idx]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { if (ready) renderPreview(); }, [ready, renderPreview, idx]);
 
@@ -513,6 +523,7 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
     const ctx = c.getContext("2d", { willReadFrequently: true });
     ctx.drawImage(img, 0, 0, w, h);
     fullImgRef.current = img;
+    facesStaleRef.current.add(idx); // 사진이 바뀌었다 — 앱이 준 얼굴 사각형은 이제 안 맞는다
     baseRef.current = ctx.getImageData(0, 0, w, h);
     baseSmallRef.current = makeSmallBase(baseRef.current);
     renderPreview();
@@ -581,7 +592,7 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
     el.dataset.drawn = "1";
     el.width = tb.width; el.height = tb.height;
     const copy = new ImageData(new Uint8ClampedArray(tb.data), tb.width, tb.height);
-    applyLook(copy.data, tb.width, tb.height, presetByKey(key), {});
+    applyLook(copy.data, tb.width, tb.height, presetByKey(key), { faces: facesFor(idx, 0, null) });
     el.getContext("2d").putImageData(copy, 0, 0);
   }, [ready, idx]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -894,7 +905,7 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
         const id = ctx.getImageData(0, 0, w, h);
         if (hasGeo) applyGeometry(id.data, w, h, { ...g, lens: lk.lens || 0 });
         // 원본이 커서(2K) 수백 ms 걸릴 수 있다 — 호출측이 busy 표시를 켠 채로 부른다
-        if (hasLook) applyLookWithStrength(id.data, w, h, presetByKey(lk.presetKey), { ...lk.fx, seed: GRAIN_SEED }, lk.strength);
+        if (hasLook) applyLookWithStrength(id.data, w, h, presetByKey(lk.presetKey), { ...lk.fx, seed: GRAIN_SEED, faces: facesFor(i, lk.lens, lk.geo) }, lk.strength);
         ctx.putImageData(id, 0, 0);
       }
       if (dateStyle !== "none") drawDateStamp(ctx, w, h, dateStyle);

@@ -1,5 +1,6 @@
 import Foundation
 import CoreImage
+import Vision
 
 /// 카메라 탭 **실시간 필터** 엔진 — 웹 편집기의 `src/filters.js`(applyLook)를 Core Image 커널로
 /// 그대로 옮긴 것(오너 지시 2026-10-09 "필터는 실시간으로 볼 수 있어야 하는데??").
@@ -63,6 +64,29 @@ enum LiveFilter {
 
     /// 편집기 미리보기 긴 변 (PhotoEditor.jsx PREVIEW_MAX)
     static let editorLongSide: CGFloat = 1080
+
+    // MARK: 인플(Influencer) — 실시간 뷰티. filters.js `beautyRGBA`/`INFL` 와 **같은 수식·상수**(값을 바꾸면 둘 다).
+    // 찍은 사진은 편집기(filters.js)가 입히므로 저장 결과의 기준은 웹이고, 여기는 미리보기다.
+    // 얼굴: 여기선 Vision 얼굴 사각형(눈썹~턱), 웹은 피부색 덩어리로 같은 틀을 추정한다.
+    static let beautyKey = "infl"
+    enum Infl {
+        static let cy = 0.45, rx = 0.56, ry = 0.74     // 얼굴 사각형 → 타원
+        static let work = 140.0                        // 작업 격자에서 얼굴 폭(칸)
+        static let sigS = 0.044, detail = 0.0013, feather = 1.0 / 60, glowS = 0.032
+        static let edgeLo = 45.0, edgeHi = 95.0
+    }
+
+    /// 얼굴 사각형(정규화, **아래가 원점** = CI 좌표) — 정지 사진·검증용 동기 검출. 실시간은 렌더러가 띄엄띄엄 돌린다.
+    static func detectFaces(_ img: CIImage, context: CIContext? = nil) -> [CGRect] {
+        let e = img.extent
+        let k = min(1, 640 / max(e.width, e.height))
+        let small = img.transformed(by: .init(translationX: -e.minX, y: -e.minY)).transformed(by: .init(scaleX: k, y: k))
+        let req = VNDetectFaceRectanglesRequest()
+        var opts: [VNImageOption: Any] = [:]
+        if let context { opts[.ciContext] = context }
+        try? VNImageRequestHandler(ciImage: small, options: opts).perform([req])
+        return (req.results ?? []).map(\.boundingBox).sorted { $0.width > $1.width }.prefix(3).map { $0 }
+    }
 
     // filters.js FILM_PRESETS — genpresets.mjs 로 생성 (원본 none 은 없음 = 처리 안 함)
     static let presets: [String: Preset] = [
@@ -170,6 +194,16 @@ inline float3 lf_floorq(float3 v) { return floor(clamp(v + 0.5, 0.0, 255.0)); }
 // Uint8ClampedArray 저장 = 짝수 반올림
 inline float3 lf_store(float3 v) { return clamp(rint(v), 0.0, 255.0); }
 inline float lf_lum(float3 v) { return v.r * 0.299 + v.g * 0.587 + v.b * 0.114; }
+// 인플 — 피부 가능성 0..1 (filters.js skinWeight 와 같은 식: YCrCb 범위를 ±4 부드럽게)
+inline float lf_skin(float3 c) {
+    float Y = lf_lum(c);
+    float cr = (c.r - Y) * 0.713 + 128.0, cb = (c.b - Y) * 0.564 + 128.0;
+    return smoothstep(36.0, 44.0, Y) * smoothstep(129.0, 137.0, cr) * (1.0 - smoothstep(174.0, 182.0, cr))
+         * smoothstep(73.0, 81.0, cb) * (1.0 - smoothstep(126.0, 134.0, cb));
+}
+inline float4 lf_clampSample(coreimage::sampler s, float2 p, float W, float H) {
+    return s.sample(s.transform(clamp(p, float2(0.5), float2(W - 0.5, H - 0.5))));
+}
 
 inline float3 lf_rgb2hsl(float3 c) {
     float r = c.r / 255.0, g = c.g / 255.0, b = c.b / 255.0;
@@ -457,6 +491,113 @@ extern "C" [[stitchable]] float4 lfScan(coreimage::sampler src, float period, fl
     if (fmod(y, period) == 0.0) v = lf_store(v * num / den);
     return lf_out(v);
 }
+
+//@kernel
+// 인플 ① 작업 격자로 면적 평균 축소 — 칸(1/s 픽셀) 안을 n×n 점으로 고르게 찍어 평균
+extern "C" [[stitchable]] float4 lfInflDown(coreimage::sampler src, float inv, float n, float W, float H, coreimage::destination dest) {
+    float2 dc = dest.coord();
+    float2 o = (dc - 0.5) * inv;
+    float4 acc = float4(0.0);
+    for (float j = 0.0; j < n; j += 1.0)
+        for (float i = 0.0; i < n; i += 1.0)
+            acc += lf_clampSample(src, o + (float2(i, j) + 0.5) * (inv / n), W, H);
+    return float4(acc.rgb / (n * n), 1.0);
+}
+
+//@kernel
+// 인플 ② 마스크 = 피부색 × 얼굴 타원(최대 3개, 원해상도 좌표·아래가 원점) — r 채널
+extern "C" [[stitchable]] float4 lfInflMask(coreimage::sampler small, float s, float4 e0, float4 e1, float4 e2, float count,
+                                coreimage::destination dest) {
+    float2 dc = dest.coord();
+    float2 X = dc / s;
+    float reg = 0.0;
+    for (int k = 0; k < 3; k++) {
+        if (float(k) >= count) break;
+        float4 e = k == 0 ? e0 : (k == 1 ? e1 : e2);
+        float2 d = (X - e.xy) / e.zw;
+        reg = max(reg, 1.0 - smoothstep(0.7, 1.0, dot(d, d)));
+    }
+    float m = reg > 0.0 ? reg * lf_skin(small.sample(small.transform(dc)).rgb * 255.0) : 0.0;
+    return float4(m, m, m, 1.0);
+}
+
+//@kernel
+// 분리형 가우시안 한 방향 (가장자리 클램프) — 마스크 페더·글로우·고주파 분리 공용
+extern "C" [[stitchable]] float4 lfInflGauss(coreimage::sampler src, float sigma, float dx, float dy, float W, float H,
+                                 coreimage::destination dest) {
+    float2 dc = dest.coord();
+    if (sigma < 0.3) return src.sample(src.transform(dc));
+    int R = min(32, int(ceil(sigma * 3.0)));
+    float4 acc = float4(0.0);
+    float ws = 0.0;
+    for (int i = -R; i <= R; i++) {
+        float wgt = exp(-float(i * i) / (2.0 * sigma * sigma));
+        acc += lf_clampSample(src, dc + float2(dx, dy) * float(i), W, H) * wgt;
+        ws += wgt;
+    }
+    return acc / ws;
+}
+
+//@kernel
+// 인플 ③ 양방향(bilateral) 스무딩 — 9×9 탭(반경 R 을 4등분, JS Math.round 와 같게 floor(x+0.5)), 색 거리 = RGB 합
+extern "C" [[stitchable]] float4 lfInflBilat(coreimage::sampler small, coreimage::sampler mask, float sigS, float R, float sigC,
+                                 float W, float H, coreimage::destination dest) {
+    float2 dc = dest.coord();
+    float4 c = small.sample(small.transform(dc));
+    if (mask.sample(mask.transform(dc)).r < 0.002) return c;
+    float3 c0 = c.rgb * 255.0;
+    float is2 = 1.0 / (2.0 * sigS * sigS), ic2 = 1.0 / (2.0 * sigC * sigC);
+    float3 acc = float3(0.0);
+    float aw = 0.0;
+    for (int ty = -4; ty <= 4; ty++) {
+        float oy = floor(float(ty) * R / 4.0 + 0.5);
+        for (int tx = -4; tx <= 4; tx++) {
+            float ox = floor(float(tx) * R / 4.0 + 0.5);
+            float3 q = lf_clampSample(small, dc + float2(ox, oy), W, H).rgb * 255.0;
+            float3 dd = abs(q - c0);
+            float d = dd.r + dd.g + dd.b;
+            float wgt = exp(-(ox * ox + oy * oy) * is2 - d * d * ic2);
+            acc += q * wgt; aw += wgt;
+        }
+    }
+    return float4(acc / aw / 255.0, 1.0);
+}
+
+//@kernel
+// 글로우 원천 — 밝은 부분만 (base - 150)
+extern "C" [[stitchable]] float4 lfInflHi(coreimage::sampler base, coreimage::destination dest) {
+    float3 v = base.sample(base.transform(dest.coord())).rgb * 255.0;
+    return float4(max(float3(0.0), v - 150.0) / 255.0, 1.0);
+}
+
+//@kernel
+// 인플 ④ 원해상도 합성 — filters.js beautyRGBA 마지막 루프와 같은 식
+extern "C" [[stitchable]] float4 lfInfl(coreimage::sampler src, coreimage::sampler blurD, coreimage::sampler mask,
+                            coreimage::sampler base, coreimage::sampler glow, float s, float a, float ww, float wh,
+                            float edgeLo, float edgeHi, coreimage::destination dest) {
+    float2 dc = dest.coord();
+    float4 o4 = src.sample(src.transform(dc));
+    float2 p = dc * s;
+    float m0 = lf_clampSample(mask, p, ww, wh).r;
+    if (m0 < 0.002) return o4;
+    float3 v = o4.rgb * 255.0;
+    float3 l = blurD.sample(blurD.transform(dc)).rgb * 255.0;
+    float mSkin = m0 * (0.1 + 0.9 * lf_skin(l));
+    float3 ba = lf_clampSample(base, p, ww, wh).rgb * 255.0;
+    float3 dv = abs(l - ba);
+    float m = mSkin * (1.0 - smoothstep(edgeLo, edgeHi, dv.r + dv.g + dv.b));
+    float3 sm = ba + (v - l) * (0.55 - 0.3 * a);
+    float Y = lf_lum(sm);
+    float cb = (sm.b - Y) * 0.564, cr = (sm.r - Y) * 0.713 * (1.0 - 0.18 * a);
+    Y = Y + (255.0 - Y) * 0.10 * a * smoothstep(60.0, 130.0, Y);
+    float r = Y + 1.403 * cr, b = Y + 1.773 * cb;
+    float g = (Y - 0.299 * r - 0.114 * b) / 0.587;
+    float k = min(1.0, m * 0.85 * a);
+    float3 o = v + (float3(r, g, b) - v) * k;
+    float3 gl = lf_clampSample(glow, p, ww, wh).rgb * 255.0;
+    o = 255.0 - ((255.0 - o) * (255.0 - gl * (0.35 * a * m))) / 255.0;
+    return lf_out(lf_floorq(o));
+}
 """#
 }
 
@@ -483,10 +624,17 @@ final class LiveFilterEngine {
     /// 칸·반경은 짧은 변 비율이라 해상도가 달라도 같은 모양이고, 그레인 알갱이만 조금 더 곱다.
     /// intensity: 카메라 세기 슬라이더(0..1, 오너 지시 2026-10-09 "젤 왼쪽으로 가면 기본 카메라") —
     /// 편집기 "색감" 슬라이더와 같은 식: 색만 원본↔프리셋 사이를 섞는다(= 편집기 색감 0.7×t). 효과는 그대로.
-    func render(frame: CIImage, key: String, intensity: Double = 1) -> CIImage {
+    /// faces: 인플 전용 — 얼굴 사각형(정규화·아래가 원점). nil 이면 여기서 Vision 으로 찾는다(정지 사진·검증용).
+    func render(frame: CIImage, key: String, intensity: Double = 1, faces: [CGRect]? = nil) -> CIImage {
         let e = frame.extent
         let img = frame.transformed(by: .init(translationX: -e.minX, y: -e.minY))
             .cropped(to: CGRect(x: 0, y: 0, width: e.width.rounded(.down), height: e.height.rounded(.down)))
+        if key == LiveFilter.beautyKey {
+            // 색감 슬라이더 = 보정 세기 그대로(0 = 기본 카메라). 편집기로 넘길 때 strength 0.7×t → filters.js a = t 로 같다.
+            let t = min(1, max(0, intensity))
+            if t <= 0.001 { return img }
+            return beauty(img, amount: t, faces: faces ?? LiveFilter.detectFaces(img))
+        }
         guard let p = LiveFilter.presets[key] else { return img }
         let t = min(1, max(0, intensity))
         if t >= 0.999 { return apply(img, key: key) }
@@ -556,6 +704,38 @@ final class LiveFilterEngine {
             img = run("lfGlow", ext, [img, soft], [img, soft, p.fx.glow * 0.85, p.fx.glow * 10])
         }
         return img
+    }
+
+    /// 인플 — filters.js beautyRGBA 와 같은 단계: 작업 격자 축소 → 마스크(피부×타원)·페더 → bilateral →
+    /// 글로우 원천 → 원해상도 고주파 분리 → 합성. 무거운 건 전부 작업 격자(얼굴 폭 140칸)라 프레임 해상도와 무관하다.
+    func beauty(_ img: CIImage, amount a: Double, faces: [CGRect]) -> CIImage {
+        typealias I = LiveFilter.Infl
+        let ext = img.extent
+        let W = ext.width, H = ext.height
+        let F = faces.prefix(3).map { CGRect(x: $0.minX * W, y: $0.minY * H, width: $0.width * W, height: $0.height * H) }
+        guard let fw = F.map(\.width).max(), fw >= 8 else { return img }
+        // 타원(원해상도, 아래가 원점) — 웹(위가 원점)의 cy = 위 + 0.45h 를 뒤집으면 maxY - 0.45h
+        let ell = F.map { CIVector(x: $0.midX, y: $0.maxY - I.cy * $0.height, z: I.rx * $0.width, w: I.ry * $0.height) }
+        let s = min(1, I.work / fw)
+        let ww = (W * s).rounded(.up), wh = (H * s).rounded(.up)
+        let sExt = CGRect(x: 0, y: 0, width: ww, height: wh)
+        let small = run("lfInflDown", sExt, [img], [img, 1 / s, min(8, (1 / s).rounded(.up)), W, H])
+        let zero = CIVector(x: -1e6, y: -1e6, z: 1, w: 1)
+        var mask = run("lfInflMask", sExt, [small], [small, s, ell[0], ell.count > 1 ? ell[1] : zero,
+                                                    ell.count > 2 ? ell[2] : zero, CGFloat(ell.count)])
+        mask = gauss(mask, I.feather * fw * s, ww, wh)
+        let sigS = I.sigS * fw * s
+        let base = run("lfInflBilat", sExt, [small, mask], [small, mask, sigS, max(1, (1.5 * sigS).rounded(.up)), 22 + 18 * a, ww, wh])
+        let glow = gauss(run("lfInflHi", sExt, [base], [base]), I.glowS * fw * s, ww, wh)
+        let blurD = gauss(img, I.detail * fw, W, H)
+        return run("lfInfl", ext, [img, blurD, mask, base, glow],
+                   [img, blurD, mask, base, glow, s, a, ww, wh, I.edgeLo, I.edgeHi])
+    }
+
+    private func gauss(_ img: CIImage, _ sigma: CGFloat, _ W: CGFloat, _ H: CGFloat) -> CIImage {
+        guard sigma >= 0.3 else { return img }
+        let h = run("lfInflGauss", img.extent, [img], [img, sigma, 1, 0, W, H])
+        return run("lfInflGauss", img.extent, [h], [h, sigma, 0, 1, W, H])
     }
 
     // MARK: 내부

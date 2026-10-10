@@ -516,16 +516,33 @@ final class AppState {
         //    1~3장 = 4096(12MP 원본 그대로) · 4~10장 = 3072.
         let picked = Array(images.prefix(10))
         let maxLong: CGFloat = picked.count <= 3 ? 4096 : 3072
-        let srcs: [String] = picked.compactMap { img in
+        var srcs: [String] = []
+        var kept: [UIImage] = []
+        for img in picked {
             let scaled = img.downscaled(maxLong: maxLong)
-            guard let d = scaled.jpegData(compressionQuality: 0.95) else { return nil }
-            return "data:image/jpeg;base64,\(d.base64EncodedString())"
+            guard let d = scaled.jpegData(compressionQuality: 0.95) else { continue }
+            srcs.append("data:image/jpeg;base64,\(d.base64EncodedString())")
+            kept.append(scaled)
         }
         guard !srcs.isEmpty else { return }
         let fxAmt = photoPickFxAmount
         photoPickFxAmount = 1
-        webTool = WebTool(url: Config.filterToolURL(mode: "edit", presetKey: preset), title: Copy.decorate,
-                          initialPayload: ["mode": "edit", "srcs": srcs, "presetKey": preset, "strength": 0.7 * fxAmt])
+        let open = { [weak self] (faces: [[[Double]]]?) in
+            var payload: [String: Any] = ["mode": "edit", "srcs": srcs, "presetKey": preset, "strength": 0.7 * fxAmt]
+            if let faces { payload["faces"] = faces }
+            self?.webTool = WebTool(url: Config.filterToolURL(mode: "edit", presetKey: preset), title: Copy.decorate,
+                                    initialPayload: payload)
+        }
+        // 인플(뷰티): 편집기(웹)엔 쓸 만한 얼굴 검출기가 없어 — 여기서 Vision 으로 찾아 사진별로 넘긴다.
+        // 그래야 카메라 미리보기(같은 Vision 사각형)와 저장본이 같은 얼굴 영역을 쓴다. 다른 필터는 기존 그대로(즉시).
+        if preset == LiveFilter.beautyKey {
+            Task.detached(priority: .userInitiated) {
+                let faces = kept.map { FaceRects.normalizedTopLeft($0) }
+                await MainActor.run { open(faces) }
+            }
+        } else {
+            open(nil)
+        }
     }
 
     /// 결과 화면 "다듬기" — 지금 보고 있는 사진을 편집기에 바로 실어 보낸다(사진 선택 화면 생략).

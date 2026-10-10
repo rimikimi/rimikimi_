@@ -126,6 +126,9 @@ export const FILM_PRESETS = [
     fx: { grain: 0.55, vignette: 0.45 } },
 
   /* ── 재미 (SNOW류 — 특수 렌더 모드, special 필드가 전용 코드 경로를 탄다) ── */
+  // 인플 — 얼굴 피부 보정(뷰티). 색 LUT 대신 beautyRGBA 를 탄다. 강도 = 색감 슬라이더(0 = 원본).
+  { key: "infl",     ko: "인플",      en: "Influencer", group: "fun",
+    special: "beauty" },
   { key: "sepia",    ko: "세피아",    en: "Sepia", group: "fun",
     ex: 0.02, con: 0.12, fade: 8, whitePull: 6, bw: [0.3, 0.55, 0.15], sh: [18, 6, -14], hi: [24, 10, -18] },
   { key: "duopink",  ko: "듀오 핑크", en: "Duo Pink", group: "fun",
@@ -186,7 +189,9 @@ export function applyLookWithStrength(data, w, h, preset, effects = {}, strength
   const p = preset && preset.key !== "none" ? preset : null;
   const k = strength / 0.7;
   const seedOnly = { seed: effects.seed };
-  if (p) {
+  if (p?.special === "beauty") {
+    beautyRGBA(data, w, h, k, effects.faces); // 강도 = 보정 세기 그 자체(보간 아님) — 0 이면 원본 그대로
+  } else if (p) {
     if (Math.abs(k - 1) > 0.01) {
       const orig = new Uint8ClampedArray(data);
       applyLook(data, w, h, p, seedOnly); // 프리셋만 (효과 제외)
@@ -399,6 +404,11 @@ function blockAverageRGBA(data, w, h, bs) {
    effects: { grain, vignette, leak, blur(흐림), lowres(저해상도 칸, 짧은 변 대비 칸 크기), shake(흔들림), glow(뽀샤시), seed }
    순서: 흔들림/흐림(기하) → 색·그레인·비네트·빛샘(1패스) → 뽀샤시(블룸, 마지막) */
 export function applyLook(data, w, h, preset, effects = {}) {
+  if (preset?.special === "beauty") {
+    beautyRGBA(data, w, h, 1, effects.faces);
+    const { faces: _f, ...rest } = effects;
+    return applyLook(data, w, h, null, rest);
+  }
   const p = preset && preset.key !== "none" ? preset : null;
   const luts = p ? buildLuts(p) : null;
   const sat = p?.sat || 0;
@@ -618,6 +628,236 @@ export function applyLook(data, w, h, preset, effects = {}) {
   // 방법: 격자를 훑어 **주변보다 밝은 꼭짓점**만 고르고, 거기서 4방향(가로·세로·대각)
   // 으로 밝기를 더해 가며 뻗는다. 더하기(additive)라 어두운 곳은 그대로 남는다.
   if (effects.twinkle) twinkleRGBA(data, w, h, effects.twinkle, seed);
+  return data;
+}
+
+/* ---------- 인플(Influencer) — 실시간 뷰티: 얼굴 피부만 결 살려 매끈·화사하게 (오너 승인 2026-10-10) ----------
+   원형 = scratch infl/beauty.py(OpenCV). 앱 카메라 미리보기(ios2 LiveFilter.swift lfInfl*)가 **같은 수식**을
+   Core Image 로 돌린다 — 찍은 사진은 이 함수(편집기)가 입히므로 여기가 저장 결과의 기준이다. 값 바꾸면 둘 다.
+   ① 얼굴 찾기 — 웹엔 싼 얼굴 검출기가 없다(FaceDetector API 는 WKWebView 에 없음). 그래서
+      128px 격자에서 피부색(YCrCb) 덩어리를 연결 요소로 묶고, 화면 가운데에 가깝고 큰 덩어리의
+      윗부분(이마~턱, 폭 기준 1.4배 높이)을 얼굴로 본다 → Vision 얼굴 사각형(눈썹~턱)과 같은 틀로 환산.
+      effects.faces(정규화 [x,y,w,h], 위가 0)를 주면 그걸 쓴다.
+   ② 마스크 = 피부색(부드러운 경계) × 얼굴 타원 → 가우시안 페더. 피부 밖(배경·머리카락·눈흰자)은 0 → 원본 그대로.
+   ③ 저해상도 격자(얼굴 폭 ≈140칸)에서 양방향(bilateral) 스무딩 = 결 보존 저주파,
+      원해상도 고주파(모공 결)를 (0.55-0.3a) 만큼 되돌려 플라스틱 피부 방지
+   ④ 밝기 살짝 올리고(Y) 붉은기(Cr) 덜고, 하이라이트 글로우(피부 위에만)
+   amount a: 0 = 원본과 바이트 단위 동일, 1 = 표준(카메라 슬라이더 끝 = 편집기 색감 0.7), 편집기 1.0 = a 1.43 */
+export const INFL = {
+  cy: 0.45, rx: 0.56, ry: 0.74,  // 얼굴 사각형(눈썹~턱, Vision 틀) → 타원 중심 y·반경 배율
+  work: 140,                     // 작업 격자에서 얼굴 폭(칸)
+  sigS: 0.044,                   // bilateral 공간 σ (얼굴 폭 대비)
+  detail: 0.0013,                // 되돌릴 고주파 σ (얼굴 폭 대비, 원형 1.2px @ 폭 926)
+  feather: 1 / 60,               // 마스크 페더 σ (얼굴 폭 대비)
+  glowS: 0.032,                  // 글로우 번짐 σ (얼굴 폭 대비)
+  edgeLo: 45, edgeHi: 95,        // |고주파 뺀 원본 − base| (RGB 합) 이 이만큼이면 구조로 보고 보정을 뺀다
+};
+const ss = (e0, e1, x) => { const t = x <= e0 ? 0 : x >= e1 ? 1 : (x - e0) / (e1 - e0); return t * t * (3 - 2 * t); };
+/** 피부 가능성 0..1 — OpenCV YCrCb inRange (Y≥40, 133≤Cr≤178, 77≤Cb≤130) 을 ±4 부드럽게(영상에서 깜빡임 방지) */
+export function skinWeight(r, g, b) {
+  const Y = 0.299 * r + 0.587 * g + 0.114 * b;
+  const cr = (r - Y) * 0.713 + 128, cb = (b - Y) * 0.564 + 128;
+  return ss(36, 44, Y) * ss(129, 137, cr) * (1 - ss(174, 182, cr)) * ss(73, 81, cb) * (1 - ss(126, 134, cb));
+}
+
+/** 피부색 덩어리로 얼굴 사각형 추정 → [{x,y,w,h}] 픽셀(위가 0), Vision 틀(눈썹~턱) 기준 */
+export function findFacesSkin(data, w, h) {
+  const s = Math.min(1, 128 / Math.max(w, h));
+  const gw = Math.max(1, Math.round(w * s)), gh = Math.max(1, Math.round(h * s));
+  const bin = new Uint8Array(gw * gh);
+  for (let gy = 0; gy < gh; gy++) for (let gx = 0; gx < gw; gx++) {
+    // 칸 안 2×2 점 평균
+    let r = 0, g = 0, b = 0;
+    for (let k = 0; k < 4; k++) {
+      const x = Math.min(w - 1, Math.floor((gx + 0.25 + 0.5 * (k & 1)) / s));
+      const y = Math.min(h - 1, Math.floor((gy + 0.25 + 0.5 * (k >> 1)) / s));
+      const i = (y * w + x) * 4; r += data[i]; g += data[i + 1]; b += data[i + 2];
+    }
+    bin[gy * gw + gx] = skinWeight(r / 4, g / 4, b / 4) > 0.5 ? 1 : 0;
+  }
+  const label = new Int32Array(gw * gh).fill(-1);
+  const comps = [];
+  const stack = [];
+  for (let start = 0; start < gw * gh; start++) {
+    if (!bin[start] || label[start] >= 0) continue;
+    const id = comps.length, rows = new Map();
+    let area = 0, sx = 0, sy = 0, ymin = gh;
+    stack.push(start); label[start] = id;
+    while (stack.length) {
+      const p = stack.pop(), x = p % gw, y = (p / gw) | 0;
+      area++; sx += x; sy += y; if (y < ymin) ymin = y;
+      const rr = rows.get(y); if (rr) { if (x < rr[0]) rr[0] = x; if (x > rr[1]) rr[1] = x; } else rows.set(y, [x, x]);
+      if (x > 0 && bin[p - 1] && label[p - 1] < 0) { label[p - 1] = id; stack.push(p - 1); }
+      if (x < gw - 1 && bin[p + 1] && label[p + 1] < 0) { label[p + 1] = id; stack.push(p + 1); }
+      if (y > 0 && bin[p - gw] && label[p - gw] < 0) { label[p - gw] = id; stack.push(p - gw); }
+      if (y < gh - 1 && bin[p + gw] && label[p + gw] < 0) { label[p + gw] = id; stack.push(p + gw); }
+    }
+    if (area < 0.004 * gw * gh) continue;
+    const cx = sx / area / gw, cy = sy / area / gh;
+    const d = Math.hypot(cx - 0.5, cy - 0.42) / 0.5;
+    comps.push({ id, area, ymin, rows, score: area * (1 - 0.6 * Math.min(1, d)) });
+  }
+  // label 번호가 comps 인덱스와 어긋나도 상관없다(rows 를 들고 있다)
+  if (!comps.length) return [];
+  comps.sort((a, b) => b.score - a.score);
+  const faces = [];
+  for (const c of comps) {
+    if (c.score < 0.35 * comps[0].score || faces.length >= 3) break;
+    // 위에서부터 내려가며 가장 넓은 줄 폭(fw)을 잰다 — 높이가 1.4·fw 를 넘으면(목·어깨) 멈춘다
+    let fw = 0, sumC = 0, n = 0, yEnd = c.ymin, edge = false, xl = gw, xr = 0;
+    for (let y = c.ymin; y < gh; y++) {
+      const rr = c.rows.get(y); if (!rr) continue;
+      if (fw >= 4 && y - c.ymin > 1.4 * fw) break;
+      const span = rr[1] - rr[0] + 1; if (span > fw) fw = span;
+      if (rr[0] === 0 || rr[1] === gw - 1) edge = true;
+      if (rr[0] < xl) xl = rr[0]; if (rr[1] > xr) xr = rr[1];
+      sumC += (rr[0] + rr[1]) / 2; n++; yEnd = y;
+    }
+    if (fw < Math.max(4, 0.06 * Math.max(gw, gh)) || !n) continue;
+    // 얼굴답지 않은 덩어리 거르기(벽·바닥·나무가 피부색일 때 — 2026-10-10 거리 사진에서 벽돌 벽이 잡혔다):
+    // 화면 폭의 60% 넘게 넓거나, 좌우 끝에 닿거나, 키가 폭보다 많이 작거나, 속이 비어 있으면(채움 < 55%) 버린다.
+    const tall = yEnd - c.ymin + 1;
+    // 줄 안쪽의 피부색 아닌 칸 비율 — 128px 격자에선 얼굴(눈·입)이 오히려 매끈하게 차 있다(실측 0.4~6%).
+    // 솔기·무늬가 있는 가죽 의자·나무는 15% 넘게 뚫려 있다(실측 18~24%) → 버린다
+    let holes = 0, inner = 0;
+    for (let y = c.ymin; y <= yEnd; y++) { const rr = c.rows.get(y); if (!rr) continue;
+      for (let x = rr[0]; x <= rr[1]; x++) { inner++; if (!bin[y * gw + x] || label[y * gw + x] !== c.id) holes++; } }
+    let filled = 0;
+    for (let y = c.ymin; y <= yEnd; y++) for (let x = xl; x <= xr; x++) if (bin[y * gw + x]) filled++;
+    if (fw > 0.6 * gw || edge || tall < 0.9 * fw || holes > 0.15 * inner || filled < 0.55 * tall * (xr - xl + 1)) continue;
+    // 보수적으로: 셀카급(화면 폭 15% 이상) + 화면 가운데 부근만 — 웹 단독 경로는 틀리게 입히느니 안 입힌다
+    const fxc = (xl + xr + 1) / 2 / gw, fyc = (c.ymin + tall / 2) / gh;
+    if (fw < 0.15 * gw || Math.abs(fxc - 0.5) > 0.3 || fyc > 0.7) continue;
+    const xc = sumC / n;
+    faces.push({ x: (xc - fw / 2) / s, y: (c.ymin + 0.2 * fw) / s, w: fw / s, h: fw / s });
+  }
+  return faces;
+}
+
+/** 분리형 가우시안 (Float32 평면 1~3장, 가장자리 클램프) */
+function gaussPlanes(planes, w, h, sigma) {
+  if (sigma < 0.3) return planes.map((p) => p.slice());
+  const R = Math.min(32, Math.ceil(sigma * 3));
+  const k = new Float32Array(2 * R + 1);
+  let sum = 0; for (let i = -R; i <= R; i++) { k[i + R] = Math.exp(-(i * i) / (2 * sigma * sigma)); sum += k[i + R]; }
+  for (let i = 0; i < k.length; i++) k[i] /= sum;
+  return planes.map((src) => {
+    const tmp = new Float32Array(w * h), out = new Float32Array(w * h);
+    // 가로 — 가장자리만 클램프, 안쪽은 바로 읽는다
+    for (let y = 0; y < h; y++) { const row = y * w;
+      for (let x = 0; x < w; x++) { let a = 0;
+        if (x >= R && x < w - R) { const b = row + x - R; for (let i = 0; i <= 2 * R; i++) a += src[b + i] * k[i]; }
+        else for (let i = -R; i <= R; i++) { const xx = x + i < 0 ? 0 : x + i >= w ? w - 1 : x + i; a += src[row + xx] * k[i + R]; }
+        tmp[row + x] = a; } }
+    // 세로 — 줄 단위로 더해 캐시를 따라간다
+    for (let y = 0; y < h; y++) { const o = y * w;
+      for (let i = -R; i <= R; i++) { const yy = y + i < 0 ? 0 : y + i >= h ? h - 1 : y + i, b = yy * w, kk = k[i + R];
+        for (let x = 0; x < w; x++) out[o + x] += tmp[b + x] * kk; } }
+    return out;
+  });
+}
+
+/** 인플 본체 — data 제자리 수정. faces: 정규화 [{x,y,w,h}] (없으면 피부 덩어리로 찾는다) */
+export function beautyRGBA(data, w, h, amount, faces) {
+  const a = Math.max(0, Math.min(1 / 0.7, amount || 0));
+  if (a <= 0) return data;
+  // faces 를 받았으면(앱 Vision) 그대로 — 빈 배열 = 얼굴 없음 → 원본 그대로(피부색 추정으로 넘어가지 않는다)
+  const F = Array.isArray(faces) ? faces.map((f) => ({ x: f.x * w, y: f.y * h, w: f.w * w, h: f.h * h })) : findFacesSkin(data, w, h);
+  if (!F.length) return data;
+  const fw = Math.max(...F.map((f) => f.w));
+  const ell = F.map((f) => ({ cx: f.x + f.w / 2, cy: f.y + INFL.cy * f.h, rx: INFL.rx * f.w, ry: INFL.ry * f.h }));
+  // 처리 영역(ROI) = 타원들 + 여유
+  const pad = fw * 0.12;
+  let x0 = w, y0 = h, x1 = 0, y1 = 0;
+  for (const e of ell) { x0 = Math.min(x0, e.cx - e.rx - pad); x1 = Math.max(x1, e.cx + e.rx + pad); y0 = Math.min(y0, e.cy - e.ry - pad); y1 = Math.max(y1, e.cy + e.ry + pad); }
+  x0 = Math.max(0, Math.floor(x0)); y0 = Math.max(0, Math.floor(y0)); x1 = Math.min(w, Math.ceil(x1)); y1 = Math.min(h, Math.ceil(y1));
+  if (x1 - x0 < 4 || y1 - y0 < 4) return data;
+  const RW = x1 - x0, RH = y1 - y0;
+  // ── 작업 격자 (면적 평균 축소)
+  const s = Math.min(1, INFL.work / fw);
+  const ww = Math.max(1, Math.ceil(RW * s)), wh = Math.max(1, Math.ceil(RH * s));
+  const sr = new Float32Array(ww * wh), sg = new Float32Array(ww * wh), sb = new Float32Array(ww * wh), cnt = new Float32Array(ww * wh);
+  for (let y = y0; y < y1; y++) { const cy = Math.min(wh - 1, ((y - y0) * s) | 0) * ww;
+    for (let x = x0; x < x1; x++) { const c = cy + Math.min(ww - 1, ((x - x0) * s) | 0), i = (y * w + x) * 4;
+      sr[c] += data[i]; sg[c] += data[i + 1]; sb[c] += data[i + 2]; cnt[c]++; } }
+  for (let c = 0; c < ww * wh; c++) { const n = cnt[c] || 1; sr[c] /= n; sg[c] /= n; sb[c] /= n; }
+  // ── 마스크 (피부 × 타원) → 페더
+  let mask = new Float32Array(ww * wh);
+  for (let j = 0; j < wh; j++) for (let i = 0; i < ww; i++) {
+    const X = x0 + (i + 0.5) / s, Y = y0 + (j + 0.5) / s;
+    let reg = 0;
+    for (const e of ell) { const dx = (X - e.cx) / e.rx, dy = (Y - e.cy) / e.ry; const r = 1 - ss(0.7, 1, dx * dx + dy * dy); if (r > reg) reg = r; }
+    const c = j * ww + i;
+    mask[c] = reg > 0 ? reg * skinWeight(sr[c], sg[c], sb[c]) : 0;
+  }
+  mask = gaussPlanes([mask], ww, wh, INFL.feather * fw * s)[0];
+  // ── bilateral (작업 격자, 마스크 있는 칸만) — 9×9 탭, 반경 1.5σ
+  const sigS = INFL.sigS * fw * s, R = Math.max(1, Math.ceil(1.5 * sigS)), sigC = 22 + 18 * a;
+  const offs = []; for (let t = -4; t <= 4; t++) offs.push(Math.round((t * R) / 4));
+  const bR = sr.slice(), bG = sg.slice(), bB = sb.slice();
+  const is2 = 1 / (2 * sigS * sigS), ic2 = 1 / (2 * sigC * sigC);
+  const swt = offs.map((oy) => offs.map((ox) => Math.exp(-(ox * ox + oy * oy) * is2)));
+  const cwt = new Float32Array(768); for (let d = 0; d < 768; d++) cwt[d] = Math.exp(-d * d * ic2); // 색 거리(정수) → 가중치
+  for (let j = 0; j < wh; j++) for (let i = 0; i < ww; i++) {
+    const c = j * ww + i; if (mask[c] < 0.002) continue;
+    const r0 = sr[c], g0 = sg[c], b0 = sb[c];
+    let ar = 0, ag = 0, ab = 0, aw = 0;
+    for (let ty = 0; ty < 9; ty++) { const oy = offs[ty], yy = j + oy < 0 ? 0 : j + oy >= wh ? wh - 1 : j + oy, sw = swt[ty];
+      for (let tx = 0; tx < 9; tx++) { const ox = offs[tx], xx = i + ox < 0 ? 0 : i + ox >= ww ? ww - 1 : i + ox, q = yy * ww + xx;
+        const d = Math.abs(sr[q] - r0) + Math.abs(sg[q] - g0) + Math.abs(sb[q] - b0);
+        const wt = sw[tx] * cwt[(d + 0.5) | 0];
+        ar += sr[q] * wt; ag += sg[q] * wt; ab += sb[q] * wt; aw += wt; } }
+    bR[c] = ar / aw; bG[c] = ag / aw; bB[c] = ab / aw;
+  }
+  // ── 글로우 원천 = 밝은 부분만(base-150) 번지게
+  const hR = new Float32Array(ww * wh), hG = new Float32Array(ww * wh), hB = new Float32Array(ww * wh);
+  for (let c = 0; c < ww * wh; c++) { hR[c] = Math.max(0, bR[c] - 150); hG[c] = Math.max(0, bG[c] - 150); hB[c] = Math.max(0, bB[c] - 150); }
+  const [gR, gG, gB] = gaussPlanes([hR, hG, hB], ww, wh, INFL.glowS * fw * s);
+  // ── 원해상도 고주파 (ROI 만)
+  const pr = new Float32Array(RW * RH), pg = new Float32Array(RW * RH), pb = new Float32Array(RW * RH);
+  for (let y = 0; y < RH; y++) for (let x = 0; x < RW; x++) { const i = ((y + y0) * w + x + x0) * 4, c = y * RW + x; pr[c] = data[i]; pg[c] = data[i + 1]; pb[c] = data[i + 2]; }
+  const [lr, lg, lb] = gaussPlanes([pr, pg, pb], RW, RH, INFL.detail * fw);
+  const keep = 0.55 - 0.3 * a, lift = 0.10 * a, red = 1 - 0.18 * a, gl = 0.35 * a;
+  // 작업 격자 양선형 — 열·행마다 (칸 번호, 비율)을 미리 구해 둔다(칸 중심 기준, 가장자리 클램프)
+  const axis = (n, cells) => { const ix = new Int32Array(n), t = new Float32Array(n);
+    for (let q = 0; q < n; q++) { let f = (q + 0.5) * s - 0.5; f = f < 0 ? 0 : f > cells - 1 ? cells - 1 : f;
+      const k = cells < 2 ? 0 : Math.min(cells - 2, f | 0); ix[q] = k; t[q] = cells < 2 ? 0 : f - k; } return [ix, t]; };
+  const [IU, TU] = axis(RW, ww), [IV, TV] = axis(RH, wh);
+  const dx1 = ww < 2 ? 0 : 1, dy1 = wh < 2 ? 0 : ww;
+  let c00 = 0, wa = 0, wb = 0, wc = 0, wd = 0;
+  const bil = (arr) => arr[c00] * wa + arr[c00 + dx1] * wb + arr[c00 + dy1] * wc + arr[c00 + dy1 + dx1] * wd;
+  // 마스크가 있는 칸의 범위만 돈다
+  let cx0 = ww, cx1 = -1, cy0 = wh, cy1 = -1;
+  for (let j = 0; j < wh; j++) for (let i = 0; i < ww; i++) if (mask[j * ww + i] >= 0.002) { if (i < cx0) cx0 = i; if (i > cx1) cx1 = i; if (j < cy0) cy0 = j; if (j > cy1) cy1 = j; }
+  if (cx1 < 0) return data;
+  const X0 = Math.max(0, Math.floor((cx0 - 1) / s)), X1 = Math.min(RW, Math.ceil((cx1 + 2) / s));
+  const Y0 = Math.max(0, Math.floor((cy0 - 1) / s)), Y1 = Math.min(RH, Math.ceil((cy1 + 2) / s));
+  for (let y = Y0; y < Y1; y++) { const rv = IV[y] * ww, tv = TV[y];
+    for (let x = X0; x < X1; x++) { const tu = TU[x];
+      c00 = rv + IU[x]; wa = (1 - tu) * (1 - tv); wb = tu * (1 - tv); wc = (1 - tu) * tv; wd = tu * tv;
+      const m0 = bil(mask); if (m0 < 0.002) continue;
+      const c = y * RW + x, i = ((y + y0) * w + x + x0) * 4;
+      // 원해상도 피부 게이트 — 눈(흰자·홍채·속눈썹)·눈썹·입술 경계처럼 피부색이 아닌 픽셀은 덜 건드린다
+      const mSkin = m0 * (0.1 + 0.9 * skinWeight(lr[c], lg[c], lb[c]));
+      const r = pr[c], g = pg[c], b = pb[c];
+      const baR = bil(bR), baG = bil(bG), baB = bil(bB);
+      // 굵은 구조(속눈썹·쌍꺼풀 선·눈썹·콧구멍)는 저해상도 base 와 크게 달라 — 그만큼 보정을 뺀다(잡티는 덜 달라서 남는다)
+      const dev = Math.abs(lr[c] - baR) + Math.abs(lg[c] - baG) + Math.abs(lb[c] - baB);
+      const m = mSkin * (1 - ss(INFL.edgeLo, INFL.edgeHi, dev));
+      let sR = baR + (r - lr[c]) * keep, sG = baG + (g - lg[c]) * keep, sB = baB + (b - lb[c]) * keep;
+      // 밝게(Y) + 붉은기 빼기(Cr) — YCbCr 에서
+      let Y = 0.299 * sR + 0.587 * sG + 0.114 * sB;
+      const cb = (sB - Y) * 0.564, cr = (sR - Y) * 0.713 * red;
+      Y = Y + (255 - Y) * lift * ss(60, 130, Y); // 어두운 선(속눈썹·눈썹·콧구멍)은 안 띄운다 — 깊이 유지
+      sR = Y + 1.403 * cr; sB = Y + 1.773 * cb; sG = (Y - 0.299 * sR - 0.114 * sB) / 0.587;
+      const k = Math.min(1, m * 0.85 * a);
+      let oR = r + (sR - r) * k, oG = g + (sG - g) * k, oB = b + (sB - b) * k;
+      const gm = gl * m;
+      oR = 255 - ((255 - oR) * (255 - bil(gR) * gm)) / 255;
+      oG = 255 - ((255 - oG) * (255 - bil(gG) * gm)) / 255;
+      oB = 255 - ((255 - oB) * (255 - bil(gB) * gm)) / 255;
+      data[i] = clamp8(oR + 0.5) | 0; data[i + 1] = clamp8(oG + 0.5) | 0; data[i + 2] = clamp8(oB + 0.5) | 0;
+    } }
   return data;
 }
 

@@ -164,7 +164,7 @@ function FilterPicker({ presetKey, onPicked }) {
   );
 }
 
-function FilterTool({ mode, presetKey, fxAmt, strength, initSrc, initSrcs }) {
+function FilterTool({ mode, presetKey, fxAmt, strength, initSrc, initSrcs, initFaces }) {
   // 네이티브가 사진을 먼저 고르게 하고 여기로 넘긴다(`srcs`). 그러면 웹에
   // "사진 선택" 중간 화면이 아예 안 뜬다 — 사파리는 사용자 제스처 없는 파일창 열기를
   // 막아서 웹에서 자동으로 여는 건 불가능하다(2026-09-17 실패 확인).
@@ -177,6 +177,7 @@ function FilterTool({ mode, presetKey, fxAmt, strength, initSrc, initSrcs }) {
       initialPresetKey={presetKey}
       initialFxAmt={fxAmt}
       initialStrength={strength}
+      initialFaces={initFaces}
       filename="rimikimi_filter"
       onClose={nativeClose}
     />
@@ -197,5 +198,7 @@ export default function ToolEntry() {
   const presetKey = init.presetKey || params.preset || "none";
   const fxAmt = typeof init.fxAmt === "number" ? Math.max(0, Math.min(1, init.fxAmt)) : 1;
   const strength = typeof init.strength === "number" ? Math.max(0, Math.min(1.4, init.strength)) : 0.7;
-  return <FilterTool mode={mode} presetKey={presetKey} fxAmt={fxAmt} strength={strength} initSrc={init.src} initSrcs={init.srcs} />;
+  // 인플(뷰티) — 앱이 Vision 으로 찾은 사진별 얼굴 사각형(없으면 null → 편집기가 피부색으로 추정)
+  const faces = Array.isArray(init.faces) ? init.faces : null;
+  return <FilterTool mode={mode} presetKey={presetKey} fxAmt={fxAmt} strength={strength} initSrc={init.src} initSrcs={init.srcs} initFaces={faces} />;
 }
