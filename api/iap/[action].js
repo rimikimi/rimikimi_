@@ -57,12 +57,19 @@ export default async function handler(req, res) {
   return res.status(404).json({ error: "not found" });
 }
 
+// 카메라 이용권(rimikimi.filter.lifetime/annual/monthly) — 크레딧 상품이 아님.
+const isFilterProduct = (id) => /^rimikimi\.filter\./.test(String(id || ""));
+
 // ── 1) 클라이언트 즉시 적립 (RC v2 재검증) ──
 async function handleGrant(req, res) {
   const { user, admin, error, status } = await getAuthedUser(req);
   if (error) return res.status(status).json({ error });
 
   const { productId, transactionId } = req.body || {};
+  // 카메라 이용권(필터)은 RevenueCat entitlement 로만 열린다 — 크레딧 없음, 200 으로 무시.
+  if (isFilterProduct(productId)) {
+    return res.status(200).json({ ok: true, credits: 0, ignored: "filter_pass" });
+  }
   if (!productId || !(productId in PRODUCT_CREDITS)) {
     return res.status(400).json({ error: "유효하지 않은 상품입니다." });
   }
@@ -163,6 +170,10 @@ async function handleWebhook(req, res) {
   const GRANT_TYPES = ["NON_RENEWING_PURCHASE", "INITIAL_PURCHASE", "RENEWAL"];
   if (!GRANT_TYPES.includes(type)) {
     return res.status(200).json({ ok: true, ignored: type || "unknown" });
+  }
+  // 카메라 이용권(필터) 상품은 크레딧을 주지 않는다(Play 는 "id:basePlan" 형태라 접두어로 판별).
+  if (isFilterProduct(ev.product_id)) {
+    return res.status(200).json({ ok: true, ignored: "filter_pass" });
   }
 
   // 샌드박스 이벤트는 적립하지 않는다. RevenueCat 은 샌드박스 갱신도 그대로 쏘는데,
