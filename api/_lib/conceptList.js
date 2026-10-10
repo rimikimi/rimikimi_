@@ -31,6 +31,7 @@ function isFeature(c) {
 // publishAt 이 지난 것만. 날짜가 깨졌으면 숨기지 않는다(빈 갤러리보다 낫다).
 export function isPublished(c, now) {
   if (!c) return false;
+  if (c.takenDown) return false; // 오너가 내린 컨셉(데이터는 남겨 둔다 — 지난 결과 제목·되살리기용)
   if (!c.publishAt) return true; // 예약 없는 건 이미 공개된 것
   const t = Date.parse(c.publishAt);
   return !Number.isFinite(t) || t <= now;
