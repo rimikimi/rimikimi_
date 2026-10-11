@@ -33,6 +33,10 @@ struct CameraFilterTab: View {
             } else {
                 if let live = model.live {
                     // 기본 카메라처럼 — 탭 = 그 자리 초점·노출, 두 손가락 = 줌(오너 지시 2026-10-09)
+                    // 미리보기는 **4:3 그대로**(센서 비율). 예전엔 화면을 꽉 채워 양옆이 잘려 확대돼 보였고,
+                    // 저장본(4:3 전체)과도 달랐다(오너 2026-10-11 "기카랑 우리 앱이랑 카메라에서 보이는 게 왜 다름").
+                    VStack(spacing: 0) {
+                    Color.clear.frame(height: 56)
                     GeometryReader { geo in
                         LiveFilterPreview(renderer: live)
                             .contentShape(Rectangle())
@@ -120,7 +124,9 @@ struct CameraFilterTab: View {
                                 }
                             }
                     }
-                    .ignoresSafeArea()
+                    .aspectRatio(3.0 / 4.0, contentMode: .fit)
+                    Spacer(minLength: 0)
+                    }
                 } else {
                     CameraPreviewLayer(session: model.session).ignoresSafeArea()
                 }
@@ -165,9 +171,9 @@ struct CameraFilterTab: View {
                         sideButton(L.t("앨범", "Album"), "photo.on.rectangle") { app.photoPickFxAmount = fxAmount; Task { await app.perform(.filterPick(presetKey: selected)) } }
                     } else {
                         Button {
-                            app.photoPickPreset = selected
+                            app.photoPickPreset = nil   // 장마다 찍을 때 고른 필터를 쓴다(아래 presets)
                             app.photoPickFxAmount = fxAmount
-                            app.finishBurstCamera(model.shots)
+                            app.finishBurstCamera(model.shots, presets: model.shotPresets, fx: model.shotFx)
                             while !model.shots.isEmpty { model.remove(at: 0) }
                         } label: {
                             Text(Copy.burstDone(model.shots.count)).font(AppFont.footnote.weight(.bold)).foregroundStyle(.black)

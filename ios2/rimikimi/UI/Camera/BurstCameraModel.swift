@@ -10,6 +10,10 @@ final class BurstCameraModel {
 
     let session = AVCaptureSession()
     private(set) var shots: [UIImage] = []
+    /// 장마다 **찍는 순간 고른 필터**와 세기 — 완료 때 고른 하나를 전부에 씌우던 결함(오너 2026-10-11
+    /// "필터 다 다르게 찍었는데 왜 다 똑같음"). 앨범 저장본도 이걸로 입혀서 저장한다.
+    private(set) var shotPresets: [String] = []
+    private(set) var shotFx: [Double] = []
     private(set) var denied = false
     private(set) var flashOverlay = false
     var flashOn = false
@@ -184,11 +188,15 @@ final class BurstCameraModel {
     private func add(_ image: UIImage?) {
         guard let image, shots.count < Self.maxShots else { return }
         shots.append(image)
+        shotPresets.append(live?.presetKey ?? "none")
+        shotFx.append(live?.fxAmount ?? 1)
     }
 
     func remove(at i: Int) {
         guard shots.indices.contains(i) else { return }
         shots.remove(at: i)
+        if shotPresets.indices.contains(i) { shotPresets.remove(at: i) }
+        if shotFx.indices.contains(i) { shotFx.remove(at: i) }
         HapticPlayer.selection()
     }
 

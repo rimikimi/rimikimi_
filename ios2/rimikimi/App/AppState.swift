@@ -493,15 +493,29 @@ final class AppState {
     /// **찍고 나서** 필터를 입히는 순서가 된다.
     /// 연속 촬영 완료 — 찍은 컷을 앨범에 남기고, 전부 편집기로 넘겨 필터를 한 번에 입힌다.
     /// (편집기는 이미 여러 장을 받도록 돼 있다 — `PhotoEditor` 의 `srcs`.)
-    func finishBurstCamera(_ images: [UIImage]) {
+    /// presets/fx: 장마다 찍는 순간 고른 필터·세기(카메라 탭). nil 이면 예전처럼 photoPickPreset 하나.
+    func finishBurstCamera(_ images: [UIImage], presets: [String]? = nil, fx: [Double]? = nil) {
         showBurstCamera = false
         guard !images.isEmpty else { return }
-        Task {
+        let keys = presets.map { ps in images.indices.map { ps.indices.contains($0) ? ps[$0] : "none" } }
+        let amts = fx.map { fs in images.indices.map { fs.indices.contains($0) ? fs[$0] : 1 } }
+        // 앨범 저장본은 **보던 그대로**(필터 입힌 것) — 기본 카메라처럼. 편집기엔 원본+사진별 프리셋을 보내 손볼 수 있게.
+        Task.detached(priority: .userInitiated) { [weak self] in
+            let engine = try? LiveFilterEngine()
+            let ctx = CIContext()
             var saved = 0
-            for img in images where await CameraAlbum.save(img) { saved += 1 }
-            showToast(saved == images.count ? Copy.savedNToAlbum(saved) : Copy.noAlbumPermission)
+            for (i, img) in images.enumerated() {
+                var out = img
+                if let engine, let keys, keys[i] != "none", let ci = CIImage(image: img) {
+                    let r = engine.render(frame: ci, key: keys[i], intensity: amts?[i] ?? 1)
+                    if let cg = ctx.createCGImage(r, from: r.extent) { out = UIImage(cgImage: cg, scale: 1, orientation: .up) }
+                }
+                if await CameraAlbum.save(out) { saved += 1 }
+            }
+            let n = saved
+            await MainActor.run { self?.showToast(n == images.count ? Copy.savedNToAlbum(n) : Copy.noAlbumPermission) }
         }
-        handlePickedPhotos(images)
+        handlePickedPhotos(images, presets: keys)
     }
 
     func handleCameraShot(_ image: UIImage) {
@@ -514,9 +528,9 @@ final class AppState {
     }
 
     /// 사진 선택 완료 → 고른 사진들을 편집기에 실어 보낸다.
-    func handlePickedPhotos(_ images: [UIImage]) {
+    func handlePickedPhotos(_ images: [UIImage], presets: [String]? = nil) {
         showPhotoPicker = false
-        let preset = photoPickPreset ?? "none"
+        let preset = photoPickPreset ?? presets?.first ?? "none"
         photoPickPreset = nil
         guard !images.isEmpty else { return }
         // ⚠️ 2026-09-30: 예전엔 전부 긴 변 2048·JPEG 0.92 로 줄였다 — 편집기는 받은 크기 그대로 저장하므로
@@ -539,6 +553,7 @@ final class AppState {
         photoPickFxAmount = 1
         let open = { [weak self] (faces: [[[Double]]]?) in
             var payload: [String: Any] = ["mode": "edit", "srcs": srcs, "presetKey": preset, "strength": 0.7 * fxAmt]
+            if let presets { payload["presetKeys"] = Array(presets.prefix(srcs.count)) }   // 사진별 프리셋(웹 PhotoEditor initialPresetKeys)
             if let faces { payload["faces"] = faces }
             self?.webTool = WebTool(url: Config.filterToolURL(mode: "edit", presetKey: preset), title: Copy.decorate,
                                     initialPayload: payload)
