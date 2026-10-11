@@ -35,7 +35,7 @@ struct BurstCameraView: View {
             }
         }
         .statusBarHidden()
-        .task { await model.start() }
+        .task { model.savesOnCapture = true; await model.start() }
         .onDisappear { model.stop() }
     }
 
@@ -62,42 +62,17 @@ struct BurstCameraView: View {
 
             Spacer()
 
-            if !model.shots.isEmpty { thumbnails }
-
-            Text(model.shots.count >= BurstCameraModel.maxShots ? Copy.burstAllTaken : " ")
-                .font(AppFont.footnote)
-                .foregroundStyle(.white.opacity(0.75))
-                .padding(.bottom, Spacing.s3)
 
             HStack {
                 // 왼쪽: 전/후면 전환
                 CircleGlassButton(system: "arrow.triangle.2.circlepath.camera") { model.flip() }
                     .frame(width: 84)
                 Spacer()
-                ShutterButton(disabled: model.shots.count >= BurstCameraModel.maxShots) { model.capture() }
+                ShutterButton(disabled: false) { model.capture() }
                 Spacer()
-                // 오른쪽: 완료(찍은 게 있을 때만)
-                Group {
-                    if model.shots.isEmpty {
-                        // ⚠️ 높이를 안 주면 `Color.clear` 가 세로로도 무한히 늘어나 위의 `Spacer` 를
-                        //    잡아먹는다(셔터가 화면 한가운데로 갔다 — 시뮬레이터 캡처로 확인).
-                        Color.clear.frame(height: 40)
-                    } else {
-                        Button {
-                            app.finishBurstCamera(model.shots)
-                            dismiss()
-                        } label: {
-                            Text(Copy.burstDone(model.shots.count))
-                                .font(AppFont.calloutEmphasis)
-                                .foregroundStyle(Color.onAccent)
-                                .padding(.horizontal, Spacing.s3)
-                                .frame(height: 40)
-                                .background(Color.accent, in: Capsule())
-                        }
-                        .buttonStyle(PressScaleButtonStyle())
-                    }
-                }
-                .frame(width: 84)
+                // 오른쪽: "완료" 단계 없음(오너 2026-10-11) — 찍는 즉시 필터본이 사진첩에 들어간다.
+                // ⚠️ 높이를 안 주면 `Color.clear` 가 세로로도 무한히 늘어나 위의 `Spacer` 를 잡아먹는다.
+                Color.clear.frame(width: 84, height: 40)
             }
             .padding(.horizontal, Spacing.page)
             .padding(.bottom, Spacing.s5)

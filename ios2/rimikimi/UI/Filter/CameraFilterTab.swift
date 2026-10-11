@@ -167,7 +167,8 @@ struct CameraFilterTab: View {
                 fxSlider
                 filterStrip
                 HStack {
-                    if model.shots.isEmpty {
+                    // "완료" 단계 없음(오너 2026-10-11) — 셔터 = 필터본 저장 끝. 왼쪽은 방금 찍은 썸네일/앨범.
+                    Group {
                         // 기본 카메라처럼 — 방금 저장한 필터본 썸네일(없으면 앨범 아이콘). 탭 = 사진첩에서 골라 편집기.
                         if let t = model.lastSaved {
                             Button { app.photoPickFxAmount = fxAmount; Task { await app.perform(.filterPick(presetKey: selected)) } } label: {
@@ -180,19 +181,9 @@ struct CameraFilterTab: View {
                         } else {
                             sideButton(L.t("앨범", "Album"), "photo.on.rectangle") { app.photoPickFxAmount = fxAmount; Task { await app.perform(.filterPick(presetKey: selected)) } }
                         }
-                    } else {
-                        Button {
-                            app.photoPickPreset = nil   // 장마다 찍을 때 고른 필터를 쓴다(아래 presets)
-                            app.photoPickFxAmount = fxAmount
-                            app.finishBurstCamera(model.shots, presets: model.shotPresets, fx: model.shotFx, alreadySaved: true)
-                            while !model.shots.isEmpty { model.remove(at: 0) }
-                        } label: {
-                            Text(Copy.burstDone(model.shots.count)).font(AppFont.footnote.weight(.bold)).foregroundStyle(.black)
-                                .frame(width: 64, height: 40).background(.white, in: Capsule())
-                        }
                     }
                     Spacer()
-                    ShutterButton(disabled: !model.savesOnCapture && model.shots.count >= BurstCameraModel.maxShots) { model.capture() }
+                    ShutterButton(disabled: false) { model.capture() }
                     Spacer()
                     sideButton(L.t("전환", "Flip"), "arrow.triangle.2.circlepath.camera") { model.flip() }
                 }
