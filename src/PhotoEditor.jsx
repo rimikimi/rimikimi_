@@ -19,6 +19,7 @@ import { FILM_PRESETS, presetByKey, applyLook, applyLookWithStrength, applyGeome
 import { isNative, nativeSaveToAlbum, nativeOpenPaywall } from "./nativeBridge";
 import { useFilterAccess, isLocked, isPaidPreset, markFilterUsed, trialDaysLeft } from "./filterAccess";
 import { shareImage } from "./share";
+import { applyLookAsync, SAVE_CONCURRENCY } from "./lookPool";
 import { t, getLang } from "./i18n";
 import { supabase } from "./supabaseClient";
 import { STICKER_SETS, stickerById } from "./stickerAssets";
@@ -909,10 +910,15 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
       // ⚠️ 정방향도 같은 이유로 여기 걸어야 한다 — 필터 없이 기울기만 고친 사진.
       if (hasLook || hasGeo) {
         const id = ctx.getImageData(0, 0, w, h);
-        if (hasGeo) applyGeometry(id.data, w, h, { ...g, lens: lk.lens || 0 });
-        // 원본이 커서(2K) 수백 ms 걸릴 수 있다 — 호출측이 busy 표시를 켠 채로 부른다
-        if (hasLook) applyLookWithStrength(id.data, w, h, presetByKey(lk.presetKey), { ...lk.fx, seed: GRAIN_SEED, faces: facesFor(i, lk.lens, lk.geo) }, lk.strength);
-        ctx.putImageData(id, 0, 0);
+        // 픽셀 작업은 워커에서(2026-10-11) — 12MP 한 장에 수 초 걸리던 것을 메인 스레드 밖, 여러 장 동시에.
+        const out = await applyLookAsync({
+          data: id.data, w, h,
+          preset: hasLook ? presetByKey(lk.presetKey) : null,
+          effects: hasLook ? { ...lk.fx, seed: GRAIN_SEED, faces: facesFor(i, lk.lens, lk.geo) } : {},
+          strength: lk.strength,
+          geo: hasGeo ? g : null, lens: lk.lens || 0,
+        });
+        ctx.putImageData(new ImageData(out, w, h), 0, 0);
       }
       if (dateStyle !== "none") drawDateStamp(ctx, w, h, dateStyle);
       for (const st of stickersByIdx[i] || []) drawSticker(ctx, st, w, h);
@@ -954,14 +960,26 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
       await new Promise((r) => setTimeout(r, 30)); // busy 표시가 먼저 그려지게
       // 합성 전에 글꼴 도착을 기다린다 — 안 그러면 저장본만 대체 글꼴로 찍힐 수 있다
       await ensureTextFonts(Object.values(stickersByIdx).flat());
-      let okAll = true;
-      for (let i = 0; i < sources.length; i++) {
-        if (multi) setSaveProg(`${i + 1}/${sources.length}`);
-        const data = await renderFullAt(i, i === idx ? fullImgRef.current : null);
-        const name = multi ? `${filename}_edit_${i + 1}` : `${filename}_edit`;
-        const ok = await saveDataUrl(data, name);
-        okAll = okAll && ok;
-      }
+      let okAll = true, done = 0;
+      // 여러 장은 2장씩 겹쳐서(한 장 합성하는 동안 다음 장 디코드·합성) — 순서는 저장 큐가 지킨다.
+      let next = 0;
+      let saveChain = Promise.resolve();
+      const worker = async () => {
+        while (next < sources.length) {
+          const i = next++;
+          const data = await renderFullAt(i, i === idx ? fullImgRef.current : null);
+          const name = multi ? `${filename}_edit_${i + 1}` : `${filename}_edit`;
+          saveChain = saveChain.then(async () => {
+            const ok = await saveDataUrl(data, name);
+            okAll = okAll && ok;
+            done++;
+            if (multi) setSaveProg(`${done}/${sources.length}`);
+          });
+          await saveChain;
+        }
+      };
+      if (multi) setSaveProg(`0/${sources.length}`);
+      await Promise.all(Array.from({ length: Math.min(SAVE_CONCURRENCY, sources.length) }, worker));
       okAll ? hap.done() : hap.warn();
       flashToast(okAll ? t("save.toast.done") : t("save.toast.fail"));
     } catch (_) {
