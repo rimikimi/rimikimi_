@@ -18,7 +18,9 @@ final class BurstCameraModel {
     /// 완료 때는 다시 저장하지 않고 편집기(선택)만 연다.
     var savesOnCapture = false
     private(set) var savedCount = 0
-    private static let bakeCtx = CIContext()
+    /// ⚠️ 미리보기와 **같은 색공간 옵션**(sRGB 작업공간)이어야 한다 — 기본 CIContext() 는 선형 작업공간이라 LUT 가 엉뚱한
+    /// 공간에서 걸려 저장본이 전혀 다른(어둡고 진한) 룩이 됐다(오너 2026-10-11 "앨범에 전혀 다른 필터가 입혀져 있는데").
+    private static let bakeCtx = CIContext(options: LiveFilter.contextOptions)
     private(set) var denied = false
     private(set) var flashOverlay = false
     var flashOn = false
@@ -201,7 +203,7 @@ final class BurstCameraModel {
             var out = image
             if key != "none", let engine = try? LiveFilterEngine(), let ci = CIImage(image: image) {
                 let r = engine.render(frame: ci, key: key, intensity: fx)
-                if let cg = Self.bakeCtx.createCGImage(r, from: r.extent) { out = UIImage(cgImage: cg, scale: 1, orientation: .up) }
+                if let cg = Self.bakeCtx.createCGImage(r, from: r.extent, format: .RGBA8, colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!) { out = UIImage(cgImage: cg, scale: 1, orientation: .up) }
             }
             let ok = await CameraAlbum.save(out)
             await MainActor.run { if ok { self?.savedCount += 1 } }

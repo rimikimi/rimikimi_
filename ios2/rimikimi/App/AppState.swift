@@ -503,13 +503,13 @@ final class AppState {
         // 앨범 저장본은 **보던 그대로**(필터 입힌 것) — 기본 카메라처럼. 편집기엔 원본+사진별 프리셋을 보내 손볼 수 있게.
         if !alreadySaved { Task.detached(priority: .userInitiated) { [weak self] in
             let engine = try? LiveFilterEngine()
-            let ctx = CIContext()
+            let ctx = CIContext(options: LiveFilter.contextOptions)   // 미리보기와 같은 색공간(sRGB 작업공간)
             var saved = 0
             for (i, img) in images.enumerated() {
                 var out = img
                 if let engine, let keys, keys[i] != "none", let ci = CIImage(image: img) {
                     let r = engine.render(frame: ci, key: keys[i], intensity: amts?[i] ?? 1)
-                    if let cg = ctx.createCGImage(r, from: r.extent) { out = UIImage(cgImage: cg, scale: 1, orientation: .up) }
+                    if let cg = ctx.createCGImage(r, from: r.extent, format: .RGBA8, colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!) { out = UIImage(cgImage: cg, scale: 1, orientation: .up) }
                 }
                 if await CameraAlbum.save(out) { saved += 1 }
             }
