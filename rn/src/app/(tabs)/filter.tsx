@@ -387,9 +387,9 @@ export default function CameraFilterTab() {
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.stripScroll} contentContainerStyle={styles.strip}>
             <Chip k="none" label={c21.original} on={selected === "none"} onPress={setSelected} onLong={toggleFav} />
             {/* 인플(뷰티) — 원본 바로 다음(iOS 4e81f98) */}
-            <Chip k="infl" label={filterName("infl")} on={selected === "infl"} onPress={setSelected} onLong={toggleFav} locked={lockPaid} />
-            {favs.length ? <View style={styles.groupMark}><IconStarFill size={16} color="#F5C518" /></View> : null}
-            {favs.map((k) => <Chip key={`f_${k}`} k={k} label={filterName(k)} on={selected === k} onPress={setSelected} onLong={toggleFav} locked={lockPaid} />)}
+            {/* 인플(뷰티)은 뺐다(오너 2026-10-11) */}
+            {favs.filter((k) => k !== "infl").length ? <View style={styles.groupMark}><IconStarFill size={16} color="#F5C518" /></View> : null}
+            {favs.filter((k) => k !== "infl").map((k) => <Chip key={`f_${k}`} k={k} label={filterName(k)} on={selected === k} onPress={setSelected} onLong={toggleFav} locked={lockPaid} />)}
             <View style={styles.groupMark}><IconPhone size={16} color="rgba(255,255,255,0.7)" /></View>
             {PHONE.map((k) => <Chip key={k} k={k} label={filterName(k)} on={selected === k} onPress={setSelected} onLong={toggleFav} locked={lockPaid} />)}
             <View style={styles.groupMark}><IconFilm size={16} color="rgba(255,255,255,0.7)" /></View>

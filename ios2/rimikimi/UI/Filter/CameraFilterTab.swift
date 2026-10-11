@@ -264,12 +264,10 @@ struct CameraFilterTab: View {
         ScrollView(.horizontal) {
             HStack(spacing: Spacing.s2) {
                 chip("none", L.t("원본", "Original"))
-                // 인플(뷰티) — 색이 아니라 얼굴 피부를 다듬는 필터라 폰카·아날로그 묶음과 성격이 달라 원본 바로 옆 자기 자리.
-                // (아날로그 줄은 FilterTabView.groups 에서 뽑으므로 거기 넣으면 필터 탭 격자에도 생겨 미리보기 사진이 필요해진다.)
-                chip(LiveFilter.beautyKey, Copy.filterName(LiveFilter.beautyKey))
-                if !favs.isEmpty {
+                // 인플(뷰티)은 뺐다(오너 2026-10-11 "아직 구리다. 없애자"). 엔진 코드는 남겨 둔다.
+                if !favs.filter({ $0 != LiveFilter.beautyKey }).isEmpty {
                     groupMark("star.fill", tint: Color.favoriteStar)
-                    ForEach(favs, id: \.self) { chip($0, Copy.filterName($0)) }
+                    ForEach(favs.filter { $0 != LiveFilter.beautyKey }, id: \.self) { chip($0, Copy.filterName($0)) }
                 }
                 groupMark("iphone")
                 ForEach(phone, id: \.self) { chip($0, Copy.filterName($0)) }

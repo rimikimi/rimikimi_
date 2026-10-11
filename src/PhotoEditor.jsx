@@ -1251,7 +1251,7 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
               <div style={ES.passNote}>{getLang() === "ko" ? `필터 무료 이용 ${trialDaysLeft(access)}일 남음` : `${trialDaysLeft(access)} days of free filters left`}</div>
             )}
             <div style={ES.chipScroll}>
-              {FILM_PRESETS.filter((p) => p.key === "none" || p.group === chipGroup).map((p) => (
+              {FILM_PRESETS.filter((p) => p.key === "none" || (p.group === chipGroup && !p.hidden)).map((p) => (
                 // key 에 ready 를 넣는 이유: 사진 전환 시 디코드가 끝난 "뒤"에 캔버스를
                 // 다시 마운트해야 새 사진의 썸네일로 그려진다 (idx 만 넣으면 옛 썸네일로 그림)
                 <button

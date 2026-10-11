@@ -127,7 +127,8 @@ export const FILM_PRESETS = [
 
   /* ── 재미 (SNOW류 — 특수 렌더 모드, special 필드가 전용 코드 경로를 탄다) ── */
   // 인플 — 얼굴 피부 보정(뷰티). 색 LUT 대신 beautyRGBA 를 탄다. 강도 = 색감 슬라이더(0 = 원본).
-  { key: "infl",     ko: "인플",      en: "Influencer", group: "fun",
+  // hidden: 목록에서 뺀다(오너 2026-10-11 "인플 필터는 아직 구리다. 없애자") — 키는 남겨 옛 저장값이 깨지지 않게.
+  { key: "infl",     ko: "인플",      en: "Influencer", group: "fun", hidden: true,
     special: "beauty" },
   { key: "sepia",    ko: "세피아",    en: "Sepia", group: "fun",
     ex: 0.02, con: 0.12, fade: 8, whitePull: 6, bw: [0.3, 0.55, 0.15], sh: [18, 6, -14], hi: [24, 10, -18] },
@@ -168,7 +169,7 @@ export const FILTER_GROUPS = [
 
 // [{ key, emoji, labelKey, items }] — 원본(none) 제외, FILM_PRESETS 순서 유지.
 export function groupedPresets() {
-  const rest = FILM_PRESETS.filter((p) => p.key !== "none");
+  const rest = FILM_PRESETS.filter((p) => p.key !== "none" && !p.hidden);
   const known = new Set(FILTER_GROUPS.map((g) => g.key));
   const groups = FILTER_GROUPS.map((g) => ({ ...g, items: rest.filter((p) => p.group === g.key) }));
   const orphans = rest.filter((p) => !known.has(p.group));
