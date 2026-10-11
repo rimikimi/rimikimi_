@@ -21,20 +21,10 @@ struct FilterPassSheet: View {
     private var plan: StoreManager.FilterPlan? { plans.first { $0.kind == selected } ?? plans.first }
 
     var body: some View {
+        NavigationStack {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.s3) {
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: Spacing.s1) {
-                        Text(Copy.filterPassTitle).font(AppFont.title2).tracking(Tracking.title2)
-                        Text(Copy.filterPassSubtitle).font(AppFont.callout).foregroundStyle(Color.ink2)
-                    }
-                    Spacer()
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark").font(.system(size: 13, weight: .bold)).foregroundStyle(Color.ink)
-                            .frame(width: 30, height: 30).background(Color.fill, in: Circle())
-                    }
-                    .buttonStyle(.plain).accessibilityLabel(Copy.close)
-                }
+                Text(Copy.filterPassSubtitle).font(AppFont.callout).foregroundStyle(Color.ink2)
 
                 statusLine
 
@@ -73,7 +63,10 @@ struct FilterPassSheet: View {
         }
         .scrollIndicators(.hidden)
         .background(Color.bg)
+        .navigationTitle(Copy.filterPassTitle).navigationBarTitleDisplayMode(.inline)
+        .toolbar { ToolbarItem(placement: .topBarTrailing) { Button(role: .close) { dismiss() }.tint(Color.ink) } }
         .task { await store.loadFilterPlans() }
+        } // NavigationStack
     }
 
     @ViewBuilder private var statusLine: some View {

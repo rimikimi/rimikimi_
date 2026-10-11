@@ -126,18 +126,9 @@ struct CreditsSheet: View {
     private var packs: [StoreManager.Pack] { Array(app.store.packs(firstPurchase: app.quota?.firstPurchase == true).prefix(3)) }
 
     var body: some View {
+        NavigationStack {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.s3) {
-                HStack {
-                    Text(Copy.notEnoughCredits).font(AppFont.title2).tracking(Tracking.title2)
-                    Spacer()
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark").font(.system(size: 13, weight: .bold)).foregroundStyle(Color.ink)
-                            .frame(width: 30, height: 30).background(Color.fill, in: Circle())
-                    }
-                    .buttonStyle(.plain).accessibilityLabel(Copy.close)
-                }
-
                 ForEach(packs) { p in PackRow(pack: p, busy: busyID == p.id) { buy(p) } }
 
                 Button {
@@ -160,7 +151,10 @@ struct CreditsSheet: View {
         }
         .scrollIndicators(.hidden)
         .background(Color.bg)
+        .navigationTitle(Copy.notEnoughCredits).navigationBarTitleDisplayMode(.inline)
+        .toolbar { ToolbarItem(placement: .topBarTrailing) { Button(role: .close) { dismiss() }.tint(Color.ink) } }
         .task { await app.store.loadProducts() }
+        } // NavigationStack
     }
 
     private func buy(_ pack: StoreManager.Pack) {

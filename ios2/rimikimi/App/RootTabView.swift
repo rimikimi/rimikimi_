@@ -88,6 +88,7 @@ struct RootTabView: View {
         .sheet(isPresented: $app.creditsSheet, onDismiss: { app.dropPendingPurchase() }) {
             CreditsSheet()
                 .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
                 .presentationCornerRadius(Radius.sheet)
         }
         // 제3자 AI 전송 고지 — 첫 "만들기" 때 1회만(계정/기기당). 미뤄둔 생성/채워맞춤은 시트가
@@ -137,6 +138,7 @@ struct RootTabView: View {
         .sheet(isPresented: Binding(get: { app.filterPassSheet && app.webTool == nil }, set: { app.filterPassSheet = $0 })) {
             FilterPassSheet()
                 .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
                 .presentationCornerRadius(Radius.sheet)
         }
         .fullScreenCover(item: $app.webTool) { tool in

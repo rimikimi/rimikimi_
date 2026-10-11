@@ -361,7 +361,7 @@ enum Copy {
     // MARK: 프로필
 
     static var store: String { L.t("스토어", "Store") }
-    static var storeValue: String { L.t("충전 · 구독", "Top up · Subscribe") }
+    static var storeValue: String { L.t("충전", "Top up") }
     static var inviteFriends: String { L.t("친구 초대", "Invite friends") }
     static var faceRescan: String { L.t("얼굴 다시 스캔하기", "Rescan face") }
     static var faceScan: String { L.t("얼굴 스캔하기", "Scan face") }

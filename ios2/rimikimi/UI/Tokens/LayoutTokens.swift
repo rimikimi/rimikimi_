@@ -15,6 +15,8 @@ enum Spacing {
 enum Radius {
     static let button: CGFloat = 12
     static let card: CGFloat = 14
+    /// 설정형 묶음(iOS 26 insetGrouped 목록과 같은 모서리)
+    static let group: CGFloat = 26
     static let sheet: CGFloat = 20
     static let chip: CGFloat = 999
     static let thumb: CGFloat = 10

@@ -9,13 +9,15 @@ struct CardGroup<Content: View>: View {
                 ForEach(subviews) { child in
                     child
                     if child.id != subviews.last?.id {
-                        Rectangle().fill(Color.separatorLine).frame(height: 0.5).padding(.leading, Spacing.s4)
+                        // 아이폰 설정 앱처럼 구분선은 글자 시작점부터(아이콘 밑은 비운다).
+                        Rectangle().fill(Color.separatorLine).frame(height: 0.5).padding(.leading, Spacing.s4 + 24 + Spacing.s3)
                     }
                 }
             }
         }
-        .background(Color.card, in: RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
-        .clipShape(RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
+        // iOS 26 기본 목록(insetGrouped)과 같은 큰 모서리(2026-10-11 "애플이 만든 앱처럼").
+        .background(Color.card, in: RoundedRectangle(cornerRadius: Radius.group, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Radius.group, style: .continuous))
         .padding(.horizontal, Spacing.page)
     }
 }
@@ -40,9 +42,9 @@ struct SettingsRow: View {
                 }
                 Text(title).font(AppFont.body).foregroundStyle(destructive ? Color.accent : Color.ink)
                 Spacer()
-                if let value { Text(value).font(AppFont.callout).foregroundStyle(Color.ink2) }
+                if let value { Text(value).font(AppFont.body).foregroundStyle(Color.ink2).lineLimit(1) }
                 if chevron {
-                    Image(systemName: "chevron.right").font(.system(size: 13, weight: .semibold)).foregroundStyle(Color.ink3)
+                    Image(systemName: "chevron.right").font(.system(size: 14, weight: .semibold)).foregroundStyle(Color(uiColor: .tertiaryLabel))
                 }
             }
             .padding(.horizontal, Spacing.s4)

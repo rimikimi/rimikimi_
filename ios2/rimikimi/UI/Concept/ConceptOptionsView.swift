@@ -81,11 +81,18 @@ struct ConceptOptionsView: View {
                     }
                 }
                 if !concept.isFourcut && !concept.isArtTransform {
-                    OptionBlock(title: Copy.batchTitle, note: app.quota.map { Copy.creditsHeld($0.creditsAvailable) }) {
-                        HStack(spacing: Spacing.s2) {
-                            ForEach(BatchOption.all, id: \.count) { b in
-                                OptionChip(title: b.label, subtitle: app.quota?.unlimited == true ? Copy.unlimited : Copy.credits(b.cost),
-                                           badge: b.badge, isActive: batchCount == b.count) { choose { batchCount = b.count } }
+                    OptionBlock(title: Copy.batchTitle, note: app.quota.map { Copy.creditsHeld($0.creditsAvailable) }, scrolls: false) {
+                        // 애플 기본 세그먼트(2026-10-11 "애플이 만든 앱처럼") — 크레딧·할인은 아래 한 줄로.
+                        VStack(alignment: .leading, spacing: Spacing.s2) {
+                            Picker(Copy.batchTitle, selection: Binding(get: { batchCount }, set: { v in choose { batchCount = v } })) {
+                                ForEach(BatchOption.all, id: \.count) { b in Text(b.label).tag(b.count) }
+                            }
+                            .pickerStyle(.segmented)
+                            .frame(maxWidth: .infinity)
+                            .controlSize(.large)
+                            if let b = BatchOption.all.first(where: { $0.count == batchCount }) {
+                                Text([app.quota?.unlimited == true ? Copy.unlimited : Copy.credits(b.cost), b.badge].compactMap { $0 }.joined(separator: " · "))
+                                    .font(AppFont.footnote).foregroundStyle(b.badge != nil ? Color.accent : Color.ink2)
                             }
                         }
                     }
@@ -187,6 +194,8 @@ struct RetouchTextBlock: View {
 struct OptionBlock<Content: View>: View {
     var title: String
     var note: String? = nil
+    /// false = 가로 스크롤 없이 폭에 맞춘다(세그먼트처럼 꽉 채우는 컨트롤).
+    var scrolls = true
     @ViewBuilder var content: () -> Content
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s3) {
@@ -194,7 +203,11 @@ struct OptionBlock<Content: View>: View {
                 Text(title).font(AppFont.headline).tracking(Tracking.headline)
                 if let note { Text("· " + note).font(AppFont.footnote).foregroundStyle(Color.ink2) }
             }
-            ScrollView(.horizontal) { content().padding(.vertical, 6) }.scrollIndicators(.hidden).scrollClipDisabled()
+            if scrolls {
+                ScrollView(.horizontal) { content().padding(.vertical, 6) }.scrollIndicators(.hidden).scrollClipDisabled()
+            } else {
+                content()
+            }
         }
         .padding(Spacing.s4)
         .frame(maxWidth: .infinity, alignment: .leading)
