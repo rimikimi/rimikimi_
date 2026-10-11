@@ -494,13 +494,14 @@ final class AppState {
     /// 연속 촬영 완료 — 찍은 컷을 앨범에 남기고, 전부 편집기로 넘겨 필터를 한 번에 입힌다.
     /// (편집기는 이미 여러 장을 받도록 돼 있다 — `PhotoEditor` 의 `srcs`.)
     /// presets/fx: 장마다 찍는 순간 고른 필터·세기(카메라 탭). nil 이면 예전처럼 photoPickPreset 하나.
-    func finishBurstCamera(_ images: [UIImage], presets: [String]? = nil, fx: [Double]? = nil) {
+    /// alreadySaved: 카메라 탭은 찍는 즉시 저장했으므로(BurstCameraModel.savesOnCapture) 여기서 다시 저장하지 않는다.
+    func finishBurstCamera(_ images: [UIImage], presets: [String]? = nil, fx: [Double]? = nil, alreadySaved: Bool = false) {
         showBurstCamera = false
         guard !images.isEmpty else { return }
         let keys = presets.map { ps in images.indices.map { ps.indices.contains($0) ? ps[$0] : "none" } }
         let amts = fx.map { fs in images.indices.map { fs.indices.contains($0) ? fs[$0] : 1 } }
         // 앨범 저장본은 **보던 그대로**(필터 입힌 것) — 기본 카메라처럼. 편집기엔 원본+사진별 프리셋을 보내 손볼 수 있게.
-        Task.detached(priority: .userInitiated) { [weak self] in
+        if !alreadySaved { Task.detached(priority: .userInitiated) { [weak self] in
             let engine = try? LiveFilterEngine()
             let ctx = CIContext()
             var saved = 0
@@ -514,7 +515,7 @@ final class AppState {
             }
             let n = saved
             await MainActor.run { self?.showToast(n == images.count ? Copy.savedNToAlbum(n) : Copy.noAlbumPermission) }
-        }
+        } }
         handlePickedPhotos(images, presets: keys)
     }
 

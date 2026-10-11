@@ -14,6 +14,11 @@ final class BurstCameraModel {
     /// "필터 다 다르게 찍었는데 왜 다 똑같음"). 앨범 저장본도 이걸로 입혀서 저장한다.
     private(set) var shotPresets: [String] = []
     private(set) var shotFx: [Double] = []
+    /// 카메라 탭: **찍는 즉시** 보던 필터를 입혀 사진첩에 저장(오너 2026-10-11 "찍으면 바로 사진첩에 저장하면 안 됨?").
+    /// 완료 때는 다시 저장하지 않고 편집기(선택)만 연다.
+    var savesOnCapture = false
+    private(set) var savedCount = 0
+    private static let bakeCtx = CIContext()
     private(set) var denied = false
     private(set) var flashOverlay = false
     var flashOn = false
@@ -188,8 +193,19 @@ final class BurstCameraModel {
     private func add(_ image: UIImage?) {
         guard let image, shots.count < Self.maxShots else { return }
         shots.append(image)
-        shotPresets.append(live?.presetKey ?? "none")
-        shotFx.append(live?.fxAmount ?? 1)
+        let key = live?.presetKey ?? "none", fx = live?.fxAmount ?? 1
+        shotPresets.append(key)
+        shotFx.append(fx)
+        guard savesOnCapture else { return }
+        Task.detached(priority: .userInitiated) { [weak self] in
+            var out = image
+            if key != "none", let engine = try? LiveFilterEngine(), let ci = CIImage(image: image) {
+                let r = engine.render(frame: ci, key: key, intensity: fx)
+                if let cg = Self.bakeCtx.createCGImage(r, from: r.extent) { out = UIImage(cgImage: cg, scale: 1, orientation: .up) }
+            }
+            let ok = await CameraAlbum.save(out)
+            await MainActor.run { if ok { self?.savedCount += 1 } }
+        }
     }
 
     func remove(at i: Int) {

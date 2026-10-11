@@ -173,7 +173,7 @@ struct CameraFilterTab: View {
                         Button {
                             app.photoPickPreset = nil   // 장마다 찍을 때 고른 필터를 쓴다(아래 presets)
                             app.photoPickFxAmount = fxAmount
-                            app.finishBurstCamera(model.shots, presets: model.shotPresets, fx: model.shotFx)
+                            app.finishBurstCamera(model.shots, presets: model.shotPresets, fx: model.shotFx, alreadySaved: true)
                             while !model.shots.isEmpty { model.remove(at: 0) }
                         } label: {
                             Text(Copy.burstDone(model.shots.count)).font(AppFont.footnote.weight(.bold)).foregroundStyle(.black)
@@ -192,7 +192,7 @@ struct CameraFilterTab: View {
         }
         .toolbar(.hidden, for: .navigationBar)
         .coachHost()
-        .onAppear { visible = true; Task { await model.start() }; app.enqueueCoach(Coach.filter) }
+        .onAppear { visible = true; model.savesOnCapture = true; Task { await model.start() }; app.enqueueCoach(Coach.filter) }
         .onDisappear { visible = false; model.stop() }
         .onChange(of: selected, initial: true) {
             model.live?.presetKey = selected
