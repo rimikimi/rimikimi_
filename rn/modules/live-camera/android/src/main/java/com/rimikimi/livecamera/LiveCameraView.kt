@@ -342,6 +342,89 @@ class LiveCameraView(context: Context, appContext: AppContext) : ExpoView(contex
     })
   }
 
+  /** 저장본 작업(디코드·인코드)은 한 줄로 — 연사 10장이 동시에 48MB 씩 디코드하지 않게. */
+  private val stillExec = Executors.newSingleThreadExecutor()
+  /** 저장본 긴 변 상한(px) — 메모리(4096×3072 RGBA = 48MB × 입력·텍스처·FBO·읽기버퍼·출력 ≈ 5장) 와 GL 한계 중 작은 쪽. */
+  private val STILL_MAX_SIDE = 4096
+
+  /**
+   * 찍은 사진(uri)에 미리보기와 같은 필터를 입혀 새 JPEG(품질 95) 로 — {uri, width, height}.
+   * look = JS lookFor(presetKey) 그대로, intensity = 색감 슬라이더(미리보기 `intensity` prop 과 같은 값).
+   * EXIF 방향은 먼저 적용해 세운 뒤 필터를 입힌다(capture 가 만든 파일은 이미 세워져 있어 0). 실패는 reject — JS 가 원본으로 대신한다.
+   */
+  fun renderStill(uri: String, lookMap: Map<String, Any?>, intensity: Float, promise: Promise) {
+    if (!active) { promise.reject("E_NOT_READY", "camera view inactive", null); return }
+    stillExec.execute {
+      var src: Bitmap? = null
+      try {
+        val path = uri.removePrefix("file://")
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(path, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) throw IllegalArgumentException("cannot decode $uri")
+        // GL 한계는 GL 스레드에서만 읽을 수 있다 — 먼저 물어본다
+        val maxSide = glQuery { renderer.maxSide() }.coerceAtMost(STILL_MAX_SIDE)
+        var sample = 1
+        while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= maxSide) sample *= 2
+        var bmp = BitmapFactory.decodeFile(path, BitmapFactory.Options().apply { inSampleSize = sample; inPreferredConfig = Bitmap.Config.ARGB_8888 })
+          ?: throw IllegalStateException("decode failed")
+        // EXIF 방향 → 세움
+        val exifRot = try {
+          when (android.media.ExifInterface(path).getAttributeInt(android.media.ExifInterface.TAG_ORIENTATION, 1)) {
+            android.media.ExifInterface.ORIENTATION_ROTATE_90 -> 90f
+            android.media.ExifInterface.ORIENTATION_ROTATE_180 -> 180f
+            android.media.ExifInterface.ORIENTATION_ROTATE_270 -> 270f
+            else -> 0f
+          }
+        } catch (_: Throwable) { 0f }
+        val long = maxOf(bmp.width, bmp.height)
+        val fit = if (long > maxSide) maxSide.toFloat() / long else 1f
+        if (exifRot != 0f || fit < 1f) {
+          val m = Matrix()
+          if (fit < 1f) m.postScale(fit, fit)
+          if (exifRot != 0f) m.postRotate(exifRot)
+          val o = Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, m, true)
+          if (o !== bmp) bmp.recycle()
+          bmp = o
+        }
+        if (bmp.config != Bitmap.Config.ARGB_8888) {
+          val o = bmp.copy(Bitmap.Config.ARGB_8888, false); bmp.recycle(); bmp = o
+        }
+        src = bmp
+        val look = renderer.parseLook(lookMap).also { it.intensity = intensity }
+        // 인플이면 사진에서 얼굴을 찾는다(미리보기와 같은 정규화 [x,y,w,h], 위가 0)
+        val faces: List<FloatArray> = if (look.preset > 0.5f && look.special.toInt() == 7)
+          FaceUtil.detect(bmp).map { floatArrayOf(it.left, it.top, it.width(), it.height()) } else emptyList()
+        val input = bmp
+        val out = glQuery { renderer.renderStill(input, look, faces) }
+        input.recycle(); src = null
+        if (out == null) throw IllegalStateException("gl render failed")
+        val f = File(context.cacheDir, "rimikimi_cam_f_${System.currentTimeMillis()}.jpg")
+        FileOutputStream(f).use { out.compress(Bitmap.CompressFormat.JPEG, 95, it) }
+        val res = mapOf("uri" to "file://" + f.absolutePath, "width" to out.width, "height" to out.height)
+        out.recycle()
+        promise.resolve(res)
+      } catch (e: Throwable) {
+        src?.recycle()
+        Log.w("LiveCamera", "renderStill: ${e.message}")
+        promise.reject("E_RENDER", e.message ?: "render failed", e as? Exception)
+      }
+    }
+  }
+
+  /** GL 스레드에서 실행하고 결과를 기다린다(최대 8초 — 뷰가 멈춰 있으면 큐가 안 돌 수 있다). */
+  private fun <T> glQuery(block: () -> T): T {
+    val latch = java.util.concurrent.CountDownLatch(1)
+    var result: T? = null
+    var error: Throwable? = null
+    glView.queueEvent {
+      try { result = block() } catch (t: Throwable) { error = t } finally { latch.countDown() }
+    }
+    if (!latch.await(8, TimeUnit.SECONDS)) throw IllegalStateException("gl thread timeout")
+    error?.let { throw it }
+    @Suppress("UNCHECKED_CAST")
+    return result as T
+  }
+
   fun release() {
     unbind()
     glView.queueEvent { renderer.releaseSurface() }

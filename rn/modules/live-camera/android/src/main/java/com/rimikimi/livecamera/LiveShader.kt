@@ -22,11 +22,27 @@ void main() {
 }
 """
 
-  const val FRAG = """
-#extension GL_OES_EGL_image_external : require
+  /** 오프스크린(찍은 사진 → 필터 입힌 저장본)용 — vUv 를 뒤집지 않는다: FBO 행 r = 출력 행 r(glReadPixels 가 아래부터 읽는 것과 상쇄). */
+  const val VERT_FLAT = """
+attribute vec2 aPos;
+varying vec2 vUv;
+void main() {
+  vUv = vec2(aPos.x * 0.5 + 0.5, aPos.y * 0.5 + 0.5);
+  gl_Position = vec4(aPos, 0.0, 1.0);
+}
+"""
+
+  /** 미리보기(카메라 OES 텍스처) 프래그먼트 셰이더. */
+  val FRAG: String get() = frag(oes = true)
+
+  /**
+   * 같은 수식, 입력 샘플러만 다르게 — oes=true 는 카메라 SurfaceTexture, false 는 보통 2D 텍스처(찍은 사진).
+   * 유니폼 선언 아래는 글자 하나 안 다르다(두 경로의 결과가 어긋나지 않게).
+   */
+  fun frag(oes: Boolean): String = (if (oes) "#extension GL_OES_EGL_image_external : require\n" else "") + """
 precision highp float;
 varying vec2 vUv;
-uniform samplerExternalOES uTex;
+uniform """ + (if (oes) "samplerExternalOES" else "sampler2D") + """ uTex;
 uniform sampler2D uLut;
 uniform mat4 uTexMat;
 uniform vec2 uFill;

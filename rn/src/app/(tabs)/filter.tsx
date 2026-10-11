@@ -208,16 +208,24 @@ export default function CameraFilterTab() {
     flashOv.value = withSequence(withTiming(0.85, { duration: 60 }), withTiming(0, { duration: 180 }));
     Haptics.selectionAsync().catch(() => {});
     try {
-      const r = await cam.current.capture();
+      const c = cam.current;
+      const r = await c.capture();
       const shot: Shot = { ...r, presetKey, fxAmount: fx };
       setShots((prev) => (prev.length >= MAX_SHOTS ? prev : [...prev, shot]));
-      // 찍으면 바로 사진첩에(오너 결정 2026-10-11) — 원본. 셔터를 막지 않게 기다리지 않고, 장마다 토스트도 없다.
-      // 권한이 없어 못 넣었을 때만 한 번 알린다.
-      void saveFileToAlbum(r.uri).then((res) => {
+      // 찍으면 바로 사진첩에(오너 결정 2026-10-11) — **보던 그대로**(필터 입힌 저장본, iOS 와 같다). Shot 은 원본(편집기용).
+      // 셔터를 막지 않게 기다리지 않고, 장마다 토스트도 없다. 필터 굽기에 실패하면 원본을 넣고, 권한이 없어 못 넣었을 때만 한 번 알린다.
+      void (async () => {
+        let toSave = r.uri;
+        if (presetKey !== "none") {
+          try { toSave = (await c.renderStill(r.uri, presetKey, fx)).uri; } catch (e) {
+            if (__DEV__) console.log("[camera] renderStill 실패 → 원본 저장", String(e));
+          }
+        }
+        const res = await saveFileToAlbum(toSave);
         if ("ok" in res || albumWarned.current) return;
         albumWarned.current = true;
         toast(c21.noAlbumPermission);
-      });
+      })();
     } catch (e) {
       if (__DEV__) console.log("[camera] capture 실패", String(e));
     } finally {

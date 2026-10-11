@@ -1,4 +1,4 @@
-import React, { forwardRef } from "react";
+import React, { forwardRef, useImperativeHandle, useRef } from "react";
 import type { NativeSyntheticEvent, ViewStyle } from "react-native";
 import { requireNativeModule, requireNativeViewManager } from "expo-modules-core";
 import { buildLuts, presetByKey } from "@/filters";
@@ -14,6 +14,11 @@ export interface CaptureResult { uri: string; width: number; height: number }
 
 export interface LiveCameraHandle {
   capture(): Promise<CaptureResult>;
+  /**
+   * 찍은 사진(capture 의 uri)에 미리보기와 같은 필터를 입힌 새 JPEG — 사진첩 저장본용(iOS 와 같이 보던 그대로).
+   * presetKey·fxAmount = 셔터 순간 값. 원본 uri 는 그대로 남는다(편집기용). 실패하면 reject → 원본으로 대신한다.
+   */
+  renderStill(uri: string, presetKey: string, fxAmount: number): Promise<CaptureResult>;
   focus(x: number, y: number, lock: boolean): Promise<void>;
   setExposure(ev: number): Promise<void>;
   setZoom(z: number): Promise<void>;
@@ -37,7 +42,15 @@ interface NativeProps {
   onCameraError?: (e: NativeSyntheticEvent<{ message: string }>) => void;
 }
 
-const Native = requireNativeViewManager<NativeProps & { ref?: React.Ref<LiveCameraHandle> }>("LiveCamera");
+/** 네이티브 뷰가 실제로 내놓는 함수 — renderStill 은 look 맵을 받는다(presetKey → look 변환은 JS lookFor). */
+interface NativeHandle {
+  capture(): Promise<CaptureResult>;
+  renderStill(uri: string, look: LookProps, intensity: number): Promise<CaptureResult>;
+  focus(x: number, y: number, lock: boolean): Promise<void>;
+  setExposure(ev: number): Promise<void>;
+  setZoom(z: number): Promise<void>;
+}
+const Native = requireNativeViewManager<NativeProps & { ref?: React.Ref<NativeHandle> }>("LiveCamera");
 
 const SPECIAL: Record<string, number> = { duotone: 1, thermal: 2, glitch: 3, vhs: 4, pixelate: 5, sketch: 6, beauty: 7 };
 
@@ -81,6 +94,15 @@ export function lookFor(key: string): LookProps {
 
 export const LiveCameraView = forwardRef<LiveCameraHandle, Omit<NativeProps, "look"> & { presetKey: string }>(
   function LiveCameraView({ presetKey, ...rest }, ref) {
-    return <Native ref={ref} look={lookFor(presetKey)} {...rest} />;
+    const inner = useRef<NativeHandle>(null);
+    const need = () => { const n = inner.current; if (!n) throw new Error("LiveCamera not mounted"); return n; };
+    useImperativeHandle(ref, () => ({
+      capture: () => need().capture(),
+      renderStill: (uri, key, fx) => need().renderStill(uri, lookFor(key), fx),
+      focus: (x, y, lock) => need().focus(x, y, lock),
+      setExposure: (ev) => need().setExposure(ev),
+      setZoom: (z) => need().setZoom(z),
+    }), []);
+    return <Native ref={inner} look={lookFor(presetKey)} {...rest} />;
   },
 );

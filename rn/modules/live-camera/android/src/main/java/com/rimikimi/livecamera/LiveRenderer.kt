@@ -1,9 +1,11 @@
 package com.rimikimi.livecamera
 
+import android.graphics.Bitmap
 import android.graphics.SurfaceTexture
 import android.opengl.GLES11Ext
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView
+import android.opengl.GLUtils
 import android.util.Log
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -66,13 +68,14 @@ class LiveRenderer(private val onSurfaceTexture: (SurfaceTexture) -> Unit, priva
   @Volatile var faces: List<FloatArray> = emptyList()
   @Volatile var facesAt = 0L
 
-  fun setLook(m: Map<String, Any?>) {
+  /** JS 가 넘긴 look 맵 → Look (순수 함수). 미리보기(setLook)와 저장본(renderStill)이 같은 해석을 쓴다. */
+  fun parseLook(m: Map<String, Any?>, into: Look = Look()): Look {
     fun f(k: String, d: Float = 0f) = (m[k] as? Number)?.toFloat() ?: d
     fun arr(k: String, n: Int, d: Float = 0f): FloatArray {
       val l = m[k] as? List<*> ?: return FloatArray(n) { d }
       return FloatArray(n) { i -> (l.getOrNull(i) as? Number)?.toFloat() ?: d }
     }
-    val l = look
+    val l = into
     l.preset = f("preset")
     l.special = f("special")
     (m["lut"] as? List<*>)?.let { src ->
@@ -101,12 +104,18 @@ class LiveRenderer(private val onSurfaceTexture: (SurfaceTexture) -> Unit, priva
     l.hslA = a; l.hslB = bb; l.hslN = n.toFloat()
     l.c1 = arr("c1", 3); l.c2 = arr("c2", 3, 255f)
     l.grain = f("grain"); l.vignette = f("vignette"); l.leak = f("leak")
+    return l
+  }
+
+  fun setLook(m: Map<String, Any?>) {
+    parseLook(m, look)
     requestRender()
   }
 
   override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
     program = buildProgram(LiveShader.VERT, LiveShader.FRAG)
     beauty.init { v, f -> buildProgram(v, f) }
+    stillProgram = 0   // 컨텍스트가 새로 생겼다 — 오프스크린 프로그램은 다음 renderStill 때 다시 만든다
     val t = IntArray(2)
     GLES20.glGenTextures(2, t, 0)
     oesTex = t[0]; lutTex = t[1]
@@ -155,13 +164,7 @@ class LiveRenderer(private val onSurfaceTexture: (SurfaceTexture) -> Unit, priva
     GLES20.glUseProgram(program)
 
     val l = look
-    if (l.lutDirty) {
-      val data = l.lut ?: ByteArray(256 * 4) { i -> if (i % 4 == 3) 255.toByte() else (i / 4).toByte() }
-      GLES20.glActiveTexture(GLES20.GL_TEXTURE1)
-      GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, lutTex)
-      GLES20.glTexImage2D(GLES20.GL_TEXTURE_2D, 0, GLES20.GL_RGBA, 256, 1, 0, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, ByteBuffer.wrap(data))
-      l.lutDirty = false
-    }
+    uploadLut(l, lutTex)
     GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
     GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, oesTex)
     GLES20.glUniform1i(u("uTex"), 0)
@@ -180,10 +183,32 @@ class LiveRenderer(private val onSurfaceTexture: (SurfaceTexture) -> Unit, priva
     GLES20.glUniform2f(u("uFill"), fx, fy)
     GLES20.glUniform1f(u("uRot"), shaderRotation)
     GLES20.glUniform1f(u("uMirror"), mirror)
-    // 편집기 미리보기와 같은 격자(긴 변 1080) — 그레인·모자이크 크기가 편집기와 비슷하게 보이도록
+    bindLook(program, { n -> u(n) }, l, upW, upH, beautyOn, upW0, upH0)
+
+    val aPos = GLES20.glGetAttribLocation(program, "aPos")
+    GLES20.glEnableVertexAttribArray(aPos)
+    GLES20.glVertexAttribPointer(aPos, 2, GLES20.GL_FLOAT, false, 0, quad)
+    GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
+    GLES20.glDisableVertexAttribArray(aPos)
+  }
+
+  /** LUT 텍스처 올리기(dirty 일 때만). 미리보기는 lutTex, 저장본은 자기 텍스처 — 서로 안 건드린다. */
+  private fun uploadLut(l: Look, tex: Int) {
+    if (!l.lutDirty) return
+    val data = l.lut ?: ByteArray(256 * 4) { i -> if (i % 4 == 3) 255.toByte() else (i / 4).toByte() }
+    GLES20.glActiveTexture(GLES20.GL_TEXTURE1)
+    GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, tex)
+    GLES20.glTexImage2D(GLES20.GL_TEXTURE_2D, 0, GLES20.GL_RGBA, 256, 1, 0, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, ByteBuffer.wrap(data))
+    l.lutDirty = false
+  }
+
+  /**
+   * 필터 유니폼 — 미리보기(onDrawFrame)와 저장본(renderStill)이 같은 함수로 넣는다(값이 어긋나지 않게).
+   * upW·upH = 세운 이미지 크기(px). 그레인·모자이크·빛샘 격자는 편집기 미리보기와 같은 "긴 변 1080".
+   */
+  private fun bindLook(prog: Int, u: (String) -> Int, l: Look, upW: Int, upH: Int, beautyOn: Boolean, texW: Int, texH: Int) {
     val k = 1080f / maxOf(upW, upH)
     GLES20.glUniform2f(u("uImg"), upW * k, upH * k)
-
     GLES20.glUniform1f(u("uPreset"), l.preset)
     GLES20.glUniform1f(u("uSpecial"), l.special)
     GLES20.glUniform1f(u("uBwOn"), l.bwOn)
@@ -206,18 +231,117 @@ class LiveRenderer(private val onSurfaceTexture: (SurfaceTexture) -> Unit, priva
       GLES20.glActiveTexture(GLES20.GL_TEXTURE2); GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, beauty.maskTex); GLES20.glUniform1i(u("uMaskT"), 2)
       GLES20.glActiveTexture(GLES20.GL_TEXTURE3); GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, beauty.baseTex); GLES20.glUniform1i(u("uBaseT"), 3)
       GLES20.glActiveTexture(GLES20.GL_TEXTURE4); GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, beauty.glowTex); GLES20.glUniform1i(u("uGlowT"), 4)
-      GLES20.glUniform2f(u("uTexel"), 1f / upW0, 1f / upH0)
+      GLES20.glUniform2f(u("uTexel"), 1f / texW, 1f / texH)
       GLES20.glUniform1f(u("uDetail"), BeautyPass.DETAIL * beauty.faceW)
     } else {
       // 샘플러가 가리키는 유닛을 비워 두지 않는다(드라이버 경고 방지)
       GLES20.glUniform1i(u("uMaskT"), 1); GLES20.glUniform1i(u("uBaseT"), 1); GLES20.glUniform1i(u("uGlowT"), 1)
     }
+    GLES20.glUniform1i(u("uLut"), 1)
+  }
 
-    val aPos = GLES20.glGetAttribLocation(program, "aPos")
-    GLES20.glEnableVertexAttribArray(aPos)
-    GLES20.glVertexAttribPointer(aPos, 2, GLES20.GL_FLOAT, false, 0, quad)
-    GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
-    GLES20.glDisableVertexAttribArray(aPos)
+  // ── 저장본: 찍은 사진에 미리보기와 같은 필터를 오프스크린으로 입힌다 ──────────────
+  private var stillProgram = 0
+  /** 저장본 인플 작업 격자 긴 변 상한(px) — 6장 × 2048² RGBA ≈ 100MB 까지만 */
+  private val STILL_BEAUTY_GRID = 2048
+  private val stillLoc = HashMap<String, Int>()
+  /** 2D 텍스처용 uTexMat — toBuf 가 (x, 1-y) 를 곱하므로 y 를 되돌려 "위가 0" 좌표가 비트맵 0행이 되게 한다. */
+  private val flipMat = floatArrayOf(1f, 0f, 0f, 0f, 0f, -1f, 0f, 0f, 0f, 0f, 1f, 0f, 0f, 1f, 0f, 1f)
+
+  /** 이 GL 이 받는 가장 큰 변(텍스처·렌더버퍼 중 작은 쪽). GL 스레드에서. */
+  fun maxSide(): Int {
+    val a = IntArray(1); val b = IntArray(1)
+    GLES20.glGetIntegerv(GLES20.GL_MAX_TEXTURE_SIZE, a, 0)
+    GLES20.glGetIntegerv(GLES20.GL_MAX_RENDERBUFFER_SIZE, b, 0)
+    val m = minOf(if (a[0] > 0) a[0] else 2048, if (b[0] > 0) b[0] else 2048)
+    return m
+  }
+
+  /**
+   * 세워진(+거울 끝난) 비트맵 → 같은 크기의 필터 입힌 비트맵. **GL 스레드(queueEvent)에서만.**
+   * 미리보기 셰이더와 같은 수식·같은 유니폼(uFill=1, uRot=0, uMirror=0, 격자 긴 변 1080). faces = 인플용 [x,y,w,h](위가 0).
+   * 미리보기 상태(look·lutTex)는 건드리지 않는다. 실패하면 null.
+   */
+  fun renderStill(src: Bitmap, l: Look, faces: List<FloatArray>): Bitmap? {
+    if (stillProgram == 0) {
+      stillProgram = buildProgram(LiveShader.VERT_FLAT, LiveShader.frag(oes = false))
+      stillLoc.clear()
+      if (stillProgram == 0) return null
+    }
+    val w = src.width; val h = src.height
+    while (GLES20.glGetError() != GLES20.GL_NO_ERROR) { /* 이전 프레임이 남긴 오류 플래그 비우기 */ }
+    val ids = IntArray(3)   // src tex, lut tex, dst tex
+    GLES20.glGenTextures(3, ids, 0)
+    val fb = IntArray(1)
+    GLES20.glGenFramebuffers(1, fb, 0)
+    var out: Bitmap? = null
+    try {
+      fun tex2d(id: Int, filter: Int) {
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, id)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, filter)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, filter)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE)
+      }
+      tex2d(ids[0], GLES20.GL_LINEAR)
+      GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, src, 0)
+      tex2d(ids[1], GLES20.GL_NEAREST)
+      l.lutDirty = true
+      uploadLut(l, ids[1])
+      tex2d(ids[2], GLES20.GL_LINEAR)
+      GLES20.glTexImage2D(GLES20.GL_TEXTURE_2D, 0, GLES20.GL_RGBA, w, h, 0, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, null)
+      if (GLES20.glGetError() != GLES20.GL_NO_ERROR) { Log.w("LiveCamera", "renderStill: texture alloc failed ${w}x${h}"); return null }
+
+      // 인플 — 사진에서 찾은 얼굴로 미리보기와 같은 BeautyPass(2D 입력)
+      val beautyOn = l.preset > 0.5f && l.special.toInt() == 7 &&
+        beauty.run(ids[0], flipMat, 0f, 0f, faces, w, h, l.intensity, quad, external = false, maxGrid = STILL_BEAUTY_GRID)
+
+      GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, fb[0])
+      GLES20.glFramebufferTexture2D(GLES20.GL_FRAMEBUFFER, GLES20.GL_COLOR_ATTACHMENT0, GLES20.GL_TEXTURE_2D, ids[2], 0)
+      if (GLES20.glCheckFramebufferStatus(GLES20.GL_FRAMEBUFFER) != GLES20.GL_FRAMEBUFFER_COMPLETE) {
+        Log.w("LiveCamera", "renderStill: FBO incomplete ${w}x${h}"); return null
+      }
+      GLES20.glViewport(0, 0, w, h)
+      GLES20.glClearColor(0f, 0f, 0f, 1f)
+      GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
+      GLES20.glUseProgram(stillProgram)
+      val su = { n: String -> stillLoc.getOrPut(n) { GLES20.glGetUniformLocation(stillProgram, n) } }
+      GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
+      GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, ids[0])
+      GLES20.glUniform1i(su("uTex"), 0)
+      GLES20.glActiveTexture(GLES20.GL_TEXTURE1)
+      GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, ids[1])
+      GLES20.glUniformMatrix4fv(su("uTexMat"), 1, false, flipMat, 0)
+      GLES20.glUniform2f(su("uFill"), 1f, 1f)
+      GLES20.glUniform1f(su("uRot"), 0f)
+      GLES20.glUniform1f(su("uMirror"), 0f)
+      bindLook(stillProgram, su, l, w, h, beautyOn, w, h)
+      val aPos = GLES20.glGetAttribLocation(stillProgram, "aPos")
+      GLES20.glEnableVertexAttribArray(aPos)
+      GLES20.glVertexAttribPointer(aPos, 2, GLES20.GL_FLOAT, false, 0, quad)
+      GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
+      GLES20.glDisableVertexAttribArray(aPos)
+
+      val buf = ByteBuffer.allocateDirect(w * h * 4).order(ByteOrder.nativeOrder())
+      GLES20.glReadPixels(0, 0, w, h, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, buf)
+      val err = GLES20.glGetError()
+      if (err != GLES20.GL_NO_ERROR) { Log.w("LiveCamera", "renderStill: readPixels error $err"); return null }
+      buf.rewind()
+      val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+      bmp.copyPixelsFromBuffer(buf)
+      out = bmp
+    } catch (e: Throwable) {
+      Log.w("LiveCamera", "renderStill failed", e)
+      out?.recycle(); out = null
+    } finally {
+      // 미리보기 상태로 되돌린다
+      GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
+      GLES20.glViewport(0, 0, viewW, viewH)
+      GLES20.glDeleteFramebuffers(1, fb, 0)
+      GLES20.glDeleteTextures(3, ids, 0)
+      look.lutDirty = true   // 유닛1 바인딩이 바뀌었을 수 있다 — 다음 프레임에 미리보기 LUT 다시 올림
+    }
+    return out
   }
 
   fun releaseSurface() {

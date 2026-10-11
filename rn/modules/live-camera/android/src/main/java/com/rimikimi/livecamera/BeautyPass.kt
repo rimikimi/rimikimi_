@@ -36,11 +36,9 @@ float skin(vec3 c) {
 }
 vec4 samp(sampler2D t, vec2 up) { return texture2D(t, vec2(up.x, 1.0 - up.y)); }
 """
-    // ① 축소 — 화면 셰이더와 같은 toBuf 로 OES 를 읽는다
-    private const val DOWN = """
-#extension GL_OES_EGL_image_external : require
-""" + COMMON + """
-uniform samplerExternalOES uTex;
+    // ① 축소 — 화면 셰이더와 같은 toBuf 로 읽는다(oes=true 카메라 OES, false 찍은 사진 2D 텍스처 — 수식은 같다)
+    private fun down(oes: Boolean) = (if (oes) "#extension GL_OES_EGL_image_external : require\n" else "") + COMMON + """
+uniform """ + (if (oes) "samplerExternalOES" else "sampler2D") + """ uTex;
 uniform mat4 uTexMat;
 uniform float uRot;
 uniform float uMirror;
@@ -143,7 +141,7 @@ void main() {
 """
   }
 
-  private var progDown = 0; private var progMask = 0; private var progGauss = 0; private var progBilat = 0; private var progHi = 0
+  private var progDown = 0; private var progDown2D = 0; private var progMask = 0; private var progGauss = 0; private var progBilat = 0; private var progHi = 0
   private val tex = IntArray(6)   // small, mask, tmp, base, hi, glow
   private val fbo = IntArray(6)
   private var gw = 0; private var gh = 0
@@ -156,7 +154,8 @@ void main() {
   var faceW = 0f; private set
 
   fun init(build: (String, String) -> Int) {
-    progDown = build(LiveShader.VERT, DOWN)
+    progDown = build(LiveShader.VERT, down(oes = true))
+    progDown2D = build(LiveShader.VERT, down(oes = false))
     progMask = build(LiveShader.VERT, MASK)
     progGauss = build(LiveShader.VERT, GAUSS)
     progBilat = build(LiveShader.VERT, BILAT)
@@ -224,26 +223,29 @@ void main() {
    * 한 프레임 — faces: 정규화 [x,y,w,h](세운 화면 좌표, 위가 0). upW·upH = 세운 버퍼 크기.
    * 끝나면 기본 프레임버퍼로 돌려놓는다(뷰포트는 호출부가 다시 잡는다).
    */
-  fun run(oes: Int, texMat: FloatArray, rot: Float, mirror: Float, faces: List<FloatArray>, upW: Int, upH: Int, a: Float, quad: FloatBuffer): Boolean {
+  fun run(oes: Int, texMat: FloatArray, rot: Float, mirror: Float, faces: List<FloatArray>, upW: Int, upH: Int, a: Float, quad: FloatBuffer, external: Boolean = true, maxGrid: Int = Int.MAX_VALUE): Boolean {
     if (!ready || faces.isEmpty()) return false
+    if (!external && progDown2D == 0) return false
     val F = faces.take(3).map { floatArrayOf(it[0] * upW, it[1] * upH, it[2] * upW, it[3] * upH) }
     val fw = F.maxOf { it[2] }
     if (fw < 8f) return false
-    val s = min(1f, WORK / fw)
+    // 작업 격자 = 얼굴 폭 140칸, 단 긴 변 maxGrid 를 넘지 않게(저장본 4096px 에 작은 얼굴이면 6장 × 48MB 가 되어 OOM) — 상수는 전부 fw·s 기준이라 안전
+    val s = min(min(1f, WORK / fw), maxGrid.toFloat() / max(upW, upH))
     scale = s; faceW = fw
     ensure(max(1, ceil(upW * s).toInt()), max(1, ceil(upH * s).toInt()))
 
-    // ① 축소
-    GLES20.glUseProgram(progDown)
+    // ① 축소 — 미리보기는 OES, 찍은 사진(renderStill)은 2D 텍스처
+    val pd = if (external) progDown else progDown2D
+    GLES20.glUseProgram(pd)
     GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
-    GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, oes)
-    GLES20.glUniform1i(GLES20.glGetUniformLocation(progDown, "uTex"), 0)
-    GLES20.glUniformMatrix4fv(GLES20.glGetUniformLocation(progDown, "uTexMat"), 1, false, texMat, 0)
-    GLES20.glUniform1f(GLES20.glGetUniformLocation(progDown, "uRot"), rot)
-    GLES20.glUniform1f(GLES20.glGetUniformLocation(progDown, "uMirror"), mirror)
-    GLES20.glUniform2f(GLES20.glGetUniformLocation(progDown, "uCell"), 1f / gw, 1f / gh)
-    GLES20.glUniform1f(GLES20.glGetUniformLocation(progDown, "uN"), min(4f, ceil(1f / s)))
-    draw(progDown, 0, quad)
+    GLES20.glBindTexture(if (external) GLES11Ext.GL_TEXTURE_EXTERNAL_OES else GLES20.GL_TEXTURE_2D, oes)
+    GLES20.glUniform1i(GLES20.glGetUniformLocation(pd, "uTex"), 0)
+    GLES20.glUniformMatrix4fv(GLES20.glGetUniformLocation(pd, "uTexMat"), 1, false, texMat, 0)
+    GLES20.glUniform1f(GLES20.glGetUniformLocation(pd, "uRot"), rot)
+    GLES20.glUniform1f(GLES20.glGetUniformLocation(pd, "uMirror"), mirror)
+    GLES20.glUniform2f(GLES20.glGetUniformLocation(pd, "uCell"), 1f / gw, 1f / gh)
+    GLES20.glUniform1f(GLES20.glGetUniformLocation(pd, "uN"), min(4f, ceil(1f / s)))
+    draw(pd, 0, quad)
 
     // ② 마스크 → 페더
     GLES20.glUseProgram(progMask)
