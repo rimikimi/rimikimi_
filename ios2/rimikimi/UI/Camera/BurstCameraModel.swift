@@ -21,6 +21,11 @@ final class BurstCameraModel {
     /// ⚠️ 미리보기와 **같은 색공간 옵션**(sRGB 작업공간)이어야 한다 — 기본 CIContext() 는 선형 작업공간이라 LUT 가 엉뚱한
     /// 공간에서 걸려 저장본이 전혀 다른(어둡고 진한) 룩이 됐다(오너 2026-10-11 "앨범에 전혀 다른 필터가 입혀져 있는데").
     private static let bakeCtx = CIContext(options: LiveFilter.contextOptions)
+    /// 마지막으로 저장한 필터본(왼쪽 아래 썸네일용).
+    private(set) var lastSaved: UIImage?
+    /// 저장용 엔진은 한 번만 만든다(장마다 만들면 커널 컴파일로 미리보기가 버벅인다) + 한 장씩 차례로(버벅임 방지, 오너 2026-10-11).
+    private static let bakeEngine: LiveFilterEngine? = try? LiveFilterEngine()
+    private static let bakeQueue = DispatchQueue(label: "rimikimi.bake", qos: .utility)
     private(set) var denied = false
     private(set) var flashOverlay = false
     var flashOn = false
@@ -193,21 +198,30 @@ final class BurstCameraModel {
     }
 
     private func add(_ image: UIImage?) {
-        guard let image, shots.count < Self.maxShots else { return }
-        shots.append(image)
+        guard let image else { return }
         let key = live?.presetKey ?? "none", fx = live?.fxAmount ?? 1
+        if savesOnCapture {
+            // 카메라 탭: 원본은 남기지 않는다 — 필터본만 사진첩에(오너 2026-10-11 "원본은 없애고 필터 촬영본만").
+            // 미리보기 GPU 와 겹치지 않게 낮은 우선순위 직렬 큐에서 한 장씩.
+            Self.bakeQueue.async { [weak self] in
+                var out = image
+                if key != "none", let engine = Self.bakeEngine, let ci = CIImage(image: image) {
+                    let r = engine.render(frame: ci, key: key, intensity: fx)
+                    if let cg = Self.bakeCtx.createCGImage(r, from: r.extent, format: .RGBA8, colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!) { out = UIImage(cgImage: cg, scale: 1, orientation: .up) }
+                }
+                let thumb = out.downscaled(maxLong: 240)
+                Task { @MainActor in self?.lastSaved = thumb }
+                Task.detached(priority: .utility) { [weak self] in
+                    let ok = await CameraAlbum.save(out)
+                    await MainActor.run { if ok { self?.savedCount += 1 } }
+                }
+            }
+            return
+        }
+        guard shots.count < Self.maxShots else { return }
+        shots.append(image)
         shotPresets.append(key)
         shotFx.append(fx)
-        guard savesOnCapture else { return }
-        Task.detached(priority: .userInitiated) { [weak self] in
-            var out = image
-            if key != "none", let engine = try? LiveFilterEngine(), let ci = CIImage(image: image) {
-                let r = engine.render(frame: ci, key: key, intensity: fx)
-                if let cg = Self.bakeCtx.createCGImage(r, from: r.extent, format: .RGBA8, colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!) { out = UIImage(cgImage: cg, scale: 1, orientation: .up) }
-            }
-            let ok = await CameraAlbum.save(out)
-            await MainActor.run { if ok { self?.savedCount += 1 } }
-        }
     }
 
     func remove(at i: Int) {

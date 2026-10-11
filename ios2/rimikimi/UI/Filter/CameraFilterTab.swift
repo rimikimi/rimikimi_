@@ -168,7 +168,18 @@ struct CameraFilterTab: View {
                 filterStrip
                 HStack {
                     if model.shots.isEmpty {
-                        sideButton(L.t("앨범", "Album"), "photo.on.rectangle") { app.photoPickFxAmount = fxAmount; Task { await app.perform(.filterPick(presetKey: selected)) } }
+                        // 기본 카메라처럼 — 방금 저장한 필터본 썸네일(없으면 앨범 아이콘). 탭 = 사진첩에서 골라 편집기.
+                        if let t = model.lastSaved {
+                            Button { app.photoPickFxAmount = fxAmount; Task { await app.perform(.filterPick(presetKey: selected)) } } label: {
+                                Image(uiImage: t).resizable().scaledToFill().frame(width: 44, height: 44)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                    .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(.white.opacity(0.8), lineWidth: 1.5))
+                            }
+                            .buttonStyle(PressScaleButtonStyle())
+                            .accessibilityLabel(L.t("앨범", "Album"))
+                        } else {
+                            sideButton(L.t("앨범", "Album"), "photo.on.rectangle") { app.photoPickFxAmount = fxAmount; Task { await app.perform(.filterPick(presetKey: selected)) } }
+                        }
                     } else {
                         Button {
                             app.photoPickPreset = nil   // 장마다 찍을 때 고른 필터를 쓴다(아래 presets)
@@ -181,7 +192,7 @@ struct CameraFilterTab: View {
                         }
                     }
                     Spacer()
-                    ShutterButton(disabled: model.shots.count >= BurstCameraModel.maxShots) { model.capture() }
+                    ShutterButton(disabled: !model.savesOnCapture && model.shots.count >= BurstCameraModel.maxShots) { model.capture() }
                     Spacer()
                     sideButton(L.t("전환", "Flip"), "arrow.triangle.2.circlepath.camera") { model.flip() }
                 }
