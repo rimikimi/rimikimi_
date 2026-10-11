@@ -32,8 +32,12 @@ import { chrome, space } from "@/theme/tokens";
 //  · "색감" 슬라이더(원본 빼고 모든 필터): 0 = 기본 카메라 색, 1 = 프리셋 색 그대로. 효과(그레인 등)는 그대로.
 //  · 탭 = 그 자리 초점·노출(노란 네모), 그 뒤 화면 어디서든 위아래로 끌면 밝기(±2EV). 손 떼고 2.5초면 흐려지고
 //    7초면 사라진다. 길게 누르기 = AE/AF 잠금. 두 손가락 = 줌 + 렌즈 버튼(있는 것만). 플래시. 전면 좌우반전(기본 켬, 기억).
-//  · 촬영은 연속(최대 10장) → "완료 n" = 전부 앨범에 저장하고 고른 필터로 편집기에(색감 = 0.7×슬라이더).
-//    로그인 없이 쓴다.
+//  · 촬영은 연속(최대 10장). **찍으면 바로 사진첩에 저장**(원본 — 네이티브 모듈에 필터 입힌 정지화면 캡처가 없다,
+//    미리보기 셰이더는 화면에만 그린다). 장마다 토스트는 없다. "완료 n" = 저장 없이 편집기만 연다(원본 + 사진별 프리셋).
+//    필터는 **찍는 순간 고른 것**을 장마다 기억해 넘긴다(payload.presetKeys, iOS BurstCameraModel.shotPresets 와 같다).
+//    색감 = 0.7×슬라이더. 로그인 없이 쓴다.
+//  · 미리보기는 기본 카메라처럼 4:3 상자(가로 = 화면 너비, 위 컨트롤 아래 56dp) — 센서가 4:3 이라 잘리지 않고
+//    찍힌 사진과 같은 범위가 보인다. 위아래 검정에 필터 줄·셔터·탭바.
 //  · 필터 이용권(scratchpad filterpass_spec.md, 원격 스위치 filterPass.enabled): 잠겨 있으면 원본 말고 모든 칩에
 //    작은 자물쇠. 미리보기·찍기는 막지 않는다 — 막는 곳은 편집기 저장·공유뿐. 원본 아닌 필터를 처음 고르면 3일 무료 시작.
 // ============================================================================
@@ -57,7 +61,10 @@ function zoomText(z: number, active: boolean): string {
 }
 
 interface FocusMark { id: number; x: number; y: number; locked: boolean; adjusting: boolean; dim: boolean; touched: number }
-interface Shot { uri: string; width: number; height: number }
+/** 찍은 한 장 — 찍는 순간 고른 필터·색감을 같이 기억한다(나중에 칩을 바꿔도 이 장은 그대로). */
+interface Shot { uri: string; width: number; height: number; presetKey: string; fxAmount: number }
+/** 미리보기 상자 위 여백(위 안전영역 아래) — 기본 안드 카메라 느낌. */
+const PREVIEW_TOP = 56;
 
 export default function CameraFilterTab() {
   const insets = useSafeAreaInsets();
@@ -192,65 +199,82 @@ export default function CameraFilterTab() {
 
   // ── 촬영 ──
   const shooting = useRef(false);
+  const albumWarned = useRef(false);   // 사진첩 권한 없음 안내는 한 번만
   const capture = useCallback(async () => {
     if (shooting.current || shots.length >= MAX_SHOTS || !cam.current) return;
     shooting.current = true;
+    // 셔터 누른 순간의 필터·색감 — 찍히는 동안 칩을 바꿔도 이 장은 보던 그대로 기록된다
+    const presetKey = selected, fx = fxAmount;
     flashOv.value = withSequence(withTiming(0.85, { duration: 60 }), withTiming(0, { duration: 180 }));
     Haptics.selectionAsync().catch(() => {});
     try {
       const r = await cam.current.capture();
-      setShots((prev) => (prev.length >= MAX_SHOTS ? prev : [...prev, r]));
+      const shot: Shot = { ...r, presetKey, fxAmount: fx };
+      setShots((prev) => (prev.length >= MAX_SHOTS ? prev : [...prev, shot]));
+      // 찍으면 바로 사진첩에(오너 결정 2026-10-11) — 원본. 셔터를 막지 않게 기다리지 않고, 장마다 토스트도 없다.
+      // 권한이 없어 못 넣었을 때만 한 번 알린다.
+      void saveFileToAlbum(r.uri).then((res) => {
+        if ("ok" in res || albumWarned.current) return;
+        albumWarned.current = true;
+        toast(c21.noAlbumPermission);
+      });
     } catch (e) {
       if (__DEV__) console.log("[camera] capture 실패", String(e));
     } finally {
       shooting.current = false;
     }
-  }, [shots.length, flashOv]);
+  }, [shots.length, flashOv, selected, fxAmount, toast]);
 
-  /** 사진들을 편집기로 — 고른 필터 + 색감(0.7×슬라이더), iOS handlePickedPhotos 와 같은 규약. */
+  /**
+   * 사진들을 편집기로 — 사진별 프리셋(presetKeys, srcs 와 같은 순서) + 대표 프리셋(presetKey = 첫 장) +
+   * 색감(0.7×첫 장 슬라이더). iOS handlePickedPhotos/finishBurstCamera 와 같은 규약.
+   * 웹 편집기는 strength 를 한 값만 읽으므로 장마다 다른 색감까지는 못 넘긴다.
+   */
   const openEditor = useCallback(async (list: Shot[]) => {
     const picked = list.slice(0, 10);
     // 1~3장 = 4096(12MP 원본 그대로) · 4~10장 = 3072 (iOS 2026-09-30 화질 결정과 같다)
     const maxLong = picked.length <= 3 ? 4096 : 3072;
     const srcs: string[] = [];
+    const kept: Shot[] = [];
     for (const s of picked) {
       const long = Math.max(s.width || 0, s.height || 0);
       const actions = long > maxLong ? [{ resize: (s.width >= s.height ? { width: maxLong } : { height: maxLong }) }] : [];
       const r = await ImageManipulator.manipulateAsync(s.uri, actions, { compress: 0.95, format: ImageManipulator.SaveFormat.JPEG, base64: true });
-      if (r.base64) srcs.push(`data:image/jpeg;base64,${r.base64}`);
+      if (r.base64) { srcs.push(`data:image/jpeg;base64,${r.base64}`); kept.push(s); }
     }
     if (!srcs.length) return;
-    const payload: Record<string, unknown> = { mode: "edit", srcs, presetKey: selected, strength: 0.7 * fxAmount };
-    // 인플: 편집기(웹)엔 쓸 만한 얼굴 검출기가 없다 — 여기서 찾아 사진별로 넘긴다(미리보기와 같은 사각형 틀).
-    if (selected === "infl") {
-      payload.faces = await Promise.all(picked.map((s) => detectFaces(s.uri)));
+    const presetKeys = kept.map((s) => s.presetKey || "none");
+    const presetKey = presetKeys[0];
+    const payload: Record<string, unknown> = { mode: "edit", srcs, presetKey, presetKeys, strength: 0.7 * (kept[0].fxAmount ?? 1) };
+    // 인플: 편집기(웹)엔 쓸 만한 얼굴 검출기가 없다 — 한 장이라도 인플이면 여기서 찾아 사진별로 넘긴다(미리보기와 같은 사각형 틀).
+    if (presetKeys.some((k) => k === "infl")) {
+      payload.faces = await Promise.all(kept.map((s) => detectFaces(s.uri)));
     }
     setEditorPayload(payload);
-    router.push({ pathname: "/editor", params: { preset: selected } });
-  }, [selected, fxAmount]);
+    router.push({ pathname: "/editor", params: { preset: presetKey } });
+  }, []);
 
+  /** "완료 n" — 사진첩 저장은 찍을 때 이미 끝났다. 원본 + 사진별 프리셋으로 편집기만 연다(손보기는 선택). */
   const finish = useCallback(async () => {
     if (!shots.length || working) return;
     setWorking(true);
     try {
       const list = shots;
       setShots([]);
-      let saved = 0;
-      for (const s of list) { const r = await saveFileToAlbum(s.uri); if ("ok" in r) saved++; }
-      toast(saved === list.length ? c21.savedNToAlbum(saved) : c21.noAlbumPermission);
       await openEditor(list);
     } finally {
       setWorking(false);
     }
-  }, [shots, working, toast, openEditor]);
+  }, [shots, working, openEditor]);
 
   const pickFromAlbum = useCallback(async () => {
     const picked = await pickPhotos({ multiple: true, limit: 10 });
     if (!picked.length) return;
     setWorking(true);
-    try { await openEditor(picked.map((p) => ({ uri: p.uri, width: p.width ?? 0, height: p.height ?? 0 }))); }
+    // 앨범에서 고른 사진은 지금 고른 필터·색감으로
+    try { await openEditor(picked.map((p) => ({ uri: p.uri, width: p.width ?? 0, height: p.height ?? 0, presetKey: selected, fxAmount }))); }
     finally { setWorking(false); }
-  }, [openEditor]);
+  }, [openEditor, selected, fxAmount]);
 
   const toggleFav = useCallback((k: string) => {
     if (k === "none") return;
@@ -290,10 +314,15 @@ export default function CameraFilterTab() {
 
   const nearStop = ready?.lensStops.length ? ready.lensStops.reduce((a, b) => (Math.abs(b - zoom) < Math.abs(a - zoom) ? b : a)) : null;
 
+  // 미리보기 = 4:3 상자(가로 = 화면 너비). 네이티브는 상자를 꽉 채우는(aspect fill) 방식이고 센서 프레임도 4:3 이라
+  // 여기선 잘리는 게 없다 — 찍힌 사진과 같은 범위. 탭·핀치·초점 네모는 이 상자 기준 좌표(네이티브 toBuffer 도 자기 크기로 계산).
+  const previewH = Math.round(width * 4 / 3);
+  const previewTop = insets.top + PREVIEW_TOP;
+
   return (
     <View style={styles.root}>
       <GestureDetector gesture={gesture}>
-        <View style={StyleSheet.absoluteFill} collapsable={false}>
+        <View style={[styles.preview, { top: previewTop, width, height: previewH }]} collapsable={false}>
           <LiveCameraView
             ref={cam}
             style={StyleSheet.absoluteFill}
@@ -454,6 +483,7 @@ function FxSlider({ value, onChange, width }: { value: number; onChange: (v: num
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#000000" },
+  preview: { position: "absolute", left: 0, backgroundColor: "#000000" },
   center: { alignItems: "center", justifyContent: "center", gap: space.s3 },
   top: { position: "absolute", left: 0, right: 0, top: 0, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: space.screen },
   circleBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(0,0,0,0.35)", alignItems: "center", justifyContent: "center" },
