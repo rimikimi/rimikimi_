@@ -52,7 +52,8 @@ final class BurstCameraModel {
             HapticPlayer.selection()
         }
     }
-    private var delegate: ShotDelegate?
+    /// 처리 중인 촬영마다 델리게이트를 살려 둔다 — 하나만 들고 있으면 연달아 찍을 때 앞 장 델리게이트가 풀려 사진이 사라질 수 있다(애플 샘플과 같은 방식).
+    private var inFlight: [Int64: ShotDelegate] = [:]
 
     /// 카메라 탭 실시간 필터 — 있으면 미리보기 프레임을 여기로 흘려 필터를 입혀 그린다
     /// (`LiveFilterPreview`). 연속 촬영 화면(`BurstCameraView`)은 nil = 지금 그대로.
@@ -184,10 +185,14 @@ final class BurstCameraModel {
             if c.isVideoRotationAngleSupported(90) { c.videoRotationAngle = 90 }
             if c.isVideoMirroringSupported { c.automaticallyAdjustsVideoMirroring = false; c.isVideoMirrored = want }
         }
+        // 필터는 **셔터를 누른 순간** 값으로 고정한다 — 사진은 화질 우선 처리라 최대 1초 뒤에 도착하는데, 그때 읽으면
+        // 그 사이 바꾼 필터가 들어갔다(오너 2026-10-11 "필터 2개로 1장씩 찍었는데 하나로만 저장됐어").
+        let key = live?.presetKey ?? "none", fx = live?.fxAmount ?? 1
+        let id = s.uniqueID
         let d = ShotDelegate(wantMirror: want) { [weak self] image in
-            Task { @MainActor in self?.add(image) }
+            Task { @MainActor in self?.inFlight[id] = nil; self?.add(image, key: key, fx: fx) }
         }
-        delegate = d                 // 콜백이 올 때까지 살려 둔다
+        inFlight[id] = d             // 콜백이 올 때까지 살려 둔다
         output.capturePhoto(with: s, delegate: d)
         HapticPlayer.selection()
         flashOverlay = true
@@ -197,9 +202,8 @@ final class BurstCameraModel {
         }
     }
 
-    private func add(_ image: UIImage?) {
+    private func add(_ image: UIImage?, key: String, fx: Double) {
         guard let image else { return }
-        let key = live?.presetKey ?? "none", fx = live?.fxAmount ?? 1
         if savesOnCapture {
             // 카메라 탭: 원본은 남기지 않는다 — 필터본만 사진첩에(오너 2026-10-11 "원본은 없애고 필터 촬영본만").
             // 미리보기 GPU 와 겹치지 않게 낮은 우선순위 직렬 큐에서 한 장씩.
