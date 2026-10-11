@@ -1622,7 +1622,8 @@ const ES = {
   // 정방향 슬라이더 3개 + 3:4 맞춤 + 렌즈 — 그냥 쌓으면 사진이 화면 밖으로 밀려난다(실측) → 효과 탭처럼 높이 제한 + 스크롤
   fitCol: {
     padding: "8px 18px 4px", display: "flex", flexDirection: "column", gap: 10,
-    maxHeight: "34vh", overflowY: "auto", WebkitOverflowScrolling: "touch",
+    // ⚠️ overflowY:auto 만 두면 가로도 auto 가 돼서, 슬라이더를 끌면 패널 전체가 옆으로 끌려갔다(오너 2026-10-11).
+    maxHeight: "34vh", overflowY: "auto", overflowX: "hidden", minWidth: 0, touchAction: "pan-y", WebkitOverflowScrolling: "touch",
   },
   fitHint: { fontSize: 13.5, lineHeight: 1.5, color: "rgba(255,255,255,0.8)" },
   fitBtn: {
@@ -1774,7 +1775,7 @@ const PE_CSS = `
               transform var(--d-swap, 180ms) var(--ease-out, cubic-bezier(0.32,0.72,0,1));
 }
 @starting-style { .pe-toast { opacity: 0; transform: translate(-50%, -6px); } }
-.pe-range { -webkit-appearance: none; appearance: none; height: 28px; background: transparent; }
+.pe-range { -webkit-appearance: none; appearance: none; height: 28px; background: transparent; touch-action: none; max-width: 100%; box-sizing: border-box; }
 .pe-range::-webkit-slider-runnable-track {
   height: 3px; border-radius: 2px; background: rgba(255,255,255,.22);
 }
