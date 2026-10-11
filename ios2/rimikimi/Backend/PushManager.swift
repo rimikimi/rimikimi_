@@ -25,6 +25,10 @@ final class PushManager: NSObject {
     private(set) var pendingGalleryId: String?
 
     private var configured = false
+    /// 마지막 APNs 등록 실패 사유 — 진단용(서버 로그 pushDiag).
+    private var lastRegisterError: String?
+    /// 생성 요청에 같이 실어 보내는 진단 문자열의 사본(다른 액터에서 읽는다). 토큰이 없을 때 원인을 서버 로그로 본다.
+    nonisolated(unsafe) static var diagSnapshot = ""
     @ObservationIgnored private var topicSync: Task<Void, Never>?
 
     /// 앱 시작 — Firebase 만 설정한다. 권한은 묻지 않는다.
@@ -102,6 +106,27 @@ final class PushManager: NSObject {
         }
     }
 
+    /// 생성 요청 직전에 부른다 — 토큰이 아직 없으면 등록을 다시 걸고 최대 3초 기다린다.
+    /// (2026-10-11: TestFlight 60 에서 생성 두 건이 토큰 없이 들어와 완료 알림이 안 갔다. 실행 직후·업데이트 직후
+    ///  토큰이 아직 안 온 상태에서 바로 만들면 그대로 nil 이 실렸다.)
+    func tokenForRequest() async -> String? {
+        guard configured else { Self.diagSnapshot = "notConfigured"; return nil }
+        if let t = fcmToken { Self.diagSnapshot = "ok"; return t }
+        let status = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
+        authorization = status
+        guard status == .authorized || status == .provisional || status == .ephemeral else {
+            Self.diagSnapshot = "auth=\(status.rawValue)"; return nil
+        }
+        UIApplication.shared.registerForRemoteNotifications()
+        for _ in 0..<15 {
+            if let t = fcmToken { Self.diagSnapshot = "ok-late"; return t }
+            if Messaging.messaging().apnsToken != nil, let t = try? await Messaging.messaging().token() { fcmToken = t; Self.diagSnapshot = "ok-fetched"; return t }
+            try? await Task.sleep(nanoseconds: 200_000_000)
+        }
+        Self.diagSnapshot = "auth=\(status.rawValue) apns=\(Messaging.messaging().apnsToken != nil) err=\(lastRegisterError ?? "-")"
+        return nil
+    }
+
     /// `drop_p540` = UTC+9. 서버 규칙과 동일. 영어 기기는 `drop_p540_en`(서버가 영어 문구로 보냄).
     static var dropTopic: String { topic(ko: L.ko) }
     static func topic(ko: Bool) -> String {
@@ -132,6 +157,7 @@ final class PushManager: NSObject {
     }
 
     func didFailToRegister(_ error: Error) {
+        lastRegisterError = String(error.localizedDescription.prefix(60))
         AppLog.ui.error("push.register.failed \(error.localizedDescription, privacy: .public)")
     }
 }

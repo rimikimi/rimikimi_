@@ -256,7 +256,7 @@ final class RimikimiAPI {
             body["dressStyle"] = r.dressStyle
         }
         // 이 기기의 푸시 토큰 — 서버가 생성을 마치면 여기로 "완성됐어요"를 쏜다(1.x 와 동일).
-        if let pushToken { body["pushToken"] = pushToken }
+        if let pushToken { body["pushToken"] = pushToken } else { body["pushDiag"] = PushManager.diagSnapshot }
         body["lang"] = L.ko ? "ko" : "en" // 완료 알림 문구 언어
         // 페이스 프로필(1.x `loadProfileRefs`): 등록 사진을 참조로 같이 보낸다. 서버는 참조로만 쓰고 저장하지 않는다.
         // 매직부스(얼굴 미유지)는 1.x 와 같이 보내지 않는다.

@@ -349,13 +349,13 @@ async function getVertexToken(sa) {
 // fire-and-forget 이 아니라 응답 전에 await 한다(FCM 왕복 ~200ms).
 // 실패해도 생성 결과와는 무관하므로 삼킨다.
 // lang: 앱이 보낸 표시 언어("en" 이면 영어 알림). 구버전 앱은 안 보내므로 한국어 그대로.
-async function notifyDone(pushToken, count, conceptTitle, galleryId, lang, conceptId) {
+async function notifyDone(pushToken, count, conceptTitle, galleryId, lang, conceptId, pushDiag) {
   // 발송 결과를 반드시 남긴다. 이게 없어서 "완료 알림이 원격(FCM→APNs)으로 가는지,
   // 로컬 예비 경로로 뜨는지"를 신고를 받고도 판별할 수 없었다 (2026-08-25).
   //   · pushToken 없음  → 앱이 FCM 토큰을 못 얻었다는 뜻 (initPush 실패/행)
   //   · 실패: 401 third-party auth → Firebase 에 APNs 키가 없거나 무효
   if (!pushToken) {
-    console.log("[push] genDone: pushToken 없음 — 원격 미발송(웹이거나 앱 initPush 실패)");
+    console.log(`[push] genDone: pushToken 없음 — 원격 미발송(웹이거나 앱 initPush 실패)${pushDiag ? ` diag=${String(pushDiag).slice(0, 120)}` : ""}`);
     return;
   }
   try {
@@ -1004,6 +1004,8 @@ async function handleGenerate(req, res, hold) {
     // 이 기기의 FCM 토큰(네이티브만). 생성이 끝나면 여기로 "완성됐어요"를 쏜다.
     // 앱이 완전히 종료돼도 도착한다 — 로컬 알림으로는 안 되던 부분.
     pushToken,
+    // 앱이 토큰을 못 실었을 때 왜 못 실었는지(권한·등록 상태) — 로그에만 남긴다(2026-10-11 알림 미수신 추적).
+    pushDiag,
     // 앱 표시 언어("ko"|"en") — 완료 알림 문구 언어. 없으면 한국어(구버전 앱).
     lang,
     // 페이스 프로필 v1.1 — 같은 사람의 얼굴을 여러 각도로 담은 참조 사진 3~5장.
@@ -1168,7 +1170,7 @@ async function handleGenerate(req, res, hold) {
     }
     console.log(`[retouch] ${rt.w}x${rt.h} lang=${rt.plan.lang} edits=${rt.plan.edits.length} ` +
       `붙임 ${(rt.stats.pasted * 100).toFixed(1)}% credit=${useCredit}`);
-    await notifyDone(pushToken, 1, conceptTitle, galleryId, lang, conceptId);
+    await notifyDone(pushToken, 1, conceptTitle, galleryId, lang, conceptId, pushDiag);
     return res.status(200).json({
       mimeType: small.mime,
       base64: small.base64,
@@ -1944,7 +1946,7 @@ async function handleGenerate(req, res, hold) {
     if (images.length > 0 && !isGuest) {
       admin.from("usage_log").insert({ user_id: user.id }).then(() => {}).catch(() => {});
     }
-    await notifyDone(pushToken, images.length, conceptTitle, images[0]?.galleryId, lang, conceptId);
+    await notifyDone(pushToken, images.length, conceptTitle, images[0]?.galleryId, lang, conceptId, pushDiag);
     return res.status(200).json({
       images,
       requested: batchCount,
@@ -2166,7 +2168,7 @@ async function handleGenerate(req, res, hold) {
     proSampleAvailable = !(await getProSampleUsed(admin, user.id));
   }
 
-  await notifyDone(pushToken, 1, conceptTitle, galleryId, lang, conceptId);
+  await notifyDone(pushToken, 1, conceptTitle, galleryId, lang, conceptId, pushDiag);
   return res.status(200).json({
     mimeType: outMime,
     base64: outData,

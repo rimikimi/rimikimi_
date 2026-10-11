@@ -433,7 +433,8 @@ final class AppState {
             lastRequest = req
             HapticPlayer.commit()
             await push.askOnFirstGenerate()
-            generation.start(req, token: token, pushToken: push.fcmToken)
+            let pushToken = await push.tokenForRequest()
+            generation.start(req, token: token, pushToken: pushToken)
             // 홈으로 복귀 + 내 사진 진행 카드 (SPEC §3).
             galleryPath.removeAll()
             tab = .myPhotos
@@ -456,12 +457,13 @@ final class AppState {
             }
             HapticPlayer.commit()
             await push.askOnFirstGenerate()
+            let pushToken = await push.tokenForRequest()
             lastRequest = reqs.last
             // 동시에 다 던지면 서버(Vertex) 분당 한도에 걸린다 — 조금씩 띄워 보낸다(서버도 429 백오프가 있다).
             for (i, r) in reqs.enumerated() {
                 if i > 0 { try? await Task.sleep(nanoseconds: 700_000_000) }
                 // 결과는 내 사진 앨범에 쌓기만 — 한 장 끝날 때마다 결과 화면이 끼어들지 않게.
-                generation.start(r, token: token, pushToken: push.fcmToken, autoPresent: false)
+                generation.start(r, token: token, pushToken: pushToken, autoPresent: false)
             }
             clearCart()
             galleryPath.removeAll()
