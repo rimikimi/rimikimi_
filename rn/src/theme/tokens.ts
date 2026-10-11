@@ -29,62 +29,62 @@ export interface ColorTokens {
 }
 
 const LIGHT: ColorTokens = {
-  // 바탕 #FBF8F3
-  bg: "#FBF8F3",
+  // 바탕 #F2F2F7 — iOS systemGroupedBackground 와 같은 중립 회색(크림 톤 제거)
+  bg: "#F2F2F7",
   // 카드·행 #FFFFFF
   card: "#FFFFFF",
-  // 회색 채움(2차 버튼·칩) / 눌림
-  fill: "#F1ECE4",
-  fillPress: "#E4DCD0",
-  // 글자 — 2차 60%, 3차 30%
-  ink: "#231F20",
-  ink2: "rgba(35,31,32,0.60)",
-  ink3: "rgba(35,31,32,0.30)",
-  // 구분선
-  line: "rgba(35,31,32,0.14)",
+  // 회색 채움(2차 버튼·칩) / 눌림 — iOS systemFill 계열
+  fill: "rgba(120,120,128,0.12)",
+  fillPress: "rgba(120,120,128,0.20)",
+  // 글자 — label / secondaryLabel 60% / tertiaryLabel 30%
+  ink: "#000000",
+  ink2: "rgba(60,60,67,0.60)",
+  ink3: "rgba(60,60,67,0.30)",
+  // 구분선 — iOS separator
+  line: "rgba(60,60,67,0.29)",
   // 강조(탭 활성·주 버튼) + 연하게
   accent: "#E6403C",
   accentWeak: "rgba(230,64,60,0.12)",
   accentOn: "#FFFFFF",
   // 하트 4색 — 카테고리 칩 활성에만(테마 무관, SPEC 에 다크 변형 없음)
   hearts: ["#E6403C", "#F9C83C", "#60C9DE", "#8A5DA7"],
-  // 이미지 매트(썸네일 로딩 중 바탕). 채움색과 같은 톤.
-  mat: "#F1ECE4",
+  // 이미지 매트(썸네일 로딩 중 바탕) — systemGray5
+  mat: "#E5E5EA",
   // 시트 스크림
   scrim: "#000000",
   // 상태(오류 문구·삭제) — 강조색과 같이 쓴다(SPEC 에 별도 오류색 없음)
   danger: "#E6403C",
   // 카메라 버튼 바탕 = 잉크(오너 지시: "ink background")
   cameraBg: "#231F20",
-  glassFallback: "rgba(251,248,243,0.96)",
+  glassFallback: "rgba(242,242,247,0.96)",
 };
 
 const DARK: ColorTokens = {
-  // 바탕 #17161A
-  bg: "#17161A",
-  // 카드·행 #201E23
-  card: "#201E23",
-  // 회색 채움 / 눌림 — 다크 카드보다 한 단 밝게
-  fill: "#2A282E",
-  fillPress: "#35323A",
-  // 글자 — 흰 바탕 잉크를 뒤집는다. 2차 60%, 3차 30% 는 그대로 유지.
-  ink: "#F4F2EE",
-  ink2: "rgba(244,242,238,0.60)",
-  ink3: "rgba(244,242,238,0.30)",
-  // 구분선
-  line: "rgba(244,242,238,0.14)",
+  // 바탕 #000000 — iOS 다크 systemGroupedBackground(순검정)
+  bg: "#000000",
+  // 카드·행 #1C1C1E — secondarySystemGroupedBackground
+  card: "#1C1C1E",
+  // 회색 채움 / 눌림 — 다크 systemFill 계열
+  fill: "rgba(118,118,128,0.24)",
+  fillPress: "rgba(118,118,128,0.32)",
+  // 글자 — label / secondaryLabel 60% / tertiaryLabel 30%
+  ink: "#FFFFFF",
+  ink2: "rgba(235,235,245,0.60)",
+  ink3: "rgba(235,235,245,0.30)",
+  // 구분선 — 다크 separator
+  line: "rgba(84,84,88,0.60)",
   // 강조는 테마 무관(브랜드 색)
   accent: "#E6403C",
   accentWeak: "rgba(230,64,60,0.20)",
   accentOn: "#FFFFFF",
   hearts: ["#E6403C", "#F9C83C", "#60C9DE", "#8A5DA7"],
-  // 이미지 매트 — 다크 채움과 같은 톤
-  mat: "#2A282E",
+  // 이미지 매트 — 다크 systemGray5
+  mat: "#2C2C2E",
   scrim: "#000000",
   danger: "#E6403C",
   // 카메라 버튼 바탕 — 다크에서도 잉크(어두운 배경 위 카메라 원은 그대로 검정 계열)
   cameraBg: "#0E0D10",
-  glassFallback: "rgba(23,22,26,0.92)",
+  glassFallback: "rgba(0,0,0,0.96)",
 };
 
 /** 다른 파일에서 직접 재할당하지 않는다 — `applyScheme()` 만 값을 바꾼다. */
@@ -147,14 +147,15 @@ export const space = {
   screen: 16,
 } as const;
 
-// 타입: Title2 22/700 · Headline 17/600 · Body 17 · Callout 15 · Footnote 13/500 · Caption 11/600
-// size + lineHeight 는 한 세트로만 움직인다.
+// 타입: 시스템 텍스트 스타일 그대로 — title2(섹션 제목)=iOS .title3 bold 20/700 · Headline 17/600 ·
+// Body 17 · Callout 15 · Footnote 13/500 · Caption 11/600. size + lineHeight 는 한 세트로만 움직인다.
+// 음수 자간은 쓰지 않는다(시스템 글꼴이 알아서 잡는다).
 export const type = {
-  title2: { fontSize: 22, lineHeight: 28, letterSpacing: -0.26 },
-  headline: { fontSize: 17, lineHeight: 22, letterSpacing: -0.41 },
-  body: { fontSize: 17, lineHeight: 22, letterSpacing: -0.41 },
-  callout: { fontSize: 15, lineHeight: 20, letterSpacing: -0.23 },
-  footnote: { fontSize: 13, lineHeight: 18, letterSpacing: -0.08 },
+  title2: { fontSize: 20, lineHeight: 25, letterSpacing: 0 },
+  headline: { fontSize: 17, lineHeight: 22, letterSpacing: 0 },
+  body: { fontSize: 17, lineHeight: 22, letterSpacing: 0 },
+  callout: { fontSize: 15, lineHeight: 20, letterSpacing: 0 },
+  footnote: { fontSize: 13, lineHeight: 18, letterSpacing: 0 },
   caption: { fontSize: 11, lineHeight: 13, letterSpacing: 0.06 },
 } as const;
 

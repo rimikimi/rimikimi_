@@ -99,7 +99,7 @@ export function FilterPassSheet({ open, onClose, onUnlocked }: { open: boolean; 
               <View style={{ flex: 1, gap: 2 }}>
                 <View style={styles.titleRow}>
                   <Text size="headline">{PLAN_LABEL[plan]()}</Text>
-                  {best ? <View style={styles.badge}><Text size="caption" tone="onAccent">{c21.fpBest}</Text></View> : null}
+                  {best ? <View style={styles.badge}><Text size="caption" tone="accent">{c21.fpBest}</Text></View> : null}
                 </View>
                 <Text size="footnote" tone="muted">{PLAN_NOTE[plan]()}</Text>
               </View>
@@ -148,7 +148,7 @@ const styles = themedStyles(() => StyleSheet.create({
   },
   rowBest: { borderWidth: 2, borderColor: color.accent },
   titleRow: { flexDirection: "row", alignItems: "center", gap: space.s2 },
-  badge: { backgroundColor: color.accent, borderRadius: radius.pill, paddingHorizontal: space.s2, paddingVertical: 2 },
+  badge: { backgroundColor: color.accentWeak, borderRadius: radius.pill, paddingHorizontal: space.s2, paddingVertical: 2 },
   trail: { minWidth: 72, alignItems: "flex-end" },
   links: { flexDirection: "row", justifyContent: "center", alignItems: "center", gap: space.s2 },
   link: { textDecorationLine: "underline" },

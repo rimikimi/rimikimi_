@@ -70,7 +70,7 @@ export function ConceptRail({ title, items, big, onMore, isNew, cardWidth, gap }
   );
 }
 
-/** NEW — 빨간 작은 배지(iOS NewBadge: 11/700, 모서리 5, 강조색 배경). */
+/** NEW — 작은 배지(iOS NewBadge: 11/700, 연한 강조 틴트 위 강조색 글자 — 빨간 면 아님). */
 export function NewBadge() {
   return (
     <View style={styles.newBadge} accessibilityLabel="NEW">
@@ -83,7 +83,7 @@ const styles = themedStyles(() => StyleSheet.create({
   rail: { gap: space.s3 },
   railHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: space.screen },
   titleRow: { flexDirection: "row", alignItems: "center", gap: space.s2 },
-  newBadge: { backgroundColor: color.accent, borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2 },
-  newText: { color: "#FFFFFF", fontSize: 11, lineHeight: 14, letterSpacing: 0.4 },
+  newBadge: { backgroundColor: color.accentWeak, borderRadius: radius.pill, paddingHorizontal: 6, paddingVertical: 2 },
+  newText: { color: color.accent, fontSize: 11, lineHeight: 14, letterSpacing: 0.4 },
   railRow: { paddingHorizontal: space.screen, gap: space.s3 },
 }));

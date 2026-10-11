@@ -41,8 +41,8 @@ export function PackRows({ flow, limit, onBought }: { flow: StoreFlow; limit?: n
                 <View style={{ gap: 2 }}>
                   <View style={styles.titleRow}>
                     <Text size="headline">{copy.store.count(p.count)}</Text>
-                    {firstRc ? <View style={styles.badge}><Text size="caption" tone="onAccent">{copy.store.badge.firstDiscount}</Text></View>
-                      : p.badge ? <View style={styles.badge}><Text size="caption" tone="onAccent">{copy.store.badge[p.badge]}</Text></View> : null}
+                    {firstRc ? <View style={styles.badge}><Text size="caption" tone="accent">{copy.store.badge.firstDiscount}</Text></View>
+                      : p.badge ? <View style={styles.badge}><Text size="caption" tone="accent">{copy.store.badge[p.badge]}</Text></View> : null}
                   </View>
                   <Text size="footnote" tone="muted">{copy.store.per(won(Math.round(krw / p.count)))}</Text>
                 </View>
@@ -51,7 +51,7 @@ export function PackRows({ flow, limit, onBought }: { flow: StoreFlow; limit?: n
                 {busy ? <Spinner size={20} color={color.accent} /> : (
                   <>
                     {firstRc ? <Text size="footnote" tone="subtle" tabular style={styles.strike}>{regularRc?.priceString || won(p.krw)}</Text> : null}
-                    <Text size="callout" weight="semibold" tabular>{rc?.priceString || won(krw)}</Text>
+                    <View style={styles.price}><Text size="callout" weight="semibold" tone="accent" tabular>{rc?.priceString || won(krw)}</Text></View>
                   </>
                 )}
               </View>
@@ -90,13 +90,13 @@ export function SubRows({ flow, only, onBought }: { flow: StoreFlow; only?: stri
               <View style={{ gap: 2 }}>
                 <View style={styles.titleRow}>
                   <Text size="headline">{planLabel(s)}</Text>
-                  {s.badge ? <View style={styles.badge}><Text size="caption" tone="onAccent">{planBadge(s)}</Text></View> : null}
+                  {s.badge ? <View style={styles.badge}><Text size="caption" tone="accent">{planBadge(s)}</Text></View> : null}
                 </View>
                 <Text size="footnote" tone="muted">{copy.ui.subCredits(s.credits, s.period)}</Text>
                 {intro ? <Text size="footnote" tone="accent">{copy.store.introLine(s.period, intro, rc?.priceString || won(s.krw))}</Text> : null}
               </View>
               <View style={styles.trail}>
-                {busy ? <Spinner size={20} color={color.accent} /> : <Text size="callout" weight="semibold" tabular>{intro || rc?.priceString || won(s.krw)}</Text>}
+                {busy ? <Spinner size={20} color={color.accent} /> : <View style={styles.price}><Text size="callout" weight="semibold" tone="accent" tabular>{intro || rc?.priceString || won(s.krw)}</Text></View>}
               </View>
             </Pressable>
           </View>
@@ -122,7 +122,9 @@ const styles = themedStyles(() => StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", minHeight: 62, paddingHorizontal: space.s4, paddingVertical: space.s3 },
   lead: { flexDirection: "row", alignItems: "center", gap: space.s3 },
   titleRow: { flexDirection: "row", alignItems: "center", gap: space.s2 },
-  badge: { backgroundColor: color.accent, borderRadius: radius.pill, paddingHorizontal: space.s2, paddingVertical: 2 },
+  // 배지·가격은 빨간 면이 아니라 빨간 글자(앱스토어 "받기" 알약처럼) — 연한 틴트 / 회색 채움 위에 강조색 글자
+  badge: { backgroundColor: color.accentWeak, borderRadius: radius.pill, paddingHorizontal: space.s2, paddingVertical: 2 },
+  price: { height: 30, paddingHorizontal: space.s3, borderRadius: radius.pill, backgroundColor: color.fill, alignItems: "center", justifyContent: "center" },
   trail: { minWidth: 72, alignItems: "flex-end" },
   sep: { height: StyleSheet.hairlineWidth, backgroundColor: color.line, marginLeft: space.s4 },
   subHead: { padding: space.s4, gap: 2 },

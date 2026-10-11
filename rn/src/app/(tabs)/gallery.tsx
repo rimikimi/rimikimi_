@@ -128,14 +128,14 @@ function FeatureCards() {
       onPress={() => { if (id != null) router.push({ pathname: "/concept/[id]", params: { id: String(id) } }); }}
       style={({ pressed }) => [styles.feature, { backgroundColor: bg, opacity: id == null ? 0.5 : 1, transform: [{ scale: pressed ? 0.97 : 1 }] }]}
     >
-      <Icon size={20} color={color.ink} />
-      <Text size="body" weight="semibold">{title}</Text>
+      <Icon size={20} color={color.accent} />
+      <Text size="callout" weight="semibold">{title}</Text>
     </Pressable>
   );
   return (
     <View style={styles.features}>
-      {card(c21.featureRetouch, IconPencilLine, color.accentWeak, retouch?.id)}
-      {card(c21.featureRestore, IconClockBack, color.fill, restore?.id)}
+      {card(c21.featureRetouch, IconPencilLine, color.card, retouch?.id)}
+      {card(c21.featureRestore, IconClockBack, color.card, restore?.id)}
     </View>
   );
 }
