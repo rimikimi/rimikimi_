@@ -23,6 +23,7 @@ import { CreditSheet } from "@/ui/CreditSheet";
 import { Text } from "@/ui/Text";
 import { envProblem } from "@/lib/env";
 import { applyScheme, color, space } from "@/theme/tokens";
+import { loadAppearancePref, useAppearancePref } from "@/lib/appearance";
 import { transitions } from "@/theme/motion";
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
@@ -49,8 +50,12 @@ export default function RootLayout() {
   // useColorScheme 이 바뀌면 RootLayout 이 다시 렌더되고, applyScheme 이 `color` 값을 in-place
   // 로 바꾼 뒤 그 아래 전체 트리가(메모이제이션 없음) 새 값으로 다시 그려진다 — 화면마다
   // 하드코딩 없이 tokens.ts 하나로만 나간다.
+  // 설정의 "화면 모드"(lib/appearance.ts): 시스템 설정이면 기기 값, 아니면 고른 값.
+  // 라이트/다크를 고르면 Appearance.setColorScheme 로 네이티브도 덮어써서 useColorScheme 도 그 값이 된다.
+  const appearancePref = useAppearancePref();
   const osScheme = useColorScheme();
-  applyScheme(osScheme);
+  applyScheme(appearancePref === "system" ? osScheme : appearancePref);
+  useEffect(() => { void loadAppearancePref(); }, []);
 
   useEffect(() => {
     const t = setTimeout(() => { SplashScreen.hideAsync().catch(() => undefined); }, BOOT_SPLASH_CAP_MS);

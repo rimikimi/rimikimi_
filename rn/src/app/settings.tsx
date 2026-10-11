@@ -23,6 +23,7 @@ import { copy } from "@/lib/copy";
 import { c21 } from "@/lib/copy21";
 import { getStartTab, setStartTab, useApp21 } from "@/lib/app21";
 import { useFilterAccess } from "@/lib/iap";
+import { setAppearancePref, useAppearancePref, type AppearancePref } from "@/lib/appearance";
 import { FilterPassSheet } from "@/ui/FilterPassSheet";
 import { color, radius, space, themedStyles } from "@/theme/tokens";
 
@@ -121,6 +122,28 @@ function StartTabRow() {
         {(["make", "camera"] as const).map((k) => (
           <Pressable key={k} accessibilityRole="button" accessibilityState={{ selected: v === k }} onPress={() => choose(k)} style={[styles.segItem, v === k && styles.segOn]}>
             <Text size="footnote" weight={v === k ? "semibold" : "medium"} style={{ color: v === k ? color.ink : color.ink2 }}>{k === "make" ? c21.startMake : c21.startCamera}</Text>
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+/** 화면 모드 — 시스템 설정 / 라이트 / 다크(iOS 설정의 같은 행). 고르면 재시작 없이 바로 바뀐다. */
+function AppearanceRow() {
+  const v = useAppearancePref();
+  const label: Record<AppearancePref, string> = { system: c21.appearanceSystem, light: c21.appearanceLight, dark: c21.appearanceDark };
+  const choose = (next: AppearancePref) => {
+    setAppearancePref(next);
+    Haptics.selectionAsync().catch(() => undefined);
+  };
+  return (
+    <View style={styles.startRow}>
+      <Text size="body" style={{ flex: 1 }}>{c21.appearance}</Text>
+      <View style={styles.seg}>
+        {(["system", "light", "dark"] as const).map((k) => (
+          <Pressable key={k} accessibilityRole="button" accessibilityState={{ selected: v === k }} onPress={() => choose(k)} style={[styles.segItem, v === k && styles.segOn]}>
+            <Text size="footnote" weight={v === k ? "semibold" : "medium"} style={{ color: v === k ? color.ink : color.ink2 }}>{label[k]}</Text>
           </Pressable>
         ))}
       </View>
@@ -263,9 +286,11 @@ export default function SettingsScreen() {
       {/* 초대 */}
       {session ? <InviteSection code={quota?.referralCode} token={token} onClaimed={refresh} /> : null}
 
-      {/* 앱을 켜면 먼저 보일 화면 (2.1) */}
+      {/* 앱을 켜면 먼저 보일 화면 (2.1) · 화면 모드 */}
       <Card padded={false}>
         <StartTabRow />
+        <Sep />
+        <AppearanceRow />
       </Card>
 
       {/* 알림 */}

@@ -115,6 +115,10 @@ export const c21 = {
   get startScreen() { return t("앱을 켜면 먼저 보일 화면", "Opens to"); },
   get startMake() { return t("만들기", "Create"); },
   get startCamera() { return t("카메라·필터", "Camera"); },
+  get appearance() { return t("화면 모드", "Appearance"); },
+  get appearanceSystem() { return t("시스템 설정", "System"); },
+  get appearanceLight() { return t("라이트", "Light"); },
+  get appearanceDark() { return t("다크", "Dark"); },
   // 목적 화면
   get filter() { return t("필터", "Filter"); },
   get groomAdded() { return t("신랑 사진 추가됨", "Groom added"); },

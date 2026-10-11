@@ -53,10 +53,12 @@ struct ConceptBrowserView: View {
                         browseTop(pagerHeight: nil)
                         if let current {
                             // 브루클린 룩·조세핀 드레스는 옵션 화면이 없다 — 여기서 바로 담는다(길게 누르기와 같다).
-                            Button { _ = app.toggleCart(current) } label: {
-                                Text(app.isInCart(current) ? Copy.a11yRemoveFromCart : L.t("담기", "Pick"))
+                            let inCart = app.isInCart(current)
+                            Button { withAnimation(Motion.easeOut()) { _ = app.toggleCart(current) } } label: {
+                                Text((inCart ? Copy.a11yRemoveFromCart : L.t("담기", "Pick"))
+                                     + (app.cart.isEmpty ? "" : L.t(" · 담은 것 \(app.cart.count)", " · \(app.cart.count) picked")))
                             }
-                            .buttonStyle(PrimaryButtonStyle(isDisabled: false))
+                            .buttonStyle(inCart ? AnyButtonStyle(SecondaryButtonStyle()) : AnyButtonStyle(PrimaryButtonStyle(isDisabled: false)))
                             .padding(.horizontal, Spacing.page)
                             .padding(.bottom, Spacing.s4)
                         }
@@ -96,6 +98,12 @@ struct ConceptBrowserView: View {
                         RemoteImage(url: c.largeURL, cornerRadius: 0, fallback: c.thumbURL)
                             .photoRatio()
                     }
+                    // 격자와 같은 규칙(오너 2026-10-11): 담은 건 순번 배지, 길게 누르면 담기/빼기.
+                    .overlay(alignment: .topLeading) { cartBadge(c, size: 30).padding(Spacing.s3) }
+                    .simultaneousGesture(LongPressGesture(minimumDuration: 0.35).onEnded { _ in
+                        guard !zoomedIn else { return }
+                        withAnimation(Motion.easeOut()) { _ = app.toggleCart(c, longPress: true) }
+                    })
                     .tag(Optional(c.id))
                 }
             }
@@ -216,11 +224,29 @@ struct ConceptBrowserView: View {
                     RoundedRectangle(cornerRadius: Radius.button - 4, style: .continuous)
                         .strokeBorder(selected ? Color.accent : Color.clear, lineWidth: 2)
                 }
+                .overlay(alignment: .topLeading) { cartBadge(c, size: 18).padding(3) }
             // 안 고른 칸을 흐리게 하지 않는다 — 사진 앱도 안 그러고, 반투명은 이 앱에서
             // 이미 한 번 오해를 샀다(테두리만으로 충분히 구분된다).
         }
         .buttonStyle(PressScaleButtonStyle())
+        .simultaneousGesture(LongPressGesture(minimumDuration: 0.35).onEnded { _ in
+            withAnimation(Motion.easeOut()) { _ = app.toggleCart(c, longPress: true) }
+        })
         .id(c.id)
+    }
+
+    /// 담은 컨셉의 순번(1, 2, …) — 격자 칸과 같은 빨간 원. 안 담았으면 아무것도 안 그린다.
+    @ViewBuilder
+    private func cartBadge(_ c: Concept, size: CGFloat) -> some View {
+        if let i = app.cartIndex(c) {
+            Text("\(i + 1)")
+                .font(.system(size: size * 0.55, weight: .bold)).foregroundStyle(.white)
+                .frame(minWidth: size, minHeight: size)
+                .background(Color.accent, in: Circle())
+                .overlay(Circle().stroke(.white, lineWidth: size > 20 ? 2 : 1.5))
+                .transition(.scale(scale: 0.6).combined(with: .opacity))
+                .accessibilityLabel(L.t("\(i + 1)번째로 담음", "Picked #\(i + 1)"))
+        }
     }
 
     private func jump(to id: String) {

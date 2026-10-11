@@ -67,3 +67,10 @@ struct RowButtonStyle: ButtonStyle {
             .contentShape(Rectangle())
     }
 }
+
+/// 조건에 따라 다른 버튼 스타일을 쓸 때(담기 = 주 버튼, 빼기 = 보조).
+struct AnyButtonStyle: ButtonStyle {
+    private let make: (Configuration) -> AnyView
+    init<S: ButtonStyle>(_ style: S) { make = { AnyView(style.makeBody(configuration: $0)) } }
+    func makeBody(configuration: Configuration) -> some View { make(configuration) }
+}

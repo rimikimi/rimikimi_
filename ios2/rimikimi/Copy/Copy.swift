@@ -474,6 +474,10 @@ enum Copy {
     /// 첫 달 무료 체험 자격이 있을 때 월간 행 아래 줄(3.1.2 — 기간·이후 가격·자동 갱신을 한 줄에).
     static func filterPassIntroLine(_ price: String) -> String { L.t("첫 1개월 무료 · 이후 월 \(price) 자동 갱신", "First month free · then \(price)/month, auto-renews") }
     static var filterPassStartFree: String { L.t("첫 달 0원으로 시작", "Start with first month free") }
+    static var appearance: String { L.t("화면 모드", "Appearance") }
+    static func appearanceOption(_ a: AppAppearance) -> String {
+        switch a { case .system: L.t("시스템 설정", "System"); case .light: L.t("라이트", "Light"); case .dark: L.t("다크", "Dark") }
+    }
     static var settingsCameraPass: String { L.t("카메라 이용권", "Camera Pass") }
     static var filterPassActiveShort: String { L.t("이용 중", "Active") }
     static var filterPassUnlocked: String { L.t("모든 필터가 열렸어요", "Every filter is unlocked") }

@@ -53,6 +53,7 @@ struct ProfileView: View {
                 // 언어 — 로그인과 상관없이 보인다(2026-09-30 오너 지시). 기본은 기기 언어.
                 CardGroup {
                     StartScreenRow()
+                    AppearanceRow()
                     LanguageRow()
                 }
                 // 카메라 이용권 — 심사관·사용자가 결제 시트와 구매 복원에 닿는 자리(3일 무료 중엔 카메라에서 안 뜨므로).
@@ -181,6 +182,49 @@ struct NotificationToggleRow: View {
 
 /// "언어" 행 — 시스템 따라가기(기본) · 한국어 · English. 고르면 앱 문구가 바로 바뀐다(`L`, L10n.swift).
 /// 메뉴 안 Picker 라 지금 고른 항목에 체크 표시가 붙는다.
+/// 화면 모드 — 시스템 설정 따르기 / 라이트 / 다크(오너 2026-10-11 "다크·라이트 사용자 선택이 안 되네").
+/// 창 전체의 `overrideUserInterfaceStyle` 로 건다 — 시트·전체화면·웹뷰(편집기)·알림창까지 한 번에 따라온다.
+enum AppAppearance: String, CaseIterable, Identifiable {
+    case system, light, dark
+    var id: String { rawValue }
+    static let key = "appearance.v1"
+    static var current: AppAppearance { AppAppearance(rawValue: UserDefaults.standard.string(forKey: key) ?? "") ?? .system }
+    var style: UIUserInterfaceStyle { switch self { case .system: .unspecified; case .light: .light; case .dark: .dark } }
+    @MainActor static func apply(_ a: AppAppearance = current) {
+        for scene in UIApplication.shared.connectedScenes {
+            for w in (scene as? UIWindowScene)?.windows ?? [] { w.overrideUserInterfaceStyle = a.style }
+        }
+    }
+}
+
+struct AppearanceRow: View {
+    @AppStorage(AppAppearance.key) private var raw = AppAppearance.system.rawValue
+    private var value: AppAppearance { AppAppearance(rawValue: raw) ?? .system }
+
+    var body: some View {
+        Menu {
+            Picker(Copy.appearance, selection: Binding(get: { value }, set: { v in
+                raw = v.rawValue; AppAppearance.apply(v); HapticPlayer.selection()
+            })) {
+                ForEach(AppAppearance.allCases) { Text(Copy.appearanceOption($0)).tag($0) }
+            }
+        } label: {
+            HStack(spacing: Spacing.s3) {
+                Image(systemName: "circle.lefthalf.filled").font(.system(size: 16, weight: .medium)).foregroundStyle(Color.ink2).frame(width: 24)
+                Text(Copy.appearance).font(AppFont.body).foregroundStyle(Color.ink)
+                Spacer()
+                Text(Copy.appearanceOption(value)).font(AppFont.callout).foregroundStyle(Color.ink2)
+                Image(systemName: "chevron.up.chevron.down").font(.system(size: 12, weight: .semibold)).foregroundStyle(Color.ink3)
+            }
+            .padding(.horizontal, Spacing.s4)
+            .frame(minHeight: ControlHeight.row)
+            .contentShape(Rectangle())
+        }
+        .menuStyle(.button)
+        .buttonStyle(RowButtonStyle())
+    }
+}
+
 struct LanguageRow: View {
     @Environment(AppState.self) private var app
 

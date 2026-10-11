@@ -14,6 +14,7 @@ struct RimikimiApp: App {
                 .tint(Color.accent)
                 .preferredColorScheme(nil)
                 .task {
+                    AppAppearance.apply()   // 사용자가 고른 화면 모드(라이트/다크/시스템)
                     // 실행 시 팝업 없음 — Firebase 설정만, 권한은 프로필 토글에서.
                     app.push.configureAtLaunch()
                     // 전면광고 SDK 초기화 + 첫 광고 미리 로드. 팝업은 안 뜬다(ATT 는 TrackingPrompt 소유).
