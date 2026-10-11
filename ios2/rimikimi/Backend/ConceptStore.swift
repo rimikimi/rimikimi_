@@ -41,7 +41,10 @@ final class ConceptStore {
     }
 
     /// 증명사진은 목록에서 뺀다(웹과 동일 — 별도 앱으로 안내하던 항목).
-    var pool: [Concept] { concepts.filter { !$0.isIdPhoto } }
+    /// 목록·앨범·추천에 쓰는 컨셉. 증명사진(브루클린) 제외, 그리고 홈 위 카드·칸으로 바로 여는 기능
+    /// (말로 고치기·옛날 사진 복원·드레스룸)은 매직 부스 앨범에서 뺀다(오너 2026-10-11). 이 셋은 카드가
+    /// `concepts` 에서 직접 찾으므로 여기서 빠져도 그대로 열린다.
+    var pool: [Concept] { concepts.filter { !$0.isIdPhoto && !$0.isHomeShortcut } }
 
     var categories: [Category] {
         var counts: [String: Int] = [:]

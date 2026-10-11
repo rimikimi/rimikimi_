@@ -85,6 +85,8 @@ struct Concept: Identifiable, Hashable, Decodable {
     var isRestore: Bool { id == "408" || title.range(of: "복원|restor", options: [.regularExpression, .caseInsensitive]) != nil }
     /// 기능 컨셉(매직부스·증명사진·인생네컷)은 "새로 나왔어요" 에서 뺀다.
     var isFeature: Bool { isArt || isIdPhoto || isFourcut }
+    /// 홈 위 카드·칸에서 바로 여는 기능 — 앨범·목록에는 안 띄운다.
+    var isHomeShortcut: Bool { isRetouch || isRestore || isDressroom }
     /// 셀카 한 장만으로 만들 수 있어 여러 장 담기에 넣을 수 있는지 — 상대 사진·옷 사진·컷 수·글 입력이 필요한 컨셉은 옵션 화면으로.
     var isBatchable: Bool { !isCouple && !isDressroom && !isFourcut && !isArtTransform && !isRetouch }
 

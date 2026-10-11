@@ -56,9 +56,11 @@ function activeSeasonCats(seasons) {
   return (seasons || []).filter((s) => s && s.start <= kst && kst <= s.end).map((s) => s.category);
 }
 // 앨범 타일: 최근에 새 컨셉이 들어온 카테고리가 앞(rows) → 활성 시즌은 맨 앞. (즐겨찾기 앨범은 웹에 없다)
+// 홈 위 카드·칸으로 바로 여는 기능(말로 고치기·옛날 사진 복원·드레스룸)은 앨범·목록에서 뺀다(앱 isHomeShortcut, 2026-10-11)
+export const isHomeShortcut = (c) => c.mode === "retouch" || c.mode === "dressroom" || Number(c.id) === 408 || /복원|restor/i.test(c.title || "");
 export function albumTiles(pool, seasons) {
   const groups = new Map();
-  for (const c of pool) for (const cat of cats(c)) {
+  for (const c of pool) if (!isHomeShortcut(c)) for (const cat of cats(c)) {
     const g = groups.get(cat) || { items: [], latest: -Infinity };
     g.items.push(c);
     g.latest = Math.max(g.latest, sortKey(c));
@@ -254,7 +256,7 @@ export function PurposePage({
   const current = segment || segments[0]?.[0] || "";
 
   const items = useMemo(() => {
-    if (view.kind === "album") return conceptsIn(pool, view.name).sort(byNewest);
+    if (view.kind === "album") return conceptsIn(pool, view.name).filter((c) => !isHomeShortcut(c)).sort(byNewest);
     if (purpose === "profile") return studioLooks(catalog, current);
     if (purpose === "wedding") return current === "main" || current === "after" ? dressList(dresses, current, studio.filter) : conceptsFor(pool, "wedding", isFeature);
     if (purpose === "concept") return current === "today" ? pool.filter((c) => !isFeature(c)).sort(byNewest).slice(0, 12) : conceptsIn(pool, current).sort(byNewest);

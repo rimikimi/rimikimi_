@@ -153,7 +153,9 @@ export function conceptThumb(c: Concept): string { return c.thumb || thumbUrl(c.
 /** 크게 보이는 자리(1200px). 없으면 RemoteImage 쪽에서 썸네일로 물러선다. */
 export function conceptLarge(c: Concept): string { return c.thumb || `${getEnv().apiBase}/large/${c.id}.webp`; }
 /** 증명사진은 목록에서 뺀다(iOS `ConceptStore.pool`, 웹과 동일). */
-export function conceptPool(all: Concept[]): Concept[] { return all.filter((c) => !isIdPhoto(c)); }
+// 홈 위 카드·칸으로 바로 여는 기능(말로 고치기·옛날 사진 복원·드레스룸)은 앨범·목록에서 뺀다(iOS isHomeShortcut, 오너 2026-10-11)
+export function isHomeShortcut(c: Concept): boolean { return isRetouch(c) || isRestoreConcept(c) || isDressroom(c); }
+export function conceptPool(all: Concept[]): Concept[] { return all.filter((c) => !isIdPhoto(c) && !isHomeShortcut(c)); }
 
 export function isFourcut(c?: Concept | null): boolean { return !!c && (c.mode === "fourcut" || /인생네컷/.test(c.title || "")); }
 export function isRestoreConcept(c?: Concept | null): boolean { return !!c && (Number(c.id) === 408 || /복원|restor/i.test(c.title || "")); }
