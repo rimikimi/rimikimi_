@@ -408,6 +408,7 @@ enum Copy {
     static var restoring: String { L.t("복원 중…", "Restoring…") }
     static var restore: String { L.t("구매 복원", "Restore purchases") }
     static var restoreDone: String { L.t("구매 내역을 확인했어요.", "Checked your purchases.") }
+    static var storeLegalCredits: String { L.t("구매는 App Store 계정으로 안전하게 결제돼요.", "Purchases are billed securely through your App Store account.") }
     static var storeLegal: String { L.t("구매는 App Store 계정으로 안전하게 결제돼요. 구독은 기간 종료 24시간 전까지 해지하지 않으면 자동 갱신돼요.", "Purchases are billed securely through your App Store account. Subscriptions renew automatically unless canceled at least 24 hours before the end of the current period.") }
     static func purchaseDone(_ n: Int) -> String { L.ko ? "🎉 +\(n) 크레딧 충전 완료!" : "🎉 +\(plural(n, "credit", "credits")) added!" }
     static var purchaseTestNoCredit: String { L.t("테스트 결제라 크레딧은 적립되지 않았어요.", "This was a test purchase, so no credits were added.") }

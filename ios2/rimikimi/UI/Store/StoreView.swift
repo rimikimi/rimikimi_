@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// 프로필 > 스토어 — 크레딧 팩 3(첫 구매면 30% 할인 팩) + rimikimi+ 구독 3(첫 결제 할인 표시). 가격은 스토어가 준 값, 없으면 KRW 정가.
+/// 프로필 > 스토어 — 크레딧 팩(첫 구매면 할인 팩). 가격은 스토어가 준 값, 없으면 KRW 정가.
+/// rimikimi+ 구독은 판매 중단(오너 2026-10-11 "AI 이미지 생성은 크레딧으로만") — 구매 복원은 남긴다.
 struct StoreView: View {
     @Environment(AppState.self) private var app
     @State private var busyID: String?
@@ -24,14 +25,6 @@ struct StoreView: View {
                 }
                 .padding(.horizontal, Spacing.page)
 
-                SectionHeader(title: Copy.storeSubs)
-                Text(Copy.storeSubsDesc).font(AppFont.footnote).foregroundStyle(Color.ink2)
-                    .padding(.horizontal, Spacing.page).padding(.top, -Spacing.s2)
-                VStack(spacing: Spacing.s2) {
-                    ForEach(app.store.subs) { p in PackRow(pack: p, busy: busyID == p.id) { buy(p) } }
-                }
-                .padding(.horizontal, Spacing.page)
-
                 if let err = app.store.lastError {
                     Text(err).font(AppFont.footnote).foregroundStyle(Color.accent).padding(.horizontal, Spacing.page)
                 }
@@ -41,7 +34,7 @@ struct StoreView: View {
                 }
                 .buttonStyle(TextButtonStyle(color: .ink2))
                 .frame(maxWidth: .infinity).padding(.top, Spacing.s3)
-                Text(Copy.storeLegal)
+                Text(Copy.storeLegalCredits)
                     .font(AppFont.caption).foregroundStyle(Color.ink3).multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity).padding(.horizontal, Spacing.page)
                 LegalLinksRow()
@@ -123,14 +116,13 @@ struct PackRow: View {
     }
 }
 
-/// 크레딧 부족 시트 — 팩 3개 · 구독 1개 · "친구 초대로 무료 3장". 구매 즉시 하던 생성이 이어진다(SPEC §3).
+/// 크레딧 부족 시트 — 팩 3개 · "친구 초대로 무료 3장". 구매 즉시 하던 생성이 이어진다(SPEC §3).
 struct CreditsSheet: View {
     @Environment(AppState.self) private var app
     @Environment(\.dismiss) private var dismiss
     @State private var busyID: String?
 
     private var packs: [StoreManager.Pack] { Array(app.store.packs(firstPurchase: app.quota?.firstPurchase == true).prefix(3)) }
-    private var sub: StoreManager.Pack? { app.store.subs.first { $0.id == "rimikimi.sub.plus.monthly" } }
 
     var body: some View {
         ScrollView {
@@ -146,7 +138,6 @@ struct CreditsSheet: View {
                 }
 
                 ForEach(packs) { p in PackRow(pack: p, busy: busyID == p.id) { buy(p) } }
-                if let sub { PackRow(pack: sub, busy: busyID == sub.id) { buy(sub) } }
 
                 Button {
                     dismiss()
@@ -159,9 +150,7 @@ struct CreditsSheet: View {
                 if let err = app.store.lastError {
                     Text(err).font(AppFont.footnote).foregroundStyle(Color.accent)
                 }
-                // 3.1.2 — 구독도 파는 화면이라 자동갱신 고지가 필요하다(컴플라이언스 리뷰로 발견:
-                // 이 시트에만 없고 StoreView 에는 있던 문구). 두 화면 문구를 동일하게 맞췄다.
-                Text(Copy.storeLegal)
+                Text(Copy.storeLegalCredits)
                     .font(AppFont.caption).foregroundStyle(Color.ink3).frame(maxWidth: .infinity)
                 LegalLinksRow()
                     .frame(maxWidth: .infinity)
