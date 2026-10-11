@@ -35,26 +35,17 @@ struct OptionChip: View {
         Button(action: action) {
             VStack(spacing: 1) {
                 Text(title).font(AppFont.calloutEmphasis)
-                if let subtitle {
-                    Text(subtitle).font(AppFont.caption).foregroundStyle(isActive ? Color.accent : Color.ink2)
+                // 할인 배지는 칩 밖에 겹쳐 띄우지 않고(2026-10-11 정리) 부제 줄에 붙인다 — "5 크레딧 · 17% 할인".
+                if let line = [subtitle, badge].compactMap({ $0 }).joined(separator: " · ").nilIfEmpty {
+                    Text(line).font(AppFont.caption).foregroundStyle(isActive || badge != nil ? Color.accent : Color.ink2)
                 }
             }
             .padding(.horizontal, Spacing.s3 + 2)
             .frame(minWidth: 64)
-            .frame(height: subtitle == nil ? ControlHeight.small : 48)
+            .frame(height: subtitle == nil && badge == nil ? ControlHeight.small : 48)
             // 리퀴드글래스(오너 지시 2026-10-09) — 고른 칩은 강조색으로 물든 유리.
             .glassEffect(isActive ? .regular.tint(Color.accent.opacity(0.22)).interactive() : .regular.interactive(),
                          in: Capsule())
-            .overlay(alignment: .topTrailing) {
-                if let badge {
-                    Text(badge)
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(Color.white)
-                        .padding(.horizontal, 5).padding(.vertical, 2)
-                        .background(Color.accent, in: Capsule())
-                        .offset(x: 6, y: -8)
-                }
-            }
             .foregroundStyle(isActive ? Color.accent : Color.ink)
             .contentShape(Capsule())
         }
@@ -92,4 +83,8 @@ struct SegmentedPair: View {
         .padding(3)
         .background(Color.fill, in: RoundedRectangle(cornerRadius: Radius.button, style: .continuous))
     }
+}
+
+private extension String {
+    var nilIfEmpty: String? { isEmpty ? nil : self }
 }

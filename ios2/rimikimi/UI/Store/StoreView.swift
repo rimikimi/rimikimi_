@@ -84,9 +84,9 @@ struct PackRow: View {
                     HStack(spacing: 6) {
                         Text(pack.isSubscription ? "rimikimi+ \(pack.label)" : Copy.photos(pack.credits)).font(AppFont.headline)
                         if let b = pack.badge {
-                            Text(b).font(AppFont.badge).foregroundStyle(.white)
+                            Text(b).font(AppFont.badge).foregroundStyle(Color.accent)
                                 .padding(.horizontal, 6).padding(.vertical, 2)
-                                .background(Color.accent, in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+                                .background(Color.accentTint, in: Capsule())
                         }
                     }
                     Text(pack.isSubscription ? Copy.subLine(period: pack.period, credits: pack.credits) : Copy.perImage(krw: pack.krw / pack.credits))
@@ -101,11 +101,12 @@ struct PackRow: View {
                     Text(regular).font(AppFont.footnote).strikethrough().foregroundStyle(Color.ink3)
                 }
                 Text(busy ? Copy.processing : (pack.introPrice ?? pack.displayPrice))
+                    // 애플 앱스토어 "받기" 버튼처럼 — 회색 알약에 강조색 글자(빨강 면 금지, 2026-10-11).
                     .font(AppFont.calloutEmphasis)
-                    .foregroundStyle(Color.onAccent)
-                    .padding(.horizontal, Spacing.s3)
-                    .frame(height: ControlHeight.small)
-                    .background(Color.accent, in: RoundedRectangle(cornerRadius: Radius.button - 2, style: .continuous))
+                    .foregroundStyle(Color.accent)
+                    .padding(.horizontal, Spacing.s4)
+                    .frame(height: ControlHeight.small - 4)
+                    .background(Color.fill, in: Capsule())
             }
             .padding(Spacing.s4)
             .background(Color.card, in: RoundedRectangle(cornerRadius: Radius.card, style: .continuous))

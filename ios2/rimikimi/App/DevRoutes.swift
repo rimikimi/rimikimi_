@@ -201,6 +201,10 @@ enum DevRoutes {
                 if let img = app.userPhoto.image { app.openEditor(image: img) }
             default: app.webTool = .init(url: Config.filterToolURL(mode: "pick", presetKey: q["preset"]), title: "필터")
             }
+        case "/coachseen":
+            // 캡처용 — 튜토리얼(코치마크) 전부 본 것으로 표시. `simctl spawn defaults write` 는 앱 컨테이너에 안 닿는다.
+            for k in ["cards", "purposes", "albums", "cameraTab", "firstTile", "cartMake", "cartBadge", "filterStrip"] { Coach.markSeen(k) }
+            app.skipCoach()
         case "/filterpass":
             #if DEBUG
             if q["reset"] == "1" { app.store.debugResetTrial() }

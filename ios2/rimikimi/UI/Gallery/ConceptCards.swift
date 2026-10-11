@@ -50,9 +50,9 @@ struct NewBadge: View {
     var body: some View {
         Text("NEW")
             .font(AppFont.badge).tracking(0.4)
-            .foregroundStyle(Color.white)
+            .foregroundStyle(Color.accent)
             .padding(.horizontal, 6).padding(.vertical, 2)
-            .background(Color.accent, in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+            .background(Color.accentTint, in: Capsule())
             .offset(y: -2)
             .accessibilityLabel(Copy.a11yNew)
     }

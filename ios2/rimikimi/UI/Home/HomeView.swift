@@ -63,11 +63,9 @@ struct HomeHeader: View {
             .accessibilityLabel(Copy.creditsLabel)
             Button { app.pushRoute(.settings) } label: {
                 Image(systemName: "gearshape")
-                    .font(.system(size: 17, weight: .medium))
+                    .font(.system(size: 20, weight: .regular))
                     .foregroundStyle(Color.ink)
                     .frame(width: 36, height: 36)
-                    .background(Color.card, in: Circle())
-                    .overlay(Circle().stroke(Color.separatorLine, lineWidth: 1))
             }
             .buttonStyle(PressScaleButtonStyle())
             .accessibilityLabel(Copy.settingsTitle)
@@ -85,8 +83,8 @@ struct FeatureCards: View {
 
     var body: some View {
         HStack(spacing: Spacing.s3) {
-            card(Copy.featureRetouch, "pencil.line", Color.accentTint, retouch)
-            card(Copy.featureRestore, "clock.arrow.circlepath", Color.fill, restore)
+            card(Copy.featureRetouch, "pencil.line", Color.card, retouch)
+            card(Copy.featureRestore, "clock.arrow.circlepath", Color.card, restore)
         }
         .padding(.horizontal, Spacing.page)
     }
@@ -94,7 +92,7 @@ struct FeatureCards: View {
     private func card(_ title: String, _ icon: String, _ bg: Color, _ c: Concept?) -> some View {
         Button { if let c { app.pushRoute(.concept(c)) } } label: {
             VStack(alignment: .leading, spacing: Spacing.s2) {
-                Image(systemName: icon).font(.system(size: 20, weight: .medium))
+                Image(systemName: icon).font(.system(size: 20, weight: .medium)).foregroundStyle(Color.accent)
                 Text(title).font(AppFont.bodyEmphasis)
             }
             .foregroundStyle(Color.ink)
