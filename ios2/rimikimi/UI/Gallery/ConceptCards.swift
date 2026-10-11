@@ -66,24 +66,16 @@ struct ConceptCard: View {
 
     var body: some View {
         NavigationLink(value: Route.concept(concept)) {
-            VStack(alignment: .leading, spacing: 0) {
-                RemoteImage(url: concept.thumbURL, cornerRadius: 0)
-                    .photoRatio()
-                    .overlay { if app.favorites.hasGenerated(concept.id) { GeneratedScrim() } }
-                    .overlay(alignment: .topTrailing) {
-                        if app.favorites.isFavorite(concept: concept.id) {
-                            FavoriteBadge().padding(Spacing.s2)
-                        }
+            // 이름은 사진 안 왼쪽 아래에 흰 글씨로(사진 앱 앨범처럼, 오너 2026-10-11). "만든 컨셉" 표시는 왼쪽 위로.
+            RemoteImage(url: concept.thumbURL, cornerRadius: 0)
+                .photoRatio()
+                .overlay(alignment: .bottomLeading) { PhotoCaption(title: concept.displayTitle, size: 16) }
+                .overlay(alignment: .topLeading) { if app.favorites.hasGenerated(concept.id) { MadeBadge().padding(Spacing.s2) } }
+                .overlay(alignment: .topTrailing) {
+                    if app.favorites.isFavorite(concept: concept.id) {
+                        FavoriteBadge().padding(Spacing.s2)
                     }
-                Text(concept.displayTitle)
-                    .font(AppFont.cardTitle)
-                    .foregroundStyle(Color.ink)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                    .padding(.horizontal, Spacing.s3)
-                    .padding(.top, 9).padding(.bottom, 11)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
+                }
             .background(Color.card)
             .clipShape(RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
             .shadow(color: .black.opacity(0.06), radius: 1, y: 1)
@@ -104,17 +96,18 @@ struct AlbumGridTile: View {
 
     var body: some View {
         NavigationLink(value: Route.category(tile.name)) {
-            VStack(alignment: .leading, spacing: Spacing.s1) {
-                RemoteImage(url: tile.coverURL, cornerRadius: Radius.card, fallback: tile.coverFallbackURL)
-                    .photoRatio()
-                    .overlay(alignment: .topTrailing) {
-                        if app.favorites.isFavorite(category: tile.name) {
-                            FavoriteBadge().padding(Spacing.s2)
-                        }
+            // 앨범 이름·장수를 사진 안 왼쪽 아래에(사진 앱 앨범처럼, 오너 2026-10-11)
+            RemoteImage(url: tile.coverURL, cornerRadius: 0, fallback: tile.coverFallbackURL)
+                .photoRatio()
+                .overlay(alignment: .bottomLeading) {
+                    PhotoCaption(title: Copy.category(tile.name), subtitle: Copy.albumCount(tile.count), size: 15)
+                }
+                .overlay(alignment: .topTrailing) {
+                    if app.favorites.isFavorite(category: tile.name) {
+                        FavoriteBadge().padding(Spacing.s2)
                     }
-                Text(Copy.category(tile.name)).font(AppFont.cardTitle).foregroundStyle(Color.ink).lineLimit(1)
-                Text(Copy.albumCount(tile.count)).font(AppFont.footnote).foregroundStyle(Color.ink3)
-            }
+                }
+                .clipShape(RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
         }
         .buttonStyle(PressScaleButtonStyle())
     }
@@ -149,6 +142,40 @@ struct FavoriteBadge: View {
 
 /// "이미 만들어 본 컨셉" 표시 — 아래쪽 반투명 그라데이션 + 체크(오너 지시 2026-09-22:
 /// "이미 생성했던걸 사용자가 한 눈에 알 수 있도록"). 사진을 가리지 않을 만큼만 덮는다.
+/// 사진 안 왼쪽 아래 이름 — 아래쪽만 살짝 어둡게 깔고 흰 굵은 글씨(사진 앱 "앨범"과 같은 처리).
+struct PhotoCaption: View {
+    var title: String
+    var subtitle: String? = nil
+    var size: CGFloat = 16
+    var body: some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(title).font(.system(size: size, weight: .bold)).lineLimit(2).minimumScaleFactor(0.85)
+            if let subtitle { Text(subtitle).font(.system(size: size - 4, weight: .medium)).opacity(0.85) }
+        }
+        .foregroundStyle(.white)
+        .shadow(color: .black.opacity(0.35), radius: 3, y: 1)
+        .padding(.horizontal, 10).padding(.bottom, 9).padding(.top, 28)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(LinearGradient(colors: [.clear, .black.opacity(0.55)], startPoint: .top, endPoint: .bottom))
+        .allowsHitTesting(false)
+    }
+}
+
+/// "만든 컨셉" — 작은 체크 배지(이름이 사진 안 아래로 들어가면서 왼쪽 위로 옮겼다).
+struct MadeBadge: View {
+    var body: some View {
+        HStack(spacing: 3) {
+            Image(systemName: "checkmark.circle.fill").font(.system(size: 11, weight: .bold))
+            Text(Copy.madeBadge).font(.system(size: 10, weight: .semibold))
+        }
+        .foregroundStyle(.white)
+        .padding(.horizontal, 6).padding(.vertical, 4)
+        .background(.black.opacity(0.45), in: Capsule())
+        .allowsHitTesting(false)
+        .accessibilityLabel(Copy.a11yAlreadyMade)
+    }
+}
+
 struct GeneratedScrim: View {
     var body: some View {
         ZStack(alignment: .bottomLeading) {
