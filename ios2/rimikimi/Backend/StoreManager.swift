@@ -196,7 +196,7 @@ final class StoreManager {
 
     /// 원격 스위치 `labels.json` → `"filterPass": {"enabled": "true"}`(오너 2026-10-10: 꺼 둔 채로 출시, 앱 업데이트 없이 켠다).
     /// dev 라우트가 상태를 강제하면 켜진 것으로 본다.
-    var filterPassEnabled: Bool { devFilterState != nil || devForceEnabled || LabelStore.flag("filterPass") }
+    var filterPassEnabled: Bool { devFilterState != nil || devForceEnabled || LabelStore.flag("filterPass") || LabelStore.minBuild("filterPass") }
     /// 캡처용(`/dev/filterpass?state=on`) — 상태는 강제하지 않고 스위치만 켠다(실제 규칙 그대로).
     var devForceEnabled = false
 
@@ -204,7 +204,10 @@ final class StoreManager {
     static let filterEntitlement = "filters"
     static let filterOffering = "filters"
 
-    private(set) var filterPlans: [FilterPlan] = [.init(kind: .annual), .init(kind: .monthly), .init(kind: .lifetime)]
+    /// 2026-10-11 오너 결정: **월간 하나만** 판다(첫 달 무료는 스토어 체험 오퍼). 연간·평생 상품은 스토어에 남아 있지만 보여 주지 않는다.
+    private(set) var filterPlans: [FilterPlan] = [.init(kind: .monthly)]
+    /// 월간의 "첫 1개월 무료" 체험 자격(스토어가 판정) — 있으면 시트에 그 줄을 보여 준다(3.1.2 고지).
+    private(set) var filterIntroEligible = false
     private var filterPackages: [FilterPlan.Kind: Package] = [:]
     private var filterProducts: [FilterPlan.Kind: StoreProduct] = [:]
     private(set) var filterPlansLoading = false
@@ -305,6 +308,10 @@ final class StoreManager {
             }
         }
         filterPlans = filterPlans.map { var x = $0; x.priceString = filterProducts[$0.kind]?.localizedPriceString; return x }
+        if let m = filterProducts[.monthly], let d = m.introductoryDiscount, d.paymentMode == .freeTrial {
+            let el = await Purchases.shared.checkTrialOrIntroDiscountEligibility(productIdentifiers: [m.productIdentifier])
+            filterIntroEligible = el[m.productIdentifier]?.status == .eligible
+        } else { filterIntroEligible = false }
         filterPlansError = filterProducts.isEmpty ? Copy.filterPassNotLoaded : nil
         AppLog.api.info("filterpass.plans offering=\(self.filterPackages.keys.map(\.rawValue).sorted(), privacy: .public) products=\(self.filterProducts.keys.map(\.rawValue).sorted(), privacy: .public)")
         await refreshFilterAccess()

@@ -32,6 +32,14 @@ final class LabelStore {
         return v == "true" || v == "1" || v == "on"
     }
 
+    /// 빌드 번호로 켜는 스위치 — `{"filterPass": {"iosMinBuild": "53"}}` 처럼. 이 빌드(CFBundleVersion)가 그 이상이면 켜진 것.
+    /// `enabled` 를 전역으로 "true" 로 바꾸면 결제 시트가 없는 옛 빌드(≤52)까지 잠기므로, 새 빌드부터만 켜는 길(2026-10-11).
+    static func minBuild(_ key: String, _ field: String = "iosMinBuild") -> Bool {
+        guard let v = shared.table[key]?[field], let min = Int(v),
+              let cur = Int(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "") else { return false }
+        return cur >= min
+    }
+
     /// 서버 표에 값이 있으면 그것, 없으면 기본 문구.
     static func t(_ key: String, _ ko: String, _ en: String) -> String {
         if let v = shared.table[key]?[L.ko ? "ko" : "en"], !v.isEmpty { return v }

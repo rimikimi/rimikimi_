@@ -65,16 +65,16 @@ const NEW = {
   ko: {
     subtitle: "AI 화보 · 감성 카메라 · 드레스룸",
     keywords: "리미키미,컨셉,화보,AI화보,프로필사진,프사,커플,드레스룸,감성카메라,필름카메라,폰카,사진복원,옛날사진,보정,셀카,네컷",
-    promotionalText: "새로워진 홈 — 필요한 사진을 고르면 어울리는 컨셉이 바로 모여요. 감성 카메라는 개편 기념 무료!",
-    whatsNew: `리미키미가 새로워졌어요.
+    promotionalText: "새로워진 홈 — 필요한 사진을 고르면 어울리는 컨셉이 바로 모여요. 감성 카메라도 새로 생겼어요.",
+    whatsNew: `리미키미, 다시 태어났어요.
 
-• 새 홈 — 프로필 · 프사 · 커플 · 드레스룸, 필요한 사진을 고르면 어울리는 컨셉이 바로 모여요
-• 추천과 새로 나온 컨셉은 옆으로 넘겨 보고, 컨셉 앨범은 아래로 쭉
-• 컨셉 여러 개를 담아 한 번에 만들기(최대 8장)
-• 감성 카메라 — 필름 · 폰카 감성 38가지를 보면서 찍어요. 개편 기념 무료
-• 말로 고치기 · 옛날 사진 복원을 홈 위에서 바로
-• 내 사진 — 만든 사진을 한눈에 보고 바로 저장
-• 더 깔끔해진 디자인, 안정성 개선 및 버그 수정`,
+• 셀카 한 장이면 다 돼요. 프로필, 프사, 커플, 드레스룸 — 홈에서 고르는 순간 끝
+• 감성 카메라 등장 — 필름 · 폰카 감성 38가지, 보면서 찍고 바로 저장
+• 옷 사진 한 장이면 입어본 내 모습이 바로 — 드레스룸
+• "뒤에 사람 지워줘" 한 마디면 끝 — 말로 고치기
+• 컨셉 580가지. 매일 저녁 4종 더. 담아서 8장 한 번에
+• 20년 전 사진이 오늘 찍은 것처럼 — 사진 복원
+• 디자인 싹 갈아엎었어요. 더 빠르고, 더 예쁘게`,
     description: `rimikimi - 셀카 한 장으로 만드는 AI 화보
 
 셀카 한 장만 올리면 AI가 내 얼굴 특징을 살려 원하는 컨셉의 사진을 만들어 드려요. 새로워진 홈에서 오늘 필요한 사진을 고르면, 어울리는 컨셉이 바로 모여요.
@@ -82,7 +82,7 @@ const NEW = {
 새로워진 홈
 · 프로필 · 프사 · 커플 · 드레스룸 — 필요한 사진부터 고르세요
 · 추천 · 새로 나온 컨셉은 옆으로 넘겨 보고, 컨셉 앨범은 아래로 쭉
-· 세계여행 · 스튜디오 · 시즌 · 영화 무드 등 300가지가 넘는 컨셉, 매일 저녁 8시 새 컨셉 4종
+· 세계여행 · 스튜디오 · 시즌 · 영화 무드 등 500가지가 넘는 컨셉, 매일 저녁 8시 새 컨셉 4종
 
 한 번에 여러 장
 · 마음에 드는 컨셉을 담아 두고 최대 8장을 한 번에 만들어요
@@ -97,7 +97,7 @@ const NEW = {
 
 감성 카메라
 · 필름 · 폰카 · 카메라 감성 38가지 룩을 보면서 바로 찍어요
-· 찍은 사진은 바로 다듬어 저장 — 개편 기념 무료
+· 찍은 사진은 바로 다듬어 저장해요
 
 말로 고치기 · 옛날 사진 복원
 · “뒤에 지나가는 사람 지워줘” 한 줄이면 그 부분만 고쳐요
@@ -119,16 +119,16 @@ const NEW = {
   "en-US": {
     subtitle: "AI photoshoot · mood camera",
     keywords: "rimikimi,ai photoshoot,concept,profile photo,couple,dressing room,mood camera,film,restore,selfie",
-    promotionalText: "A new Home — pick the photo you need and matching concepts gather right away. The mood camera is free for the relaunch!",
-    whatsNew: `rimikimi has a new look.
+    promotionalText: "A new Home — pick the photo you need and matching concepts gather right away. Plus a brand-new mood camera.",
+    whatsNew: `rimikimi, reborn.
 
-• New Home — profile, social, couple, dressing room: pick the photo you need and matching concepts gather right away
-• Swipe through featured and new concepts; concept albums continue below
-• Pick several concepts and make them at once (up to 8)
-• Mood camera — 38 film and retro-phone looks, live as you shoot. Free for the relaunch
-• Fix it in words and old-photo restoration, right from Home
-• My Photos — see everything you made and save in one tap
-• Cleaner design, stability improvements and bug fixes`,
+• One selfie does it all — profile, social, couple, dressing room, picked right on Home
+• The mood camera is here — 38 film and retro-phone looks, live as you shoot, saved in a tap
+• One photo of the clothes and you're wearing them — Dressing Room
+• "Remove the person behind me." Done. — Fix it in words
+• 580 concepts, 4 more every evening — pick 8 and make them all at once
+• A 20-year-old photo, back like it was shot today — Restore
+• Redesigned from the ground up. Faster. Prettier.`,
     description: `rimikimi — an AI photoshoot from one selfie
 
 Upload one selfie and rimikimi turns it into the photo you need, keeping your face clearly recognizable. On the new Home, pick what you need today and matching concepts gather right away.
@@ -136,7 +136,7 @@ Upload one selfie and rimikimi turns it into the photo you need, keeping your fa
 A new Home
 · Profile, social, couple, dressing room — start from the photo you need
 · Swipe through featured and new concepts; concept albums continue below
-· 300+ concepts — travel, studio, seasons, film moods — and 4 new ones every evening
+· 500+ concepts — travel, studio, seasons, film moods — and 4 new ones every evening
 
 Several at once
 · Pick the concepts you like and make up to 8 photos in one go
@@ -151,7 +151,7 @@ Dressing Room — will this look good on me?
 
 Mood camera
 · 38 film, retro-phone and camera looks, live as you shoot
-· Touch up and save right away — free for the relaunch
+· Touch up and save right away
 
 Fix it in words · old-photo restoration
 · “Remove the person behind me” — one line and only that part changes

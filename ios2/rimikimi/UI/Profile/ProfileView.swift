@@ -55,6 +55,14 @@ struct ProfileView: View {
                     StartScreenRow()
                     LanguageRow()
                 }
+                // 카메라 이용권 — 심사관·사용자가 결제 시트와 구매 복원에 닿는 자리(3일 무료 중엔 카메라에서 안 뜨므로).
+                if app.store.filterPassEnabled {
+                    CardGroup {
+                        SettingsRow(title: Copy.settingsCameraPass,
+                                    value: app.store.filterAccess == .pass || app.store.filterAccess == .plus ? Copy.filterPassActiveShort : nil,
+                                    systemImage: "camera.aperture") { app.openFilterPass() }
+                    }
+                }
                 CardGroup {
                     SettingsRow(title: Copy.terms, systemImage: "doc.text") { open(Config.termsURL, Copy.terms) }
                     SettingsRow(title: Copy.privacy, systemImage: "hand.raised") { open(Config.privacyURL, Copy.privacy) }

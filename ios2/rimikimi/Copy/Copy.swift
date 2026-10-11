@@ -471,6 +471,11 @@ enum Copy {
     static var filterPassMonthlyLine: String { L.t("1개월마다 자동 갱신", "Renews every month") }
     static var filterPassLifetimeLine: String { L.t("한 번 결제, 계속 사용", "Pay once, keep forever") }
     static var filterPassBest: String { L.t("추천", "Best value") }
+    /// 첫 달 무료 체험 자격이 있을 때 월간 행 아래 줄(3.1.2 — 기간·이후 가격·자동 갱신을 한 줄에).
+    static func filterPassIntroLine(_ price: String) -> String { L.t("첫 1개월 무료 · 이후 월 \(price) 자동 갱신", "First month free · then \(price)/month, auto-renews") }
+    static var filterPassStartFree: String { L.t("첫 달 0원으로 시작", "Start with first month free") }
+    static var settingsCameraPass: String { L.t("카메라 이용권", "Camera Pass") }
+    static var filterPassActiveShort: String { L.t("이용 중", "Active") }
     static var filterPassUnlocked: String { L.t("모든 필터가 열렸어요", "Every filter is unlocked") }
     static var filterPassNotLoaded: String { L.t("스토어에서 가격을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.", "Couldn't load prices from the store. Please try again in a moment.") }
     static var filterPassNothingToRestore: String { L.t("복원할 필터 이용권이 없어요.", "No Filter Pass to restore.") }

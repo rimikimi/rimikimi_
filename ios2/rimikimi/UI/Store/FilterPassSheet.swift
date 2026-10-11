@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 필터 이용권 결제 시트(계약서 filterpass_spec.md) — 연간(강조)·월간·평생 3개, 가격은 스토어 priceString,
+/// 필터 이용권 결제 시트 — 2026-10-11부터 **월간 하나**(첫 달 무료는 스토어 체험 오퍼, 자격은 스토어가 판정). 가격은 스토어 priceString,
 /// 기간·자동갱신 안내, 이용약관·개인정보 링크, 구매 복원. 카드 모양은 StoreView `PackRow` 와 같은 재질
 /// (유리는 탭바·상단 바에만 — Glass.swift). 원격 스위치가 꺼져 있으면 아무 데서도 열리지 않는다.
 struct FilterPassSheet: View {
@@ -8,7 +8,7 @@ struct FilterPassSheet: View {
     @Environment(\.dismiss) private var dismiss
     /// 구매·복원으로 열렸을 때 — 편집기는 여기서 `__rimikimiFilterAccess({unlocked:true})` 를 받는다.
     var onUnlocked: () -> Void = {}
-    @State private var selected: StoreManager.FilterPlan.Kind = .annual
+    @State private var selected: StoreManager.FilterPlan.Kind = .monthly
     @State private var restoring = false
 
     private var store: StoreManager { app.store }
@@ -51,6 +51,7 @@ struct FilterPassSheet: View {
                         buy()
                     } label: {
                         if store.filterPurchasing != nil { ProgressView().tint(.white) }
+                        else if store.filterIntroEligible, plan?.kind == .monthly { Text(Copy.filterPassStartFree) }
                         else { Text(L.t("계속하기", "Continue") + (plan.map { " · \($0.displayPrice)" } ?? "")) }
                     }
                     .buttonStyle(PrimaryButtonStyle(isDisabled: !(plan?.purchasable ?? false)))
@@ -97,7 +98,7 @@ struct FilterPassSheet: View {
         let (name, line): (String, String) = {
             switch p.kind {
             case .annual: return (Copy.filterPassAnnual, Copy.filterPassAnnualLine)
-            case .monthly: return (Copy.filterPassMonthly, Copy.filterPassMonthlyLine)
+            case .monthly: return (Copy.filterPassMonthly, store.filterIntroEligible ? Copy.filterPassIntroLine(p.displayPrice) : Copy.filterPassMonthlyLine)
             case .lifetime: return (Copy.filterPassLifetime, Copy.filterPassLifetimeLine)
             }
         }()
@@ -106,18 +107,12 @@ struct FilterPassSheet: View {
                 Image(systemName: on ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 22)).foregroundStyle(on ? Color.accent : Color.ink3)
                 VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 6) {
-                        Text(name).font(AppFont.headline)
-                        if p.kind == .annual {
-                            Text(Copy.filterPassBest).font(AppFont.badge).foregroundStyle(.white)
-                                .padding(.horizontal, 6).padding(.vertical, 2)
-                                .background(Color.accent, in: RoundedRectangle(cornerRadius: 5, style: .continuous))
-                        }
-                    }
+                    Text(name).font(AppFont.headline)
                     Text(line).font(AppFont.footnote).foregroundStyle(Color.ink2)
                 }
                 Spacer()
-                Text(p.displayPrice).font(AppFont.calloutEmphasis).foregroundStyle(Color.ink)
+                Text(store.filterIntroEligible && p.kind == .monthly ? L.t("첫 달 0원", "First month free") : p.displayPrice)
+                    .font(AppFont.calloutEmphasis).foregroundStyle(Color.ink)
             }
             .padding(Spacing.s4)
             .background(Color.card, in: RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
