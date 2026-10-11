@@ -4,6 +4,7 @@ import { router } from "expo-router";
 import { Image } from "expo-image";
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { Text } from "./Text";
+import { PhotoCaption } from "./PhotoCaption";
 import { conceptTitle, thumbUrl, type Concept } from "@/lib/concepts";
 import { color, radius, space, themedStyles } from "@/theme/tokens";
 import { CARD_PRESS_SCALE, duration, ease } from "@/theme/motion";
@@ -25,14 +26,16 @@ export function ConceptCard({ concept, width, onPress }: { concept: Concept; wid
         onPress={onPress ?? (() => router.push({ pathname: "/concept/[id]", params: { id: String(concept.id) } }))}
         style={{ gap: space.s2 }}
       >
-        <Image
-          source={{ uri: thumbUrl(concept.id) }}
-          style={{ width, height, borderRadius: radius.thumb, backgroundColor: color.mat }}
-          contentFit="cover"
-          transition={duration.enter}
-          cachePolicy="disk"
-        />
-        <Text size="footnote" numberOfLines={1}>{conceptTitle(concept)}</Text>
+        <View style={{ width, height, borderRadius: radius.thumb, overflow: "hidden", backgroundColor: color.mat }}>
+          <Image
+            source={{ uri: thumbUrl(concept.id) }}
+            style={{ width, height }}
+            contentFit="cover"
+            transition={duration.enter}
+            cachePolicy="disk"
+          />
+          <PhotoCaption title={conceptTitle(concept)} size={width >= 140 ? 16 : 13} />
+        </View>
       </Pressable>
     </Animated.View>
   );

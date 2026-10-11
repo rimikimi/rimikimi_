@@ -4,6 +4,7 @@ import { router, useFocusEffect } from "expo-router";
 import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Text } from "@/ui/Text";
+import { PhotoCaption } from "@/ui/PhotoCaption";
 import { Logo } from "@/ui/Logo";
 import { Spinner } from "@/ui/Spinner";
 import { Thumb, photoHeight } from "@/ui/Thumb";
@@ -193,10 +194,9 @@ function AlbumGridTile({ tile, width, fav }: { tile: AlbumTile; width: number; f
             onError={() => setFailed(true)}
           />
         ) : null}
+        <PhotoCaption title={albumName(tile.name)} subtitle={c21.albumCount(tile.count)} size={15} />
         {fav ? <View style={styles.favBadge}><FavoriteBadge size={20} /></View> : null}
       </View>
-      <Text size="footnote" weight="semibold" numberOfLines={1}>{albumName(tile.name)}</Text>
-      <Text size="footnote" tone="subtle">{c21.albumCount(tile.count)}</Text>
     </Pressable>
   );
 }

@@ -205,9 +205,12 @@ export function MakeHome({ pool, labels, seasons, isFeature, onOpenConcept, onPu
           <button key={t.name} type="button" className="dkCard" onClick={() => onAlbum(t.name)} aria-label={catLabel(labels, t.name)}>
             <div className="dkIm" style={W.albumIm}>
               {t.cover && <img src={`/large/${t.cover.id}.webp`} onError={onThumbErr(t.cover)} alt="" loading="lazy" style={W.img} />}
+              {/* 이름·장수를 사진 안 왼쪽 아래에(사진 앱 앨범처럼, 앱과 같게 2026-10-11) */}
+              <div style={W.capWrap}>
+                <div style={W.capName}>{catLabel(labels, t.name)}</div>
+                <div style={W.capCount}>{L(`${t.count}장`, `${t.count}`)}</div>
+              </div>
             </div>
-            <div style={W.albumName}>{catLabel(labels, t.name)}</div>
-            <div style={W.albumCount}>{L(`${t.count}장`, `${t.count}`)}</div>
           </button>
         ))}
       </div>
@@ -666,6 +669,9 @@ const W = {
   albumIm: { position: "relative", aspectRatio: "3 / 4", borderRadius: 16, overflow: "hidden", background: DK.s1 },
   albumName: { marginTop: 10, fontSize: 16, fontWeight: 700, color: DK.tx, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
   albumCount: { marginTop: 2, fontSize: 14, color: DK.mu },
+  capWrap: { position: "absolute", left: 0, right: 0, bottom: 0, padding: "40px 14px 12px", background: "linear-gradient(to bottom, rgba(0,0,0,0), rgba(0,0,0,.55))", pointerEvents: "none", textAlign: "left" },
+  capName: { fontSize: 18, fontWeight: 800, color: "#fff", textShadow: "0 1px 3px rgba(0,0,0,.35)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+  capCount: { marginTop: 2, fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,.85)" },
   titleRow: { display: "flex", alignItems: "center", gap: 14, marginBottom: 18 },
   back: { width: 40, height: 40, borderRadius: 12, border: `1px solid ${DK.line}`, background: DK.s1, color: DK.tx, cursor: "pointer", display: "grid", placeItems: "center" },
   h1: { fontSize: 30, fontWeight: 800, letterSpacing: "-0.03em", color: DK.tx, margin: 0 },
