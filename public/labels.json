@@ -60,6 +60,8 @@
   "en": "Dressing room"
  },
  "filterPass": {
-  "enabled": "false"
+  "enabled": "false",
+  "iosMinBuild": "53",
+  "androidMinVersionCode": "109"
  }
 }
