@@ -165,7 +165,7 @@ function FilterPicker({ presetKey, onPicked }) {
   );
 }
 
-function FilterTool({ mode, presetKey, fxAmt, strength, initSrc, initSrcs, initFaces }) {
+function FilterTool({ mode, presetKey, presetKeys, fxAmt, strength, initSrc, initSrcs, initFaces }) {
   // 네이티브가 사진을 먼저 고르게 하고 여기로 넘긴다(`srcs`). 그러면 웹에
   // "사진 선택" 중간 화면이 아예 안 뜬다 — 사파리는 사용자 제스처 없는 파일창 열기를
   // 막아서 웹에서 자동으로 여는 건 불가능하다(2026-09-17 실패 확인).
@@ -176,6 +176,7 @@ function FilterTool({ mode, presetKey, fxAmt, strength, initSrc, initSrcs, initF
     <PhotoEditor
       srcs={srcs}
       initialPresetKey={presetKey}
+      initialPresetKeys={presetKeys}
       initialFxAmt={fxAmt}
       initialStrength={strength}
       initialFaces={initFaces}
@@ -197,11 +198,13 @@ export default function ToolEntry() {
   // filter
   const mode = init.mode || params.mode;
   const presetKey = init.presetKey || params.preset || "none";
+  // 사진별 프리셋(카메라 연속 촬영 — 장마다 고른 필터). 길이가 srcs 와 다르면 모자란 장은 presetKey.
+  const presetKeys = Array.isArray(init.presetKeys) ? init.presetKeys.map((k) => (typeof k === "string" && k) || presetKey) : null;
   const fxAmt = typeof init.fxAmt === "number" ? Math.max(0, Math.min(1, init.fxAmt)) : 1;
   const strength = typeof init.strength === "number" ? Math.max(0, Math.min(1.4, init.strength)) : 0.7;
   // 인플(뷰티) — 앱이 Vision 으로 찾은 사진별 얼굴 사각형(없으면 null → 편집기가 피부색으로 추정)
   const faces = Array.isArray(init.faces) ? init.faces : null;
   // 필터 이용권 상태(앱이 준 값, 없으면 구버전 앱 → 잠그지 않음)
   initFilterAccess(init);
-  return <FilterTool mode={mode} presetKey={presetKey} fxAmt={fxAmt} strength={strength} initSrc={init.src} initSrcs={init.srcs} initFaces={faces} />;
+  return <FilterTool mode={mode} presetKey={presetKey} presetKeys={presetKeys} fxAmt={fxAmt} strength={strength} initSrc={init.src} initSrcs={init.srcs} initFaces={faces} />;
 }

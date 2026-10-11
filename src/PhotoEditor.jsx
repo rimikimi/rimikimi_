@@ -194,7 +194,8 @@ const fxOf = (p) => ({
 // initialStrength: 앱 카메라 세기 슬라이더(0..1 → 색감 0.7×세기)로 찍어 넘어왔을 때.
 // initialFaces: 앱(iOS)이 Vision 으로 찾은 사진별 얼굴 사각형 [[[x,y,w,h],…],…] (정규화·위가 원점) — 인플(뷰티) 전용.
 //   카메라 미리보기와 같은 얼굴 영역을 쓰려고 받는다. 없으면 filters.js 가 피부색으로 추정한다.
-export default function PhotoEditor({ src, srcs, initialPresetKey = "none", initialFxAmt = 1, initialStrength = 0.7, initialFaces = null, filename = "rimikimi", onClose }) {
+// initialPresetKeys: 사진별 프리셋(카메라에서 장마다 다른 필터로 찍은 경우, 2026-10-11 오너 "필터 다 다르게 찍었는데 왜 다 똑같음"). 없으면 initialPresetKey 하나.
+export default function PhotoEditor({ src, srcs, initialPresetKey = "none", initialPresetKeys = null, initialFxAmt = 1, initialStrength = 0.7, initialFaces = null, filename = "rimikimi", onClose }) {
   const sources = srcs && srcs.length ? srcs : [src];
   const multi = sources.length > 1;
   // 에디터가 떠 있는 동안 앱 루트의 스와이프 제스처(뒤로가기·탭 전환)를 끈다.
@@ -215,7 +216,7 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
   const AI_KEY = "rimikimi_ai_consent_v2";
   const aiOk = () => { try { return localStorage.getItem(AI_KEY) === "1"; } catch (_) { return false; } };
   const [fitErr, setFitErr] = useState("");
-  const [presetKey, setPresetKey] = useState(initialPresetKey);
+  const [presetKey, setPresetKey] = useState((Array.isArray(initialPresetKeys) && initialPresetKeys[0]) || initialPresetKey);
   const scaledFx = (p, amt) => { const b = fxOf(p); const o = {}; for (const k of Object.keys(b)) o[k] = b[k] * amt; return o; };
   const [fx, setFx] = useState(() => scaledFx(presetByKey(initialPresetKey), initialFxAmt));
   const [chipGroup, setChipGroup] = useState(() => presetByKey(initialPresetKey).group || "phone");
@@ -236,9 +237,10 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
   // presetKey/fx/strength 는 "지금 보는 사진"의 룩이고, lookByIdx 가 장부 —
   // 룩을 바꾸는 곳은 반드시 updateLook 을 거쳐 둘을 같이 쓴다. (effect 로 미러링하면
   // 사진 전환 직후 옛 룩이 새 사진에 덮어써지는 레이스가 생겨서 명령형으로 간다)
-  const defaultLook = () => ({
-    presetKey: initialPresetKey,
-    fx: scaledFx(presetByKey(initialPresetKey), initialFxAmt),
+  const presetFor = (i) => (Array.isArray(initialPresetKeys) && initialPresetKeys[i]) || initialPresetKey;
+  const defaultLook = (i = 0) => ({
+    presetKey: presetFor(i),
+    fx: scaledFx(presetByKey(presetFor(i)), initialFxAmt),
     strength: initialStrength,
     fxAmt: initialFxAmt,
     lens: 0,   // 렌즈 왜곡 보정 -1..1 (0 = 원본)
@@ -246,7 +248,7 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
     geoAuto: null,
   });
   const [lookByIdx, setLookByIdx] = useState({});
-  const lookOf = (i) => lookByIdx[i] || defaultLook();
+  const lookOf = (i) => lookByIdx[i] || defaultLook(i);
   function updateLook(patch) {
     const next = { presetKey, fx, strength, fxAmt, lens, geo, geoAuto, ...patch };
     setPresetKey(next.presetKey);
