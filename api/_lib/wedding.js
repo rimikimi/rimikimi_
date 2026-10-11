@@ -554,7 +554,10 @@ import DRESSES from "../_data/wedding-dresses.json" with { type: "json" };
 const DRESS_BUCKET = "https://aknjtopskvegcmsnbnut.supabase.co/storage/v1/object/public/preset-dresses";
 export function findDress(code) { return DRESSES.find((d) => d.code === code) || null; }
 export function dressImageURL(code, angle = "front") { return `${DRESS_BUCKET}/${code}/${angle}.webp`; }
-export function weddingCatalog() { return DRESSES.map((d) => ({ ...d, thumb: dressImageURL(d.code, "front") })); }
+// 목록 썸네일은 앱 도메인의 작은 사본(720×960, 평균 ~20KB) — 원본(1792×2400, 100~180KB, 캐시 없음)을 80장씩 받아
+// 본식/2부 탭 로딩이 매우 느렸다(오너 2026-10-11). 생성에는 여전히 원본(dressImageURL)을 쓴다. full = 원본.
+const THUMB_BASE = "https://rimikimi-app.vercel.app/thumbs/dress";
+export function weddingCatalog() { return DRESSES.map((d) => ({ ...d, thumb: `${THUMB_BASE}/${d.code}.webp`, full: dressImageURL(d.code, "front") })); }
 
 // josephine app/api/generate.js buildPresetDressInstruction 그대로(신랑 예복 기본 = 블랙 턱시도).
 export function buildPresetDressInstruction(dress, angles, sel, mode = "bride_solo") {
