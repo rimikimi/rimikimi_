@@ -343,7 +343,9 @@ class LiveCameraView(context: Context, appContext: AppContext) : ExpoView(contex
   }
 
   /** 저장본 작업(디코드·인코드)은 한 줄로 — 연사 10장이 동시에 48MB 씩 디코드하지 않게. */
-  private val stillExec = Executors.newSingleThreadExecutor()
+  private val stillExec = Executors.newSingleThreadExecutor { r ->
+    Thread(r, "rimikimi-still").apply { priority = Thread.MIN_PRIORITY; isDaemon = true }   // 미리보기·JS 보다 뒤로
+  }
   /** 저장본 긴 변 상한(px) — 메모리(4096×3072 RGBA = 48MB × 입력·텍스처·FBO·읽기버퍼·출력 ≈ 5장) 와 GL 한계 중 작은 쪽. */
   private val STILL_MAX_SIDE = 4096
 
@@ -355,6 +357,7 @@ class LiveCameraView(context: Context, appContext: AppContext) : ExpoView(contex
   fun renderStill(uri: String, lookMap: Map<String, Any?>, intensity: Float, promise: Promise) {
     if (!active) { promise.reject("E_NOT_READY", "camera view inactive", null); return }
     stillExec.execute {
+      android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND)
       var src: Bitmap? = null
       try {
         val path = uri.removePrefix("file://")
@@ -395,9 +398,12 @@ class LiveCameraView(context: Context, appContext: AppContext) : ExpoView(contex
         val faces: List<FloatArray> = if (look.preset > 0.5f && look.special.toInt() == 7)
           FaceUtil.detect(bmp).map { floatArrayOf(it.left, it.top, it.width(), it.height()) } else emptyList()
         val input = bmp
-        val out = glQuery { renderer.renderStill(input, look, faces) }
+        // GL 작업은 세 번의 queueEvent 로 쪼갠다(올리기 → 그리기 → 읽기) — 사이사이 미리보기 프레임이 그려져 버벅임이 줄어든다
+        val job = glQuery { renderer.stillUpload(input, look, faces) }
         input.recycle(); src = null
-        if (out == null) throw IllegalStateException("gl render failed")
+        if (job == null) throw IllegalStateException("gl upload failed")
+        glQuery { renderer.stillDraw(job) }
+        val out = glQuery { renderer.stillRead(job) } ?: throw IllegalStateException("gl render failed")
         val f = File(context.cacheDir, "rimikimi_cam_f_${System.currentTimeMillis()}.jpg")
         FileOutputStream(f).use { out.compress(Bitmap.CompressFormat.JPEG, 95, it) }
         val res = mapOf("uri" to "file://" + f.absolutePath, "width" to out.width, "height" to out.height)

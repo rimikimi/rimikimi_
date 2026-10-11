@@ -5,7 +5,6 @@ import { useCameraPermissions } from "expo-camera";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Haptics from "expo-haptics";
 import * as ImageManipulator from "expo-image-manipulator";
-import { Image } from "expo-image";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { FadeIn, FadeOut, runOnJS, useAnimatedStyle, useSharedValue, withSequence, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -42,8 +41,18 @@ import { chrome, space } from "@/theme/tokens";
 //    작은 자물쇠. 미리보기·찍기는 막지 않는다 — 막는 곳은 편집기 저장·공유뿐. 원본 아닌 필터를 처음 고르면 3일 무료 시작.
 // ============================================================================
 
-const MAX_SHOTS = 10;
 const FAV_KEY = "filter.favorites";
+
+/** 카메라가 캐시에 남긴 임시 JPEG(file://) 삭제 — 실패해도 조용히. */
+async function deleteTemp(uri: string) {
+  try {
+    const { File } = await import("expo-file-system");
+    const f = new File(uri);
+    if (f.exists) f.delete();
+  } catch (e) {
+    if (__DEV__) console.log("[camera] 임시 파일 삭제 실패", String(e));
+  }
+}
 const MIRROR_KEY = "camera.frontMirror";
 const PHONE = ["ph16pro", "ph15pro", "ph14pro", "phxs", "ph7", "ph6s", "ph4s", "ph3gs"];
 // 아날로그 = iOS FilterTabView.groups 에서 폰카를 뺀 순서(필름 → 카메라 → 재미, 빛번짐은 재미 맨 끝).
@@ -61,7 +70,7 @@ function zoomText(z: number, active: boolean): string {
 }
 
 interface FocusMark { id: number; x: number; y: number; locked: boolean; adjusting: boolean; dim: boolean; touched: number }
-/** 찍은 한 장 — 찍는 순간 고른 필터·색감을 같이 기억한다(나중에 칩을 바꿔도 이 장은 그대로). */
+/** 편집기로 넘길 한 장(앨범에서 고른 사진) + 그때 고른 필터·색감. */
 interface Shot { uri: string; width: number; height: number; presetKey: string; fxAmount: number }
 /** 미리보기 상자 위 여백(위 안전영역 아래) — 기본 안드 카메라 느낌. */
 const PREVIEW_TOP = 56;
@@ -102,7 +111,6 @@ export default function CameraFilterTab() {
   const [flash, setFlash] = useState(false);
   const [ready, setReady] = useState<LiveReady | null>(null);
   const [zoom, setZoomState] = useState(1);
-  const [shots, setShots] = useState<Shot[]>([]);
   const [mark, setMark] = useState<FocusMark | null>(null);
   const [locked, setLocked] = useState(false);
   const [bias, setBias] = useState(0);
@@ -197,41 +205,45 @@ export default function CameraFilterTab() {
   function setPinchStart() { zoomStart.current = zoomRef.current; }
   function setPinchScale(s: number) { applyZoomRef.current(zoomStart.current * s); }
 
-  // ── 촬영 ──
+  // ── 촬영 ── 셔터 = 필터 입힌 저장본만 사진첩에(오너 결정 2026-10-11 "원본은 없애고 필터 촬영본만"). 앱 안에 쌓지 않고
+  // 편집기로도 안 넘어간다(앨범 버튼으로 기존 사진을 여는 길만 남김). 굽기·저장은 전부 뒤에서 — 셔터는 capture() 끝나면 바로 다시 눌린다.
   const shooting = useRef(false);
   const albumWarned = useRef(false);   // 사진첩 권한 없음 안내는 한 번만
   const capture = useCallback(async () => {
-    if (shooting.current || shots.length >= MAX_SHOTS || !cam.current) return;
+    if (shooting.current || !cam.current) return;
     shooting.current = true;
     // 셔터 누른 순간의 필터·색감 — 찍히는 동안 칩을 바꿔도 이 장은 보던 그대로 기록된다
     const presetKey = selected, fx = fxAmount;
     flashOv.value = withSequence(withTiming(0.85, { duration: 60 }), withTiming(0, { duration: 180 }));
     Haptics.selectionAsync().catch(() => {});
+    const c = cam.current;
+    let raw: { uri: string } | null = null;
     try {
-      const c = cam.current;
-      const r = await c.capture();
-      const shot: Shot = { ...r, presetKey, fxAmount: fx };
-      setShots((prev) => (prev.length >= MAX_SHOTS ? prev : [...prev, shot]));
-      // 찍으면 바로 사진첩에(오너 결정 2026-10-11) — **보던 그대로**(필터 입힌 저장본, iOS 와 같다). Shot 은 원본(편집기용).
-      // 셔터를 막지 않게 기다리지 않고, 장마다 토스트도 없다. 필터 굽기에 실패하면 원본을 넣고, 권한이 없어 못 넣었을 때만 한 번 알린다.
-      void (async () => {
-        let toSave = r.uri;
-        if (presetKey !== "none") {
-          try { toSave = (await c.renderStill(r.uri, presetKey, fx)).uri; } catch (e) {
-            if (__DEV__) console.log("[camera] renderStill 실패 → 원본 저장", String(e));
-          }
-        }
-        const res = await saveFileToAlbum(toSave);
-        if ("ok" in res || albumWarned.current) return;
-        albumWarned.current = true;
-        toast(c21.noAlbumPermission);
-      })();
+      raw = await c.capture();
     } catch (e) {
       if (__DEV__) console.log("[camera] capture 실패", String(e));
     } finally {
       shooting.current = false;
     }
-  }, [shots.length, flashOv, selected, fxAmount, toast]);
+    if (!raw) return;
+    const rawUri = raw.uri;
+    // 뒤에서: 필터 굽기(네이티브, 직렬) → 사진첩 → 임시 파일 삭제. 실패하면 원본을 넣는다. 장마다 토스트 없음.
+    void (async () => {
+      let toSave = rawUri;
+      if (presetKey !== "none") {
+        try { toSave = (await c.renderStill(rawUri, presetKey, fx)).uri; } catch (e) {
+          if (__DEV__) console.log("[camera] renderStill 실패 → 원본 저장", String(e));
+        }
+      }
+      const res = await saveFileToAlbum(toSave);
+      // 원본 임시 파일은 없앤다(필터본이 됐든 원본이 됐든 저장 시도 뒤). 필터본 임시 파일도 사진첩에 들어갔으니 지운다.
+      await deleteTemp(rawUri);
+      if (toSave !== rawUri) await deleteTemp(toSave);
+      if ("ok" in res || albumWarned.current) return;
+      albumWarned.current = true;
+      toast(c21.noAlbumPermission);
+    })();
+  }, [flashOv, selected, fxAmount, toast]);
 
   /**
    * 사진들을 편집기로 — 사진별 프리셋(presetKeys, srcs 와 같은 순서) + 대표 프리셋(presetKey = 첫 장) +
@@ -261,19 +273,6 @@ export default function CameraFilterTab() {
     setEditorPayload(payload);
     router.push({ pathname: "/editor", params: { preset: presetKey } });
   }, []);
-
-  /** "완료 n" — 사진첩 저장은 찍을 때 이미 끝났다. 원본 + 사진별 프리셋으로 편집기만 연다(손보기는 선택). */
-  const finish = useCallback(async () => {
-    if (!shots.length || working) return;
-    setWorking(true);
-    try {
-      const list = shots;
-      setShots([]);
-      await openEditor(list);
-    } finally {
-      setWorking(false);
-    }
-  }, [shots, working, openEditor]);
 
   const pickFromAlbum = useCallback(async () => {
     const picked = await pickPhotos({ multiple: true, limit: 10 });
@@ -398,25 +397,16 @@ export default function CameraFilterTab() {
           </ScrollView>
         </CoachAnchor>
         <View style={styles.controls}>
-          {shots.length === 0 ? (
-            <Pressable accessibilityRole="button" onPress={() => { void pickFromAlbum(); }} style={styles.side}>
-              <IconImage size={24} color="#FFFFFF" />
-              <Text size="caption" weight="semibold" style={{ color: "#FFFFFF" }}>{c21.album}</Text>
-            </Pressable>
-          ) : (
-            <Pressable accessibilityRole="button" onPress={() => { void finish(); }} style={styles.side}>
-              <View style={styles.doneBtn}>
-                {shots[shots.length - 1] ? <Image source={{ uri: shots[shots.length - 1].uri }} style={StyleSheet.absoluteFill} contentFit="cover" /> : null}
-              </View>
-              <View style={styles.donePill}><Text size="footnote" weight="bold" style={{ color: "#000" }}>{c21.burstDone(shots.length)}</Text></View>
-            </Pressable>
-          )}
+          <Pressable accessibilityRole="button" onPress={() => { void pickFromAlbum(); }} style={styles.side}>
+            <IconImage size={24} color="#FFFFFF" />
+            <Text size="caption" weight="semibold" style={{ color: "#FFFFFF" }}>{c21.album}</Text>
+          </Pressable>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="shutter"
-            disabled={shots.length >= MAX_SHOTS || working}
+            disabled={working}
             onPress={() => { void capture(); }}
-            style={({ pressed }) => [styles.shutterOuter, { opacity: shots.length >= MAX_SHOTS ? 0.4 : 1, transform: [{ scale: pressed ? 0.94 : 1 }] }]}
+            style={({ pressed }) => [styles.shutterOuter, { transform: [{ scale: pressed ? 0.94 : 1 }] }]}
           >
             <View style={styles.shutterInner} />
           </Pressable>
@@ -512,8 +502,6 @@ const styles = StyleSheet.create({
   chipOn: { backgroundColor: "#FFFFFF" },
   controls: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", alignSelf: "stretch", paddingHorizontal: space.s5 },
   side: { width: 64, alignItems: "center", gap: 4 },
-  doneBtn: { width: 40, height: 40, borderRadius: 8, overflow: "hidden", borderWidth: 2, borderColor: "#FFFFFF" },
-  donePill: { position: "absolute", top: -14, paddingHorizontal: 8, height: 22, borderRadius: 11, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center" },
   shutterOuter: { width: 76, height: 76, borderRadius: 38, borderWidth: 4, borderColor: "#FFFFFF", alignItems: "center", justifyContent: "center" },
   shutterInner: { width: 62, height: 62, borderRadius: 31, backgroundColor: "#FFFFFF" },
   focusWrap: { position: "absolute", flexDirection: "row", alignItems: "flex-start", gap: 8, width: 112, height: 120 },
