@@ -6,7 +6,7 @@ import { Card } from "./Card";
 import { Button } from "./Button";
 import { Spinner } from "./Spinner";
 import {
-  FILTER_PLAN_KRW, FILTER_PLAN_ORDER, getFilterPackages, iapAvailable, purchaseFilterPackage, restoreFilterAccess,
+  FILTER_PLAN_KRW, FILTER_PLANS_SHOWN, getFilterPackages, iapAvailable, purchaseFilterPackage, restoreFilterAccess,
   useFilterAccess, type FilterPackage, type FilterPlan,
 } from "@/lib/iap";
 import { won } from "@/lib/packs";
@@ -16,12 +16,15 @@ import { copy } from "@/lib/copy";
 import { color, radius, space, themedStyles } from "@/theme/tokens";
 
 // ============================================================================
-// 필터 이용권 결제 시트(scratchpad filterpass_spec.md "결제 시트(네이티브)").
-//  · RevenueCat offering "filters" 의 3개(연간 강조 → 월간 → 평생). 가격은 스토어 priceString,
-//    못 불러오면 원화 참고가(누를 수는 없음) — StoreList 와 같은 규칙.
+// 카메라 이용권 결제 시트(scratchpad filterpass_spec.md "결제 시트(네이티브)").
+//  · 오너 결정 2026-10-11: 월간(rimikimi.filter.monthly ₩1,900/월)만 보여 준다 — FILTER_PLANS_SHOWN.
+//    연간·평생은 스토어·RevenueCat 에 그대로 두고 숨긴다(복원은 FILTER_PRODUCTS 로 계속 된다).
+//  · Play 오퍼 first-month-free(첫 1개월 무료, 1회) 가 상품에 붙어 오면(freeTrial) 요금제 아래
+//    "첫 1개월 무료 · 이후 월 {갱신가} 자동 갱신" 과 상단 버튼 "첫 달 0원으로 시작" 을 보여 준다.
+//    오퍼가 안 오면(이미 써 본 계정 등) 기존 "매월 자동 갱신" + "계속하기 · {가격}".
+//  · 가격은 스토어 priceString, 못 불러오면 원화 참고가(누를 수는 없음) — StoreList 와 같은 규칙.
 //  · 기간·자동갱신 안내 · 이용약관/개인정보 링크(설정 화면과 같은 주소) · 구매 복원.
 //  · 크레딧 적립(/api/iap/grant)과 무관 — 로그인 없이도 산다(카메라 탭은 로그인 없이 쓴다).
-//  · "무료 체험"이라는 말을 구독과 묶어 쓰지 않는다.
 // iOS 결제 시트가 아직 없어 CreditSheet(StoreList) 모양을 따랐다.
 // ============================================================================
 
@@ -77,41 +80,49 @@ export function FilterPassSheet({ open, onClose, onUnlocked }: { open: boolean; 
 
   const base = getEnv().apiBase;
   const expired = access.source === "locked";
+  // 미리 고른 요금제 = 보이는 것 중 첫째(월간만 보이므로 월간). 상단 버튼이 이걸 산다.
+  const selected: FilterPlan = FILTER_PLANS_SHOWN[0];
+  const selPkg = pkgs.find((x) => x.plan === selected);
+  const selPrice = selPkg?.priceString || won(FILTER_PLAN_KRW[selected]);
+  const ctaDisabled = !!busy || restoring || (!selPkg && !loading) || !available;
 
   return (
     <Sheet open={open} title={c21.fpTitle} onClose={onClose}>
       <Text size="callout" tone="muted">{expired ? c21.fpLeadExpired : c21.fpLead}</Text>
       <View style={{ gap: space.s2 }}>
-        {FILTER_PLAN_ORDER.map((plan) => {
+        {FILTER_PLANS_SHOWN.map((plan) => {
           const p = pkgs.find((x) => x.plan === plan);
-          const best = plan === "annual";
           const isBusy = busy === plan;
           const disabled = !!busy || restoring || (!p && !loading) || !available;
+          const note = p?.freeTrial ? c21.fpIntroNote(p.renewPrice || p.priceString) : PLAN_NOTE[plan]();
           return (
             <Pressable
               key={plan}
               accessibilityRole="button"
-              accessibilityState={{ disabled }}
+              accessibilityState={{ disabled, selected: plan === selected }}
               disabled={disabled}
               onPress={() => { void buy(plan); }}
-              style={({ pressed }) => [styles.row, best && styles.rowBest, pressed && { backgroundColor: color.fill }, disabled && !isBusy && { opacity: 0.55 }]}
+              style={({ pressed }) => [styles.row, plan === selected && styles.rowSelected, pressed && { backgroundColor: color.fill }, disabled && !isBusy && { opacity: 0.55 }]}
             >
               <View style={{ flex: 1, gap: 2 }}>
-                <View style={styles.titleRow}>
-                  <Text size="headline">{PLAN_LABEL[plan]()}</Text>
-                  {best ? <View style={styles.badge}><Text size="caption" tone="accent">{c21.fpBest}</Text></View> : null}
-                </View>
-                <Text size="footnote" tone="muted">{PLAN_NOTE[plan]()}</Text>
+                <Text size="headline">{PLAN_LABEL[plan]()}</Text>
+                <Text size="footnote" tone="muted">{note}</Text>
               </View>
               <View style={styles.trail}>
                 {isBusy ? <Spinner size={20} color={color.accent} /> : (
-                  <Text size="callout" weight="semibold" tabular>{p?.priceString || won(FILTER_PLAN_KRW[plan])}</Text>
+                  <Text size="callout" weight="semibold" tabular>{(p?.freeTrial ? p.renewPrice : p?.priceString) || won(FILTER_PLAN_KRW[plan])}</Text>
                 )}
               </View>
             </Pressable>
           );
         })}
       </View>
+      <Button
+        label={selPkg?.freeTrial ? c21.fpCtaIntro : c21.fpCtaPrice(selPrice)}
+        loading={busy === selected}
+        disabled={ctaDisabled}
+        onPress={() => { void buy(selected); }}
+      />
       <Card padded>
         <Text size="footnote" tone="muted">{c21.fpPlusFree}</Text>
       </Card>
@@ -146,9 +157,7 @@ const styles = themedStyles(() => StyleSheet.create({
     flexDirection: "row", alignItems: "center", minHeight: 62, paddingHorizontal: space.s4, paddingVertical: space.s3,
     backgroundColor: color.card, borderRadius: radius.card, borderWidth: 1, borderColor: color.line,
   },
-  rowBest: { borderWidth: 2, borderColor: color.accent },
-  titleRow: { flexDirection: "row", alignItems: "center", gap: space.s2 },
-  badge: { backgroundColor: color.accentWeak, borderRadius: radius.pill, paddingHorizontal: space.s2, paddingVertical: 2 },
+  rowSelected: { borderWidth: 2, borderColor: color.accent },
   trail: { minWidth: 72, alignItems: "flex-end" },
   links: { flexDirection: "row", justifyContent: "center", alignItems: "center", gap: space.s2 },
   link: { textDecorationLine: "underline" },

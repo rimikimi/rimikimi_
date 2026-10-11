@@ -22,6 +22,8 @@ import { clearRegisteredPhoto } from "@/lib/photo";
 import { copy } from "@/lib/copy";
 import { c21 } from "@/lib/copy21";
 import { getStartTab, setStartTab, useApp21 } from "@/lib/app21";
+import { useFilterAccess } from "@/lib/iap";
+import { FilterPassSheet } from "@/ui/FilterPassSheet";
 import { color, radius, space, themedStyles } from "@/theme/tokens";
 
 // ============================================================================
@@ -189,6 +191,11 @@ export default function SettingsScreen() {
   };
   const removeFace = async () => { await deleteProfile(); setFace(null); setScanN(0); };
 
+  // 카메라 이용권 — 원격 스위치(filterPass.enabled 또는 androidMinVersionCode ≤ 이 빌드)가 켜진 빌드에만 행이 보인다.
+  // 스토어 심사자가 결제 화면을 찾는 자리. 로그인 없이 산다(카메라 탭이 로그인 없이 쓰이므로 requireLogin 안 함).
+  const filterAccess = useFilterAccess();
+  const [passOpen, setPassOpen] = useState(false);
+
   const onDeleteAccount = () => {
     Alert.alert(copy.profile.deleteAccount, copy.account.deleteConfirm, [
       { text: copy.photos.cancel, style: "cancel" },
@@ -244,7 +251,14 @@ export default function SettingsScreen() {
         <Row label={copy.profile.freeToday} value={quota ? `${freeLeft}/${quota.limit}` : "–"} />
         <Sep />
         <Row label={copy.profile.store} onPress={() => requireLogin("make", () => router.push("/store"), "/store")} />
+        {filterAccess.enabled ? (
+          <>
+            <Sep />
+            <Row label={c21.fpSettingsRow} value={filterAccess.unlocked && filterAccess.source !== "notStarted" && filterAccess.source !== "trial" ? c21.fpDone : undefined} onPress={() => setPassOpen(true)} />
+          </>
+        ) : null}
       </Card>
+      {filterAccess.enabled ? <FilterPassSheet open={passOpen} onClose={() => setPassOpen(false)} onUnlocked={() => setPassOpen(false)} /> : null}
 
       {/* 초대 */}
       {session ? <InviteSection code={quota?.referralCode} token={token} onClaimed={refresh} /> : null}

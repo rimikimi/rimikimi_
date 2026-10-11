@@ -6,7 +6,8 @@ import { getRcApiKey } from "./env";
 import { iapGrant, ApiError } from "./api";
 import { IAP_PRODUCTS, PRODUCT_IDS, baseProductId, isSubscription } from "./packs";
 import { copy } from "./copy";
-import { labelFlag, labelsVersionSubscribe } from "./copy21";
+import { labelFlag, labelValue, labelsVersionSubscribe } from "./copy21";
+import Constants from "expo-constants";
 
 // ============================================================================
 // IAP — RevenueCat (react-native-purchases). 1.x src/iap.js 흐름 그대로:
@@ -205,6 +206,11 @@ export async function grantWithRetry(token: string, productId: string, transacti
 // · 원격 스위치: 서버 이름표 `/labels.json` 의 `filterPass.enabled`(기본 false, 오너 2026-10-10).
 //   꺼져 있으면 잠금·결제 시트 없음, 편집기 payload 는 filtersUnlocked=true. trialStart 도 기록하지 않는다
 //   (스위치를 켠 날부터 각자 3일이 시작되게 — 켜자마자 기존 사용자가 전부 잠기지 않게).
+// · 빌드별 스위치(2026-10-11): `filterPass.androidMinVersionCode`("109" 같은 문자열) 가 있고 현재 versionCode 가
+//   그 이상이면 켜진다. 옛 빌드(≤108)는 이 키를 모르고, 평평한 키 `"filterPass.enabled"` 만 읽는다
+//   (중첩 `{"filterPass": {"enabled": …}}` 는 옛 labelFlag 가 못 읽는다). 설정 진입점·월간 단일 요금제가 없는
+//   옛 빌드가 잠기지 않게 그쪽이 보는 값은 계속 false 여야 한다 — 평평한 `"filterPass.enabled": "true"` 를
+//   쓰면 모든 빌드가 켜지니 쓰지 말 것. 새 빌드만 켜려면 중첩 filterPass 안에 androidMinVersionCode: "109".
 // · trialStart 가 아직 없으면(한 번도 안 써 봄) 잠그지 않는다 — 처음 쓰는 순간 3일이 시작된다.
 // · Android 는 SecureStore 에 둔다 → 재설치하면 초기화(계약서의 알려진 한계).
 // · rimikimi+ 구독자는 무료 — RevenueCat entitlement 에 plus 상품이 묶여 있지만, 대시보드 설정 전이어도
@@ -215,6 +221,26 @@ export async function grantWithRetry(token: string, productId: string, transacti
 export const FILTER_ENTITLEMENT = "filters";
 export const FILTER_OFFERING = "filters";
 export const FILTER_FLAG_KEY = "filterPass.enabled";
+export const FILTER_MIN_VERSION_KEY = "filterPass.androidMinVersionCode";
+
+/** 이 빌드의 안드로이드 versionCode — app.config.ts 에서 빌드 때 박힌 값(expo-application 은 링크돼 있지 않다). */
+function currentVersionCode(): number | null {
+  const v = Constants.expoConfig?.android?.versionCode;
+  return typeof v === "number" && Number.isFinite(v) ? v : null;
+}
+
+/**
+ * 원격 스위치 — `filterPass.enabled` 가 true 이거나, `filterPass.androidMinVersionCode`(문자열) 가 있고
+ * 현재 versionCode 가 그 이상이면 켜짐. 옛 빌드는 `enabled` 만 보므로 "false" 로 두어야 그쪽은 계속 꺼져 있다.
+ */
+export function filterPassRemoteEnabled(): boolean {
+  if (labelFlag(FILTER_FLAG_KEY)) return true;
+  if (Platform.OS !== "android") return false;
+  const raw = labelValue(FILTER_MIN_VERSION_KEY);
+  const min = typeof raw === "string" || typeof raw === "number" ? Number(raw) : NaN;
+  const cur = currentVersionCode();
+  return Number.isFinite(min) && min > 0 && cur != null && min <= cur;
+}
 const TRIAL_KEY = "filterpass.trialStart";
 const TRIAL_MS = 3 * 24 * 60 * 60 * 1000;
 const FILTER_PRODUCTS = ["rimikimi.filter.lifetime", "rimikimi.filter.annual", "rimikimi.filter.monthly"];
@@ -241,7 +267,7 @@ const fpListeners = new Set<() => void>();
 
 function computeFilterAccess(): FilterAccess {
   const devState = fpDev?.state ?? null;
-  const enabled = !!fpDev || labelFlag(FILTER_FLAG_KEY);
+  const enabled = !!fpDev || filterPassRemoteEnabled();
   if (!enabled) return { enabled, unlocked: true, trialEndsAt: null, source: "off", devState };
   const entitled = fpDev ? fpDev.entitled : fpEntitled;
   const plus = fpDev ? fpDev.plus : fpPlus;
@@ -349,10 +375,33 @@ export function useFilterAccess(): FilterAccess {
 }
 
 export type FilterPlan = "annual" | "monthly" | "lifetime";
-export interface FilterPackage { plan: FilterPlan; priceString: string; _pkg: PurchasesPackage }
+export interface FilterPackage {
+  plan: FilterPlan;
+  /** 스토어 표시가(Play 는 defaultOption 기준 — 무료 체험이 붙어 있어도 이 값이 온다). */
+  priceString: string;
+  /** 갱신가(전액 단계). 무료 체험 안내 "이후 월 {price}" 에 쓴다. 못 구하면 priceString. */
+  renewPrice: string;
+  /** 스토어 상품에 무료 체험 단계가 있나(Play first-month-free 오퍼 / RevenueCat freePhase·introPrice). */
+  freeTrial: boolean;
+  _pkg: PurchasesPackage;
+}
 /** 상품을 못 불러왔을 때 보여 줄 원화 참고가(오너 결정 가격). */
 export const FILTER_PLAN_KRW: Record<FilterPlan, number> = { annual: 4900, monthly: 1900, lifetime: 9900 };
 export const FILTER_PLAN_ORDER: FilterPlan[] = ["annual", "monthly", "lifetime"];
+/** 시트에 보이는 요금제 — 오너 결정 2026-10-11: 월간만(연간·평생은 스토어·RevenueCat 에 그대로 두고 숨김). */
+export const FILTER_PLANS_SHOWN: FilterPlan[] = ["monthly"];
+
+/** 무료 체험 단계 + 갱신가 — Android 는 defaultOption(실제로 결제되는 옵션)을 먼저 본다. */
+function trialInfo(product: PurchasesStoreProduct | null | undefined): { freeTrial: boolean; renewPrice: string } {
+  const price = product?.priceString || "";
+  if (!product) return { freeTrial: false, renewPrice: price };
+  const def = product.defaultOption;
+  const freeTrial = !!def?.freePhase
+    || (product.subscriptionOptions || []).some((o) => !!o.freePhase)
+    || (!!product.introPrice && product.introPrice.price === 0);
+  const renewPrice = def?.fullPricePhase?.price?.formatted || price;
+  return { freeTrial, renewPrice };
+}
 
 function planOf(p: PurchasesPackage): FilterPlan | null {
   if (p.packageType === PACKAGE_TYPE.ANNUAL) return "annual";
@@ -365,7 +414,7 @@ function planOf(p: PurchasesPackage): FilterPlan | null {
   return null;
 }
 
-/** RevenueCat offering "filters" 의 3개 상품(연간 → 월간 → 평생). 못 불러오면 []. */
+/** RevenueCat offering "filters" 의 상품(연간 → 월간 → 평생 순, 시트는 FILTER_PLANS_SHOWN 만 보여 준다). 못 불러오면 []. */
 export async function getFilterPackages(): Promise<FilterPackage[]> {
   if (!iapAvailable()) return [];
   try {
@@ -375,7 +424,7 @@ export async function getFilterPackages(): Promise<FilterPackage[]> {
     const list = (off?.availablePackages || [])
       .map((pkg) => ({ plan: planOf(pkg), pkg }))
       .filter((x): x is { plan: FilterPlan; pkg: PurchasesPackage } => !!x.plan)
-      .map(({ plan, pkg }) => ({ plan, priceString: pkg.product?.priceString || "", _pkg: pkg }));
+      .map(({ plan, pkg }) => ({ plan, priceString: pkg.product?.priceString || "", ...trialInfo(pkg.product), _pkg: pkg }));
     if (!list.length) setDiag("offering(filters)", new Error(copy.errors.noProducts));
     return FILTER_PLAN_ORDER.map((pl) => list.find((x) => x.plan === pl)).filter((x): x is FilterPackage => !!x);
   } catch (e) {

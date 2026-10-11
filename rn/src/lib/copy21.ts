@@ -52,11 +52,26 @@ export function label(key: string, ko: string, en: string): string {
 }
 
 /**
+ * 서버 이름표의 값 하나 — 평평한 키(`"filterPass.enabled"`)를 먼저 보고, 없으면 점으로 내려간다
+ * (`{"filterPass": {"enabled": "false"}}` — 실제 public/labels.json 이 이 모양). 없으면 undefined.
+ */
+export function labelValue(key: string): unknown {
+  const tbl = labelTable as Record<string, unknown>;
+  if (key in tbl) return tbl[key];
+  let cur: unknown = tbl;
+  for (const part of key.split(".")) {
+    if (!cur || typeof cur !== "object") return undefined;
+    cur = (cur as Record<string, unknown>)[part];
+  }
+  return cur;
+}
+
+/**
  * 서버 이름표의 켜기/끄기 값 — `{"filterPass.enabled": true}` 처럼 그냥 true 여도 되고,
  * 다른 키와 같은 모양(`{ko:"true"}` · `{enabled:true}` · `{value:true}`)이어도 된다. 없거나 못 받으면 false.
  */
 export function labelFlag(key: string): boolean {
-  const raw = (labelTable as Record<string, unknown>)[key];
+  const raw = labelValue(key);
   const yes = (v: unknown) => v === true || v === "true" || v === 1 || v === "1";
   if (yes(raw)) return true;
   if (raw && typeof raw === "object") {
@@ -196,8 +211,13 @@ export const c21 = {
   get fpMonthlyNote() { return t("매월 자동 갱신", "Renews every month"); },
   get fpLifetimeNote() { return t("한 번 결제하고 계속 사용", "Pay once, keep forever"); },
   get fpBest() { return t("추천", "Best value"); },
+  get fpSettingsRow() { return t("카메라 이용권", "Camera Pass"); },
+  /** 스토어에 첫 달 무료 오퍼(Play first-month-free)가 있을 때 요금제 아래 한 줄. {price} = 갱신가(월). */
+  fpIntroNote: (price: string) => (isKo ? `첫 1개월 무료 · 이후 월 ${price} 자동 갱신` : `First month free · then ${price}/month, auto-renews`),
+  get fpCtaIntro() { return t("첫 달 0원으로 시작", "Start with first month free"); },
+  fpCtaPrice: (price: string) => (isKo ? `계속하기 · ${price}` : `Continue · ${price}`),
   get fpPlusFree() { return t("rimikimi+ 구독 중이면 모든 필터가 무료예요", "rimikimi+ members get every filter free"); },
-  get fpLegal() { return t("1년·1개월 이용권은 구독이에요. 표시된 기간마다 자동 갱신되며 Google Play 계정으로 결제돼요. 기간 종료 24시간 전까지 해지하지 않으면 갱신되고, Google Play 설정에서 언제든 관리·해지할 수 있어요. 평생 이용권은 한 번만 결제해요.", "The 1-year and 1-month passes are subscriptions that renew automatically each period and are billed to your Google Play account. They renew unless you cancel at least 24 hours before the period ends; manage or cancel anytime in Google Play settings. The lifetime pass is a one-time purchase."); },
+  get fpLegal() { return t("카메라 이용권(월간)은 구독이에요. 1개월마다 자동 갱신되며 Google Play 계정으로 결제돼요. 기간 종료 24시간 전까지 해지하지 않으면 갱신되고, Google Play 설정에서 언제든 관리·해지할 수 있어요. 첫 달 무료 체험은 구독 시작 시 적용되고, 체험 종료 전에 해지하면 요금이 청구되지 않아요.", "Camera Pass (monthly) is a subscription that renews every month and is billed to your Google Play account. It renews unless you cancel at least 24 hours before the period ends; manage or cancel anytime in Google Play settings. The first-month free trial applies when you start the subscription; cancel before it ends and you won't be charged."); },
   get fpDone() { return t("이용권이 적용됐어요", "Your pass is active"); },
   get fpRestoreNone() { return t("복원할 이용권이 없어요", "No pass to restore"); },
   get fpLocked() { return t("잠김", "Locked"); },
