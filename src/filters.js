@@ -25,73 +25,73 @@
    con: 대비 S커브 강도 / fade: 블랙 들어올림(빛바랜 느낌) / whitePull: 하이라이트 눌러 롤오프
    sat: 채도 / vib: 바이브런스 / sh·hi: 그림자·하이라이트 스플릿톤 [r,g,b]
    bw: 흑백 채널 믹서 [wr,wg,wb] (합=1) */
-// group: "film"(필름 스톡) | "camera"(카메라 룩). 오너 지시 — "상징적인 카메라와 필름".
+// group: "mood"(필름 스톡) | "camera"(카메라 룩). 오너 지시 — "상징적인 카메라와 필름".
 // hsl: 색상 대역 조정(applyHslBands) / fx: 프리셋 기본 효과(칩 탭 = 원탭 완성 룩)
 export const FILM_PRESETS = [
   { key: "none",     ko: "원본",      en: "Original" },
 
   /* ── 필름 스톡 (코닥/후지/시네스틸/아그파/일포드 색과학 참고, 이름은 느낌만) ── */
-  { key: "golden",   ko: "LA '88",      en: "LA '88", group: "film", // Kodak Gold 200
+  { key: "golden",   ko: "LA '88",      en: "LA '88", group: "mood", // Kodak Gold 200
     temp: 20, tint: 0,  ex: 0.04,  con: 0.18, fade: 10, whitePull: 8,  sat: 0.12,  vib: 0.15, sh: [6, 3, -8],   hi: [12, 9, -12],
     hsl: [{ c: 110, w: 60, h: -18, s: -0.12 }, { c: 30, w: 25, s: 0.08, l: 0.02 }] },
-  { key: "peach",    ko: "리스본 '98",      en: "Lisbon '98", group: "film", // Portra 400
+  { key: "peach",    ko: "리스본 '98",      en: "Lisbon '98", group: "mood", // Portra 400
     temp: 12, tint: 6,  ex: 0.07,  con: 0.08, fade: 14, whitePull: 14, sat: -0.08, vib: 0.25, sh: [4, 2, 0],    hi: [10, 5, -2],
     hsl: [{ c: 30, w: 28, s: -0.06, l: 0.04 }, { c: 110, w: 60, h: -10, s: -0.15 }] },
-  { key: "slide",    ko: "코펜하겐 '02",  en: "Copenhagen '02", group: "film", // Ektachrome
+  { key: "slide",    ko: "코펜하겐 '02",  en: "Copenhagen '02", group: "mood", // Ektachrome
     temp: -6, tint: -2, ex: 0,     con: 0.26, fade: 4,  whitePull: 0,  sat: 0.2,   vib: 0.1,  sh: [-3, 0, 8],   hi: [0, 0, 0],
     hsl: [{ c: 225, w: 55, s: 0.25, l: -0.05 }, { c: 120, w: 50, s: 0.1 }] },
-  { key: "retro",    ko: "하바나 '74",    en: "Havana '74", group: "film", // Kodachrome
+  { key: "retro",    ko: "하바나 '74",    en: "Havana '74", group: "mood", // Kodachrome
     temp: 6,  tint: 2,  ex: -0.05, con: 0.32, fade: 2,  whitePull: 4,  sat: 0.18,  vib: 0,    sh: [4, -2, -4],  hi: [6, 2, -6],
     hsl: [{ c: 0, w: 30, s: 0.2, l: -0.06 }, { c: 60, w: 35, h: -10, s: 0.1 }, { c: 220, w: 60, s: -0.15, l: -0.05 }] },
-  { key: "vivid",    ko: "발리 '99",    en: "Bali '99", group: "film", // Velvia
+  { key: "vivid",    ko: "발리 '99",    en: "Bali '99", group: "mood", // Velvia
     temp: 0,  tint: 0,  ex: 0,     con: 0.28, fade: 0,  whitePull: 0,  sat: 0.18,  vib: 0.12, sh: [0, -2, 4],   hi: [2, 0, -2],
     hsl: [{ c: 225, w: 60, s: 0.3, l: -0.04 }, { c: 120, w: 55, s: 0.25, l: -0.03 }, { c: 0, w: 25, s: 0.2 }, { c: 30, w: 18, s: -0.1 }] },
-  { key: "green",    ko: "도쿄 '97",      en: "Tokyo '97", group: "film", // Superia
+  { key: "green",    ko: "도쿄 '97",      en: "Tokyo '97", group: "mood", // Superia
     temp: 4,  tint: -8, ex: 0,     con: 0.15, fade: 8,  whitePull: 6,  sat: 0.1,   vib: 0.12, sh: [0, 6, -2],   hi: [6, 4, -4],
     hsl: [{ c: 120, w: 60, h: 6, s: 0.2, l: -0.03 }, { c: 60, w: 25, h: 20, s: -0.1 }] },
-  { key: "pastel",   ko: "파리 '05",    en: "Paris '05", group: "film", // Pro 400H
+  { key: "pastel",   ko: "파리 '05",    en: "Paris '05", group: "mood", // Pro 400H
     temp: -4, tint: -10, ex: 0.18, con: -0.05, fade: 24, whitePull: 16, sat: -0.15, vib: 0.2,  sh: [-2, 7, 5],   hi: [2, 5, 3],
     hsl: [{ c: 120, w: 70, h: 8, s: -0.2, l: 0.05 }, { c: 220, w: 60, s: -0.15, l: 0.05 }, { c: 30, w: 25, s: -0.08 }] },
-  { key: "cine",     ko: "런던 '93",      en: "London '93", group: "film", // CineStill 800T
+  { key: "cine",     ko: "런던 '93",      en: "London '93", group: "mood", // CineStill 800T
     temp: -14, tint: 6, ex: 0,     con: 0.20, fade: 12, whitePull: 6,  sat: 0.05,  vib: 0.1,  sh: [-6, 4, 10],  hi: [14, 2, -4],
     hsl: [{ c: 120, w: 70, h: 55, s: -0.2 }, { c: 220, w: 50, h: -18 }, { c: 30, w: 22, s: 0.05 }],
     fx: { grain: 0.3 } },
-  { key: "newtro",   ko: "오사카 '96",    en: "Osaka '96", group: "film", // Agfa Vista
+  { key: "newtro",   ko: "오사카 '96",    en: "Osaka '96", group: "mood", // Agfa Vista
     temp: 8,  tint: 8,  ex: 0,     con: 0.22, fade: 8,  whitePull: 6,  sat: 0.16,  vib: 0,    sh: [6, -2, 0],   hi: [8, 2, -4],
     hsl: [{ c: 0, w: 35, s: 0.15 }, { c: 180, w: 60, s: -0.2 }, { c: 30, w: 20, s: 0.05 }] },
-  { key: "softmono", ko: "로마 '62", en: "Rome '62", group: "film", // Ilford HP5
+  { key: "softmono", ko: "로마 '62", en: "Rome '62", group: "mood", // Ilford HP5
     ex: 0.05, con: 0.12, fade: 16, whitePull: 12, bw: [0.28, 0.56, 0.16],
     fx: { grain: 0.35 } },
 
   /* ── 카메라 룩 (상징적인 카메라들의 렌더링) ── */
-  { key: "warm",     ko: "바르셀로나 '08",      en: "Barcelona '08", group: "camera", // 캐논풍 스킨톤
+  { key: "warm",     ko: "바르셀로나 '08",      en: "Barcelona '08", group: "mood", // 캐논풍 스킨톤
     temp: 10, tint: 10, ex: 0.08,  con: 0.10, fade: 6,  whitePull: 4,  sat: 0.06,  vib: 0.15, sh: [2, 0, 0],    hi: [9, 2, 2],
     hsl: [{ c: 30, w: 25, l: 0.03 }, { c: 220, w: 50, s: -0.1 }] },
-  { key: "cool",     ko: "오슬로 '11",      en: "Oslo '11", group: "camera", // 니콘풍 뉴트럴
+  { key: "cool",     ko: "오슬로 '11",      en: "Oslo '11", group: "mood", // 니콘풍 뉴트럴
     temp: -14, tint: -4, ex: 0,    con: 0.16, fade: 6,  whitePull: 4,  sat: 0.04,  vib: 0.1,  sh: [-2, 2, 5],   hi: [0, 2, 5],
     hsl: [{ c: 225, w: 60, s: 0.12 }, { c: 110, w: 50, h: 15, s: -0.08 }] },
-  { key: "vintage",  ko: "서울 '92",    en: "Seoul '92", group: "camera", // 미놀타 90년대 자동카메라
+  { key: "vintage",  ko: "서울 '92",    en: "Seoul '92", group: "mood", // 미놀타 90년대 자동카메라
     temp: 14, tint: 2,  ex: -0.02, con: -0.08, fade: 22, whitePull: 18, sat: -0.15, vib: 0.05, sh: [6, 4, -2],   hi: [8, 6, -6],
     hsl: [{ c: 120, w: 60, h: -25, s: -0.3 }, { c: 220, w: 60, s: -0.25 }, { c: 30, w: 30, s: -0.05, l: 0.03 }],
     fx: { grain: 0.25 } },
-  { key: "docu",     ko: "베를린 '89",      en: "Berlin '89", group: "camera", // 후지 클래식크롬풍
+  { key: "docu",     ko: "베를린 '89",      en: "Berlin '89", group: "mood", // 후지 클래식크롬풍
     temp: -4, tint: 0,  ex: -0.03, con: 0.20, fade: 10, whitePull: 10, sat: -0.28, vib: 0.1,  sh: [0, 2, 6],    hi: [4, 2, -2],
     hsl: [{ c: 220, w: 70, h: -10, s: 0.05 }, { c: 0, w: 30, s: -0.15 }, { c: 30, w: 25, s: -0.12 }] },
-  { key: "mono",     ko: "뉴욕 '59",      en: "New York '59", group: "camera", // 라이카 모노크롬풍
+  { key: "mono",     ko: "뉴욕 '59",      en: "New York '59", group: "mood", // 라이카 모노크롬풍
     ex: 0,    con: 0.35, fade: 2,  whitePull: 0,  bw: [0.35, 0.5, 0.15] },
-  { key: "digicam",  ko: "시부야 '04",    en: "Shibuya '04", group: "camera", // 2000년대 CCD 컴팩트 (Y2K)
+  { key: "digicam",  ko: "시부야 '04",    en: "Shibuya '04", group: "mood", // 2000년대 CCD 컴팩트 (Y2K)
     temp: -8, tint: -2, ex: 0.06,  con: 0.22, fade: 0,  whitePull: 0,  sat: 0.15,  vib: 0.1,  sh: [0, 2, 6],    hi: [4, 4, 10],
     hsl: [{ c: 225, w: 60, s: 0.2 }, { c: 180, w: 40, s: 0.15 }],
     fx: { grain: 0.15 } },
-  { key: "toy",      ko: "제주 '01",      en: "Jeju '01", group: "camera", // 로모/홀가 토이카메라
+  { key: "toy",      ko: "제주 '01",      en: "Jeju '01", group: "mood", // 로모/홀가 토이카메라
     temp: 4,  tint: 6,  ex: 0,     con: 0.3,  fade: 4,  whitePull: 0,  sat: 0.24,  vib: 0,    sh: [0, -4, 8],   hi: [6, 0, -6],
     hsl: [{ c: 225, w: 55, s: 0.3, l: -0.06 }, { c: 0, w: 30, s: 0.15 }],
     fx: { vignette: 0.65, grain: 0.25 } },
-  { key: "dispo",    ko: "오키나와 '00",    en: "Okinawa '00", group: "camera", // 일회용 카메라 + 플래시
+  { key: "dispo",    ko: "오키나와 '00",    en: "Okinawa '00", group: "mood", // 일회용 카메라 + 플래시
     temp: 6,  tint: 0,  ex: 0.1,   con: 0.25, fade: 6,  whitePull: 0,  sat: 0.12,  vib: 0.08, sh: [-2, 4, 0],   hi: [10, 8, 2],
     hsl: [{ c: 110, w: 50, h: -8, s: -0.05 }],
     fx: { grain: 0.45, leak: 0.12 } },
-  { key: "instant",  ko: "마이애미 '84",  en: "Miami '84", group: "camera", // 폴라로이드 인화지 색
+  { key: "instant",  ko: "마이애미 '84",  en: "Miami '84", group: "mood", // 폴라로이드 인화지 색
     temp: -2, tint: -6, ex: 0.06,  con: -0.06, fade: 20, whitePull: 14, sat: -0.12, vib: 0.08, sh: [-4, 6, 4],   hi: [6, 4, -2],
     hsl: [{ c: 120, w: 60, h: 10, s: -0.15, l: 0.03 }],
     fx: { grain: 0.2 } },
@@ -128,7 +128,7 @@ export const FILM_PRESETS = [
   /* ── 재미 (SNOW류 — 특수 렌더 모드, special 필드가 전용 코드 경로를 탄다) ── */
   // 인플 — 얼굴 피부 보정(뷰티). 색 LUT 대신 beautyRGBA 를 탄다. 강도 = 색감 슬라이더(0 = 원본).
   // hidden: 목록에서 뺀다(오너 2026-10-11 "인플 필터는 아직 구리다. 없애자") — 키는 남겨 옛 저장값이 깨지지 않게.
-  { key: "infl",     ko: "인플",      en: "Influencer", group: "fun", hidden: true,
+  { key: "infl",     ko: "인플",      en: "Influencer", group: "mood", hidden: true,
     special: "beauty" },
   /* ── 빈티지 (필름카메라 6종, 오너 2026-10-12 — 자기 카테고리. 세피아·듀오 핑크·네온·서모·스케치는 숨김) ── */
   { key: "vintC", ko: "빈티지C", en: "Vintage C", group: "vintage", // CineStill 800T 계열 — 푸른 밤·붉은 하이라이트
@@ -155,30 +155,29 @@ export const FILM_PRESETS = [
     temp: -2, tint: -10, ex: 0.04, con: 0.14, fade: 14, whitePull: 10, sat: 0.06, vib: 0.14, sh: [-4, 8, 6], hi: [6, 8, 2],
     hsl: [{ c: 120, w: 60, h: 12, s: 0.1, l: -0.02 }, { c: 220, w: 55, s: 0.12 }, { c: 30, w: 22, h: -4, s: -0.04 }],
     fx: { grain: 0.4, vignette: 0.2 } },
-  { key: "sepia",    ko: "세피아",    en: "Sepia", group: "fun", hidden: true,
+  { key: "sepia",    ko: "세피아",    en: "Sepia", group: "mood", hidden: true,
     ex: 0.02, con: 0.12, fade: 8, whitePull: 6, bw: [0.3, 0.55, 0.15], sh: [18, 6, -14], hi: [24, 10, -18] },
-  { key: "duopink",  ko: "듀오 핑크", en: "Duo Pink", group: "fun", hidden: true,
+  { key: "duopink",  ko: "듀오 핑크", en: "Duo Pink", group: "mood", hidden: true,
     special: "duotone", c1: [38, 18, 66], c2: [255, 158, 201] },
-  { key: "neon",     ko: "네온",      en: "Neon", group: "fun", hidden: true,
+  { key: "neon",     ko: "네온",      en: "Neon", group: "mood", hidden: true,
     special: "duotone", c1: [24, 8, 66], c2: [90, 255, 240],
   },
-  { key: "thermal",  ko: "서모",      en: "Thermal", group: "fun", hidden: true,
+  { key: "thermal",  ko: "서모",      en: "Thermal", group: "mood", hidden: true,
     special: "thermal" },
-  { key: "glitch",   ko: "글리치",    en: "Glitch", group: "fun",
+  { key: "glitch",   ko: "글리치",    en: "Glitch", group: "mood",
     special: "glitch" },
-  { key: "vhs",      ko: "VHS",      en: "VHS", group: "fun",
+  { key: "vhs",      ko: "VHS",      en: "VHS", group: "mood",
     special: "vhs", fx: { grain: 0.35 } },
-  { key: "pixelate", ko: "모자이크",  en: "Pixel", group: "fun",
+  { key: "pixelate", ko: "모자이크",  en: "Pixel", group: "mood",
     special: "pixelate" },
-  { key: "bloom",    ko: "빛번짐",    en: "Bloom", group: "fun",
-    temp: 8, tint: 2, ex: 0.06, con: -0.06, fade: 16, whitePull: 10, sat: -0.04, vib: 0.18,
-    sh: [6, 4, 0], hi: [14, 10, 2],
-    fx: { leak: 0.3 } },
-  { key: "twinkle",  ko: "트윙클",    en: "Twinkle", group: "fun",
+  // 빛번짐 — 드리미 글로우 + 펄 + 프리즘 스파클(dreamyRGBA). 오너 2026-10-12 확정. 세기 = 색감 슬라이더.
+  { key: "bloom",    ko: "빛번짐",    en: "Bloom", group: "mood",
+    special: "dreamy" },
+  { key: "twinkle",  ko: "트윙클",    en: "Twinkle", group: "mood",
     temp: 4, tint: 0, ex: 0.03, con: 0.1, fade: 6, whitePull: 6, sat: 0.06, vib: 0.2,
     sh: [0, 0, 4], hi: [8, 6, 0],
     fx: { twinkle: 0.85 } },
-  { key: "sketch",   ko: "스케치",    en: "Sketch", group: "fun", hidden: true,
+  { key: "sketch",   ko: "스케치",    en: "Sketch", group: "mood", hidden: true,
     special: "sketch" },
 ];
 
@@ -188,9 +187,7 @@ export const FILM_PRESETS = [
 export const FILTER_GROUPS = [
   { key: "phone",  labelKey: "filter.gPhone", emoji: "📱" },
   { key: "vintage", labelKey: "filter.gVintage", emoji: "📸" },
-  { key: "film",   labelKey: "filter.gFilm", emoji: "🎞️" },
-  { key: "camera", labelKey: "filter.gCam",  emoji: "📷" },
-  { key: "fun",    labelKey: "filter.gFun",  emoji: "✨" },
+  { key: "mood",   labelKey: "filter.gMood", emoji: "🎞️" }, // 감성 = 예전 필름·카메라·재미(오너 2026-10-12 "폰카, 빈티지, 감성 3개")
 ];
 
 // [{ key, emoji, labelKey, items }] — 원본(none) 제외, FILM_PRESETS 순서 유지.
@@ -218,6 +215,8 @@ export function applyLookWithStrength(data, w, h, preset, effects = {}, strength
   const seedOnly = { seed: effects.seed };
   if (p?.special === "beauty") {
     beautyRGBA(data, w, h, k, effects.faces); // 강도 = 보정 세기 그 자체(보간 아님) — 0 이면 원본 그대로
+  } else if (p?.special === "dreamy") {
+    dreamyRGBA(data, w, h, k, effects.faces, effects.seed); // 색감 슬라이더 = 빛번짐 세기(70% = 기본 룩)
   } else if (p) {
     if (Math.abs(k - 1) > 0.01) {
       const orig = new Uint8ClampedArray(data);
@@ -433,6 +432,11 @@ function blockAverageRGBA(data, w, h, bs) {
 export function applyLook(data, w, h, preset, effects = {}) {
   if (preset?.special === "beauty") {
     beautyRGBA(data, w, h, 1, effects.faces);
+    const { faces: _f, ...rest } = effects;
+    return applyLook(data, w, h, null, rest);
+  }
+  if (preset?.special === "dreamy") {
+    dreamyRGBA(data, w, h, 1, effects.faces, effects.seed);
     const { faces: _f, ...rest } = effects;
     return applyLook(data, w, h, null, rest);
   }
@@ -656,6 +660,231 @@ export function applyLook(data, w, h, preset, effects = {}) {
   // 으로 밝기를 더해 가며 뻗는다. 더하기(additive)라 어두운 곳은 그대로 남는다.
   if (effects.twinkle) twinkleRGBA(data, w, h, effects.twinkle, seed);
   return data;
+}
+
+/* ---------- 빛번짐(dreamy) — 드리미 글로우 + 펄 광택 + 프리즘 스파클 (오너 확정 2026-10-12) ----------
+   원형 = scratch filmtest/sparkle.py (STYLE=prism, GLITTER/FILM 끔). 값 바꾸면 iOS·안드 카메라도 같이.
+   a = 세기(색감 슬라이더 k = strength/0.7 — 70% 가 오너가 고른 기본 룩, 100% ≈ 1.43배).
+   ① 글로우: 밝은 곳(조명·하이라이트)에서만 빛이 번진다 — 화면 전체 안개·검정 띄우기 없음.
+   ② 펄: 위치 따라 천천히 도는 분홍·라벤더·하늘빛을 하이라이트와 사진 전체에 얇게.
+   ③ 스파클: 가장 밝은 "작고 날카로운" 반사광 3곳(반지·시계·귀걸이·조명)에 프리즘 별빛. 얼굴 피부엔 안 넣는다.
+   무거운 블러·검출은 긴 변 540 격자에서 하고, 원해상도엔 쌍선형으로 올려 섞는다(12MP 저장도 같은 그림). */
+function dreamyRGBA(data, w, h, a, facesIn, seed) {
+  if (!(a > 0.001)) return;
+  const sc = Math.min(1, 540 / Math.max(w, h));
+  const gw = Math.max(8, Math.round(w * sc)), gh = Math.max(8, Math.round(h * sc));
+  const n = gw * gh;
+  const R = new Float32Array(n), G = new Float32Array(n), B = new Float32Array(n);
+  // 면적 평균 축소
+  const cnt = new Float32Array(n);
+  // 모든 픽셀을 다 더한다 — 띄엄띄엄 읽으면 미리보기(1080)와 저장(원본)에서 스파클 자리가 달라진다
+  for (let y = 0; y < h; y++) {
+    const gy = Math.min(gh - 1, (y * gh / h) | 0);
+    for (let x = 0; x < w; x++) {
+      const gx = Math.min(gw - 1, (x * gw / w) | 0), j = gy * gw + gx, i = (y * w + x) * 4;
+      R[j] += data[i]; G[j] += data[i + 1]; B[j] += data[i + 2]; cnt[j]++;
+    }
+  }
+  for (let j = 0; j < n; j++) { const c = cnt[j] * 255 || 255; R[j] /= c; G[j] /= c; B[j] /= c; }
+  const m = Math.min(gw, gh);
+
+  // 펄 색(격자) — sparkle.py 의 hue/pearl 과 같은 식
+  const PR = new Float32Array(n), PG = new Float32Array(n), PB = new Float32Array(n);
+  for (let y = 0; y < gh; y++) for (let x = 0; x < gw; x++) {
+    const xx = x / m, yy = y / m, j = y * gw + x;
+    const hue = (Math.sin(xx * 5.0 + yy * 3.0) * 0.5 + 0.5) * 0.35 + 0.72;
+    PR[j] = 0.5 + 0.5 * Math.cos(2 * Math.PI * hue);
+    PG[j] = 0.5 + 0.5 * Math.cos(2 * Math.PI * (hue + 1 / 3));
+    PB[j] = 0.5 + 0.5 * Math.cos(2 * Math.PI * (hue + 2 / 3));
+  }
+
+  // ① 글로우 원천 = 밝은 부분만
+  const SR = new Float32Array(n), SG = new Float32Array(n), SB = new Float32Array(n);
+  for (let j = 0; j < n; j++) {
+    const L = R[j] * 0.299 + G[j] * 0.587 + B[j] * 0.114;
+    const t = Math.max(0, Math.min(1, (L - 0.45) / 0.55)) ** 1.2;
+    SR[j] = R[j] * t; SG[j] = G[j] * t; SB[j] = B[j] * t;
+  }
+  const [g1r, g1g, g1b] = gaussPlanes([SR, SG, SB], gw, gh, m * 0.018);
+  const [g2r, g2g, g2b] = gaussPlanes([SR, SG, SB], gw, gh, m * 0.05);
+  const GLR = new Float32Array(n), GLG = new Float32Array(n), GLB = new Float32Array(n);
+  for (let j = 0; j < n; j++) {
+    const pr = 0.82 + 0.18 * PR[j], pg = 0.82 + 0.18 * PG[j], pb = 0.82 + 0.18 * PB[j];
+    GLR[j] = (g1r[j] * 0.75 + g2r[j] * 0.5) * pr;
+    GLG[j] = (g1g[j] * 0.75 + g2g[j] * 0.5) * pg * 0.94;
+    GLB[j] = (g1b[j] * 0.75 + g2b[j] * 0.5) * pb * 0.96;
+  }
+  const [sfr, sfg, sfb] = gaussPlanes([R, G, B], gw, gh, m * 0.008);
+
+  // ③ 스파클 자리 — 원본 격자에서 찾는다(글로우 입히기 전)
+  const peaks = sparklePeaks(R, G, B, gw, gh, facesIn, data, w, h);
+
+  // 원해상도 합성 (격자 값은 쌍선형으로)
+  const gx1 = gw - 1, gy1 = gh - 1;
+  for (let y = 0; y < h; y++) {
+    const fy = Math.min(gy1, Math.max(0, (y + 0.5) * gh / h - 0.5)), y0 = fy | 0, y1 = Math.min(gy1, y0 + 1), ty = fy - y0;
+    for (let x = 0; x < w; x++) {
+      const fx = Math.min(gx1, Math.max(0, (x + 0.5) * gw / w - 0.5)), x0 = fx | 0, x1 = Math.min(gx1, x0 + 1), tx = fx - x0;
+      const j00 = y0 * gw + x0, j01 = y0 * gw + x1, j10 = y1 * gw + x0, j11 = y1 * gw + x1;
+      const bl = (A) => (A[j00] * (1 - tx) + A[j01] * tx) * (1 - ty) + (A[j10] * (1 - tx) + A[j11] * tx) * ty;
+      const i = (y * w + x) * 4;
+      let r = data[i] / 255, g = data[i + 1] / 255, b = data[i + 2] / 255;
+      // ① 글로우(screen)
+      const ka = 1.15 * a;
+      r = 1 - (1 - r) * (1 - Math.min(1, bl(GLR) * ka));
+      g = 1 - (1 - g) * (1 - Math.min(1, bl(GLG) * ka));
+      b = 1 - (1 - b) * (1 - Math.min(1, bl(GLB) * ka));
+      // 전반적으로 살짝 몽글 — 밝은 쪽으로만 섞어 안개 X
+      const sa = 0.15 * a;
+      r = r * (1 - sa) + Math.max(r, bl(sfr)) * sa;
+      g = g * (1 - sa) + Math.max(g, bl(sfg)) * sa;
+      b = b * (1 - sa) + Math.max(b, bl(sfb)) * sa;
+      // ② 펄 — 하이라이트에 얇게
+      const pr = 0.82 + 0.18 * bl(PR), pg = 0.82 + 0.18 * bl(PG), pb = 0.82 + 0.18 * bl(PB);
+      const lp = r * 0.299 + g * 0.587 + b * 0.114;
+      const hm = Math.max(0, Math.min(1, (lp - 0.55) / 0.4)) ** 1.5 * a;
+      r = r * (1 - 0.16 * hm) + pr * 0.16 * hm + 0.03 * hm;
+      g = g * (1 - 0.16 * hm) + pg * 0.16 * hm + 0.03 * hm;
+      b = b * (1 - 0.16 * hm) + pb * 0.16 * hm + 0.03 * hm;
+      // 사진 전체 펄(소프트라이트)
+      const wg = (0.35 + 0.65 * Math.min(1, Math.max(0, lp))) * 0.22 * a;
+      const sl = (v, p) => (p < 0.5 ? 2 * v * p + v * v * (1 - 2 * p) : 2 * v * (1 - p) + Math.sqrt(Math.max(0, v)) * (2 * p - 1));
+      r = r * (1 - wg) + sl(Math.min(1, r), pr) * wg + 0.012 * a;
+      g = g * (1 - wg) + sl(Math.min(1, g), pg) * wg + 0.012 * a;
+      b = b * (1 - wg) + sl(Math.min(1, b), pb) * wg + 0.012 * a;
+      data[i] = clamp8(r * 255 + 0.5) | 0; data[i + 1] = clamp8(g * 255 + 0.5) | 0; data[i + 2] = clamp8(b * 255 + 0.5) | 0;
+    }
+  }
+  // ③ 스파클 — 별마다 자기 타일에서 그리고(원해상도 버퍼 없이) 부드럽게 포화시켜 screen
+  let rs = (seed || 7) | 0;
+  const rnd = () => ((rs = (rs * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+  const mw = Math.min(w, h), px = mw / 1080; // 광선 굵기는 1080 기준 px 로 맞춰 해상도와 무관하게
+  const top = peaks.length ? peaks[0].v : 1;
+  for (const pk of peaks) {
+    const size = mw * 0.075 * (0.6 + 0.5 * pk.v / top) * (0.8 + 0.2 * a);
+    drawPrismStar(data, w, h, pk.x / gw * w, pk.y / gh * h, size, pk.tint, a, px, rnd);
+  }
+}
+
+/** 스파클 자리: 작고 날카로운·채도 낮은 반사광 우선, 큰 빛덩이(보케) 감점, 얼굴 피부 제외. 격자 좌표로 최대 3개. */
+function sparklePeaks(R, G, B, gw, gh, facesIn, data, w, h) {
+  const n = gw * gh, m = Math.min(gw, gh);
+  const L = new Float32Array(n), sat = new Float32Array(n);
+  for (let j = 0; j < n; j++) {
+    L[j] = R[j] * 0.299 + G[j] * 0.587 + B[j] * 0.114;
+    const mx = Math.max(R[j], G[j], B[j]), mn = Math.min(R[j], G[j], B[j]);
+    sat[j] = (mx - mn) / (mx + 1e-6);
+  }
+  const boxMean = (src, rad) => {
+    const tmp = new Float32Array(n), out = new Float32Array(n);
+    for (let y = 0; y < gh; y++) { let s = 0, c = 0; const o = y * gw;
+      for (let x = -rad; x < gw; x++) { const xa = x + rad; if (xa < gw) { s += src[o + xa]; c++; } const xr = x - rad - 1; if (xr >= 0) { s -= src[o + xr]; c--; } if (x >= 0) tmp[o + x] = s / c; } }
+    for (let x = 0; x < gw; x++) { let s = 0, c = 0;
+      for (let y = -rad; y < gh; y++) { const ya = y + rad; if (ya < gh) { s += tmp[ya * gw + x]; c++; } const yr = y - rad - 1; if (yr >= 0) { s -= tmp[yr * gw + x]; c--; } if (y >= 0) out[y * gw + x] = s / c; } }
+    return out;
+  };
+  const loc = boxMean(L, Math.max(4, Math.round(m / 80)));
+  const locS = boxMean(L, Math.max(2, Math.round(m / 180)));
+  // 문턱 = 상위 0.4% 밝기 (최대 0.9) — 어두운·노을 사진도 제일 밝은 반사광은 잡히게
+  const hist = new Uint32Array(256); for (let j = 0; j < n; j++) hist[Math.min(255, (L[j] * 255) | 0)]++;
+  let acc = 0, q = 255; for (let v = 255; v >= 0; v--) { acc += hist[v]; if (acc >= n * 0.004) { q = v; break; } }
+  const th = Math.min(0.9, q / 255);
+  // 큰 빛덩이 면적(밝은 연결 요소)
+  const lab = new Int32Array(n), area = [0];
+  const bth = Math.max(th, 0.8);
+  for (let j = 0; j < n; j++) {
+    if (lab[j] || L[j] <= bth) continue;
+    const id = area.length; let cnt = 0; const st = [j]; lab[j] = id;
+    while (st.length) { const k = st.pop(); cnt++; const x = k % gw, y = (k / gw) | 0;
+      if (x > 0 && !lab[k - 1] && L[k - 1] > bth) { lab[k - 1] = id; st.push(k - 1); }
+      if (x < gw - 1 && !lab[k + 1] && L[k + 1] > bth) { lab[k + 1] = id; st.push(k + 1); }
+      if (y > 0 && !lab[k - gw] && L[k - gw] > bth) { lab[k - gw] = id; st.push(k - gw); }
+      if (y < gh - 1 && !lab[k + gw] && L[k + gw] > bth) { lab[k + gw] = id; st.push(k + gw); } }
+    area.push(cnt);
+  }
+  // 얼굴(이마~턱)만 막는다 — 액세서리는 반짝여도 된다. 정규화 {x,y,w,h}(위가 0). 없으면 피부 덩어리로 추정.
+  let faces = Array.isArray(facesIn) ? facesIn : null;
+  if (!faces) { try { faces = findFacesSkin(data, w, h); } catch (_) { faces = []; } }
+  const block = new Uint8Array(n);
+  for (const f of faces || []) {
+    const fx = f.x ?? f[0], fy = f.y ?? f[1], fw = f.w ?? f[2], fh = f.h ?? f[3];
+    const x0 = Math.floor((fx + fw * 0.08) * gw), x1 = Math.ceil((fx + fw * 0.92) * gw);
+    const y0 = Math.floor((fy - fh * 0.1) * gh), y1 = Math.ceil((fy + fh * 1.05) * gh);
+    for (let y = Math.max(0, y0); y < Math.min(gh, y1); y++) for (let x = Math.max(0, x0); x < Math.min(gw, x1); x++) block[y * gw + x] = 1;
+  }
+  const blobMax = (m / 45) ** 2 * (gw * gh) / (m * m) * (m * m) / (gw * gh);
+  const score = new Float32Array(n);
+  for (let j = 0; j < n; j++) {
+    if (L[j] <= th || block[j]) continue;
+    // 피부색(어두운 쪽)만 — 하얗게 날아간 반사광(노을 물결 등)은 살린다
+    const skin = R[j] > G[j] && G[j] > B[j] && sat[j] > 0.15 && sat[j] < 0.6 && L[j] < 0.85 && R[j] - G[j] > 0.05;
+    if (skin) continue;
+    const small = Math.max(0, Math.min(1, 1 - (lab[j] ? area[lab[j]] : 0) / ((m / 45) ** 2)));
+    const metal = Math.max(0, Math.min(1, 1 - sat[j] / 0.35));
+    score[j] = ((L[j] - loc[j]) + (L[j] - locS[j]) * 1.5 + (L[j] - th) * 0.6) * (0.35 + 0.65 * small) * (0.7 + 0.3 * metal);
+  }
+  void blobMax;
+  // 살짝 뭉갠 점수로 고른다 — 리샘플 차이(미리보기 1080 ↔ 저장 원본)로 1·2등이 뒤바뀌지 않게
+  { const sm = boxMean(score, 1); for (let j = 0; j < n; j++) score[j] = score[j] > 0 ? sm[j] : 0; }
+  // 국소 최대(반경 m/8) 중 상위 3
+  const rad = Math.max(3, Math.round(m / 8)), cand = [];
+  for (let y = 0; y < gh; y++) for (let x = 0; x < gw; x++) {
+    const j = y * gw + x, s = score[j]; if (s <= 0.05) continue;
+    let ok = true;
+    for (let yy = Math.max(0, y - rad); yy <= Math.min(gh - 1, y + rad) && ok; yy += 2)
+      for (let xx = Math.max(0, x - rad); xx <= Math.min(gw - 1, x + rad); xx += 2) if (score[yy * gw + xx] > s) { ok = false; break; }
+    if (ok) cand.push({ x: x + 0.5, y: y + 0.5, v: s, tint: [R[j], G[j], B[j]] });
+  }
+  cand.sort((p, q2) => q2.v - p.v);
+  const out = [];
+  for (const c of cand) { if (out.every((o) => Math.hypot(o.x - c.x, o.y - c.y) > rad)) out.push(c); if (out.length >= 3) break; }
+  return out;
+}
+
+/** 프리즘 별빛 한 개 — 타일 버퍼에 가운데 빛 + 가는 무지개 광선 40개, 살짝 흐리고 헤일로, 1-exp 로 부드럽게 포화 → screen */
+function drawPrismStar(data, w, h, cx, cy, size, tint, a, px, rnd) {
+  const half = Math.ceil(size * 1.35 + 8 * px);
+  const x0 = Math.max(0, Math.floor(cx - half)), x1 = Math.min(w, Math.ceil(cx + half));
+  const y0 = Math.max(0, Math.floor(cy - half)), y1 = Math.min(h, Math.ceil(cy + half));
+  const tw = x1 - x0, th = y1 - y0; if (tw < 4 || th < 4) return;
+  const T = [new Float32Array(tw * th), new Float32Array(tw * th), new Float32Array(tw * th)];
+  const tmx = Math.max(1e-3, tint[0], tint[1], tint[2]);
+  const white = [1.0 * 0.5 + tint[0] / tmx * 0.5, 0.97 * 0.5 + tint[1] / tmx * 0.5, 0.92 * 0.5 + tint[2] / tmx * 0.5];
+  const splat = (x, y, c0, c1, c2, inten, sig) => {
+    const r = Math.ceil(sig * 3) + 1, lx = x - x0, ly = y - y0;
+    const xa = Math.max(0, Math.floor(lx - r)), xb = Math.min(tw - 1, Math.ceil(lx + r));
+    const ya = Math.max(0, Math.floor(ly - r)), yb = Math.min(th - 1, Math.ceil(ly + r));
+    const k = -1 / (2 * sig * sig);
+    for (let yy = ya; yy <= yb; yy++) { const dy = yy - ly;
+      for (let xx = xa; xx <= xb; xx++) { const dx = xx - lx, gv = Math.exp((dx * dx + dy * dy) * k) * inten, o = yy * tw + xx;
+        T[0][o] += gv * c0; T[1][o] += gv * c1; T[2][o] += gv * c2; } }
+  };
+  splat(cx, cy, white[0], white[1], white[2], 0.9, size * 0.045);
+  splat(cx, cy, white[0], white[1], white[2], 0.22, size * 0.16);
+  const hsv = (hh, s) => { const i = Math.floor(hh * 6), f = hh * 6 - i, p = 1 - s, q = 1 - f * s, t = 1 - (1 - f) * s;
+    return [[1, t, p], [q, 1, p], [p, 1, t], [p, q, 1], [t, p, 1], [1, p, q]][((i % 6) + 6) % 6]; };
+  const step = Math.max(1, px);
+  for (let r = 0; r < 40; r++) {
+    const ang = rnd() * Math.PI * 2, ln = rnd() * 0.75 + 0.25;
+    const Lr = size * (0.35 + 0.9 * ln ** 1.4), nn = Math.max(2, Math.floor(Lr / step));
+    const dx = Math.cos(ang) * step, dy = Math.sin(ang) * step, hue0 = rnd(), br = rnd() * 0.45 + 0.25;
+    for (let t = 1; t < nn; t++) {
+      const u = t / nn, f = 1 - u, mix = 1 - f * f;
+      const rc = hsv((hue0 + u * 0.6) % 1, 0.55 * u ** 0.6);
+      const c0 = white[0] * f * f + rc[0] * mix, c1 = white[1] * f * f + rc[1] * mix, c2 = white[2] * f * f + rc[2] * mix;
+      splat(cx + dx * t, cy + dy * t, c0, c1, c2, br * 0.22 * f ** 1.5, (1.0 + 1.8 * u) * px);
+    }
+  }
+  // 살짝 흐림 + 헤일로
+  const s1 = gaussPlanes(T, tw, th, 0.8 * px), s2 = gaussPlanes(T, tw, th, Math.min(w, h) * 0.006);
+  for (let o = 0, i0 = 0; o < tw * th; o++) {
+    const yy = (o / tw) | 0, xx = o - yy * tw; i0 = ((y0 + yy) * w + (x0 + xx)) * 4;
+    for (let c = 0; c < 3; c++) {
+      const v = (1 - Math.exp(-(s1[c][o] + s2[c][o] * 0.45) * 1.1)) * Math.min(1.6, a);
+      const base = data[i0 + c] / 255;
+      data[i0 + c] = clamp8((1 - (1 - base) * (1 - Math.min(1, v))) * 255 + 0.5) | 0;
+    }
+  }
 }
 
 /* ---------- 인플(Influencer) — 실시간 뷰티: 얼굴 피부만 결 살려 매끈·화사하게 (오너 승인 2026-10-10) ----------

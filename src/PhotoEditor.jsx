@@ -1236,9 +1236,9 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
 
         {tab === "filter" && (
           <>
-            {/* 폰카 / 빈티지 / 필름 / 카메라 / 재미 그룹 토글 */}
+            {/* 폰카 / 빈티지 / 감성 그룹 토글 */}
             <div style={ES.groupRow}>
-              {[["phone", t("filter.gPhone")], ["vintage", t("filter.gVintage")], ["film", t("filter.gFilm")], ["camera", t("filter.gCam")], ["fun", t("filter.gFun")]].map(([g, label]) => (
+              {[["phone", t("filter.gPhone")], ["vintage", t("filter.gVintage")], ["mood", t("filter.gMood")]].map(([g, label]) => (
                 <button
                   key={g}
                   style={{ ...ES.groupBtn, ...(chipGroup === g ? ES.groupBtnOn : null) }}

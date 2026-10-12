@@ -24,18 +24,15 @@ struct FilterTabView: View {
             .init(key: "vintC"), .init(key: "vintL"), .init(key: "vintP"),
             .init(key: "vintG"), .init(key: "vintS"), .init(key: "vintF"),
         ]),
-        .init(key: "film", title: Copy.filterGroupFilm, emoji: "🎞️", presets: [
+        // 감성 = 예전 필름·카메라·재미를 한 칸으로(오너 2026-10-12 "폰카, 빈티지, 감성 3개")
+        .init(key: "mood", title: Copy.filterGroupMood, emoji: "🎞️", presets: [
             .init(key: "golden"), .init(key: "peach"), .init(key: "slide"),
             .init(key: "retro"), .init(key: "vivid"), .init(key: "green"),
             .init(key: "pastel"), .init(key: "cine"), .init(key: "newtro"),
             .init(key: "softmono"),
-        ]),
-        .init(key: "camera", title: Copy.filterGroupCamera, emoji: "📷", presets: [
             .init(key: "warm"), .init(key: "cool"), .init(key: "vintage"),
             .init(key: "docu"), .init(key: "mono"), .init(key: "digicam"),
             .init(key: "toy"), .init(key: "dispo"), .init(key: "instant"),
-        ]),
-        .init(key: "fun", title: Copy.filterGroupFun, emoji: "✨", presets: [
             .init(key: "glitch"), .init(key: "vhs"), .init(key: "pixelate"),
             .init(key: "bloom"),
         ]),

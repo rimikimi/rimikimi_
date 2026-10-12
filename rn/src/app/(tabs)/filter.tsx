@@ -12,7 +12,7 @@ import { Text } from "@/ui/Text";
 import { Button } from "@/ui/Button";
 import { CoachAnchor, CoachHost } from "@/ui/Coach";
 import { IconCameraFlip, IconFlash, IconImage } from "@/ui/icons";
-import { IconFilm, IconLock, IconMirror, IconPhone, IconStarFill, IconSun } from "@/ui/icons21";
+import { IconFilm, IconHeartCircle, IconLock, IconMirror, IconPhone, IconStarFill, IconSun } from "@/ui/icons21";
 import { LiveCameraView, detectFaces, type LiveCameraHandle, type LiveReady } from "@/ui/LiveCamera";
 import { Coach, useApp21 } from "@/lib/app21";
 import { c21 } from "@/lib/copy21";
@@ -55,9 +55,9 @@ async function deleteTemp(uri: string) {
 }
 const MIRROR_KEY = "camera.frontMirror";
 const PHONE = ["ph16pro", "ph15pro", "ph14pro", "phxs", "ph7", "ph6s", "ph4s", "ph3gs"];
-// 아날로그 = iOS FilterTabView.groups 에서 폰카를 뺀 순서(빈티지 → 필름 → 카메라 → 재미, 빛번짐은 재미 맨 끝).
+// iOS FilterTabView.groups 와 같은 순서 — 폰카 / 빈티지 / 감성(예전 필름·카메라·재미, 오너 2026-10-12).
+const VINTAGE = ["vintC", "vintL", "vintP", "vintG", "vintS", "vintF"];
 const ANALOG = [
-  "vintC", "vintL", "vintP", "vintG", "vintS", "vintF",
   "golden", "peach", "slide", "retro", "vivid", "green", "pastel", "cine", "newtro", "softmono",
   "warm", "cool", "vintage", "docu", "mono", "digicam", "toy", "dispo", "instant",
   "glitch", "vhs", "pixelate", "bloom",
@@ -394,6 +394,8 @@ export default function CameraFilterTab() {
             <View style={styles.groupMark}><IconPhone size={16} color="rgba(255,255,255,0.7)" /></View>
             {PHONE.map((k) => <Chip key={k} k={k} label={filterName(k)} on={selected === k} onPress={setSelected} onLong={toggleFav} locked={lockPaid} />)}
             <View style={styles.groupMark}><IconFilm size={16} color="rgba(255,255,255,0.7)" /></View>
+            {VINTAGE.map((k) => <Chip key={k} k={k} label={filterName(k)} on={selected === k} onPress={setSelected} onLong={toggleFav} locked={lockPaid} />)}
+            <View style={styles.groupMark}><IconHeartCircle size={16} color="rgba(255,255,255,0.7)" /></View>
             {ANALOG.map((k) => <Chip key={k} k={k} label={filterName(k)} on={selected === k} onPress={setSelected} onLong={toggleFav} locked={lockPaid} />)}
           </ScrollView>
         </CoachAnchor>

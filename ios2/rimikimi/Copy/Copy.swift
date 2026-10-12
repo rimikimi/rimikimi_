@@ -149,6 +149,7 @@ enum Copy {
     static var filterGroupCamera: String { L.t("카메라", "Camera") }
     static var filterGroupFun: String { L.t("재미", "Fun") }
     static var filterGroupVintage: String { L.t("빈티지", "Vintage") }
+    static var filterGroupMood: String { L.t("감성", "Mood") }
     /// 프리셋 이름 (key → ko, en). 영어는 웹 `src/filters.js` 의 en.
     static let filterNames: [String: (ko: String, en: String)] = [
         "ph16pro": ("16 Pro", "16 Pro"), "ph15pro": ("15 Pro", "15 Pro"), "ph14pro": ("14 Pro", "14 Pro"),
