@@ -118,7 +118,8 @@ export function WebTool({ title, tool, query, initialPayload, devSimulatePaywall
           break;
         }
         case "saveToAlbum": {
-          await adGate(); // 무료 사용자는 광고를 본 뒤 저장
+          // 무료 사용자는 보상형 광고를 끝까지 본 뒤 저장 — 아니면 adCancelled(웹 편집기는 남은 장도 멈춘다)
+          if (!(await adGate())) { resolve(id, { error: "adCancelled" }); break; }
           const r = await saveDataUrlToAlbum(String(payload?.dataUrl ?? ""), String(payload?.filename ?? "rimikimi"));
           resolve(id, r);
           break;

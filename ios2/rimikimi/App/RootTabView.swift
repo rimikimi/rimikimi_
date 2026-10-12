@@ -87,7 +87,7 @@ struct RootTabView: View {
         //    구매 성공 경로(continueAfterPurchase)는 시트를 닫기 **전에** 예약을 꺼내 쓰므로 안전하다.
         // 만들기 직전 "광고 없애기" 안내(무료 사용자).
         .sheet(isPresented: Binding(get: { app.adFreePrompt }, set: { if !$0 && app.adFreePrompt { app.adFreePromptDismiss() } })) {
-            AdFreePromptSheet(guest: app.adFreePromptGuest, onBuy: { app.adFreePromptBuy() }, onContinue: { app.adFreePromptContinue() })
+            AdFreePromptSheet(guest: app.adFreePromptGuest, save: app.adFreePromptSave, onBuy: { app.adFreePromptBuy() }, onContinue: { app.adFreePromptContinue() })
                 .presentationDetents([.height(300)])
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(Radius.sheet)

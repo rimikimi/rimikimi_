@@ -173,10 +173,15 @@ final class AppState {
     var creditsSheet = false
     /// 크레딧 시트를 "광고 없애기"로 열었을 때 — 제목을 "크레딧이 부족해요" 대신 광고 문구로.
     var creditsSheetForAds = false
-    /// 생성 후 전면광고 직전에 한 번 묻는 "광고 없애기" 안내(오너 2026-10-12 — 생성 광고 앞에만, 저장 광고엔 없음).
+    /// 만들기·저장 직전에 묻는 "광고 없애기 / 광고 보고 계속" 안내(오너 2026-10-12 — 둘 다 보상형).
     var adFreePrompt = false
     /// 로그인 전 첫 1장 — 안내 창에서 "광고 없애기"(충전)를 숨긴다.
     var adFreePromptGuest = false
+    /// 저장 직전 안내 — 문구가 "광고 보고 저장"(오너 2026-10-12: 저장 광고도 보상형).
+    var adFreePromptSave = false
+    /// 보상형을 끝까지 본 뒤 잠깐은 다시 묻지 않는다 — 편집기에서 여러 장을 한 번에 저장해도 광고는 1번.
+    private var saveAdPassUntil = Date.distantPast
+    private var saveGateTask: Task<Bool, Never>?
     var pendingAfterPurchase: GenerateRequest?
     /// 채워 맞춤(outpaint) 진행 상태 — `FitSheet` 가 지켜본다.
     var outpaintPhase: OutpaintPhase = .idle
@@ -484,7 +489,8 @@ final class AppState {
             tab = .myPhotos
         case .guestReceive(let image):
             await refreshQuota()
-            await adGateBeforeSave()
+            // 로그인 전 첫 1장 — 충전할 수 없으니 "광고 보고 저장"만(닫으면 저장 안 하고 받기 화면에 남는다).
+            guard await adGateBeforeSave(guest: true) else { return }
             let ok = await CameraAlbum.save(image)
             showToast(ok ? Copy.savedToAlbum : Copy.noAlbumPermission)
             guestFlow = nil
@@ -848,12 +854,13 @@ final class AppState {
     }
     /// 안내에서 "광고 보고 만들기" — 보상형 광고를 끝까지 보면 진행, 중간에 닫으면 이번 생성은 취소.
     func adFreePromptContinue() {
+        let forSave = adFreePromptSave
         adFreePrompt = false
         let c = adFreeContinuation; adFreeContinuation = nil
         Task {
             try? await Task.sleep(nanoseconds: 350_000_000)   // 시트가 내려간 뒤 광고를 띄운다
             let ok = await RewardedAdManager.shared.showForReward()
-            if !ok { showToast(Copy.rewardNotEarned) }
+            if !ok { showToast(forSave ? Copy.rewardNotEarnedSave : Copy.rewardNotEarned) }
             c?.resume(returning: ok)
         }
     }
@@ -875,11 +882,29 @@ final class AppState {
     ///   - 무료 = 결제 기록이 한 번도 없는 계정(서버 quota `firstPurchase`). 크레딧팩·구독을 한 번이라도 샀으면 유료.
     ///   - 무제한 계정·구독 중인 계정 → 안 띄운다.
     ///   - quota 를 아직 못 불러왔으면 → 안 띄운다(모르면 안 띄우는 쪽).
-    /// 광고가 닫힐 때까지 기다렸다가 돌아오므로, 호출한 쪽은 그다음에 저장하면 된다.
-    func adGateBeforeSave() async {
-        guard let q = quota, q.unlimited != true, q.firstPurchase == true else { return }
-        if await store.hasActiveSubscription() { return }
-        await AdManager.shared.showAndWait()
+    /// 2026-10-12 오너: 저장 광고도 보상형 — 만들기와 같은 안내("광고 없애기" / "광고 보고 저장")를 먼저 띄운다.
+    /// true = 저장 진행(끝까지 봄·광고 없음·무료 아님), false = 저장 안 함(닫음·중간에 끔·충전으로 감).
+    /// 끝까지 본 뒤 90초 동안은 다시 묻지 않는다(여러 장 저장 = 광고 1번). 동시에 여러 번 불려도 안내는 하나.
+    func adGateBeforeSave(guest: Bool = false) async -> Bool {
+        if !guest {
+            guard let q = quota, q.unlimited != true, q.firstPurchase == true else { return true }
+            if await store.hasActiveSubscription() { return true }
+        }
+        if Date() < saveAdPassUntil { return true }
+        if let t = saveGateTask { return await t.value }
+        let t = Task { @MainActor () -> Bool in
+            adFreePromptSave = true
+            adFreePromptGuest = guest
+            let ok = await withCheckedContinuation { c in adFreeContinuation = c; adFreePrompt = true }
+            adFreePromptSave = false
+            adFreePromptGuest = false
+            if ok { saveAdPassUntil = Date().addingTimeInterval(90) }
+            return ok
+        }
+        saveGateTask = t
+        let ok = await t.value
+        saveGateTask = nil
+        return ok
     }
 
     /// 홈 초대 카드를 닫는다 — 닫힌 상태를 영구 기억해 다음 실행에도 다시 뜨지 않게 한다(결함 #5).

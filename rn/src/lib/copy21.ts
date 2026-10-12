@@ -91,6 +91,11 @@ export const c21 = {
   get guestRewardBody() { return t("광고를 끝까지 보면 첫 사진을 무료로 만들어 드려요.", "Watch the whole ad and your first photo is on us."); },
   /** 만들기 직전 안내 시트 제목(충전 시트의 adFreeTitle 과 별개). */
   get adFreePromptTitle() { return t("광고 없이 만들고 싶다면", "Create without ads"); },
+  get adFreeSaveTitle() { return t("광고 없이 저장하고 싶다면", "Save without ads"); },
+  get adFreeWatchSave() { return t("광고 보고 저장", "Watch an ad to save"); },
+  get guestSaveTitle() { return t("광고 보고 저장하기", "Watch an ad to save"); },
+  get guestSaveBody() { return t("광고를 끝까지 보면 사진첩에 저장돼요.", "Watch the whole ad and it's saved to your gallery."); },
+  get rewardedIncompleteSave() { return t("광고를 끝까지 보면 저장할 수 있어요", "Watch the whole ad to save"); },
   get rewardedIncomplete() { return t("광고를 끝까지 보면 만들 수 있어요", "Watch the whole ad to create"); },
   // 탭
   get tabMake() { return t("만들기", "Create"); },

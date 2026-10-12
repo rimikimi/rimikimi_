@@ -382,7 +382,7 @@ export function App21Provider({ children }: { children: React.ReactNode }) {
 
   const guestReceive = useCallback((uri: string) => {
     const doSave = async () => {
-      await adGate();
+      if (!(await adGate())) return; // 보상형을 끝까지 안 봤으면 저장 안 하고 받기 화면에 남는다
       const r = await saveDataUrlToAlbum(uri, "rimikimi");
       toast("ok" in r ? c21.savedToAlbum : c21.noAlbumPermission);
       setGuestFlow(null);

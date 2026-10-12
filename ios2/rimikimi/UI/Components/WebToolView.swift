@@ -46,7 +46,7 @@ final class WebBridgeCoordinator: NSObject, WKScriptMessageHandler, WKNavigation
     var onPaywall: (() -> Void)?
     var onFilterUsed: (() -> Void)?
     /// 앨범에 저장하기 직전에 기다릴 일(무료 사용자 광고). 없으면 바로 저장.
-    var beforeSave: (() async -> Void)?
+    var beforeSave: (() async -> Bool)?
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         guard let body = message.body as? [String: Any], let type = body["type"] as? String else { return }
@@ -93,7 +93,10 @@ final class WebBridgeCoordinator: NSObject, WKScriptMessageHandler, WKNavigation
         }
         Task { [weak self] in
             guard let self else { return }
-            if let gate = await MainActor.run(body: { self.beforeSave }) { await gate() }
+            // 광고를 끝까지 안 보면 저장 안 함 — 웹(편집기)은 adCancelled 를 받으면 남은 장도 멈춘다.
+            if let gate = await MainActor.run(body: { self.beforeSave }), !(await gate()) {
+                self.resolve(id, ["error": "adCancelled"]); return
+            }
             do {
                 try await PHPhotoLibrary.shared().performChanges { PHAssetChangeRequest.creationRequestForAsset(from: img) }
                 await MainActor.run { self.onSaved?() }
@@ -132,7 +135,7 @@ struct WebToolView: UIViewRepresentable {
     var onClose: () -> Void
     var onRefreshCredits: () -> Void
     var onSaved: () -> Void
-    var beforeSave: (() async -> Void)? = nil
+    var beforeSave: (() async -> Bool)? = nil
     var onPaywall: (() -> Void)? = nil
     var onFilterUsed: (() -> Void)? = nil
     /// 네이티브 → 웹 호출용(결제 성공 뒤 `__rimikimiFilterAccess`). makeUIView 가 웹뷰를 넣는다.

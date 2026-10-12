@@ -932,6 +932,8 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
   async function saveDataUrl(data, name) {
     if (isNative()) {
       const r = await nativeSaveToAlbum(data, name);
+      // 앱이 저장 전 보상형 광고를 끝까지 못 봤다고 알려 줌 — 실패가 아니라 취소(안내는 앱이 띄운다)
+      if (r?.error === "adCancelled") return "cancel";
       return !!r?.ok;
     }
     const a = document.createElement("a");
@@ -960,17 +962,19 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
       await new Promise((r) => setTimeout(r, 30)); // busy 표시가 먼저 그려지게
       // 합성 전에 글꼴 도착을 기다린다 — 안 그러면 저장본만 대체 글꼴로 찍힐 수 있다
       await ensureTextFonts(Object.values(stickersByIdx).flat());
-      let okAll = true, done = 0;
+      let okAll = true, done = 0, cancelled = false;
       // 여러 장은 2장씩 겹쳐서(한 장 합성하는 동안 다음 장 디코드·합성) — 순서는 저장 큐가 지킨다.
       let next = 0;
       let saveChain = Promise.resolve();
       const worker = async () => {
-        while (next < sources.length) {
+        while (next < sources.length && !cancelled) {
           const i = next++;
           const data = await renderFullAt(i, i === idx ? fullImgRef.current : null);
           const name = multi ? `${filename}_edit_${i + 1}` : `${filename}_edit`;
           saveChain = saveChain.then(async () => {
+            if (cancelled) return;
             const ok = await saveDataUrl(data, name);
+            if (ok === "cancel") { cancelled = true; return; }
             okAll = okAll && ok;
             done++;
             if (multi) setSaveProg(`${done}/${sources.length}`);
@@ -980,8 +984,9 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
       };
       if (multi) setSaveProg(`0/${sources.length}`);
       await Promise.all(Array.from({ length: Math.min(SAVE_CONCURRENCY, sources.length) }, worker));
-      okAll ? hap.done() : hap.warn();
-      flashToast(okAll ? t("save.toast.done") : t("save.toast.fail"));
+      if (cancelled && done === 0) return; // 광고를 안 보고 닫음 — 아무것도 저장 안 됨, 안내는 앱 몫
+      okAll && !cancelled ? hap.done() : hap.warn();
+      flashToast(okAll && !cancelled ? t("save.toast.done") : t("save.toast.fail"));
     } catch (_) {
       hap.warn();
       flashToast(t("save.toast.fail"));

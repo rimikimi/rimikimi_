@@ -206,24 +206,35 @@ struct LegalLinksRow: View {
 }
 
 
-/// 만들기 직전 안내(무료 사용자) — "광고 없애기"(크레딧 충전) / "광고 보고 계속".
+/// 만들기·저장 직전 안내(무료 사용자) — "광고 없애기"(크레딧 충전) / "광고 보고 만들기·저장".
 struct AdFreePromptSheet: View {
     var guest = false
+    var save = false
     var onBuy: () -> Void
     var onContinue: () -> Void
+    private var title: String {
+        switch (guest, save) {
+        case (true, true): Copy.guestSaveTitle
+        case (true, false): Copy.guestRewardTitle
+        case (false, true): Copy.adFreeSaveTitle
+        case (false, false): Copy.adFreeTitle
+        }
+    }
+    private var desc: String { guest ? (save ? Copy.guestSaveDesc : Copy.guestRewardDesc) : Copy.adFreeDesc }
+    private var continueLabel: String { save ? Copy.adFreeSaveContinue : Copy.adFreeContinue }
     var body: some View {
         VStack(spacing: Spacing.s3) {
             Image(systemName: "sparkles.rectangle.stack").font(.system(size: 34, weight: .regular)).foregroundStyle(Color.accent)
                 .padding(.top, Spacing.s4)
-            Text(guest ? Copy.guestRewardTitle : Copy.adFreeTitle).font(AppFont.title2).tracking(Tracking.title2)
-            Text(guest ? Copy.guestRewardDesc : Copy.adFreeDesc).font(AppFont.callout).foregroundStyle(Color.ink2).multilineTextAlignment(.center)
+            Text(title).font(AppFont.title2).tracking(Tracking.title2)
+            Text(desc).font(AppFont.callout).foregroundStyle(Color.ink2).multilineTextAlignment(.center)
                 .padding(.horizontal, Spacing.s4)
             Spacer(minLength: 0)
             if guest {
-                Button(Copy.adFreeContinue, action: onContinue).buttonStyle(PrimaryButtonStyle())
+                Button(continueLabel, action: onContinue).buttonStyle(PrimaryButtonStyle())
             } else {
                 Button(Copy.adFreeBuy, action: onBuy).buttonStyle(PrimaryButtonStyle())
-                Button(Copy.adFreeContinue, action: onContinue).buttonStyle(TextButtonStyle(color: .ink2))
+                Button(continueLabel, action: onContinue).buttonStyle(TextButtonStyle(color: .ink2))
             }
         }
         .padding(.horizontal, Spacing.page)

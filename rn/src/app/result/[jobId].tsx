@@ -70,9 +70,10 @@ export default function Result() {
 
   const save = async () => {
     if (!img) return;
+    // 무료 사용자는 보상형 광고를 끝까지 본 뒤 저장(닫으면 저장 안 함 — 안내 토스트는 게이트가)
+    if (!(await adGate())) return;
     setSaving(true);
     try {
-      await adGate(); // 무료 사용자는 광고를 본 뒤 저장
       const MediaLibrary = await import("expo-media-library");
       const perm = await MediaLibrary.requestPermissionsAsync(true);
       if (!perm.granted) throw new Error("no permission");

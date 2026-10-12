@@ -479,6 +479,11 @@ enum Copy {
     static var adFreeContinue: String { L.t("광고 보고 만들기", "Watch an ad to create") }
     static var guestRewardTitle: String { L.t("광고 보고 무료로 만들기", "Watch an ad to create for free") }
     static var guestRewardDesc: String { L.t("광고를 끝까지 보면 첫 사진을 무료로 만들어 드려요.", "Watch the whole ad and your first photo is on us.") }
+    static var adFreeSaveTitle: String { L.t("광고 없이 저장하고 싶다면", "Save without ads") }
+    static var adFreeSaveContinue: String { L.t("광고 보고 저장", "Watch an ad to save") }
+    static var guestSaveTitle: String { L.t("광고 보고 저장하기", "Watch an ad to save") }
+    static var guestSaveDesc: String { L.t("광고를 끝까지 보면 사진첩에 저장돼요.", "Watch the whole ad and it's saved to your Photos.") }
+    static var rewardNotEarnedSave: String { L.t("광고를 끝까지 보면 저장할 수 있어요", "Watch the whole ad to save") }
     static var rewardNotEarned: String { L.t("광고를 끝까지 보면 만들 수 있어요", "Watch the whole ad to create") }
     static var filterPassLaunchBadge: String { L.t("런칭 기념", "Launch price") }
     static var filterPassLaunchLine: String { L.t("한 번 결제, 계속 사용 · 11월 13일까지", "Pay once, keep forever · until Nov 13") }

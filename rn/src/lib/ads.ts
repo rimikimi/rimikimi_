@@ -237,7 +237,7 @@ export function showAndWait(): Promise<void> {
 //   · 끝까지 봐서 보상(EARNED_REWARD)이 오면 true → 생성 진행
 //   · 보상 전에 닫으면 false → 생성 안 함(호출부가 안내 토스트)
 //   · 광고가 없거나(no-fill)·에러·타임아웃이면 true — 광고 재고 때문에 만들기를 막지 않는다
-// 생성 뒤 전면광고는 이걸로 대체돼 없어졌다(generation.tsx 주석). 저장 전 광고(showAndWait)는 그대로 전면광고.
+// 생성 뒤 전면광고는 이걸로 대체돼 없어졌다(generation.tsx 주석). 2026-10-12부터 저장 전 광고도 이걸 쓴다(saveAdGate.ts) — showAndWait(전면)는 지금 안 쓴다.
 // ============================================================================
 
 const ANDROID_REWARDED = "ca-app-pub-9458625554324585/1900552754";
