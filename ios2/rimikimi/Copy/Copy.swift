@@ -458,7 +458,7 @@ enum Copy {
     static var storeNoProducts: String { L.t("스토어가 상품 0개를 반환했어요. 잠시 후 다시 시도해 주세요.", "The store returned no products. Please try again in a moment.") }
     // MARK: 필터 이용권 (filterpass_spec.md — '무료 체험'을 구독과 묶어 쓰지 않는다)
     static var filterPassTitle: String { L.t("필터 이용권", "Filter Pass") }
-    static var filterPassSubtitle: String { L.t("폰카·필름·카메라·재미·인플 필터를 전부 저장하고 공유해요.", "Save and share every filter — phone, film, camera, fun and beauty.") }
+    static var filterPassSubtitle: String { L.t("폰카·필름·카메라·재미 필터를 전부 저장하고 공유해요.", "Save and share every filter — phone, film, camera and fun.") }
     static var filterPassFreeLine: String { L.t("원본은 언제나 무료예요. 처음 3일은 모든 필터를 무료로 써 보세요.", "Original is always free. Try every filter free for your first 3 days.") }
     static func filterPassDaysLeft(_ n: Int) -> String { L.ko ? "무료 이용 \(n)일 남음" : (n == 1 ? "1 free day left" : "\(n) free days left") }
     static var filterPassEnded: String { L.t("처음 3일이 끝났어요. 이용권으로 계속 쓸 수 있어요.", "Your first 3 days are over. Keep going with a pass.") }
@@ -473,6 +473,12 @@ enum Copy {
     static var filterPassBest: String { L.t("추천", "Best value") }
     /// 첫 달 무료 체험 자격이 있을 때 월간 행 아래 줄(3.1.2 — 기간·이후 가격·자동 갱신을 한 줄에).
     static func filterPassIntroLine(_ price: String) -> String { L.t("첫 1개월 무료 · 이후 월 \(price) 자동 갱신", "First month free · then \(price)/month, auto-renews") }
+    static var adFreeTitle: String { L.t("광고 없이 쓰고 싶다면", "Go ad-free") }
+    static var adFreeDesc: String { L.t("크레딧을 한 번만 충전해도 광고가 사라져요.", "Top up credits once and ads are gone for good.") }
+    static var adFreeBuy: String { L.t("광고 없애기", "Remove ads") }
+    static var adFreeContinue: String { L.t("광고 보고 계속", "Watch the ad and continue") }
+    static var filterPassLaunchBadge: String { L.t("런칭 기념", "Launch price") }
+    static var filterPassLaunchLine: String { L.t("한 번 결제, 계속 사용 · 11월 13일까지", "Pay once, keep forever · until Nov 13") }
     static var filterPassStartFree: String { L.t("첫 달 0원으로 시작", "Start with first month free") }
     static var appearance: String { L.t("화면 모드", "Appearance") }
     static func appearanceOption(_ a: AppAppearance) -> String {

@@ -184,7 +184,7 @@ final class StoreManager {
         var id: String { "rimikimi.filter.\(kind.rawValue)" }
         var priceString: String?
         /// 스토어 가격을 못 받았을 때만 쓰는 KRW 정가(오너 결정 2026-10-10).
-        var krw: Int { switch kind { case .lifetime: 9900; case .annual: 4900; case .monthly: 1900 } }
+        var krw: Int { switch kind { case .lifetime: StoreManager.lifetimePromoActive ? 4900 : 9900; case .annual: 4900; case .monthly: 1900 } }
         var displayPrice: String { priceString ?? Copy.krw(krw) }
         var isSubscription: Bool { kind != .lifetime }
         /// 오퍼링(또는 상품)이 실제로 로드됐는지 — 아니면 버튼을 막는다.
@@ -205,7 +205,11 @@ final class StoreManager {
     static let filterOffering = "filters"
 
     /// 2026-10-11 오너 결정: **월간 하나만** 판다(첫 달 무료는 스토어 체험 오퍼). 연간·평생 상품은 스토어에 남아 있지만 보여 주지 않는다.
-    private(set) var filterPlans: [FilterPlan] = [.init(kind: .monthly)]
+    /// 2026-10-12: 평생 런칭가(4,900원, 11/13까지)로 평생을 다시 보인다 — 평생 먼저, 그다음 월간.
+    private(set) var filterPlans: [FilterPlan] = [.init(kind: .lifetime), .init(kind: .monthly)]
+    /// 평생 런칭 기념가 기간 — 11/14 00:00 KST 부터 정가(9,900). App Store 가격 일정도 같은 날 바뀐다(asc_life_price).
+    nonisolated static let lifetimePromoEnd: Date = ISO8601DateFormatter().date(from: "2026-11-13T15:00:00Z")!
+    nonisolated static var lifetimePromoActive: Bool { Date() < lifetimePromoEnd }
     /// 월간의 "첫 1개월 무료" 체험 자격(스토어가 판정) — 있으면 시트에 그 줄을 보여 준다(3.1.2 고지).
     private(set) var filterIntroEligible = false
     private var filterPackages: [FilterPlan.Kind: Package] = [:]

@@ -171,6 +171,10 @@ final class AppState {
     static var aiConsentGiven: Bool { UserDefaults.standard.bool(forKey: aiConsentKey) }
     /// 크레딧 부족 시트(팩 3 · 구독 · 초대). 구매 성공 시 `pendingAfterPurchase` 를 이어간다.
     var creditsSheet = false
+    /// 크레딧 시트를 "광고 없애기"로 열었을 때 — 제목을 "크레딧이 부족해요" 대신 광고 문구로.
+    var creditsSheetForAds = false
+    /// 생성 후 전면광고 직전에 한 번 묻는 "광고 없애기" 안내(오너 2026-10-12 — 생성 광고 앞에만, 저장 광고엔 없음).
+    var adFreePrompt = false
     var pendingAfterPurchase: GenerateRequest?
     /// 채워 맞춤(outpaint) 진행 상태 — `FitSheet` 가 지켜본다.
     var outpaintPhase: OutpaintPhase = .idle
@@ -820,8 +824,21 @@ final class AppState {
         Task {
             // 구독자(광고 제거)에게는 띄우지 않는다.
             if await store.hasActiveSubscription() { return }
-            AdManager.shared.showInterstitial()
+            // 광고 직전 "광고 없애기" 안내 — 고르면 결제(크레딧) 시트로, 아니면 광고를 그대로 보여 준다.
+            adFreePrompt = true
         }
+    }
+
+    /// 안내에서 "광고 보고 계속".
+    func adFreePromptContinue() {
+        adFreePrompt = false
+        Task { try? await Task.sleep(nanoseconds: 350_000_000); AdManager.shared.showInterstitial() }
+    }
+    /// 안내에서 "광고 없애기" — 크레딧을 한 번이라도 충전하면 무료 판정(firstPurchase)이 풀려 광고가 사라진다.
+    func adFreePromptBuy() {
+        adFreePrompt = false
+        creditsSheetForAds = true
+        Task { try? await Task.sleep(nanoseconds: 350_000_000); creditsSheet = true }
     }
 
     /// 저장 전 광고 — **무료 사용자만**(오너 지시 2026-10-07 "무료 사용자는 무조건 저장하려면 광고를 봐야 함",

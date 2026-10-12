@@ -8,7 +8,7 @@ struct FilterPassSheet: View {
     @Environment(\.dismiss) private var dismiss
     /// 구매·복원으로 열렸을 때 — 편집기는 여기서 `__rimikimiFilterAccess({unlocked:true})` 를 받는다.
     var onUnlocked: () -> Void = {}
-    @State private var selected: StoreManager.FilterPlan.Kind = .monthly
+    @State private var selected: StoreManager.FilterPlan.Kind = .lifetime
     @State private var restoring = false
 
     private var store: StoreManager { app.store }
@@ -92,7 +92,7 @@ struct FilterPassSheet: View {
             switch p.kind {
             case .annual: return (Copy.filterPassAnnual, Copy.filterPassAnnualLine)
             case .monthly: return (Copy.filterPassMonthly, store.filterIntroEligible ? Copy.filterPassIntroLine(p.displayPrice) : Copy.filterPassMonthlyLine)
-            case .lifetime: return (Copy.filterPassLifetime, Copy.filterPassLifetimeLine)
+            case .lifetime: return (Copy.filterPassLifetime, StoreManager.lifetimePromoActive ? Copy.filterPassLaunchLine : Copy.filterPassLifetimeLine)
             }
         }()
         return Button { selected = p.kind; HapticPlayer.selection() } label: {
@@ -100,12 +100,24 @@ struct FilterPassSheet: View {
                 Image(systemName: on ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 22)).foregroundStyle(on ? Color.accent : Color.ink3)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(name).font(AppFont.headline)
+                    HStack(spacing: 6) {
+                        Text(name).font(AppFont.headline)
+                        if p.kind == .lifetime && StoreManager.lifetimePromoActive {
+                            Text(Copy.filterPassLaunchBadge).font(AppFont.badge).foregroundStyle(Color.accent)
+                                .padding(.horizontal, 6).padding(.vertical, 2)
+                                .background(Color.accentTint, in: Capsule())
+                        }
+                    }
                     Text(line).font(AppFont.footnote).foregroundStyle(Color.ink2)
                 }
                 Spacer()
-                Text(store.filterIntroEligible && p.kind == .monthly ? L.t("첫 달 0원", "First month free") : p.displayPrice)
-                    .font(AppFont.calloutEmphasis).foregroundStyle(Color.ink)
+                VStack(alignment: .trailing, spacing: 1) {
+                    if p.kind == .lifetime && StoreManager.lifetimePromoActive {
+                        Text(Copy.krw(9900)).font(AppFont.footnote).strikethrough().foregroundStyle(Color.ink3)
+                    }
+                    Text(store.filterIntroEligible && p.kind == .monthly ? L.t("첫 달 0원", "First month free") : p.displayPrice)
+                        .font(AppFont.calloutEmphasis).foregroundStyle(Color.ink)
+                }
             }
             .padding(Spacing.s4)
             .background(Color.card, in: RoundedRectangle(cornerRadius: Radius.card, style: .continuous))

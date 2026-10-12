@@ -129,6 +129,9 @@ struct CreditsSheet: View {
         NavigationStack {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.s3) {
+                if app.creditsSheetForAds {
+                    Label(Copy.adFreeDesc, systemImage: "sparkles").font(AppFont.callout).foregroundStyle(Color.ink2)
+                }
                 ForEach(packs) { p in PackRow(pack: p, busy: busyID == p.id) { buy(p) } }
 
                 Button {
@@ -151,7 +154,7 @@ struct CreditsSheet: View {
         }
         .scrollIndicators(.hidden)
         .background(Color.bg)
-        .navigationTitle(Copy.notEnoughCredits).navigationBarTitleDisplayMode(.inline)
+        .navigationTitle(app.creditsSheetForAds ? Copy.adFreeTitle : Copy.notEnoughCredits).navigationBarTitleDisplayMode(.inline)
         .toolbar { ToolbarItem(placement: .topBarTrailing) { Button(role: .close) { dismiss() }.tint(Color.ink) } }
         .task { await app.store.loadProducts() }
         } // NavigationStack
@@ -199,5 +202,28 @@ struct LegalLinksRow: View {
         .buttonStyle(.plain)
         .foregroundStyle(Color.ink3)
         .multilineTextAlignment(.center)
+    }
+}
+
+
+/// 생성 후 전면광고 직전 안내 — "광고 없애기"(크레딧 충전) / "광고 보고 계속".
+struct AdFreePromptSheet: View {
+    var onBuy: () -> Void
+    var onContinue: () -> Void
+    var body: some View {
+        VStack(spacing: Spacing.s3) {
+            Image(systemName: "sparkles.rectangle.stack").font(.system(size: 34, weight: .regular)).foregroundStyle(Color.accent)
+                .padding(.top, Spacing.s4)
+            Text(Copy.adFreeTitle).font(AppFont.title2).tracking(Tracking.title2)
+            Text(Copy.adFreeDesc).font(AppFont.callout).foregroundStyle(Color.ink2).multilineTextAlignment(.center)
+                .padding(.horizontal, Spacing.s4)
+            Spacer(minLength: 0)
+            Button(Copy.adFreeBuy, action: onBuy).buttonStyle(PrimaryButtonStyle())
+            Button(Copy.adFreeContinue, action: onContinue).buttonStyle(TextButtonStyle(color: .ink2))
+        }
+        .padding(.horizontal, Spacing.page)
+        .padding(.bottom, Spacing.s4)
+        .frame(maxWidth: .infinity)
+        .background(Color.bg)
     }
 }
