@@ -208,18 +208,23 @@ struct LegalLinksRow: View {
 
 /// 만들기 직전 안내(무료 사용자) — "광고 없애기"(크레딧 충전) / "광고 보고 계속".
 struct AdFreePromptSheet: View {
+    var guest = false
     var onBuy: () -> Void
     var onContinue: () -> Void
     var body: some View {
         VStack(spacing: Spacing.s3) {
             Image(systemName: "sparkles.rectangle.stack").font(.system(size: 34, weight: .regular)).foregroundStyle(Color.accent)
                 .padding(.top, Spacing.s4)
-            Text(Copy.adFreeTitle).font(AppFont.title2).tracking(Tracking.title2)
-            Text(Copy.adFreeDesc).font(AppFont.callout).foregroundStyle(Color.ink2).multilineTextAlignment(.center)
+            Text(guest ? Copy.guestRewardTitle : Copy.adFreeTitle).font(AppFont.title2).tracking(Tracking.title2)
+            Text(guest ? Copy.guestRewardDesc : Copy.adFreeDesc).font(AppFont.callout).foregroundStyle(Color.ink2).multilineTextAlignment(.center)
                 .padding(.horizontal, Spacing.s4)
             Spacer(minLength: 0)
-            Button(Copy.adFreeBuy, action: onBuy).buttonStyle(PrimaryButtonStyle())
-            Button(Copy.adFreeContinue, action: onContinue).buttonStyle(TextButtonStyle(color: .ink2))
+            if guest {
+                Button(Copy.adFreeContinue, action: onContinue).buttonStyle(PrimaryButtonStyle())
+            } else {
+                Button(Copy.adFreeBuy, action: onBuy).buttonStyle(PrimaryButtonStyle())
+                Button(Copy.adFreeContinue, action: onContinue).buttonStyle(TextButtonStyle(color: .ink2))
+            }
         }
         .padding(.horizontal, Spacing.page)
         .padding(.bottom, Spacing.s4)

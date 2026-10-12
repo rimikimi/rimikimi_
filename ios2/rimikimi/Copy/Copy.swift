@@ -477,6 +477,8 @@ enum Copy {
     static var adFreeDesc: String { L.t("크레딧을 한 번만 충전해도 광고가 사라져요.", "Top up credits once and ads are gone for good.") }
     static var adFreeBuy: String { L.t("광고 없애기", "Remove ads") }
     static var adFreeContinue: String { L.t("광고 보고 만들기", "Watch an ad to create") }
+    static var guestRewardTitle: String { L.t("광고 보고 무료로 만들기", "Watch an ad to create for free") }
+    static var guestRewardDesc: String { L.t("광고를 끝까지 보면 첫 사진을 무료로 만들어 드려요.", "Watch the whole ad and your first photo is on us.") }
     static var rewardNotEarned: String { L.t("광고를 끝까지 보면 만들 수 있어요", "Watch the whole ad to create") }
     static var filterPassLaunchBadge: String { L.t("런칭 기념", "Launch price") }
     static var filterPassLaunchLine: String { L.t("한 번 결제, 계속 사용 · 11월 13일까지", "Pay once, keep forever · until Nov 13") }

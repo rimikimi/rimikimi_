@@ -6,7 +6,9 @@
 // 받는 쪽이 없으면(마운트 전) 묻지 않고 "watch" — 광고 보고 만들기로 진행한다.
 
 export type AdFreeChoice = "buy" | "watch" | "cancel";
-type Listener = (resolve: (c: AdFreeChoice) => void) => void;
+/** guest = 로그인 전 첫 1장 — 충전할 수 없으니 "광고 보고 만들기"만 보인다(오너 2026-10-12). */
+export type AdFreeMode = "member" | "guest";
+type Listener = (resolve: (c: AdFreeChoice) => void, mode: AdFreeMode) => void;
 let listener: Listener | null = null;
 
 export function subscribeAdFreePrompt(fn: Listener): () => void {
@@ -14,9 +16,9 @@ export function subscribeAdFreePrompt(fn: Listener): () => void {
   return () => { if (listener === fn) listener = null; };
 }
 
-export function askAdFree(): Promise<AdFreeChoice> {
+export function askAdFree(mode: AdFreeMode = "member"): Promise<AdFreeChoice> {
   return new Promise((resolve) => {
-    if (listener) listener(resolve);
+    if (listener) listener(resolve, mode);
     else resolve("watch");
   });
 }

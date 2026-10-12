@@ -175,6 +175,8 @@ final class AppState {
     var creditsSheetForAds = false
     /// 생성 후 전면광고 직전에 한 번 묻는 "광고 없애기" 안내(오너 2026-10-12 — 생성 광고 앞에만, 저장 광고엔 없음).
     var adFreePrompt = false
+    /// 로그인 전 첫 1장 — 안내 창에서 "광고 없애기"(충전)를 숨긴다.
+    var adFreePromptGuest = false
     var pendingAfterPurchase: GenerateRequest?
     /// 채워 맞춤(outpaint) 진행 상태 — `FitSheet` 가 지켜본다.
     var outpaintPhase: OutpaintPhase = .idle
@@ -352,8 +354,18 @@ final class AppState {
         r.concept.isBatchable && r.studioOverrides.isEmpty && r.outfit == nil && r.groomPhoto == nil
     }
 
-    func startGuest(_ req: GenerateRequest) {
+    func startGuest(_ req: GenerateRequest, rewarded: Bool = false) {
         guard Self.aiConsentGiven else { pendingGuestAfterConsent = req; aiConsentSheet = true; return }
+        // 로그인 전 첫 1장도 "광고 보고 만들기"(충전 버튼 없이) — 끝까지 보면 만든다, 만든 뒤 전면광고 없음(오너 2026-10-12).
+        if !rewarded {
+            adFreePromptGuest = true
+            Task {
+                let ok = await withCheckedContinuation { c in adFreeContinuation = c; adFreePrompt = true }
+                adFreePromptGuest = false
+                if ok { startGuest(req, rewarded: true) }
+            }
+            return
+        }
         var r = req
         r.count = 1
         if r.faceRef == nil, !r.concept.isArtTransform { r.faceRef = userPhoto.image }
@@ -367,11 +379,7 @@ final class AppState {
                 GuestDevice.used = true
                 guestFlow?.images = res.items.map(\.image)
                 HapticPlayer.success()
-                #if DEBUG
-                if !UserDefaults.standard.bool(forKey: "dev.noAds") { AdManager.shared.showInterstitial() }   // 캡처용으로만 끈다
-                #else
-                AdManager.shared.showInterstitial()   // 무료 = 생성 광고 1번(오너 지시 2026-10-07)
-                #endif
+                // 생성 뒤 전면광고 없음 — 만들기 전에 보상형을 봤다(2026-10-12).
             } catch let e as APIError {
                 AppLog.api.error("guest.failed status=\(e.status) msg=\(e.message, privacy: .public)")
                 if e.status == 403 {

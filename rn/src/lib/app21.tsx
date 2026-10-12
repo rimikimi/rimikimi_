@@ -318,8 +318,19 @@ export function App21Provider({ children }: { children: React.ReactNode }) {
     });
   }, [gate, start, goMyPhotos, withConsent, afterAdFreeAsk]);
 
-  const startGuest = useCallback((input: JobInput) => {
+  const startGuest = useCallback((input: JobInput, rewarded?: boolean) => {
     if (!consentGiven.current) { withConsent(() => startGuest(input)); return; }
+    // 로그인 전 첫 1장도 "광고 보고 만들기"(충전 버튼 없이) — 끝까지 보면 만든다, 만든 뒤 전면광고는 없다(오너 2026-10-12).
+    if (!rewarded) {
+      void askAdFree("guest").then(async (choice) => {
+        if (choice !== "watch") return;
+        await new Promise((r) => setTimeout(r, 300));
+        const ok = await showRewardedForCreate();
+        if (ok) startGuest(input, true);
+        else toast(c21.rewardedIncomplete);
+      });
+      return;
+    }
     const title = conceptTitle(input.concept);
     setGuestFlow({ title, images: [] });
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
@@ -344,7 +355,7 @@ export function App21Provider({ children }: { children: React.ReactNode }) {
         const images = r.batch ? r.batch.map((b) => b.imageDataUrl) : [r.imageDataUrl];
         setGuestFlow((g) => (g ? { ...g, images } : g));
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
-        void showInterstitial(); // 무료 = 생성 광고 1번(오너 지시 2026-10-07)
+        // 생성 뒤 전면광고 없음 — 만들기 전에 보상형을 봤다(2026-10-12).
       } catch (err) {
         const e = err as ApiError;
         if (e?.status === 403) {
