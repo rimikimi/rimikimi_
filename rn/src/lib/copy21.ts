@@ -86,7 +86,10 @@ export const c21 = {
   get adFreeTitle() { return t("광고 없이 쓰고 싶다면", "Go ad-free"); },
   get adFreeBody() { return t("크레딧을 한 번만 충전해도 광고가 사라져요.", "Top up credits once and ads are gone for good."); },
   get adFreeRemove() { return t("광고 없애기", "Remove ads"); },
-  get adFreeWatch() { return t("광고 보고 계속", "Watch the ad and continue"); },
+  get adFreeWatch() { return t("광고 보고 만들기", "Watch an ad to create"); },
+  /** 만들기 직전 안내 시트 제목(충전 시트의 adFreeTitle 과 별개). */
+  get adFreePromptTitle() { return t("광고 없이 만들고 싶다면", "Create without ads"); },
+  get rewardedIncomplete() { return t("광고를 끝까지 보면 만들 수 있어요", "Watch the whole ad to create"); },
   // 탭
   get tabMake() { return t("만들기", "Create"); },
   get tabCameraFilter() { return t("카메라·필터", "Camera"); },

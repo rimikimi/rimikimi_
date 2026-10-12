@@ -9,7 +9,8 @@ import { c21 } from "@/lib/copy21";
 import { color, space, themedStyles } from "@/theme/tokens";
 
 // 만들기 직전 안내(iOS 와 같다): "광고 없애기" → buy(호출부가 생성 대신 충전 시트를 연다),
-// "광고 보고 계속" 또는 끌어내림·바깥 누름·뒤로가기 → continue(예전 그대로 생성).
+// "광고 보고 만들기" → watch(호출부가 보상형 광고 → 끝까지 보면 생성),
+// 끌어내림·바깥 누름·뒤로가기 → cancel(생성 안 함, 오너 결정 2026-10-12).
 export function AdFreePrompt() {
   const [open, setOpen] = useState(false);
   const resolver = useRef<((c: AdFreeChoice) => void) | null>(null);
@@ -22,23 +23,24 @@ export function AdFreePrompt() {
   }, []);
 
   useEffect(() => subscribeAdFreePrompt((resolve) => {
-    resolver.current?.("continue"); // 겹쳐 물으면 앞의 것은 그대로 진행
+    resolver.current?.("cancel"); // 겹쳐 물으면 앞의 것은 취소
     resolver.current = resolve;
     setOpen(true);
   }), []);
 
-  const onContinue = useCallback(() => finish("continue"), [finish]);
+  const onWatch = useCallback(() => finish("watch"), [finish]);
+  const onCancel = useCallback(() => finish("cancel"), [finish]);
   const onBuy = useCallback(() => finish("buy"), [finish]);
 
   return (
-    <Sheet open={open} onClose={onContinue}>
+    <Sheet open={open} onClose={onCancel}>
       <View style={styles.body}>
         <View style={styles.icon}><IconSparkle size={28} color={color.accent} /></View>
-        <Text size="headline" style={styles.center}>{c21.adFreeTitle}</Text>
+        <Text size="headline" style={styles.center}>{c21.adFreePromptTitle}</Text>
         <Text size="footnote" tone="muted" style={styles.center}>{c21.adFreeBody}</Text>
       </View>
       <Button label={c21.adFreeRemove} onPress={onBuy} full />
-      <Button label={c21.adFreeWatch} onPress={onContinue} variant="quiet" full />
+      <Button label={c21.adFreeWatch} onPress={onWatch} variant="quiet" full />
     </Sheet>
   );
 }

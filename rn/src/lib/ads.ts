@@ -231,3 +231,120 @@ export function showAndWait(): Promise<void> {
     void showInterstitial(fin);
   });
 }
+
+// ============================================================================
+// 보상형(rewarded) 광고 — 만들기 직전에 "광고 보고 만들기" 로 고른 무료 사용자에게(오너 결정 2026-10-12, iOS 와 같다).
+//   · 끝까지 봐서 보상(EARNED_REWARD)이 오면 true → 생성 진행
+//   · 보상 전에 닫으면 false → 생성 안 함(호출부가 안내 토스트)
+//   · 광고가 없거나(no-fill)·에러·타임아웃이면 true — 광고 재고 때문에 만들기를 막지 않는다
+// 생성 뒤 전면광고는 이걸로 대체돼 없어졌다(generation.tsx 주석). 저장 전 광고(showAndWait)는 그대로 전면광고.
+// ============================================================================
+
+const ANDROID_REWARDED = "ca-app-pub-9458625554324585/1900552754";
+// 개발 빌드에선 구글 테스트 보상형 단위(재고와 무관하게 항상 뜬다).
+const REWARDED_TEST = "ca-app-pub-3940256099942544/5224354917";
+const REWARDED_ENABLED = true;
+/** 표시하려는데 아직 못 받았으면 최대 이만큼 기다린다. 넘기면 광고 없이 만들기 진행. */
+const REWARDED_WAIT_MS = 8000;
+/** CLOSED 가 끝내 안 오는 최악의 경우 — 이 시간 뒤엔 보상 여부대로 풀어 준다(앱이 멈추지 않게). */
+const REWARDED_STALE_MS = 3 * 60 * 1000;
+
+type Rewarded = ReturnType<AdsModule["RewardedAd"]["createForAdRequest"]>;
+
+let rewardedReady: Rewarded | null = null;
+let rewardedLoading: Promise<Rewarded | null> | null = null;
+let rewardedShowing = false;
+
+async function loadRewardedOne(): Promise<Rewarded | null> {
+  const m = await ensureInit();
+  if (!m) return null;
+  const { RewardedAd, RewardedAdEventType, AdEventType } = m;
+  const adUnitId = __DEV__ ? REWARDED_TEST : ANDROID_REWARDED;
+  const ad = RewardedAd.createForAdRequest(adUnitId);
+  try {
+    await withTimeout(
+      new Promise<void>((resolve, reject) => {
+        const offLoaded = ad.addAdEventListener(RewardedAdEventType.LOADED, () => {
+          offLoaded();
+          offError();
+          resolve();
+        });
+        const offError = ad.addAdEventListener(AdEventType.ERROR, (e) => {
+          offLoaded();
+          offError();
+          reject(e instanceof Error ? e : new Error("rewarded load failed"));
+        });
+        ad.load();
+      }),
+      LOAD_TIMEOUT_MS,
+      "rewarded-load"
+    );
+    return ad;
+  } catch {
+    try { ad.removeAllListeners(); } catch { /* ignore */ }
+    return null;
+  }
+}
+
+/** 보상형 광고를 미리 받아 둔다(fire-and-forget). 이미 대기·로드 중이면 no-op. */
+export function preloadRewarded(): void {
+  if (!REWARDED_ENABLED || rewardedReady || rewardedLoading) return;
+  if (!ads()) return;
+  const p = loadRewardedOne()
+    .then((ad) => {
+      rewardedReady = ad;
+      return ad;
+    })
+    .catch(() => null)
+    .finally(() => {
+      rewardedLoading = null;
+    });
+  rewardedLoading = p;
+}
+
+/**
+ * 만들기 직전 보상형 광고. true = 만들어도 된다(끝까지 봤거나, 광고를 못 띄움), false = 보상 전에 닫음.
+ * 어떤 경우에도 resolve 된다(reject 없음).
+ */
+export async function showRewardedForCreate(): Promise<boolean> {
+  if (!REWARDED_ENABLED) return true;
+  const m = ads();
+  if (!m) return true;
+  if (rewardedShowing) return false; // 두 번 눌러 겹치는 경우 — 앞의 광고 결과를 따른다
+  rewardedShowing = true;
+  let ad: Rewarded | null = null;
+  try {
+    preloadRewarded();
+    ad = rewardedReady ?? (rewardedLoading ? await raceTimeout(rewardedLoading, REWARDED_WAIT_MS) : null);
+    rewardedReady = null;
+    if (!ad) {
+      rewardedShowing = false;
+      preloadRewarded();
+      return true; // 광고 없음 → 막지 않는다
+    }
+    const shown = ad;
+    return await new Promise<boolean>((resolve) => {
+      let earned = false;
+      let settled = false;
+      const settle = (v: boolean) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(stale);
+        try { shown.removeAllListeners(); } catch { /* ignore */ }
+        rewardedShowing = false;
+        preloadRewarded();
+        resolve(v);
+      };
+      const stale = setTimeout(() => settle(earned), REWARDED_STALE_MS);
+      shown.addAdEventListener(m.RewardedAdEventType.EARNED_REWARD, () => { earned = true; });
+      shown.addAdEventListener(m.AdEventType.CLOSED, () => settle(earned));
+      // 표시 중 에러 → 사용자 잘못이 아니다. 보상을 이미 받았든 아니든 막지 않는다.
+      shown.addAdEventListener(m.AdEventType.ERROR, () => settle(true));
+      withTimeout(shown.show(), SHOW_TIMEOUT_MS, "rewarded-show").catch(() => settle(true));
+    });
+  } catch {
+    rewardedShowing = false;
+    preloadRewarded();
+    return true;
+  }
+}

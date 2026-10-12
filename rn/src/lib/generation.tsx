@@ -9,7 +9,6 @@ import { useQuota } from "./quota";
 import { encodeForUpload, type EncodedPhoto, type PhotoRef } from "./photo";
 import { type Concept, ID_BGS, buildIdPhotoPrompt, conceptTitle, isArtOnly, isIdPhoto, isRestoreConcept, isRetouch } from "./concepts";
 import { getPushToken } from "./push";
-import { showInterstitial } from "./ads";
 import { loadProfileRefs } from "./faceProfile";
 import { clearLastDoneJob, setLastDoneJob } from "./lastJob";
 import { FIRST_GEN_DONE_KEY, INVITE_CARD_DUE_KEY, getFlag, setFlag } from "./prefs";
@@ -297,7 +296,7 @@ export function GenerationProvider({ children }: { children: React.ReactNode }) 
     const count = input.fourcutCount ?? (isArtOnly(concept) ? 1 : input.batchCount);
     const startedAt = Date.now();
     const job: Job = { id, concept, count, startedAt, status: "running", images: [], input };
-    const showAds = showAdsRef.current; // 1.x 와 같이 "누른 시점" 판정
+    // (예전엔 여기서 showAds 를 잡아 생성 뒤 전면광고를 띄웠다 — 지금은 만들기 직전 보상형으로 대체)
     const owner = uidRef.current;
     const mine = () => uidRef.current === owner; // 끝났을 때도 같은 사람인가
     setJobs((prev) => [job, ...prev]);
@@ -367,9 +366,9 @@ export function GenerationProvider({ children }: { children: React.ReactNode }) 
         if (input.autoPresent && images[0]) {
           try { router.push({ pathname: "/result/[jobId]", params: { jobId: id } }); } catch { /* 화면 전환 실패는 카드로 남는다 */ }
         }
-        // 무료 사용자 → 생성이 끝난 뒤 전면광고 1회 (1.x src/PortraitStudio.jsx 와 같은 자리·같은 조건).
-        // ⚠️ await 금지 — 광고가 늦거나 실패해도 이 흐름이 여기서 멈추면 안 된다.
-        if (showAds) void showInterstitial();
+        // 생성 뒤 전면광고는 뺐다(오너 결정 2026-10-12, iOS 와 같다): 무료 사용자는 만들기 직전에
+        // "광고 보고 만들기" 로 보상형 광고를 이미 봤다(app21.tsx afterAdFreeAsk → ads.ts showRewardedForCreate).
+        // 여기서 또 띄우면 한 장에 광고 두 번. 저장 전 광고(saveAdGate)는 그대로다.
       } catch (err) {
         const e = err as ApiError;
         const recovered = await tryRecover(id, { poll: !!e?.networkFail });

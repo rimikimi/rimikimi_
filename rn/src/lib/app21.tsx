@@ -14,7 +14,7 @@ import { useSaveAdGate } from "./saveAdGate";
 import { ApiError, generateImage } from "./api";
 import { encodeForUpload, pickPhotos, registerPhoto, type PhotoRef } from "./photo";
 import { loadProfileRefs } from "./faceProfile";
-import { showInterstitial } from "./ads";
+import { showInterstitial, showRewardedForCreate } from "./ads";
 import { saveDataUrlToAlbum } from "./nativeMedia";
 import { conceptTitle, isArtOnly, isBatchable, type Concept } from "./concepts";
 import {
@@ -294,16 +294,22 @@ export function App21Provider({ children }: { children: React.ReactNode }) {
     router.navigate("/(tabs)/photos");
   }, []);
 
-  /** 만들기를 누른 뒤, 요청 보내기 직전 — 끝나고 광고를 볼 무료 사용자면 "광고 없이 쓰고 싶다면" 시트를 먼저(오너 2026-10-12, iOS 와 같다).
-   *  "광고 없애기" → 생성 안 하고 충전 시트(광고 없애기 모드). "광고 보고 계속"·닫기 → 예전 그대로 생성(생성 뒤 광고도 그대로).
+  /** 만들기를 누른 뒤, 요청 보내기 직전 — 무료 사용자면 "광고 없이 만들고 싶다면" 시트를 먼저(오너 2026-10-12, iOS 와 같다).
+   *  "광고 없애기" → 생성 안 하고 충전 시트(광고 없애기 모드).
+   *  "광고 보고 만들기" → 보상형 광고. 끝까지 봤거나 광고를 못 띄우면 생성, 중간에 닫으면 생성 안 함 + 토스트.
+   *  끌어내림·바깥·뒤로가기 → 취소(생성 안 함). 생성 뒤 전면광고는 없다(generation.tsx).
    *  방금 시트에서 구매하고 이어 가는 경우(purchased)는 묻지 않는다. */
   const afterAdFreeAsk = useCallback((run: () => void) => (purchased?: boolean) => {
     if (purchased || !willShowAds()) { run(); return; }
-    void askAdFree().then((choice) => {
-      if (choice === "buy") setTimeout(gate.openAdFree, 300); // 안내 시트 닫힘(220ms) 뒤에
-      else run();
+    void askAdFree().then(async (choice) => {
+      if (choice === "buy") { setTimeout(gate.openAdFree, 300); return; } // 안내 시트 닫힘(220ms) 뒤에
+      if (choice !== "watch") return;
+      await new Promise((r) => setTimeout(r, 300)); // 시트 닫힘 애니메이션 뒤에 광고를 띄운다
+      const ok = await showRewardedForCreate();
+      if (ok) run();
+      else toast(c21.rewardedIncomplete);
     });
-  }, [willShowAds, gate]);
+  }, [willShowAds, gate, toast]);
 
   /** 로그인·크레딧 확인 뒤 한 건 시작(iOS perform(.generate)). */
   const performOne = useCallback((input: JobInput, opts?: GenOpts) => {

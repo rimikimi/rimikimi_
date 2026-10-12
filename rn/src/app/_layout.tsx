@@ -12,7 +12,7 @@ import { copy } from "@/lib/copy";
 import { GenerationProvider } from "@/lib/generation";
 import { CreditGateProvider } from "@/lib/creditGate";
 import { installPushHandlers, setupNotifications } from "@/lib/push";
-import { initAds } from "@/lib/ads";
+import { initAds, preloadRewarded } from "@/lib/ads";
 import { usePushResultRouting } from "@/lib/pushRouting";
 import { LoginSheet } from "@/ui/LoginSheet";
 import { App21Provider } from "@/lib/app21";
@@ -79,6 +79,8 @@ export default function RootLayout() {
   useEffect(() => {
     if (problem) return;
     initAds();
+    // 보상형은 만들기 직전에 바로 떠야 해서 미리 받아 둔다(없으면 그 자리에서 최대 8초 기다림).
+    preloadRewarded();
   }, [problem]);
 
   if (problem) {
