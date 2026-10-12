@@ -20,6 +20,7 @@ struct RimikimiApp: App {
                     // 전면광고 SDK 초기화 + 첫 광고 미리 로드. 팝업은 안 뜬다(ATT 는 TrackingPrompt 소유).
                     // 여기서 미리 받아 둬야 생성이 끝난 순간 기다림 없이 띄울 수 있다.
                     AdManager.shared.start()
+                    RewardedAdManager.shared.preload()
                     // 가이드를 이미 본 사용자(업데이트 설치 등)는 실행 직후 ATT 를 1회 묻는다.
                     // 가이드가 떠 있으면 가이드를 닫을 때(finishGuide) 묻는다 — 팝업이 겹치지 않게.
                     if !app.showGuide { TrackingPrompt.requestOnceAfterFirstResult(delay: 1.0) }

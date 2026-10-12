@@ -823,11 +823,8 @@ final class AppState {
         // 2026-10-07 오너 지시: 무료 사용자는 "생성할 때 한 번, 저장할 때 한 번". 무료 판정은 저장 광고와 같다 —
         // 결제 기록이 없는 계정(firstPurchase), 크레딧 잔액과 무관. (예전 규칙: 크레딧 0 인 사람만)
         guard let q = quota, q.unlimited != true, q.firstPurchase == true else { return }
-        Task {
-            // 구독자(광고 제거)에게는 띄우지 않는다.
-            if await store.hasActiveSubscription() { return }
-            AdManager.shared.showInterstitial()
-        }
+        // 2026-10-12: 생성 뒤 전면광고는 없앴다 — 무료 사용자는 만들기 전에 "광고 보고 만들기"(보상형)를 본다.
+        _ = q
     }
 
     /// 만들기를 누른 순간 — 무료 사용자(생성 뒤 광고를 볼 사람)에게 "광고 없애기" 안내를 먼저 띄운다(오너 2026-10-12
@@ -841,10 +838,21 @@ final class AppState {
             adFreePrompt = true
         }
     }
-    /// 안내에서 "광고 보고 계속"(또는 내려서 닫기).
+    /// 안내에서 "광고 보고 만들기" — 보상형 광고를 끝까지 보면 진행, 중간에 닫으면 이번 생성은 취소.
     func adFreePromptContinue() {
         adFreePrompt = false
-        adFreeContinuation?.resume(returning: true); adFreeContinuation = nil
+        let c = adFreeContinuation; adFreeContinuation = nil
+        Task {
+            try? await Task.sleep(nanoseconds: 350_000_000)   // 시트가 내려간 뒤 광고를 띄운다
+            let ok = await RewardedAdManager.shared.showForReward()
+            if !ok { showToast(Copy.rewardNotEarned) }
+            c?.resume(returning: ok)
+        }
+    }
+    /// 안내를 그냥 내려 닫음 — 만들지 않는다.
+    func adFreePromptDismiss() {
+        adFreePrompt = false
+        adFreeContinuation?.resume(returning: false); adFreeContinuation = nil
     }
     /// 안내에서 "광고 없애기" — 크레딧을 한 번이라도 충전하면 무료 판정(firstPurchase)이 풀려 광고가 사라진다.
     func adFreePromptBuy() {

@@ -473,10 +473,11 @@ enum Copy {
     static var filterPassBest: String { L.t("추천", "Best value") }
     /// 첫 달 무료 체험 자격이 있을 때 월간 행 아래 줄(3.1.2 — 기간·이후 가격·자동 갱신을 한 줄에).
     static func filterPassIntroLine(_ price: String) -> String { L.t("첫 1개월 무료 · 이후 월 \(price) 자동 갱신", "First month free · then \(price)/month, auto-renews") }
-    static var adFreeTitle: String { L.t("광고 없이 쓰고 싶다면", "Go ad-free") }
+    static var adFreeTitle: String { L.t("광고 없이 만들고 싶다면", "Create without ads") }
     static var adFreeDesc: String { L.t("크레딧을 한 번만 충전해도 광고가 사라져요.", "Top up credits once and ads are gone for good.") }
     static var adFreeBuy: String { L.t("광고 없애기", "Remove ads") }
-    static var adFreeContinue: String { L.t("광고 보고 계속", "Watch the ad and continue") }
+    static var adFreeContinue: String { L.t("광고 보고 만들기", "Watch an ad to create") }
+    static var rewardNotEarned: String { L.t("광고를 끝까지 보면 만들 수 있어요", "Watch the whole ad to create") }
     static var filterPassLaunchBadge: String { L.t("런칭 기념", "Launch price") }
     static var filterPassLaunchLine: String { L.t("한 번 결제, 계속 사용 · 11월 13일까지", "Pay once, keep forever · until Nov 13") }
     static var filterPassStartFree: String { L.t("첫 달 0원으로 시작", "Start with first month free") }
