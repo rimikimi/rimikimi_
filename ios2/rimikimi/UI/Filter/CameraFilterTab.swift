@@ -19,6 +19,8 @@ struct CameraFilterTab: View {
 
     private var phone: [String] { ["ph16pro", "ph15pro", "ph14pro", "phxs", "ph7", "ph6s", "ph4s", "ph3gs"] }
     private var analog: [String] { FilterTabView.groups.filter { $0.key != "phone" }.flatMap { $0.presets.map(\.key) } }
+    private var vintage: [String] { FilterTabView.groups.first { $0.key == "vintage" }?.presets.map(\.key) ?? [] }
+    private var mood: [String] { FilterTabView.groups.first { $0.key == "mood" }?.presets.map(\.key) ?? [] }
 
     var body: some View {
         ZStack {
@@ -271,8 +273,11 @@ struct CameraFilterTab: View {
                 }
                 groupMark("iphone")
                 ForEach(phone, id: \.self) { chip($0, Copy.filterName($0)) }
+                // 폰카 / 빈티지 / 감성 — 편집기·필터 탭과 같은 3구분(오너 2026-10-12)
                 groupMark("film")
-                ForEach(analog, id: \.self) { chip($0, Copy.filterName($0)) }
+                ForEach(vintage, id: \.self) { chip($0, Copy.filterName($0)) }
+                groupMark("heart.circle")
+                ForEach(mood, id: \.self) { chip($0, Copy.filterName($0)) }
             }
             .padding(.horizontal, Spacing.page)
         }

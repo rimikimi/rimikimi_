@@ -1294,37 +1294,25 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
               const ko = getLang() === "ko";
               return (
                 <div style={ES.strengthCol}>
+                  {/* 슬라이더 하나(오너 2026-10-12 "카메라처럼 하나로 통일") — 세기 t(0~100%)가 색감(0.7×t)과
+                      프리셋 효과(×t)를 함께 움직인다. 카메라 세기 슬라이더와 같은 뜻(카메라 100% = 여기 100%). */}
                   <label style={ES.fxRow}>
-                    <span style={ES.strengthLabel}>{ko ? "색감" : "Color"}</span>
+                    <span style={ES.strengthLabel}>{ko ? "세기" : "Amount"}</span>
                     <input
                       className="pe-range"
                       type="range" min="0" max="100"
-                      value={Math.round(strength * 100)}
-                      onChange={(e) => updateLook({ strength: Number(e.target.value) / 100 })}
+                      value={Math.round(Math.min(1, strength / 0.7) * 100)}
+                      onChange={(e) => {
+                        const t = Number(e.target.value) / 100;
+                        const base = fxOf(p);
+                        const nextFx = { ...fx };
+                        for (const k of fxKeys) nextFx[k] = base[k] * t;
+                        updateLook({ strength: 0.7 * t, fx: nextFx, fxAmt: t });
+                      }}
                       {...dragProps}
                       style={ES.fxSlider}
                     />
                   </label>
-                  {fxKeys.length > 0 && (
-                    <label style={ES.fxRow}>
-                      <span style={ES.strengthLabel}>{ko ? "효과" : "Effect"}</span>
-                      <input
-                        className="pe-range"
-                        type="range" min="0" max="100"
-                        value={Math.round(fxAmt * 100)}
-                        onChange={(e) => {
-                          const amt = Number(e.target.value) / 100;
-                          const base = fxOf(p);
-                          // 이 프리셋의 효과만 배율로 — 사용자가 효과 탭에서 따로 켠 다른 효과는 그대로 둔다
-                          const nextFx = { ...fx };
-                          for (const k of fxKeys) nextFx[k] = base[k] * amt;
-                          updateLook({ fx: nextFx, fxAmt: amt });
-                        }}
-                        {...dragProps}
-                        style={ES.fxSlider}
-                      />
-                    </label>
-                  )}
                 </div>
               );
             })()}
