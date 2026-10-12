@@ -434,6 +434,7 @@ final class AppState {
             if !req.concept.isArtTransform, req.faceProfile.isEmpty {
                 req.faceProfile = faceProfile.ordered.map { ($0.image, $0.angle.rawValue) }
             }
+            guard await askAdFreeBeforeGenerate() else { return }
             lastRequest = req
             HapticPlayer.commit()
             await push.askOnFirstGenerate()
@@ -459,6 +460,7 @@ final class AppState {
                 reqs[i].faceRef = userPhoto.image
                 if reqs[i].faceProfile.isEmpty { reqs[i].faceProfile = faceProfile.ordered.map { ($0.image, $0.angle.rawValue) } }
             }
+            guard await askAdFreeBeforeGenerate() else { return }
             HapticPlayer.commit()
             await push.askOnFirstGenerate()
             let pushToken = await push.tokenForRequest()
@@ -824,19 +826,30 @@ final class AppState {
         Task {
             // 구독자(광고 제거)에게는 띄우지 않는다.
             if await store.hasActiveSubscription() { return }
-            // 광고 직전 "광고 없애기" 안내 — 고르면 결제(크레딧) 시트로, 아니면 광고를 그대로 보여 준다.
-            adFreePrompt = true
+            AdManager.shared.showInterstitial()
         }
     }
 
-    /// 안내에서 "광고 보고 계속".
+    /// 만들기를 누른 순간 — 무료 사용자(생성 뒤 광고를 볼 사람)에게 "광고 없애기" 안내를 먼저 띄운다(오너 2026-10-12
+    /// "만들기 전에 나와야 함"). true = 그대로 만들기 진행, false = 충전 시트로 갔으니 이번 생성은 멈춘다.
+    private var adFreeContinuation: CheckedContinuation<Bool, Never>?
+    func askAdFreeBeforeGenerate() async -> Bool {
+        guard let q = quota, q.unlimited != true, q.firstPurchase == true else { return true }
+        if await store.hasActiveSubscription() { return true }
+        return await withCheckedContinuation { c in
+            adFreeContinuation = c
+            adFreePrompt = true
+        }
+    }
+    /// 안내에서 "광고 보고 계속"(또는 내려서 닫기).
     func adFreePromptContinue() {
         adFreePrompt = false
-        Task { try? await Task.sleep(nanoseconds: 350_000_000); AdManager.shared.showInterstitial() }
+        adFreeContinuation?.resume(returning: true); adFreeContinuation = nil
     }
     /// 안내에서 "광고 없애기" — 크레딧을 한 번이라도 충전하면 무료 판정(firstPurchase)이 풀려 광고가 사라진다.
     func adFreePromptBuy() {
         adFreePrompt = false
+        adFreeContinuation?.resume(returning: false); adFreeContinuation = nil
         creditsSheetForAds = true
         Task { try? await Task.sleep(nanoseconds: 350_000_000); creditsSheet = true }
     }

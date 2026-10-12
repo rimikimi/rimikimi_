@@ -206,7 +206,7 @@ struct LegalLinksRow: View {
 }
 
 
-/// 생성 후 전면광고 직전 안내 — "광고 없애기"(크레딧 충전) / "광고 보고 계속".
+/// 만들기 직전 안내(무료 사용자) — "광고 없애기"(크레딧 충전) / "광고 보고 계속".
 struct AdFreePromptSheet: View {
     var onBuy: () -> Void
     var onContinue: () -> Void

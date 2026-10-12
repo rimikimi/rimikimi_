@@ -20,6 +20,7 @@ import { GuestFlowOverlay } from "@/ui/GuestFlow";
 import { StudioStepSheet } from "@/ui/StudioSheets";
 import { ConsentSheet } from "@/ui/ConsentSheet";
 import { CreditSheet } from "@/ui/CreditSheet";
+import { AdFreePrompt } from "@/ui/AdFreePrompt";
 import { Text } from "@/ui/Text";
 import { envProblem } from "@/lib/env";
 import { applyScheme, color, space } from "@/theme/tokens";
@@ -135,6 +136,8 @@ export default function RootLayout() {
                 {/* 로그인 시트 · 크레딧 부족 시트 — 어느 화면에서든 띄운다. 스택 위에 그린다. */}
                 <LoginSheet />
                 <CreditSheet />
+                {/* 무료 사용자 만들기 직전 "광고 없이 쓰고 싶다면" 안내 */}
+                <AdFreePrompt />
               </App21Provider>
               </GenerationProvider>
               </CreditGateProvider>

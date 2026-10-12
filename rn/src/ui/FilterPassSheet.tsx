@@ -6,7 +6,7 @@ import { Card } from "./Card";
 import { Button } from "./Button";
 import { Spinner } from "./Spinner";
 import {
-  FILTER_PLAN_KRW, FILTER_PLANS_SHOWN, getFilterPackages, iapAvailable, purchaseFilterPackage, restoreFilterAccess,
+  FILTER_PLAN_KRW, FILTER_PLANS_SHOWN, filterPlanFallbackKrw, getFilterPackages, lifetimePromoActive, iapAvailable, purchaseFilterPackage, restoreFilterAccess,
   useFilterAccess, type FilterPackage, type FilterPlan,
 } from "@/lib/iap";
 import { won } from "@/lib/packs";
@@ -17,8 +17,9 @@ import { color, radius, space, themedStyles } from "@/theme/tokens";
 
 // ============================================================================
 // 카메라 이용권 결제 시트(scratchpad filterpass_spec.md "결제 시트(네이티브)").
-//  · 오너 결정 2026-10-11: 월간(rimikimi.filter.monthly ₩1,900/월)만 보여 준다 — FILTER_PLANS_SHOWN.
-//    연간·평생은 스토어·RevenueCat 에 그대로 두고 숨긴다(복원은 FILTER_PRODUCTS 로 계속 된다).
+//  · 오너 결정 2026-10-12: 평생(rimikimi.filter.lifetime, 먼저·기본 선택) + 월간(₩1,900/월) — FILTER_PLANS_SHOWN.
+//    연간은 스토어·RevenueCat 에 그대로 두고 숨긴다(복원은 FILTER_PRODUCTS 로 계속 된다).
+//    평생 런칭가(~2026-11-13 KST): "런칭 기념" 배지 + "11월 13일까지 · 정가 ₩9,900" + 가격 옆 정가 취소선.
 //  · Play 오퍼 first-month-free(첫 1개월 무료, 1회) 가 상품에 붙어 오면(freeTrial) 요금제 아래
 //    "첫 1개월 무료 · 이후 월 {갱신가} 자동 갱신" 과 상단 버튼 "첫 달 0원으로 시작" 을 보여 준다.
 //    오퍼가 안 오면(이미 써 본 계정 등) 기존 "매월 자동 갱신" + "계속하기 · {가격}".
@@ -80,10 +81,11 @@ export function FilterPassSheet({ open, onClose, onUnlocked }: { open: boolean; 
 
   const base = getEnv().apiBase;
   const expired = access.source === "locked";
-  // 미리 고른 요금제 = 보이는 것 중 첫째(월간만 보이므로 월간). 상단 버튼이 이걸 산다.
+  // 미리 고른 요금제 = 보이는 것 중 첫째(평생). 상단 버튼이 이걸 산다. 줄을 누르면 그 요금제를 바로 산다.
   const selected: FilterPlan = FILTER_PLANS_SHOWN[0];
   const selPkg = pkgs.find((x) => x.plan === selected);
-  const selPrice = selPkg?.priceString || won(FILTER_PLAN_KRW[selected]);
+  const selPrice = selPkg?.priceString || won(filterPlanFallbackKrw(selected));
+  const promo = lifetimePromoActive();
   const ctaDisabled = !!busy || restoring || (!selPkg && !loading) || !available;
 
   return (
@@ -94,7 +96,9 @@ export function FilterPassSheet({ open, onClose, onUnlocked }: { open: boolean; 
           const p = pkgs.find((x) => x.plan === plan);
           const isBusy = busy === plan;
           const disabled = !!busy || restoring || (!p && !loading) || !available;
-          const note = p?.freeTrial ? c21.fpIntroNote(p.renewPrice || p.priceString) : PLAN_NOTE[plan]();
+          const launch = plan === "lifetime" && promo;
+          const note = p?.freeTrial ? c21.fpIntroNote(p.renewPrice || p.priceString)
+            : launch ? c21.fpLaunchNote(won(FILTER_PLAN_KRW.lifetime)) : PLAN_NOTE[plan]();
           return (
             <Pressable
               key={plan}
@@ -105,12 +109,22 @@ export function FilterPassSheet({ open, onClose, onUnlocked }: { open: boolean; 
               style={({ pressed }) => [styles.row, plan === selected && styles.rowSelected, pressed && { backgroundColor: color.fill }, disabled && !isBusy && { opacity: 0.55 }]}
             >
               <View style={{ flex: 1, gap: 2 }}>
-                <Text size="headline">{PLAN_LABEL[plan]()}</Text>
+                <View style={styles.titleRow}>
+                  <Text size="headline">{PLAN_LABEL[plan]()}</Text>
+                  {launch ? (
+                    <View style={styles.pill}>
+                      <Text size="caption" weight="semibold" tone="onAccent">{c21.fpLaunchPill}</Text>
+                    </View>
+                  ) : null}
+                </View>
                 <Text size="footnote" tone="muted">{note}</Text>
               </View>
               <View style={styles.trail}>
                 {isBusy ? <Spinner size={20} color={color.accent} /> : (
-                  <Text size="callout" weight="semibold" tabular>{(p?.freeTrial ? p.renewPrice : p?.priceString) || won(FILTER_PLAN_KRW[plan])}</Text>
+                  <View style={styles.priceRow}>
+                    {launch ? <Text size="footnote" tone="subtle" tabular style={styles.strike}>{won(FILTER_PLAN_KRW.lifetime)}</Text> : null}
+                    <Text size="callout" weight="semibold" tabular>{(p?.freeTrial ? p.renewPrice : p?.priceString) || won(filterPlanFallbackKrw(plan))}</Text>
+                  </View>
                 )}
               </View>
             </Pressable>
@@ -159,6 +173,10 @@ const styles = themedStyles(() => StyleSheet.create({
   },
   rowSelected: { borderWidth: 2, borderColor: color.accent },
   trail: { minWidth: 72, alignItems: "flex-end" },
+  titleRow: { flexDirection: "row", alignItems: "center", gap: space.s2, flexWrap: "wrap" },
+  pill: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, backgroundColor: color.accent },
+  priceRow: { flexDirection: "row", alignItems: "baseline", gap: 6 },
+  strike: { textDecorationLine: "line-through" },
   links: { flexDirection: "row", justifyContent: "center", alignItems: "center", gap: space.s2 },
   link: { textDecorationLine: "underline" },
 }));

@@ -9,6 +9,7 @@ import { useAuth } from "./auth";
 import { useStore } from "./store";
 import { useGeneration, type JobInput } from "./generation";
 import { useCreditGate } from "./creditGate";
+import { askAdFree } from "./adFreePrompt";
 import { useSaveAdGate } from "./saveAdGate";
 import { ApiError, generateImage } from "./api";
 import { encodeForUpload, pickPhotos, registerPhoto, type PhotoRef } from "./photo";
@@ -155,7 +156,7 @@ function guestEligible(i: JobInput): boolean {
 export function App21Provider({ children }: { children: React.ReactNode }) {
   const { session, requireLogin } = useAuth();
   const { photo, setPhoto } = useStore();
-  const { start } = useGeneration();
+  const { start, willShowAds } = useGeneration();
   const gate = useCreditGate();
   const adGate = useSaveAdGate();
   const signedIn = !!session?.user?.id;
@@ -293,12 +294,23 @@ export function App21Provider({ children }: { children: React.ReactNode }) {
     router.navigate("/(tabs)/photos");
   }, []);
 
+  /** 만들기를 누른 뒤, 요청 보내기 직전 — 끝나고 광고를 볼 무료 사용자면 "광고 없이 쓰고 싶다면" 시트를 먼저(오너 2026-10-12, iOS 와 같다).
+   *  "광고 없애기" → 생성 안 하고 충전 시트(광고 없애기 모드). "광고 보고 계속"·닫기 → 예전 그대로 생성(생성 뒤 광고도 그대로).
+   *  방금 시트에서 구매하고 이어 가는 경우(purchased)는 묻지 않는다. */
+  const afterAdFreeAsk = useCallback((run: () => void) => (purchased?: boolean) => {
+    if (purchased || !willShowAds()) { run(); return; }
+    void askAdFree().then((choice) => {
+      if (choice === "buy") setTimeout(gate.openAdFree, 300); // 안내 시트 닫힘(220ms) 뒤에
+      else run();
+    });
+  }, [willShowAds, gate]);
+
   /** 로그인·크레딧 확인 뒤 한 건 시작(iOS perform(.generate)). */
   const performOne = useCallback((input: JobInput, opts?: GenOpts) => {
     withConsent(() => {
-      gate.request(opts?.cost ?? 1, () => { start({ ...input, autoPresent: true }); goMyPhotos(); }, { creditsOnly: !!opts?.creditsOnly });
+      gate.request(opts?.cost ?? 1, afterAdFreeAsk(() => { start({ ...input, autoPresent: true }); goMyPhotos(); }), { creditsOnly: !!opts?.creditsOnly });
     });
-  }, [gate, start, goMyPhotos, withConsent]);
+  }, [gate, start, goMyPhotos, withConsent, afterAdFreeAsk]);
 
   const startGuest = useCallback((input: JobInput) => {
     if (!consentGiven.current) { withConsent(() => startGuest(input)); return; }
@@ -389,7 +401,7 @@ export function App21Provider({ children }: { children: React.ReactNode }) {
       if (inputs.length === 1) { requestGenerate(inputs[0]); return; }
       const many = () => withConsent(() => {
         // 여러 장은 크레딧 전용(서버 묶음 규칙과 같다) — 장수만큼 있어야 한다.
-        gate.request(inputs.length, () => {
+        gate.request(inputs.length, afterAdFreeAsk(() => {
           void (async () => {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
             // 동시에 다 던지면 서버(Vertex) 분당 한도에 걸린다 — 조금씩 띄워 보낸다.
@@ -399,12 +411,12 @@ export function App21Provider({ children }: { children: React.ReactNode }) {
               if (i === 0) { setCart([]); setCartExpanded(false); goMyPhotos(); }
             }
           })();
-        }, { creditsOnly: true });
+        }), { creditsOnly: true });
       });
       if (signedIn) many();
       else requireLogin("make", many, undefined, c21.cartManyNeedsLogin);
     })();
-  }, [photo, setPhoto, overrides, outfit, groom, requestGenerate, gate, start, signedIn, requireLogin, goMyPhotos, toast, withConsent]);
+  }, [photo, setPhoto, overrides, outfit, groom, requestGenerate, gate, start, signedIn, requireLogin, goMyPhotos, toast, withConsent, afterAdFreeAsk]);
 
   const value = useMemo<App21Value>(() => ({
     cart, cartExpanded, setCartExpanded, cartIndex, toggleCart, removeFromCart, clearCart, generateCart,

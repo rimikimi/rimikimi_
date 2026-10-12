@@ -8,14 +8,20 @@ import { useQuota } from "./quota";
 // 시트 자체(CreditSheet.tsx)는 루트 레이아웃이 그린다.
 // ============================================================================
 
+/** need = 크레딧 부족(기본) · adFree = 생성 뒤 광고 직전 "광고 없애기" 로 연 경우(제목·안내 문구만 다르다). */
+export type GateMode = "need" | "adFree";
+
 interface GateValue {
   open: boolean;
   need: number;
+  mode: GateMode;
+  /** "광고 없애기" — 이어 갈 생성 없이 충전 시트만 연다(제목 "광고 없이 쓰고 싶다면"). */
+  openAdFree: () => void;
   /** 잔액이 충분하면 즉시 proceed. 아니면 시트를 열고 구매 뒤 proceed.
    *  creditsOnly: 묶음(2장+)·채워 맞춤은 서버에서 **크레딧 전용**이다 — 하루 무료 1장을 더하면 안 된다. */
-  request: (cost: number, proceed: () => void, opts?: { creditsOnly?: boolean }) => void;
+  request: (cost: number, proceed: (purchased?: boolean) => void, opts?: { creditsOnly?: boolean }) => void;
   /** 잔액 계산과 상관없이 시트를 연다 — 서버가 크레딧 부족이라고 답했을 때. */
-  force: (cost: number, proceed: () => void) => void;
+  force: (cost: number, proceed: (purchased?: boolean) => void) => void;
   /** 시트가 "구매 성공" 을 알린다 → 잔액 새로고침 뒤 pending proceed 실행 */
   onPurchased: () => void;
   close: () => void;
@@ -32,11 +38,20 @@ export function CreditGateProvider({ children }: { children: React.ReactNode }) 
   const { available, loaded, refresh, quota } = useQuota();
   const [open, setOpen] = useState(false);
   const [need, setNeed] = useState(1);
-  const pending = useRef<(() => void) | null>(null);
+  const [mode, setMode] = useState<GateMode>("need");
+  // proceed(true) = 시트에서 방금 구매하고 이어 가는 경우(그 사이 잔액·결제 기록이 아직 안 갱신됐을 수 있다).
+  const pending = useRef<((purchased?: boolean) => void) | null>(null);
 
   const force = useCallback<GateValue["force"]>((cost, proceed) => {
     pending.current = proceed;
     setNeed(cost);
+    setMode("need");
+    setOpen(true);
+  }, []);
+
+  const openAdFree = useCallback(() => {
+    pending.current = null;
+    setMode("adFree");
     setOpen(true);
   }, []);
 
@@ -58,11 +73,14 @@ export function CreditGateProvider({ children }: { children: React.ReactNode }) 
     const p = pending.current;
     pending.current = null;
     // 잔액 재조회가 끝나기 전이라도 서버가 최종 판정한다 — 바로 이어간다.
-    if (p) setTimeout(p, 300);
+    if (p) setTimeout(() => p(true), 300);
   }, [refresh]);
 
   const close = useCallback(() => { pending.current = null; setOpen(false); }, []);
 
-  const value = useMemo<GateValue>(() => ({ open, need, request, force, onPurchased, close }), [open, need, request, force, onPurchased, close]);
+  const value = useMemo<GateValue>(
+    () => ({ open, need, mode, openAdFree, request, force, onPurchased, close }),
+    [open, need, mode, openAdFree, request, force, onPurchased, close],
+  );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

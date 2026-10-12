@@ -9,14 +9,17 @@ import { PackRows, StoreMessage } from "./StoreList";
 import { useCreditGate } from "@/lib/creditGate";
 import { useStoreFlow } from "@/lib/storeFlow";
 import { copy } from "@/lib/copy";
+import { c21 } from "@/lib/copy21";
 import { color, space, themedStyles } from "@/theme/tokens";
 
 // 크레딧 부족 시트 — 팩 3개 · "친구 초대로 무료 3장". 구매 즉시 하던 생성 이어짐.
 export function CreditSheet() {
   const gate = useCreditGate();
   const flow = useStoreFlow();
+  const adFree = gate.mode === "adFree";
   return (
-    <Sheet open={gate.open} title={copy.creditSheet.title} onClose={gate.close}>
+    <Sheet open={gate.open} title={adFree ? c21.adFreeTitle : copy.creditSheet.title} onClose={gate.close}>
+      {adFree ? <Text size="footnote" tone="muted">{c21.adFreeBody}</Text> : null}
       <PackRows flow={flow} limit={3} onBought={gate.onPurchased} />
       <Card padded={false}>
         <Pressable

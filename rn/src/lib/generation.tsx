@@ -152,6 +152,8 @@ interface GenerationValue {
   start: (input: JobInput) => string;
   dismiss: (jobId: string) => void;
   job: (jobId: string | undefined) => Job | undefined;
+  /** 지금 만들면 끝난 뒤 전면광고가 뜨는 사용자인가(아래 showAdsRef 와 같은 판정). */
+  willShowAds: () => boolean;
 }
 
 const Ctx = createContext<GenerationValue | null>(null);
@@ -385,6 +387,7 @@ export function GenerationProvider({ children }: { children: React.ReactNode }) 
   const dismiss = useCallback((jobId: string) => setJobs((prev) => prev.filter((j) => j.id !== jobId)), []);
   const job = useCallback((jobId: string | undefined) => jobs.find((j) => j.id === jobId), [jobs]);
 
-  const value = useMemo<GenerationValue>(() => ({ jobs, start, dismiss, job }), [jobs, start, dismiss, job]);
+  const willShowAds = useCallback(() => showAdsRef.current, []);
+  const value = useMemo<GenerationValue>(() => ({ jobs, start, dismiss, job, willShowAds }), [jobs, start, dismiss, job, willShowAds]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

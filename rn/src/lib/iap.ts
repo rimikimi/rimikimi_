@@ -388,8 +388,20 @@ export interface FilterPackage {
 /** 상품을 못 불러왔을 때 보여 줄 원화 참고가(오너 결정 가격). */
 export const FILTER_PLAN_KRW: Record<FilterPlan, number> = { annual: 4900, monthly: 1900, lifetime: 9900 };
 export const FILTER_PLAN_ORDER: FilterPlan[] = ["annual", "monthly", "lifetime"];
-/** 시트에 보이는 요금제 — 오너 결정 2026-10-11: 월간만(연간·평생은 스토어·RevenueCat 에 그대로 두고 숨김). */
-export const FILTER_PLANS_SHOWN: FilterPlan[] = ["monthly"];
+/** 시트에 보이는 요금제 — 오너 결정 2026-10-12: 평생(먼저·기본 선택) + 월간. 연간은 스토어·RevenueCat 에 그대로 두고 숨김. */
+export const FILTER_PLANS_SHOWN: FilterPlan[] = ["lifetime", "monthly"];
+
+// 평생 이용권 런칭가 — 오너 결정 2026-10-12: 2026-11-13(KST)까지 ₩4,900, 11/14 00:00 KST 부터 정가 ₩9,900.
+// Play 는 할인 오퍼가 아니라 기본가 자체를 ₩4,900 으로 내렸다(RevenueCat Android 10.20 은 일회성 상품의
+// 할인 오퍼 토큰을 결제에 실지 않아 오퍼를 만들면 화면가·결제가가 어긋난다). 11/14 에 Play 기본가를 ₩9,900 으로
+// 되돌리는 건 수동. 이 날짜는 표시(배지·정가 취소선·참고가)만 바꾼다 — 실제 결제가는 언제나 스토어 priceString.
+export const LIFETIME_PROMO_END_MS = Date.parse("2026-11-14T00:00:00+09:00");
+export const LIFETIME_PROMO_KRW = 4900;
+export function lifetimePromoActive(now: number = Date.now()): boolean { return now < LIFETIME_PROMO_END_MS; }
+/** 상품을 못 불러왔을 때의 원화 참고가 — 런칭가 기간엔 평생 ₩4,900. */
+export function filterPlanFallbackKrw(plan: FilterPlan): number {
+  return plan === "lifetime" && lifetimePromoActive() ? LIFETIME_PROMO_KRW : FILTER_PLAN_KRW[plan];
+}
 
 /** 무료 체험 단계 + 갱신가 — Android 는 defaultOption(실제로 결제되는 옵션)을 먼저 본다. */
 function trialInfo(product: PurchasesStoreProduct | null | undefined): { freeTrial: boolean; renewPrice: string } {
