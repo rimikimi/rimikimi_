@@ -130,27 +130,31 @@ export const FILM_PRESETS = [
   // hidden: 목록에서 뺀다(오너 2026-10-11 "인플 필터는 아직 구리다. 없애자") — 키는 남겨 옛 저장값이 깨지지 않게.
   { key: "infl",     ko: "인플",      en: "Influencer", group: "fun", hidden: true,
     special: "beauty" },
-  /* ── 빈티지 (필름카메라 5종, 오너 2026-10-12 — 세피아·듀오 핑크·네온·서모 자리) ── */
-  { key: "vintC", ko: "빈티지C", en: "Vintage C", group: "fun", // CineStill 800T 계열 — 푸른 밤·붉은 하이라이트
+  /* ── 빈티지 (필름카메라 6종, 오너 2026-10-12 — 자기 카테고리. 세피아·듀오 핑크·네온·서모·스케치는 숨김) ── */
+  { key: "vintC", ko: "빈티지C", en: "Vintage C", group: "vintage", // CineStill 800T 계열 — 푸른 밤·붉은 하이라이트
     temp: -18, tint: 8, ex: 0.02, con: 0.22, fade: 14, whitePull: 8, sat: 0.04, vib: 0.12, sh: [-8, 4, 14], hi: [18, 4, -6],
     hsl: [{ c: 120, w: 70, h: 55, s: -0.25 }, { c: 220, w: 50, h: -20, s: 0.08 }, { c: 0, w: 25, s: 0.12 }],
     fx: { grain: 0.45, leak: 0.1 } },
-  { key: "vintL", ko: "빈티지L", en: "Vintage L", group: "fun", // 라이카 컬러 — 깊은 그림자·진한 빨강·차분한 채도
+  { key: "vintL", ko: "빈티지L", en: "Vintage L", group: "vintage", // 라이카 컬러 — 깊은 그림자·진한 빨강·차분한 채도
     temp: 4, tint: 0, ex: -0.04, con: 0.34, fade: 4, whitePull: 6, sat: -0.06, vib: 0.08, sh: [-2, 0, 4], hi: [6, 3, -4],
     hsl: [{ c: 0, w: 28, s: 0.18, l: -0.04 }, { c: 30, w: 22, s: 0.04 }, { c: 220, w: 60, s: -0.1, l: -0.06 }, { c: 110, w: 55, h: -8, s: -0.12, l: -0.04 }],
     fx: { grain: 0.25, vignette: 0.5 } },
-  { key: "vintP", ko: "빈티지P", en: "Vintage P", group: "fun", // Portra 400 계열 — 밝고 바랜 피부 톤
+  { key: "vintP", ko: "빈티지P", en: "Vintage P", group: "vintage", // Portra 400 계열 — 밝고 바랜 피부 톤
     temp: 10, tint: 8, ex: 0.12, con: -0.02, fade: 20, whitePull: 18, sat: -0.12, vib: 0.22, sh: [6, 3, 2], hi: [12, 6, 0],
     hsl: [{ c: 30, w: 28, s: -0.04, l: 0.05 }, { c: 110, w: 60, h: -12, s: -0.2 }, { c: 220, w: 60, s: -0.12, l: 0.04 }],
     fx: { grain: 0.35 } },
-  { key: "vintG", ko: "빈티지G", en: "Vintage G", group: "fun", // Gold 200 계열 — 따뜻한 노랑·뜬 검정
+  { key: "vintG", ko: "빈티지G", en: "Vintage G", group: "vintage", // Gold 200 계열 — 따뜻한 노랑·뜬 검정
     temp: 24, tint: 2, ex: 0.06, con: 0.16, fade: 18, whitePull: 12, sat: 0.08, vib: 0.1, sh: [10, 5, -10], hi: [16, 11, -14],
     hsl: [{ c: 110, w: 60, h: -20, s: -0.15 }, { c: 30, w: 25, s: 0.1, l: 0.03 }],
     fx: { grain: 0.5, vignette: 0.3 } },
-  { key: "vintS", ko: "빈티지S", en: "Vintage S", group: "fun", // 일회용 카메라 — 밝은 노출·빛샘·굵은 입자
+  { key: "vintS", ko: "빈티지S", en: "Vintage S", group: "vintage", // 일회용 카메라 — 밝은 노출·빛샘·굵은 입자
     temp: 8, tint: 4, ex: 0.16, con: 0.2, fade: 12, whitePull: 10, sat: 0.14, vib: 0.06, sh: [-2, 4, 2], hi: [14, 10, 0],
     hsl: [{ c: 110, w: 50, h: -10, s: -0.08 }],
     fx: { grain: 0.55, vignette: 0.35, leak: 0.25 } },
+  { key: "vintF", ko: "빈티지F", en: "Vintage F", group: "vintage", // 후지 C200 계열 — 청록 그림자·맑은 초록
+    temp: -2, tint: -10, ex: 0.04, con: 0.14, fade: 14, whitePull: 10, sat: 0.06, vib: 0.14, sh: [-4, 8, 6], hi: [6, 8, 2],
+    hsl: [{ c: 120, w: 60, h: 12, s: 0.1, l: -0.02 }, { c: 220, w: 55, s: 0.12 }, { c: 30, w: 22, h: -4, s: -0.04 }],
+    fx: { grain: 0.4, vignette: 0.2 } },
   { key: "sepia",    ko: "세피아",    en: "Sepia", group: "fun", hidden: true,
     ex: 0.02, con: 0.12, fade: 8, whitePull: 6, bw: [0.3, 0.55, 0.15], sh: [18, 6, -14], hi: [24, 10, -18] },
   { key: "duopink",  ko: "듀오 핑크", en: "Duo Pink", group: "fun", hidden: true,
@@ -174,7 +178,7 @@ export const FILM_PRESETS = [
     temp: 4, tint: 0, ex: 0.03, con: 0.1, fade: 6, whitePull: 6, sat: 0.06, vib: 0.2,
     sh: [0, 0, 4], hi: [8, 6, 0],
     fx: { twinkle: 0.85 } },
-  { key: "sketch",   ko: "스케치",    en: "Sketch", group: "fun",
+  { key: "sketch",   ko: "스케치",    en: "Sketch", group: "fun", hidden: true,
     special: "sketch" },
 ];
 
@@ -183,6 +187,7 @@ export const FILM_PRESETS = [
 // 순서 = 화면에 뜨는 순서. 여기 없는 group 은 "재미" 뒤에 자동으로 붙는다.
 export const FILTER_GROUPS = [
   { key: "phone",  labelKey: "filter.gPhone", emoji: "📱" },
+  { key: "vintage", labelKey: "filter.gVintage", emoji: "📸" },
   { key: "film",   labelKey: "filter.gFilm", emoji: "🎞️" },
   { key: "camera", labelKey: "filter.gCam",  emoji: "📷" },
   { key: "fun",    labelKey: "filter.gFun",  emoji: "✨" },

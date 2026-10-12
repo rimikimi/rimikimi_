@@ -55,11 +55,12 @@ async function deleteTemp(uri: string) {
 }
 const MIRROR_KEY = "camera.frontMirror";
 const PHONE = ["ph16pro", "ph15pro", "ph14pro", "phxs", "ph7", "ph6s", "ph4s", "ph3gs"];
-// 아날로그 = iOS FilterTabView.groups 에서 폰카를 뺀 순서(필름 → 카메라 → 재미, 빛번짐은 재미 맨 끝).
+// 아날로그 = iOS FilterTabView.groups 에서 폰카를 뺀 순서(빈티지 → 필름 → 카메라 → 재미, 빛번짐은 재미 맨 끝).
 const ANALOG = [
+  "vintC", "vintL", "vintP", "vintG", "vintS", "vintF",
   "golden", "peach", "slide", "retro", "vivid", "green", "pastel", "cine", "newtro", "softmono",
   "warm", "cool", "vintage", "docu", "mono", "digicam", "toy", "dispo", "instant",
-  "vintC", "vintL", "vintP", "vintG", "vintS", "glitch", "vhs", "pixelate", "sketch", "bloom",
+  "glitch", "vhs", "pixelate", "bloom",
 ];
 const filterName = (k: string) => { const p = presetByKey(k); return isKo ? p.ko : p.en; };
 

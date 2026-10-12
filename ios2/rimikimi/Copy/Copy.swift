@@ -148,6 +148,7 @@ enum Copy {
     static var filterGroupFilm: String { L.t("필름", "Film") }
     static var filterGroupCamera: String { L.t("카메라", "Camera") }
     static var filterGroupFun: String { L.t("재미", "Fun") }
+    static var filterGroupVintage: String { L.t("빈티지", "Vintage") }
     /// 프리셋 이름 (key → ko, en). 영어는 웹 `src/filters.js` 의 en.
     static let filterNames: [String: (ko: String, en: String)] = [
         "ph16pro": ("16 Pro", "16 Pro"), "ph15pro": ("15 Pro", "15 Pro"), "ph14pro": ("14 Pro", "14 Pro"),
@@ -160,7 +161,7 @@ enum Copy {
         "docu": ("베를린 '89", "Berlin '89"), "mono": ("뉴욕 '59", "New York '59"), "digicam": ("시부야 '04", "Shibuya '04"),
         "toy": ("제주 '01", "Jeju '01"), "dispo": ("오키나와 '00", "Okinawa '00"), "instant": ("마이애미 '84", "Miami '84"),
         "vintC": ("빈티지C", "Vintage C"), "vintL": ("빈티지L", "Vintage L"), "vintP": ("빈티지P", "Vintage P"),
-        "vintG": ("빈티지G", "Vintage G"), "vintS": ("빈티지S", "Vintage S"),
+        "vintG": ("빈티지G", "Vintage G"), "vintS": ("빈티지S", "Vintage S"), "vintF": ("빈티지F", "Vintage F"),
         "sepia": ("세피아", "Sepia"), "duopink": ("듀오 핑크", "Duo Pink"), "neon": ("네온", "Neon"),
         "thermal": ("서모", "Thermal"), "glitch": ("글리치", "Glitch"), "vhs": ("VHS", "VHS"),
         "pixelate": ("모자이크", "Pixel"), "sketch": ("스케치", "Sketch"), "bloom": ("빛번짐", "Bloom"),
