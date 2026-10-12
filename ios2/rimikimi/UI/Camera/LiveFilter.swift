@@ -120,6 +120,12 @@ enum LiveFilter {
         "ph6s": .init(temp: -14, tint: -8, ex: 0.02, con: 0.2, fade: 2, whitePull: 2, sat: 0.14, vib: 0.04, sh: [-4, 4, 8], hi: [0, 4, 6], fx: .init(grain: 0.14)),
         "ph4s": .init(temp: 26, tint: -6, ex: 0.12, con: 0.32, fade: 8, sat: -0.08, sh: [6, 6, -8], hi: [14, 12, -14], fx: .init(grain: 0.3, vignette: 0.35)),
         "ph3gs": .init(temp: 14, tint: -14, ex: 0.14, con: 0.26, fade: 22, sat: -0.35, vib: -0.05, sh: [-6, 10, 6], hi: [18, 16, -10], fx: .init(grain: 0.55, vignette: 0.45)),
+        // 빈티지 5종(오너 2026-10-12) — filters.js 와 같은 값
+        "vintC": .init(temp: -18, tint: 8, ex: 0.02, con: 0.22, fade: 14, whitePull: 8, sat: 0.04, vib: 0.12, sh: [-8, 4, 14], hi: [18, 4, -6], hsl: [.init(c: 120, w: 70, h: 55, s: -0.25, l: 0), .init(c: 220, w: 50, h: -20, s: 0.08, l: 0), .init(c: 0, w: 25, h: 0, s: 0.12, l: 0)], fx: .init(grain: 0.45, leak: 0.1)),
+        "vintL": .init(temp: 4, ex: -0.04, con: 0.34, fade: 4, whitePull: 6, sat: -0.06, vib: 0.08, sh: [-2, 0, 4], hi: [6, 3, -4], hsl: [.init(c: 0, w: 28, h: 0, s: 0.18, l: -0.04), .init(c: 30, w: 22, h: 0, s: 0.04, l: 0), .init(c: 220, w: 60, h: 0, s: -0.1, l: -0.06), .init(c: 110, w: 55, h: -8, s: -0.12, l: -0.04)], fx: .init(grain: 0.25, vignette: 0.5)),
+        "vintP": .init(temp: 10, tint: 8, ex: 0.12, con: -0.02, fade: 20, whitePull: 18, sat: -0.12, vib: 0.22, sh: [6, 3, 2], hi: [12, 6, 0], hsl: [.init(c: 30, w: 28, h: 0, s: -0.04, l: 0.05), .init(c: 110, w: 60, h: -12, s: -0.2, l: 0), .init(c: 220, w: 60, h: 0, s: -0.12, l: 0.04)], fx: .init(grain: 0.35)),
+        "vintG": .init(temp: 24, tint: 2, ex: 0.06, con: 0.16, fade: 18, whitePull: 12, sat: 0.08, vib: 0.1, sh: [10, 5, -10], hi: [16, 11, -14], hsl: [.init(c: 110, w: 60, h: -20, s: -0.15, l: 0), .init(c: 30, w: 25, h: 0, s: 0.1, l: 0.03)], fx: .init(grain: 0.5, vignette: 0.3)),
+        "vintS": .init(temp: 8, tint: 4, ex: 0.16, con: 0.2, fade: 12, whitePull: 10, sat: 0.14, vib: 0.06, sh: [-2, 4, 2], hi: [14, 10, 0], hsl: [.init(c: 110, w: 50, h: -10, s: -0.08, l: 0)], fx: .init(grain: 0.55, vignette: 0.35, leak: 0.25)),
         "sepia": .init(ex: 0.02, con: 0.12, fade: 8, whitePull: 6, sh: [18, 6, -14], hi: [24, 10, -18], bw: [0.3, 0.55, 0.15]),
         "duopink": .init(special: .duotone, c1: [38, 18, 66], c2: [255, 158, 201]),
         "neon": .init(special: .duotone, c1: [24, 8, 66], c2: [90, 255, 240]),

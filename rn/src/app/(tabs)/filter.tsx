@@ -59,7 +59,7 @@ const PHONE = ["ph16pro", "ph15pro", "ph14pro", "phxs", "ph7", "ph6s", "ph4s", "
 const ANALOG = [
   "golden", "peach", "slide", "retro", "vivid", "green", "pastel", "cine", "newtro", "softmono",
   "warm", "cool", "vintage", "docu", "mono", "digicam", "toy", "dispo", "instant",
-  "sepia", "duopink", "neon", "thermal", "glitch", "vhs", "pixelate", "sketch", "bloom",
+  "vintC", "vintL", "vintP", "vintG", "vintS", "glitch", "vhs", "pixelate", "sketch", "bloom",
 ];
 const filterName = (k: string) => { const p = presetByKey(k); return isKo ? p.ko : p.en; };
 

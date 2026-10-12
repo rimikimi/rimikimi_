@@ -32,8 +32,8 @@ struct FilterTabView: View {
             .init(key: "toy"), .init(key: "dispo"), .init(key: "instant"),
         ]),
         .init(key: "fun", title: Copy.filterGroupFun, emoji: "✨", presets: [
-            .init(key: "sepia"), .init(key: "duopink"), .init(key: "neon"),
-            .init(key: "thermal"), .init(key: "glitch"), .init(key: "vhs"),
+            .init(key: "vintC"), .init(key: "vintL"), .init(key: "vintP"),
+            .init(key: "vintG"), .init(key: "vintS"), .init(key: "glitch"), .init(key: "vhs"),
             .init(key: "pixelate"), .init(key: "sketch"), .init(key: "bloom"),
         ]),
     ] }
