@@ -83,15 +83,11 @@ struct PurposeView: View {
     /// 옵션 버튼 — 웨딩: 필터(드레스 탭) · 신랑도 함께.
     @ViewBuilder private var tools: some View {
         // 전문 프로필의 세부 조정·옷 바꾸기는 여기 없다 — "N장 만들기" 다음 단계(`StudioStepSheet`).
-        if purpose == .wedding {
+        // "신랑도 함께"(신랑·신부 커플 웨딩)는 뺐다 — 애플 1.1 반려(2026-10-12): 두 사람이 닿는(팔짱·포옹·이마키스) 템플릿 금지.
+        if purpose == .wedding, current != "concepts" {
             let nf = app.studio.filter.values.reduce(0) { $0 + $1.count }
             toolRow {
-                if current != "concepts" {
-                    ToolButton(title: L.t("필터", "Filter") + (nf > 0 ? " · \(nf)" : ""), icon: "line.3.horizontal.decrease", on: nf > 0) { showKnobs = true }
-                }
-                ToolButton(title: app.studio.groom != nil ? L.t("신랑 사진 추가됨", "Groom added") : L.t("신랑도 함께", "With groom"), icon: "heart.circle", on: app.studio.groom != nil) {
-                    if app.studio.groom != nil { app.studio.groom = nil } else { pickGroom = true }
-                }
+                ToolButton(title: L.t("필터", "Filter") + (nf > 0 ? " · \(nf)" : ""), icon: "line.3.horizontal.decrease", on: nf > 0) { showKnobs = true }
             }
         }
     }

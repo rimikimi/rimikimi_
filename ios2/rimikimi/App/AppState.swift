@@ -152,7 +152,7 @@ final class AppState {
                 r.studioOverrides = (studio.overrides[p] ?? [:]).mapValues { $0.base }
                 r.outfit = studio.outfit[p]
             }
-            if c.dressCode != nil { r.groomPhoto = studio.groom }
+            // 신랑 사진은 더 안 보낸다(커플 웨딩 제거, 애플 1.1 반려 2026-10-12) — 예전에 골라 둔 게 남아 있어도.
             return r
         }
         requireLogin(reqs.count == 1 ? .generate(reqs[0]) : .generateMany(reqs), message: Copy.loginToSave)

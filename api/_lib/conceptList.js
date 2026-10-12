@@ -47,8 +47,10 @@ export function supportsConcept(c, caps) {
   return !Array.isArray(c?.requires) || c.requires.every((r) => caps.has(r));
 }
 
-export function publishedConcepts(ALL, now, caps = new Set()) {
-  const list = ALL.filter((c) => isPublished(c, now) && supportsConcept(c, caps));
+// iOS 앱에는 `iosHidden` 컨셉을 안 보낸다 — 애플 1.1 반려(2026-10-12): 두 사람이 신체 접촉(포옹·키스·손잡기 등)하는
+// 커플 템플릿을 빼라. 안드로이드·웹은 그대로. 다시 넣으려면 접촉 없는 버전으로 고쳐 정식 심사를 받는다.
+export function publishedConcepts(ALL, now, caps = new Set(), { ios = false } = {}) {
+  const list = ALL.filter((c) => isPublished(c, now) && supportsConcept(c, caps) && !(ios && c.iosHidden));
 
   for (const c of list) {
     const at = PINNED[Number(c.id)];

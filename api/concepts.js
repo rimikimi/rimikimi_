@@ -53,6 +53,13 @@ function countResponse(req, res, now) {
   return res.status(200).send(JSON.stringify({ total: n }));
 }
 
+// iOS 네이티브 앱(SwiftUI, URLSession) — UA 가 "rimikimi/64 CFNetwork/… Darwin/…" 이고 브라우저(Mozilla)가 아니다.
+// 안드로이드(RN)는 okhttp, 웹은 Mozilla 라 여기 안 걸린다.
+function isIOSApp(req) {
+  const ua = String(req.headers?.["user-agent"] || "");
+  return /CFNetwork|Darwin/i.test(ua) && !/Mozilla/i.test(ua);
+}
+
 export default function handler(req, res) {
   // ⚠️ CORS 필수. 네이티브 앱은 capacitor://localhost 에서 이 주소를 부르므로
   //    크로스 오리진이다. 정적 파일일 땐 Vercel 이 알아서 열어줬는데, 함수로
@@ -87,16 +94,17 @@ export default function handler(req, res) {
     // 함수를 쓰기 때문이다 — 로직이 두 벌이면 폴백이 조용히 어긋난다.
     // ?caps=retouch — 앱이 아는 새 기능 목록(쉼표). requires 가 붙은 컨셉은 이게 있어야 보인다.
     const caps = new Set(String(req.query?.caps || "").split(",").map((x) => x.trim()).filter(Boolean));
-    list = publishedConcepts(ALL, now, caps);
+    list = publishedConcepts(ALL, now, caps, { ios: isIOSApp(req) });
   } catch (_) {
-    list = ALL.filter((c) => !Array.isArray(c?.requires)); // 필터가 어떤 이유로든 터지면 전부 내보낸다 (빈 갤러리보다 낫다)
+    list = ALL.filter((c) => !Array.isArray(c?.requires) && !(isIOSApp(req) && c.iosHidden)); // 필터가 어떤 이유로든 터지면 전부 내보낸다 (빈 갤러리보다 낫다)
   }
 
-  // 다음 공개 시각까지만 캐시 — 길어야 10분이라 드롭이 늦어도 10분 안에 반영된다.
+  // ⚠️ 응답이 기기(iOS 앱 여부)마다 다르다 → CDN 공유 캐시 금지. URL 이 같아서 CDN 에 걸리면
+  //    안드로이드용 목록(커플 포함)이 iOS 앱에 그대로 나간다(애플 1.1 반려 대응, 2026-10-12).
   res.setHeader("Content-Type", "application/json; charset=utf-8");
-  res.setHeader(
-    "Cache-Control",
-    "public, max-age=0, s-maxage=300, stale-while-revalidate=600"
-  );
+  res.setHeader("Cache-Control", "private, no-store, max-age=0");
+  res.setHeader("CDN-Cache-Control", "no-store");
+  res.setHeader("Vercel-CDN-Cache-Control", "no-store");
+  res.setHeader("Vary", "User-Agent");
   res.status(200).send(JSON.stringify(list));
 }
