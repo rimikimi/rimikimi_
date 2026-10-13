@@ -133,8 +133,12 @@ if (DRY) {
   process.exit(0);
 }
 
-const done = await api("POST", `${BASE}/edits/${edit.id}:commit`);
+// 정책 반려 상태 등에서는 자동 심사 전송이 막힌다 → --no-review 면 커밋만 하고 콘솔에서 오너가 보낸다.
+const noReview = process.argv.includes("--no-review");
+const done = await api("POST", `${BASE}/edits/${edit.id}:commit${noReview ? "?changesNotSentForReview=true" : ""}`);
 console.log(`commit 완료 (edit ${done.id})`);
-console.log(TRACK === "production"
+console.log(noReview
+  ? "→ 커밋만 됨(심사 미전송) — Play Console 게시 개요에서 [검토를 위해 전송]을 눌러야 심사에 들어간다."
+  : TRACK === "production"
   ? "→ 심사 제출됨. 통과하면 전체 사용자에게 나갑니다."
   : "→ 10~15분 뒤 테스터가 설치할 수 있습니다.");
