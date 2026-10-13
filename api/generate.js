@@ -33,6 +33,16 @@ import ALL_CONCEPTS from "./_data/concepts.json" with { type: "json" };
 // 이제 **conceptId 로 서버가 직접 찾는다.** 앱이 보낸 prompt 는 쓰지 않는다
 // (컨셉을 못 찾을 때만 폴백 — 캐시가 오래된 구버전 앱을 깨뜨리지 않기 위해서다).
 // 이렇게 해 두면 목록에서 `text` 를 빼도 생성이 그대로 돌아간다.
+// 카테고리별 생성 모델(오너 2026-10-14 "섞어서 해보자, 우선 매직부스는 2.1로") —
+// 자체 비교(18쌍): Nano Banana 2.1 은 Pro 대비 장당 1/3 가격·약 5초 빠름·손발 불량 적음, 대신 빛·명암 표현은 Pro 가 낫다.
+// 빛이 중요한 화보·웨딩·스튜디오는 Pro 유지, 그림체로 바꾸는 매직 부스부터 2.1. 2.1 이 혼잡·실패면 Pro 로 내려간다.
+const NB21_MODEL = "gemini-nano-banana-2.1";
+const NB21_CATEGORIES = new Set(["🪄 매직 부스"]);
+const NB21_IDS = new Set(
+  (Array.isArray(ALL_CONCEPTS) ? ALL_CONCEPTS : [])
+    .filter((c) => c && c.id != null && (c.categories || [c.category]).some((k) => NB21_CATEGORIES.has(k)))
+    .map((c) => String(c.id))
+);
 const PROMPT_BY_ID = new Map(
   (Array.isArray(ALL_CONCEPTS) ? ALL_CONCEPTS : [])
     .filter((c) => c && c.id != null && typeof c.text === "string" && c.text)
@@ -1688,6 +1698,8 @@ async function handleGenerate(req, res, hold) {
   const budget = (want) => Math.min(want, left());
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+  // 카테고리 라우팅 — 매직 부스 등은 2.1 이 1순위(AI Studio 로만 부른다. Vertex 엔 이 모델이 없을 수 있다).
+  const useNb21 = conceptId != null && NB21_IDS.has(String(conceptId));
   const PRO_MODEL = "gemini-3-pro-image";
   const BASE_MODEL = "gemini-3.1-flash-image";
   // 최후 폴백 — 검증된 구세대 모델.
@@ -1824,6 +1836,10 @@ async function handleGenerate(req, res, hold) {
 
     // 한 장 생성 = Vertex 우선, 실패 시 AI Studio. (단건 경로와 같은 순서)
     async function attemptShot(shotIdx = 0) {
+      if (useNb21) {
+        const r0 = await callGemini(NB21_MODEL, true, budget(70000), shotIdx);
+        if (!isBusyFailure(r0)) return r0;
+      }
       if (vertexSA()) {
         const r = await callVertexBackoff(PRO_MODEL, true, budget(90000), shotIdx);
         if (!isBusyFailure(r)) return r;
@@ -1962,7 +1978,12 @@ async function handleGenerate(req, res, hold) {
     });
   }
 
-  if (useProEngine) {
+  if (useProEngine && useNb21) {
+    result = await callGemini(NB21_MODEL, true, budget(70000));
+    if (!isBusyFailure(result)) console.log(`[generate] 2.1 성공 concept=${conceptId}`);
+    else console.error("[generate] 2.1 실패 → Pro 로:", result.networkError?.message || `HTTP ${result.upstream?.status}`);
+  }
+  if (useProEngine && (!useNb21 || isBusyFailure(result))) {
     // 1) Vertex 로 나노바나나 프로 (1순위).
     //    실측 ~29s 로 느리므로 넉넉히 주되, 실패 시 AI Studio 몫을 남겨둔다.
     if (vertexSA()) {
@@ -1989,7 +2010,7 @@ async function handleGenerate(req, res, hold) {
       busyFallback = true;
       result = await baseThenLegacy(Math.max(6000, left() - 3000));
     }
-  } else {
+  } else if (!useProEngine) {
     result = await baseThenLegacy(24000);
   }
 
@@ -2017,7 +2038,10 @@ async function handleGenerate(req, res, hold) {
     if (qa.ok === false) {
       console.log(`[generate] 불량 → 재생성 concept=${conceptId} qa="${qa.issue}"`);
       let again = null;
-      if (useProEngine && !busyFallback) {
+      if (useProEngine && !busyFallback && useNb21) {
+        again = await callGemini(NB21_MODEL, true, budget(70000));
+        if (isBusyFailure(again)) again = await proWithRetries(10000);
+      } else if (useProEngine && !busyFallback) {
         if (vertexSA()) again = await callVertexBackoff(PRO_MODEL, true, budget(90000));
         if (!again || isBusyFailure(again)) again = await proWithRetries(10000);
       } else {
