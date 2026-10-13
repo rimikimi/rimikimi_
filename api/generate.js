@@ -41,6 +41,8 @@ const NB21_CATEGORIES = new Set(["🪄 매직 부스"]);
 const NB21_IDS = new Set(
   (Array.isArray(ALL_CONCEPTS) ? ALL_CONCEPTS : [])
     .filter((c) => c && c.id != null && (c.categories || [c.category]).some((k) => NB21_CATEGORIES.has(k)))
+    // 같은 카테고리에 있어도 사진 기능(드레스룸·복원·말로 고치기)은 빼고 그림체만
+    .filter((c) => c.mode !== "dressroom" && c.mode !== "retouch" && String(c.id) !== "408" && !/복원|restor/i.test(c.title || ""))
     .map((c) => String(c.id))
 );
 const PROMPT_BY_ID = new Map(
@@ -1535,20 +1537,23 @@ async function handleGenerate(req, res, hold) {
   // 얼굴 동일인 검사 — 내 얼굴로 만드는 컨셉 1인만(매직 부스·그림체·커플·픽셀은 원래 얼굴이 바뀌거나 2인이라 제외)
   // 오너 지시(2026-10-08): 얼굴 동일인 검사는 **모든 생성**에 — 커플은 두 사람 각각, 인생네컷은 칸마다,
   // 그림체(매직 부스·픽셀)는 인종·피부톤·성별·안경·머리색만 보는 완화판(qa.js identityPrompt).
+  // 매직 부스는 그림체로 바꾸는 컨셉 — 앱이 skipFacePrecheck 를 빠뜨려도(구버전·게스트 경로) 서버가 알아서 그림체 검사로 본다.
+  //   빠뜨리면 캐리커처를 "다른 사람·장면 다름"으로 매번 불합격시켜 두 번씩 만들었다(2026-10-14 실측).
+  const magicBoothConcept = conceptId != null && NB21_IDS.has(String(conceptId));
   const wantIdentity = true;
   const qaOpts = {
     people: hasSecond ? 2 : isRestore ? 0 : 1,
     panels: isFourcut && fourcutStyle && cutCount && Number(cutCount) > 1 ? Number(cutCount) : 1,
-    art: !!skipFacePrecheck,
+    art: !!skipFacePrecheck || magicBoothConcept,
   };
   const idOpts = {
-    art: !!skipFacePrecheck || SPRITE_CONCEPT_IDS.has(String(conceptId)),
+    art: !!skipFacePrecheck || magicBoothConcept || SPRITE_CONCEPT_IDS.has(String(conceptId)),
     panels: qaOpts.panels,
     ref2Base64: hasSecond ? base64_2 : null, ref2Mime: hasSecond ? mimeType2 : null,
   };
   // 장면 검사(2026-10-08 "여러 장 만들면 배경을 이상하게 따온다") — 컨셉이 장소를 정하는 경로만.
   // 원본 배경을 살리는 매직 부스·복원, 장면을 따로 고르는 드레스룸, 칸 구성이 다른 인생네컷·픽셀은 제외.
-  const wantScene = !skipFacePrecheck && !isRestore && !isDressroom && !isFourcut && !SPRITE_CONCEPT_IDS.has(String(conceptId));
+  const wantScene = !skipFacePrecheck && !magicBoothConcept && !isRestore && !isDressroom && !isFourcut && !SPRITE_CONCEPT_IDS.has(String(conceptId));
   // 응답 본문은 뒤에서 다시 읽으므로 clone 으로 이미지 한 장만 꺼낸다.
   async function qaInline(r) {
     try {
@@ -1838,7 +1843,8 @@ async function handleGenerate(req, res, hold) {
     async function attemptShot(shotIdx = 0) {
       if (useNb21) {
         const r0 = await callGemini(NB21_MODEL, true, budget(70000), shotIdx);
-        if (!isBusyFailure(r0)) return r0;
+        if (!isBusyFailure(r0)) { console.log(`[generate] 2.1 성공 shot=${shotIdx} concept=${conceptId}`); return r0; }
+        console.error("[generate] 2.1 실패 → Pro 로:", r0.networkError?.message || `HTTP ${r0.upstream?.status}`);
       }
       if (vertexSA()) {
         const r = await callVertexBackoff(PRO_MODEL, true, budget(90000), shotIdx);
