@@ -760,15 +760,22 @@ export async function checkAnatomy(apiKey, sharp, outJpeg) {
 // 오너 지시(2026-10-08): 모든 생성에 얼굴 동일인 + 물리법칙 + 기본 해부학을 똑같이.
 // 손 개수(checkAnatomy, 3표) 위에 공용 검사(qa.js: 팔·관절·얼굴·융합·물리 / 동일인)를 같이 돌린다.
 // 단체 사진도 받으므로 인원 규칙은 끈다(people: 0). 검사 실패·타임아웃은 막지 않는다(공용 규칙과 같다).
-async function verifyRetouch(apiKey, sharp, srcBuf, outJpeg) {
+// ⚠️ 원본에 이미 있는 것(젓가락이 그릇에 걸쳐 있음 등)을 결과의 결함으로 잡으면 고치려던 사진이 두 번 다 실패한다
+//    (2026-10-13 오너 "커스텀 보정 두 번 실패" — 로그: "chopsticks floating with no hand" 2회). 그래서 원본도 같은
+//    검사에 한 번 돌려 두고(`base`), 원본에서도 걸리는 검사는 결과에서 막지 않는다 — 보정이 **새로 만든** 결함만 막는다.
+async function verifyRetouch(apiKey, sharp, srcBuf, outJpeg, base) {
   const src = srcBuf.toString("base64"), out = outJpeg.toString("base64");
-  const [an, qa, idt] = await Promise.all([
+  const [an, qa, idt, b] = await Promise.all([
     checkAnatomy(apiKey, sharp, outJpeg),
     inspectImage({ base64: out, mimeType: "image/jpeg", apiKey, people: 0 }).catch(() => ({ ok: null })),
     checkIdentity({ refBase64: src, refMime: "image/jpeg", base64: out, mimeType: "image/jpeg", apiKey }).catch(() => ({ ok: null })),
+    base || Promise.resolve(null),
   ]);
-  if (!an.ok) return an;
-  if (qa.ok === false) return { ok: false, problem: qa.issue || "generation defect", votes: "qa" };
+  const srcAnatomyBad = b?.an && b.an.ok === false, srcQaBad = b?.qa && b.qa.ok === false;
+  if (!an.ok && !srcAnatomyBad) return an;
+  if (!an.ok) console.log(`[retouch] anatomy flag ignored (also in source): ${an.problem}`);
+  if (qa.ok === false && !srcQaBad) return { ok: false, problem: qa.issue || "generation defect", votes: "qa" };
+  if (qa.ok === false) console.log(`[retouch] qa flag ignored (also in source): ${qa.issue}`);
   if (idt.ok === false) return { ok: false, problem: `the person no longer looks like the same individual: ${idt.issue}`, votes: "identity" };
   return an;
 }
@@ -785,6 +792,11 @@ export async function runRetouch({ apiKey, sharp, srcBuf, text }) {
   const toJpeg = (buf) => sharp(buf, { raw: { width: w, height: h, channels: 3 } }).jpeg({ quality: 92 }).toBuffer();
   let fix = "";
   const tried = [];
+  // 원본 기준 검사 — 첫 보정을 그리는 동안 같이 돌려 둔다(대기 시간 추가 없음)
+  const base = Promise.all([
+    checkAnatomy(apiKey, sharp, srcBuf).catch(() => ({ ok: true })),
+    inspectImage({ base64: b64, mimeType: "image/jpeg", apiKey, people: 0 }).catch(() => ({ ok: null })),
+  ]).then(([an, qa]) => ({ an, qa }));
   for (let attempt = 0; attempt < 2; attempt++) {
     const prompt = editPrompt(plan) + (fix ? `\nThe previous attempt had this error — do not repeat it: ${fix}` : "");
     const editB64 = await editImage(apiKey, b64, nearestAspect(w, h), prompt);
@@ -815,12 +827,12 @@ export async function runRetouch({ apiKey, sharp, srcBuf, text }) {
       whole = true;
     }
     let finalJpeg = await toJpeg(out);
-    let chk = await verifyRetouch(apiKey, sharp, srcBuf, finalJpeg);
+    let chk = await verifyRetouch(apiKey, sharp, srcBuf, finalJpeg, base);
     // 섞은 결과가 걸렸으면 AI 결과 통째(섞으면서 생긴 손·머리 중복이면 이걸로 풀린다)
     if (!chk.ok && !whole) {
       const g = compositeRetouch(O, E, w, h, plan.regions, plan.protect, "global", false, plan.textBoxes);
       const j2 = await toJpeg(g.out);
-      const c2 = await verifyRetouch(apiKey, sharp, srcBuf, j2);
+      const c2 = await verifyRetouch(apiKey, sharp, srcBuf, j2, base);
       if (c2.ok) ({ out, pasted, same, thr } = g), finalJpeg = j2, chk = c2;
     }
     console.log(`[retouch] anatomy try${attempt + 1} ${chk.ok ? "ok" : "FAIL: " + chk.problem}${chk.unchecked ? " (unchecked)" : " " + chk.votes}`);

@@ -182,8 +182,9 @@ You are a strict face-identity examiner. Look past styling and judge the underly
 Compare, one by one: (1) eye shape, eyelid type and eye spacing, (2) nose bridge, nose width and tip shape, (3) lip shape and philtrum, (4) face outline: jaw width, chin shape and length, cheekbones, (5) brow shape and position, (6) overall proportions (eye-nose-mouth distances), (7) apparent age.
 IGNORE: hairstyle, hair colour, makeup, outfit, lighting, camera angle, expression, skin retouching.
 An apparent age difference of about 10 years or more counts AGAINST being the same person. Two people of the same ethnicity and gender who merely look alike are NOT the same person.
+If image 1 shows no clearly visible human face (food, objects, scenery, a person seen only from behind), there is nothing to compare: return identity_score 100 and "no_face": true.
 Give identity_score from 0 to 100: 90-100 = certainly the same person, 70-89 = probably the same, 40-69 = unsure / could be a lookalike, 0-39 = a different person.
-Reply with JSON only: {"identity_score": 0-100, "ethnicity_changed": true|false, "age_gap_years": number, "reason": "short"}`;
+Reply with JSON only: {"identity_score": 0-100, "no_face": true|false, "ethnicity_changed": true|false, "age_gap_years": number, "reason": "short"}`;
 async function strictFaceMatch(ref, out, apiKey, timeoutMs) {
   for (let attempt = 0; attempt < 2; attempt++) {
     const ctrl = new AbortController();
@@ -207,6 +208,7 @@ async function strictFaceMatch(ref, out, apiKey, timeoutMs) {
       if (Array.isArray(v)) v = v[0];   // 가끔 [{…}] 로 감싸 온다
       const score = Number(v?.identity_score);
       if (!Number.isFinite(score)) continue;
+      if (v.no_face === true) return { ok: true, score, issue: "" };   // 사람 없는 사진(음식·물건·풍경)은 비교할 얼굴이 없다 — 통과
       const ok = score >= FACE_MATCH_MIN && v.ethnicity_changed !== true;
       return { ok, score, issue: ok ? "" : String(v.reason || "").slice(0, 160) };
     } catch (_) { /* 다음 시도 */ } finally { clearTimeout(t); }
