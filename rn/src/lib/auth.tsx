@@ -46,6 +46,8 @@ interface AuthValue {
   error: string | null;
   closeSheet: () => void;
   signIn: (p: Provider) => Promise<void>;
+  /** 이메일·비밀번호 로그인 — 심사용 데모 계정(구글·애플 심사관)이 쓸 수 있게(2026-10-13 Play 반려 대응). */
+  signInEmail: (email: string, password: string) => Promise<boolean>;
   signOut: () => Promise<void>;
   /**
    * 로그인돼 있으면 즉시 action. 아니면 시트를 띄우고 로그인 성공 시 action 을 이어서 실행.
@@ -184,6 +186,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const signInEmail = useCallback(async (email: string, password: string) => {
+    setBusy("email" as Provider);
+    setError(null);
+    try {
+      const { error: e } = await supabase().auth.signInWithPassword({ email: email.trim(), password });
+      if (e) { setError(copy.login.emailFail); return false; }
+      return true; // 세션은 onAuthStateChange 가 세운다 → 이어서 하던 동작이 진행된다
+    } catch {
+      setError(copy.login.emailFail);
+      return false;
+    } finally {
+      setBusy(null);
+    }
+  }, []);
+
   const signOut = useCallback(async () => {
     await logoutIap();
     await supabase().auth.signOut();
@@ -210,8 +227,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo<AuthValue>(
-    () => ({ session, loading, sheetOpen, sheetReason, sheetMessage, busy, error, closeSheet, signIn, signOut, requireLogin, takePendingRoute }),
-    [session, loading, sheetOpen, sheetReason, sheetMessage, busy, error, closeSheet, signIn, signOut, requireLogin, takePendingRoute]
+    () => ({ session, loading, sheetOpen, sheetReason, sheetMessage, busy, error, closeSheet, signIn, signInEmail, signOut, requireLogin, takePendingRoute }),
+    [session, loading, sheetOpen, sheetReason, sheetMessage, busy, error, closeSheet, signIn, signInEmail, signOut, requireLogin, takePendingRoute]
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

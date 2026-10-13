@@ -78,6 +78,11 @@ const copyKo = {
     reasonMake: "만든 사진을 내 사진에 저장하려면 로그인이 필요해요",
     reasonFilter: "필터를 쓰려면 로그인이 필요해요",
     reasonCamera: "카메라를 쓰려면 로그인이 필요해요",
+    emailToggle: "이메일로 로그인",
+    emailPlaceholder: "이메일",
+    passwordPlaceholder: "비밀번호",
+    emailSubmit: "로그인",
+    emailFail: "이메일 또는 비밀번호가 맞지 않아요.",
   },
   progress: {
     making: "이미지를 만들고 있어요",
@@ -451,6 +456,11 @@ const copyEn: Copy = {
     reasonMake: "Sign in to save your photos to My Photos",
     reasonFilter: "Sign in to use filters",
     reasonCamera: "Sign in to use the camera",
+    emailToggle: "Sign in with email",
+    emailPlaceholder: "Email",
+    passwordPlaceholder: "Password",
+    emailSubmit: "Sign in",
+    emailFail: "Incorrect email or password.",
   },
   progress: {
     making: "Creating your image",

@@ -1,5 +1,5 @@
-import React from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import React, { useState } from "react";
+import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import Svg, { Path } from "react-native-svg";
 import { Sheet } from "./Sheet";
 import { Text } from "./Text";
@@ -43,7 +43,12 @@ const ORDER: { p: Provider; label: string }[] = [
 ];
 
 export function LoginSheet() {
-  const { sheetOpen, sheetReason, sheetMessage, busy, error, closeSheet, signIn } = useAuth();
+  const { sheetOpen, sheetReason, sheetMessage, busy, error, closeSheet, signIn, signInEmail } = useAuth();
+  // 이메일 로그인 — 맨 아래 작은 링크로만 연다(일반 사용자는 소셜 로그인, 심사관용 데모 계정이 주로 쓴다).
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const emailBusy = (busy as string) === "email";
   const reason = sheetReason === "filter" ? copy.login.reasonFilter : sheetReason === "camera" ? copy.login.reasonCamera : copy.login.reasonMake;
   return (
     <Sheet open={sheetOpen} onClose={closeSheet}>
@@ -71,6 +76,22 @@ export function LoginSheet() {
           );
         })}
       </View>
+      {emailOpen ? (
+        <View style={styles.emailBox}>
+          <TextInput value={email} onChangeText={setEmail} placeholder={copy.login.emailPlaceholder} placeholderTextColor={color.ink3}
+            autoCapitalize="none" autoCorrect={false} keyboardType="email-address" textContentType="username" style={styles.input} />
+          <TextInput value={password} onChangeText={setPassword} placeholder={copy.login.passwordPlaceholder} placeholderTextColor={color.ink3}
+            secureTextEntry textContentType="password" style={styles.input} onSubmitEditing={() => { void signInEmail(email, password); }} />
+          <Pressable accessibilityRole="button" disabled={!!busy || !email || !password} onPress={() => { void signInEmail(email, password); }}
+            style={({ pressed }) => [styles.btn, styles.emailBtn, { opacity: !email || !password ? 0.5 : 1, transform: [{ scale: pressed ? 0.985 : 1 }] }]}>
+            {emailBusy ? <Spinner size={18} color={color.accentOn} /> : <Text size="callout" weight="bold" style={{ color: color.accentOn }}>{copy.login.emailSubmit}</Text>}
+          </Pressable>
+        </View>
+      ) : (
+        <Pressable accessibilityRole="button" onPress={() => setEmailOpen(true)} hitSlop={10}>
+          <Text size="footnote" tone="muted" center>{copy.login.emailToggle}</Text>
+        </Pressable>
+      )}
       {error ? <Text size="footnote" tone="danger" center>{error}</Text> : null}
       <Text size="caption" tone="subtle" center weight="medium">{copy.login.terms}</Text>
     </Sheet>
@@ -83,4 +104,7 @@ const styles = themedStyles(() => StyleSheet.create({
   btn: { height: chrome.buttonH, borderRadius: radius.btn, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: space.s2 },
   googleBorder: { borderWidth: 1.5, borderColor: color.line },
   slot: { width: 20, height: 20, alignItems: "center", justifyContent: "center" },
+  emailBox: { gap: space.s2 },
+  input: { height: chrome.buttonH, borderRadius: radius.btn, borderWidth: 1.5, borderColor: color.line, paddingHorizontal: space.s4, color: color.ink, fontSize: 16, backgroundColor: color.card },
+  emailBtn: { backgroundColor: color.accent },
 }));
