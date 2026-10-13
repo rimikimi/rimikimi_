@@ -175,12 +175,58 @@ function identityPrompt({ art = false, panels = 1, pair = false } = {}) {
     'Reply with JSON only: {"same_person": true|false, "ethnicity_changed": true|false, "reason": "short"}'
   );
 }
+const FACE_MATCH_MODEL = "gemini-3.1-pro-preview";
+const FACE_MATCH_MIN = 70;
+const FACE_MATCH_PROMPT = `Image 1 is the customer's own photo. Image 2 is an AI-generated portrait that must show the SAME individual.
+You are a strict face-identity examiner. Look past styling and judge the underlying face structure, like comparing two passport photos.
+Compare, one by one: (1) eye shape, eyelid type and eye spacing, (2) nose bridge, nose width and tip shape, (3) lip shape and philtrum, (4) face outline: jaw width, chin shape and length, cheekbones, (5) brow shape and position, (6) overall proportions (eye-nose-mouth distances), (7) apparent age.
+IGNORE: hairstyle, hair colour, makeup, outfit, lighting, camera angle, expression, skin retouching.
+An apparent age difference of about 10 years or more counts AGAINST being the same person. Two people of the same ethnicity and gender who merely look alike are NOT the same person.
+Give identity_score from 0 to 100: 90-100 = certainly the same person, 70-89 = probably the same, 40-69 = unsure / could be a lookalike, 0-39 = a different person.
+Reply with JSON only: {"identity_score": 0-100, "ethnicity_changed": true|false, "age_gap_years": number, "reason": "short"}`;
+async function strictFaceMatch(ref, out, apiKey, timeoutMs) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${FACE_MATCH_MODEL}:generateContent`, {
+        method: "POST", signal: ctrl.signal,
+        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [
+            { inline_data: { mime_type: ref.mime, data: ref.data } },
+            { inline_data: { mime_type: out.mime, data: out.data } },
+            { text: FACE_MATCH_PROMPT },
+          ] }],
+          generationConfig: { responseMimeType: "application/json", temperature: 0, thinkingConfig: { thinkingLevel: "low" } },
+        }),
+      });
+      if (!r.ok) continue;
+      const j = await r.json();
+      let v = JSON.parse((j?.candidates?.[0]?.content?.parts || []).map((p) => p.text || "").join(""));
+      if (Array.isArray(v)) v = v[0];   // 가끔 [{…}] 로 감싸 온다
+      const score = Number(v?.identity_score);
+      if (!Number.isFinite(score)) continue;
+      const ok = score >= FACE_MATCH_MIN && v.ethnicity_changed !== true;
+      return { ok, score, issue: ok ? "" : String(v.reason || "").slice(0, 160) };
+    } catch (_) { /* 다음 시도 */ } finally { clearTimeout(t); }
+  }
+  return null;
+}
+
 export async function checkIdentity({ refBase64, refMime, base64, mimeType, apiKey, timeoutMs = 15000,
   art = false, panels = 1, ref2Base64 = null, ref2Mime = null }) {
   if (!refBase64 || !base64 || !apiKey) return { ok: null };
   const pair = !!ref2Base64;
   const [ref, out, ref2] = await Promise.all([shrinkForQa(refBase64, refMime), shrinkForQa(base64, mimeType),
     pair ? shrinkForQa(ref2Base64, ref2Mime) : null]);
+  // Face Match(엄격) — 1인·사진 결과는 Pro 심사관이 0~100 점수로 본다(오너 2026-10-13 "5% 미만으로 조여").
+  // 자체 시험 180쌍(scratchpad/facematch): 예전 방식(Flash 예/아니오 2표)은 닮은 다른 사람 21% 통과,
+  // 이 방식(Pro·점수 70 이상)은 3/120 = 2.5% 통과, 같은 사람은 59/60 통과. 실패하면 예전 방식으로 내려간다.
+  if (!art && !pair && panels <= 1) {
+    const strict = await strictFaceMatch(ref, out, apiKey, Math.max(timeoutMs, 25000));
+    if (strict) return strict;
+  }
   const once = async () => {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), timeoutMs);
