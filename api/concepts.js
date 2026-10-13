@@ -96,7 +96,7 @@ export default function handler(req, res) {
     const caps = new Set(String(req.query?.caps || "").split(",").map((x) => x.trim()).filter(Boolean));
     list = publishedConcepts(ALL, now, caps, { ios: isIOSApp(req) });
   } catch (_) {
-    list = ALL.filter((c) => !Array.isArray(c?.requires) && !(isIOSApp(req) && c.iosHidden)); // 필터가 어떤 이유로든 터지면 전부 내보낸다 (빈 갤러리보다 낫다)
+    list = ALL.filter((c) => !Array.isArray(c?.requires) && true); // 필터가 어떤 이유로든 터지면 전부 내보낸다 (빈 갤러리보다 낫다)
   }
 
   // ⚠️ 응답이 기기(iOS 앱 여부)마다 다르다 → CDN 공유 캐시 금지. URL 이 같아서 CDN 에 걸리면
