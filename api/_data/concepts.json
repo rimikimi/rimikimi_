@@ -1,5 +1,16 @@
 [
  {
+  "id": "1063",
+  "title": "피카소 라인",
+  "title_en": "Picasso Line",
+  "category": "🪄 매직 부스",
+  "categories": [
+   "🪄 매직 부스"
+  ],
+  "sensitive": false,
+  "text": "Re-draw the subject of the provided image the way Picasso drew the LAST plate of his 1945 \"The Bull\" lithograph series — the radically abstracted end point, NOT a fashion sketch or a realistic line drawing.\nWhat that last plate looks like, and what you must do:\n- The subject is reduced to a bare abstract sign made of only about 6–12 thin, wiry, single-weight black lines. Fewer lines is better.\n- One long continuous outline for the main body mass, simplified into a flat geometric shape (a stretched curve, a wedge, a rounded slab) — the anatomy is stripped away.\n- Limbs become single straight stick lines, slightly splayed, with no hands or feet detail (just a tiny tick at the end). Arms likewise single lines.\n- The head is shrunk to a tiny simple mark — a small oval, a hook or a short line; NO eyes, nose, mouth or facial features at all.\n- Keep just ONE or TWO signature details as a single line each so it is still recognizable (e.g. the outline of the hairstyle, a phone held up, a bag strap; for food or objects, the one defining silhouette; for an animal its ears or tail).\n- Inside part of the body shape, a faint sparse grey speckled lithograph texture, like the original print.\n- A short soft horizontal black ink smudge under it as the ground shadow.\n- Proportions are playfully distorted (small head, long body or legs) but deliberate and elegant — witty, masterful economy.\n- Warm cream paper (#F2E6CF) with subtle paper grain, lots of empty space, subject centered.\nBlack ink on cream paper only. No scene, no colour, no text, no signature, no frame."
+ },
+ {
   "id": "1062",
   "title": "그림판",
   "title_en": "MS Paint",
