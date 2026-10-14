@@ -1,14 +1,14 @@
 [
  {
   "id": "1063",
-  "title": "피카소 라인",
-  "title_en": "Picasso Line",
+  "title": "몇 줄 드로잉",
+  "title_en": "Few-Line Sketch",
   "category": "🪄 매직 부스",
   "categories": [
    "🪄 매직 부스"
   ],
   "sensitive": false,
-  "text": "Re-draw the subject of the provided image the way Picasso drew the LAST plate of his 1945 \"The Bull\" lithograph series — the radically abstracted end point, NOT a fashion sketch or a realistic line drawing.\nWhat that last plate looks like, and what you must do:\n- The subject is reduced to a bare abstract sign made of only about 6–12 thin, wiry, single-weight black lines. Fewer lines is better.\n- One long continuous outline for the main body mass, simplified into a flat geometric shape (a stretched curve, a wedge, a rounded slab) — the anatomy is stripped away.\n- Limbs become single straight stick lines, slightly splayed, with no hands or feet detail (just a tiny tick at the end). Arms likewise single lines.\n- The head is shrunk to a tiny simple mark — a small oval, a hook or a short line; NO eyes, nose, mouth or facial features at all.\n- Keep just ONE or TWO signature details as a single line each so it is still recognizable (e.g. the outline of the hairstyle, a phone held up, a bag strap; for food or objects, the one defining silhouette; for an animal its ears or tail).\n- Inside part of the body shape, a faint sparse grey speckled lithograph texture, like the original print.\n- A short soft horizontal black ink smudge under it as the ground shadow.\n- Proportions are playfully distorted (small head, long body or legs) but deliberate and elegant — witty, masterful economy.\n- Warm cream paper (#F2E6CF) with subtle paper grain, lots of empty space, subject centered.\nBlack ink on cream paper only. No scene, no colour, no text, no signature, no frame."
+  "text": "Re-draw the subject of the provided image as the radically abstracted END POINT of a classic modernist lithograph study that strips an animal down plate by plate until only a few lines remain — NOT a fashion sketch or a realistic line drawing.\nWhat you must do:\n- The subject is reduced to a bare abstract sign made of only about 6–12 thin, wiry, single-weight black lines. Fewer lines is better.\n- One long continuous outline for the main body mass, simplified into a flat geometric shape (a stretched curve, a wedge, a rounded slab) — the anatomy is stripped away.\n- Limbs become single straight stick lines, slightly splayed, with no hands or feet detail (just a tiny tick at the end). Arms likewise single lines.\n- The head is shrunk to a tiny simple mark — a small oval, a hook or a short line; NO eyes, nose, mouth or facial features at all.\n- Keep just ONE or TWO signature details as a single line each so it is still recognizable (e.g. the outline of the hairstyle, a phone held up, a bag strap; for food or objects, the one defining silhouette; for an animal its ears or tail).\n- Inside part of the body shape, a faint sparse grey speckled lithograph texture, like an old lithograph print.\n- A short soft horizontal black ink smudge under it as the ground shadow.\n- Proportions are playfully distorted (small head, long body or legs) but deliberate and elegant — witty, masterful economy.\n- Plain clean white paper (#FFFFFF) background, lots of empty space, subject centered.\nBlack ink on white paper only. No scene, no colour, no text, no signature, no frame."
  },
  {
   "id": "1062",
@@ -2994,7 +2994,6 @@
   ],
   "sensitive": false,
   "text": "Implement 100% ultra photorealism.\nEnsure to keep and maintain the same facial structure, natural dark brown (#463021) hair, soft makeup from the reference photo.\nThe photos must be in 8k resolution(9:16)with ultra high definition, her face must have 100% fidelity to the provided reference photo.\n상반신 medium shot.\n사진 배경은 저녁 10시. 매우 어두운 야외.\n눈이 내리는 날씨에 배경은 아이스링크와 크리스마스마켓. 흐릿하게 화려안 크리스마스 장식이 보인다.\n의상은 하얀 롱패딩을 입고 있고 하얀색 털이 복실복실고 빨간 리본으로 장식된 cloche hat을 착용하고 있다.\n볼에 약간의 홍조와 환하게 웃고 있는 표정.",
-  "publishAt": "2026-12-15T11:00:00Z",
   "purposes": [
    "snap"
   ]
@@ -3334,8 +3333,7 @@
    "일상(겨울)"
   ],
   "text": "Use the attached reference image only for facial identity — preserve exact facial features and face shape. the subject in the reference photo, direct on-camera flash snapshot on an early-2000s CCD compact camera, hard bright flash falling off quickly into warm dim shop depths, slightly cool flash whites against amber (#C8791E) wood tones, cold São Paulo winter night around ten thirty glimpsed dark through the shop door glass, inside a century-old pharmacy lined floor to ceiling with small varnished wooden drawers, glass apothecary jars and a brass scale on the marble counter, she wears a thick moss-green knit cardigan over a wool dress, caught mid-motion wrapping a woven burgundy (#6E1B2E) shawl around her shoulders against the night chill, chin tucked slightly as she smiles toward the camera, face fully visible and flash-lit, hair loose, waist-up framing, eye-level, off-center rule-of-thirds composition with the subject on the right third of the frame, NOT centered, leading lines of the counter edge and drawer rows converging toward her, negative space of dim amber drawer-wall depths on the left, 38mm equivalent compact lens, f/5.6, 1/60s, ISO 200. Clean full-bleed photograph only: no app interface, no on-screen text, no frame, border, or overlay of any kind.",
-  "sensitive": false,
-  "publishAt": "2026-11-10T11:00:00Z"
+  "sensitive": false
  },
  {
   "id": "766",
@@ -3527,8 +3525,7 @@
    "일상(겨울)"
   ],
   "text": "Use the attached reference image only for facial identity — preserve exact facial features and face shape. the subject in the reference photo, Pinterest-style aspirational aesthetic, snowy Scandinavian bright-cool mood, Fujifilm Astia soft film rendering, low-contrast pale ice-blue and white (#FFFFFF) palette with gentle creamy skin tones, soft diffused winter morning daylight pouring through a frost-feathered windowpane, she wears an oversized off-white (#F7F4EF) alpaca knit sweater with the collar pooling at her chin, hands tucked into the long sweater sleeves, a faint dreamy smile as her breath fogs softly in the cold bright air, delicate frost crystals and soft snowlight bokeh behind her, face fully visible, softly lit and turned toward the camera, loose morning hair tucked behind one ear, intimate close-up framing on her face and sweater collar, eye-level, off-center rule-of-thirds composition with her eyes on the upper-right third intersection, NOT centered, leading lines of the frost feathers on the glass drifting toward her face, negative space of pale glowing frosted window filling the left, 85mm lens, f/1.4, 1/250s, ISO 200. Clean full-bleed photograph only: no app interface, no on-screen text, no frame, border, or overlay of any kind.",
-  "sensitive": false,
-  "publishAt": "2026-11-07T11:00:00Z"
+  "sensitive": false
  },
  {
   "id": "751",
@@ -3782,8 +3779,7 @@
    "일상(겨울)"
   ],
   "text": "Use the attached reference image only for facial identity — preserve exact facial features and face shape. the subject in the reference photo, single-use disposable film camera look with harsh direct on-camera flash firing in grey (#8A8A8A) daylight, crisp flash catchlight in her eyes and a faint hard flash shadow, punchy snapshot color over a cool overcast cast, blustery Wellington winter midday on the open upper deck of a big white (#FFFFFF) inter-island vehicle ferry crossing the choppy grey-green strait, low ragged rain clouds with one bright silver (#C9CDD1) break in the sky, wind whipping loose strands from her braid across her forehead, she huddles happily into a camel wool coat with a chunky rust-orange scarf, one hand holding up a small round pocket mirror to fix her wind-blown fringe while she glances at the camera laughing, face clear and flash-lit, white railings and churning wake behind her, chest-up portrait framing, straight-on eye level, 30mm fixed lens, f/11, 1/250s, ISO 800. apply focal point rule to this photography. Clean full-bleed photograph only: no app interface, no on-screen text, no frame, border, or overlay of any kind.",
-  "sensitive": false,
-  "publishAt": "2026-11-06T11:00:00Z"
+  "sensitive": false
  },
  {
   "id": "731",
