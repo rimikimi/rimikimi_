@@ -63,5 +63,21 @@
   "enabled": "false",
   "iosMinBuild": "53",
   "androidMinVersionCode": "109"
+ },
+ "category.일상(봄)": {
+  "ko": "일상(봄)",
+  "en": "Everyday · Spring"
+ },
+ "category.일상(여름)": {
+  "ko": "일상(여름)",
+  "en": "Everyday · Summer"
+ },
+ "category.일상(가을)": {
+  "ko": "일상(가을)",
+  "en": "Everyday · Autumn"
+ },
+ "category.일상(겨울)": {
+  "ko": "일상(겨울)",
+  "en": "Everyday · Winter"
  }
 }
