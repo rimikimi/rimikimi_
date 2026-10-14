@@ -1,5 +1,17 @@
 [
  {
+  "id": "1062",
+  "title": "그림판",
+  "title_en": "MS Paint",
+  "category": "🪄 매직 부스",
+  "categories": [
+   "🪄 매직 부스"
+  ],
+  "sensitive": false,
+  "postFx": "mspaint",
+  "text": "Re-draw the provided image as if an office worker with no art skills, bored at work, copied it in old Windows MS Paint using only the mouse. Keep the same scene and layout: every person, animal and object in the same place and pose, the background, and any visible text (rewritten in wobbly mouse handwriting, same words). People stay recognizable by hairstyle, hair colour, glasses, outfit colours and pose, but simplified. How it is drawn: thick, slightly wobbly black outlines made with the brush tool by hand — shaky and imperfect but trying; simple flat shapes; colours poured with the paint-bucket tool from the default palette — flat, no gradients, no soft shading, small unfilled white gaps along the lines and the odd leak through a gap; one or two areas shaded with the spray-can tool; details simplified (fingers as a few lines, background objects as rough rectangles). It must look like a real 2000s MS Paint picture: aliased jagged edges, pixel stair-steps, flat bitmap colours — not a polished vector illustration, not anime, not a clean cartoon. No program window, no toolbar, no signature, no watermark."
+ },
+ {
   "id": "1061",
   "title": "매거진 일러스트",
   "title_en": "Magazine Illustration",

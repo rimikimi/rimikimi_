@@ -84,6 +84,25 @@ async function shrinkOutput(base64, mime) {
   }
 }
 
+// 그림판 질감 — 컨셉 postFx:"mspaint". 모델 그림은 선이 매끄러워서, 긴 변 420px 로 최근접 축소 → 32색 팔레트(디더 없음)
+// → 4배 최근접 확대해 그림판 비트맵의 계단진 픽셀·평평한 색을 만든다. 실패하면 원본 그대로.
+async function paintPixelate(base64, mime) {
+  try {
+    const sharp = (await import("sharp")).default;
+    const img = sharp(Buffer.from(base64, "base64")).rotate();
+    const meta = await img.metadata();
+    const portrait = (meta.height || 1) >= (meta.width || 1);
+    const small = await img.resize(portrait ? null : 420, portrait ? 420 : null, { kernel: "nearest" })
+      .png({ palette: true, colors: 32, dither: 0 }).toBuffer();
+    const sm = await sharp(small).metadata();
+    const out = await sharp(small).resize(sm.width * 4, sm.height * 4, { kernel: "nearest" }).png().toBuffer();
+    return { base64: out.toString("base64"), mime: "image/png" };
+  } catch (e) {
+    console.error("[paintPixelate failed, using original]", e?.message || e);
+    return { base64, mime };
+  }
+}
+
 // ── 워터마크 ────────────────────────────────────────────────────────────────
 // 결제(크레딧)로 만든 이미지에만 워터마크가 없다. 무료 하루 1장도, 무제한 계정도
 // 크레딧을 쓰지 않으므로 붙는다.
@@ -1540,6 +1559,7 @@ async function handleGenerate(req, res, hold) {
   // 매직 부스는 그림체로 바꾸는 컨셉 — 앱이 skipFacePrecheck 를 빠뜨려도(구버전·게스트 경로) 서버가 알아서 그림체 검사로 본다.
   //   빠뜨리면 캐리커처를 "다른 사람·장면 다름"으로 매번 불합격시켜 두 번씩 만들었다(2026-10-14 실측).
   const magicBoothConcept = conceptId != null && NB21_IDS.has(String(conceptId));
+  const postFx = conceptId != null ? ALL_CONCEPTS.find((c) => String(c.id) === String(conceptId))?.postFx || null : null;
   const wantIdentity = true;
   const qaOpts = {
     people: hasSecond ? 2 : isRestore ? 0 : 1,
@@ -1925,6 +1945,7 @@ async function handleGenerate(req, res, hold) {
     for (const o of outs) {
       let rawMime = o.mime;
       let rawOut = o.data;
+      if (postFx === "mspaint") { const px = await paintPixelate(rawOut, rawMime); rawOut = px.base64; rawMime = px.mime; }
       // 결제로 만든 것만 깨끗하다 — 원본에 찍어야 갤러리 다운로드로 우회되지 않는다
       if (!useCredit) {
         const wm = await applyWatermark(rawOut, rawMime);
@@ -2156,6 +2177,8 @@ async function handleGenerate(req, res, hold) {
     const ref = await refineSpriteFace({ spriteBase64: rawData, photoBase64: base64, spriteDesc, apiKey, timeLeftMs: left() - 5000 });
     if (ref) { rawData = ref.data; rawMime = ref.mime; }
   }
+
+  if (postFx === "mspaint") { const px = await paintPixelate(rawData, rawMime); rawData = px.base64; rawMime = px.mime; }
 
   // 6.4) 워터마크 — 결제(크레딧)로 만든 것만 깨끗하다.
   //      축소 전 원본에 찍어야 아래 갤러리 저장분에도 함께 들어간다.
