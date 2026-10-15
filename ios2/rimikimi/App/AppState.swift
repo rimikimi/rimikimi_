@@ -306,6 +306,8 @@ final class AppState {
     /// ⚠️ `#if DEBUG` 안에 두면 호출부를 `#if` 로 갈라야 하고, 그러면 뒤에 붙는 modifier 가
     ///    붙지 않는다(릴리스 아카이브에서 실제로 걸렸다). 그래서 빌드 구분 없이 둔다.
     var devWideColumns = false
+    /// 캡처용 — 카테고리 격자에 이 배율로 핀치하고 있는 상태를 그대로 띄운다(시뮬레이터엔 핀치가 없다). 0 = 끔.
+    var devPinchScale: Double = 0
     /// 캡처·검증용 — 브라우저가 떠 있는 동안 이 id 로 **건너뛴다**(스와이프를 흉내 내는 용도).
     /// 시뮬레이터에서는 좌우 스와이프를 못 하니, 열린 뒤 필름스트립이 따라오는지 이걸로 확인한다.
     var devBrowseJump: String?

@@ -68,6 +68,10 @@ enum DevRoutes {
             // 카테고리 그리드로 바로 — 시뮬레이터에서는 앨범 타일을 탭할 수 없다(캡처·검증용).
             // 여기서 카메라 원이 그대로 보이는지 확인한다(2026-09-22 결함).
             app.devWideColumns = q["cols"] == "5"
+            // `pinch=<배율>` — 핀치 도중 상태(손가락 따라 줄어든 격자 + 겹쳐 비치는 다음 열)를 캡처용으로 띄운다.
+            if let s = q["pinch"].flatMap(Double.init) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { app.devPinchScale = s }
+            }
             app.tab = .gallery
             app.galleryPath = [.category(q["name"] ?? "세계여행")]
             // `toggleAfter=<초>` — 그만큼 뒤에 열 수를 뒤집는다. 핀치 없이 전환 순간을 녹화해서

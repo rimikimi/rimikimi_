@@ -81,6 +81,37 @@ struct PinchColumnsGesture: UIGestureRecognizerRepresentable {
     }
 }
 
+/// 손가락을 **끝까지 따라가는** 핀치 — 네이티브 사진 앱 그리드처럼 배율·손가락 위치를 매 프레임 넘긴다.
+/// (오너 지적 2026-10-15 "왜케 뚝뚝 끊기냐? 사진앱은 손가락 끝까지 따라붙어서 부드럽게 fade 되던데".
+///  예전 `PinchColumnsGesture` 는 문턱을 넘는 순간 0.24초 페이드를 한 번 재생할 뿐이라 손과 따로 놀았다.)
+/// 인식 규칙(스크롤과 동시 인식, 탭은 핀치 실패 뒤)은 `PinchColumnsGesture` 와 같다.
+@available(iOS 18.0, *)
+struct PinchTrackGesture: UIGestureRecognizerRepresentable {
+    /// 두 번째 손가락이 닿은 순간 — 두 손가락 가운데 점(이 뷰 좌표).
+    var onBegan: (CGPoint) -> Void
+    /// 매 프레임 — 시작 대비 배율.
+    var onChanged: (CGFloat) -> Void
+    /// 손을 뗐을 때 — 마지막 배율과 배율 속도(초당).
+    var onEnded: (CGFloat, CGFloat) -> Void
+
+    func makeCoordinator(converter: CoordinateSpaceConverter) -> PinchColumnsGesture.Coordinator { PinchColumnsGesture.Coordinator() }
+
+    func makeUIGestureRecognizer(context: Context) -> UIPinchGestureRecognizer {
+        let g = UIPinchGestureRecognizer()
+        g.delegate = context.coordinator
+        return g
+    }
+
+    func handleUIGestureRecognizerAction(_ recognizer: UIPinchGestureRecognizer, context: Context) {
+        switch recognizer.state {
+        case .began: onBegan(context.converter.localLocation)
+        case .changed: onChanged(recognizer.scale)
+        case .ended, .cancelled, .failed: onEnded(recognizer.scale, recognizer.velocity)
+        default: break
+        }
+    }
+}
+
 /// 칸 길게 누르기(담기). SwiftUI `LongPressGesture` 는 위 핀치가 실패할 때(=손 뗄 때)까지 기다려서
 /// 햅틱·담기가 손을 뗄 때 왔다(오너 지적 2026-10-09 "딱 선택 완료되는 그 때", 시뮬레이터 계측으로 확인).
 /// UIKit 길게 누르기는 `.began` 이 **누르고 있는 동안** 시간이 차는 순간 온다. 핀치는 이 인식기만

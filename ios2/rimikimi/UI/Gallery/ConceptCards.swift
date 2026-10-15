@@ -234,8 +234,15 @@ struct DensePhotoGrid: View {
     /// 잠금 해제 예약. 새 핀치가 시작되면 이전 예약을 **취소**한다 — 안 그러면 앞 핀치가 걸어 둔
     /// 3초 안전장치가 다음 핀치 도중에 터져서 잠금이 풀린다.
     @State private var unlock: DispatchWorkItem?
-    /// 문턱을 넘기 전, 손가락을 따라 아주 조금 움직이는 몫.
+    /// 손가락을 따라가는 지금 격자의 배율(핀치 중에만 1이 아님).
     @State private var liveScale: CGFloat = 1
+    /// 핀치 중심(격자 좌표, 시작 순간 고정) — 사진 앱처럼 두 손가락 가운데를 기준으로 줄고 커진다.
+    @State private var pinchPoint: CGPoint = .zero
+    /// 핀치하는 동안 위에 겹쳐 서서히 드러나는 다음 열 수의 격자와 그 배율.
+    @State private var pinchCols: Int?
+    @State private var pinchScale: CGFloat = 1
+    @State private var pinchOpacity: CGFloat = 0
+    @State private var gridWidth: CGFloat = 0
     /// 사라지는 쪽 격자의 열 수. 전환하는 동안만 값이 있고, 위에 겹쳐서 흐려진다.
     @State private var fadingColumns: Int?
     @State private var fadeOpacity: CGFloat = 0
@@ -354,6 +361,77 @@ struct DensePhotoGrid: View {
         }
     }
 
+    /// n열일 때 격자 전체 높이 — 칸 비율(3:4)·간격이 정해져 있어 계산으로 안다. 겹친 두 격자의
+    /// 높이가 달라도 같은 화면 점을 기준으로 줄고 커지게 하려고 쓴다.
+    private func gridHeight(_ n: Int) -> CGFloat {
+        guard gridWidth > 0 else { return 1 }
+        let w = (gridWidth - Self.gap * CGFloat(n - 1)) / CGFloat(n)
+        let rows = CGFloat((concepts.count + n - 1) / n)
+        return max(1, rows * w * 4 / 3 + max(0, rows - 1) * Self.gap)
+    }
+    private func anchor(_ n: Int) -> UnitPoint {
+        UnitPoint(x: gridWidth > 0 ? pinchPoint.x / gridWidth : 0.5, y: pinchPoint.y / gridHeight(n))
+    }
+
+    /// 핀치 도중 매 프레임 — 지금 격자는 손가락 배율 그대로 줄고/커지고, 다음 열 수의 격자가
+    /// 같은 점을 기준으로 겹쳐 진행만큼 비쳐 나온다(사진 앱: 3열을 오므리면 칸이 손가락만큼 작아지면서
+    /// 5열이 서서히 겹쳐 드러난다). 더 갈 단계가 없는 쪽으로는 고무줄처럼 살짝만 움직인다.
+    private func track(_ s: CGFloat) {
+        let from = columnCount
+        let to: Int? = s < 1 ? (from == 3 ? 5 : nil) : s > 1 ? (from == 5 ? 3 : nil) : nil
+        guard let to else {
+            pinchCols = nil; pinchOpacity = 0
+            liveScale = 1 + (s - 1) * 0.12
+            return
+        }
+        let r = CGFloat(from) / CGFloat(to)              // 3→5 = 0.6, 5→3 ≈ 1.67
+        let p = min(1, max(0, (s - 1) / (r - 1)))        // 진행 0…1
+        pinchCols = to
+        liveScale = 1 + p * (r - 1)                      // = 손가락 배율(끝에서 멈춤)
+        pinchScale = liveScale / r                       // 다음 격자는 끝에서 정확히 1배
+        // 겹침은 **후반에 몰아서** — 사진 앱 녹화(오너 2026-10-15)를 프레임으로 보면 앞 절반은 지금 격자가
+        // 손가락만큼 커지기만 하고, 뒤쪽에서야 다음 격자가 비쳐 나온다. 진행 0.3→0.85 구간에 부드럽게.
+        let f = min(1, max(0, (p - 0.3) / 0.55))
+        pinchOpacity = f * f * (3 - 2 * f)
+    }
+
+    /// 지금 진행(0…1) — 손을 뗄 때 넘어갈지 정한다.
+    private func liveProgress() -> CGFloat {
+        guard let to = pinchCols else { return 0 }
+        let r = CGFloat(columnCount) / CGFloat(to)
+        return min(1, max(0, (liveScale - 1) / (r - 1)))
+    }
+
+    /// 손을 뗐을 때 — 넘어갈 만큼 갔거나 빠르게 튕겼으면 끝까지 마저 가고, 아니면 되돌아간다.
+    private func finish(velocity v: CGFloat) {
+        guard let to = pinchCols else {
+            withAnimation(.snappy(duration: 0.2)) { liveScale = 1 }
+            return
+        }
+        let r = CGFloat(columnCount) / CGFloat(to)
+        let flick = to == 5 ? v < -0.6 : v > 0.6
+        if liveProgress() > 0.5 || flick {
+            withAnimation(.spring(duration: 0.26, bounce: 0), completionCriteria: .logicallyComplete) {
+                liveScale = r; pinchScale = 1; pinchOpacity = 1
+            } completion: {
+                // 위 장(다음 격자)은 이미 1배로 다 보인다 → 그 **뒤에서** 아래 장을 같은 열 수로 갈아끼우고,
+                // 한 프레임 뒤에 위 장을 뗀다(같은 프레임에 둘 다 바꾸면 한 프레임 허옇게 뜬다 — step(to:) 주석).
+                var t = Transaction(); t.disablesAnimations = true
+                withTransaction(t) { wideColumns = (to == 5); liveScale = 1 }
+                HapticPlayer.selection()
+                DispatchQueue.main.async {
+                    withTransaction(t) { pinchCols = nil; pinchOpacity = 0; pinchScale = 1 }
+                }
+            }
+        } else {
+            withAnimation(.spring(duration: 0.24, bounce: 0), completionCriteria: .logicallyComplete) {
+                liveScale = 1; pinchScale = 1 / r; pinchOpacity = 0
+            } completion: {
+                pinchCols = nil
+            }
+        }
+    }
+
     private func scheduleUnlock(after seconds: Double) {
         unlock?.cancel()
         let item = DispatchWorkItem { pinching = false }
@@ -366,6 +444,18 @@ struct DensePhotoGrid: View {
             EmptyState(message: Copy.noResults)
         } else {
             grid(columnCount)
+                .scaleEffect(liveScale, anchor: anchor(columnCount))
+                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { gridWidth = $0 }
+                // 핀치하는 동안 — 다음 열 수의 격자를 같은 점 기준으로 겹쳐 진행만큼 비춘다.
+                .overlay(alignment: .top) {
+                    if let pinchCols {
+                        grid(pinchCols)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .scaleEffect(pinchScale, anchor: anchor(pinchCols))
+                            .opacity(pinchOpacity)
+                            .allowsHitTesting(false)
+                    }
+                }
                 // 전환하는 동안만, 옛 배치를 그대로 위에 얹어 흐린다. 자리를 차지하지 않게
                 // `overlay` 로 얹는다 — 아래 새 배치가 스크롤 높이를 정한다.
                 .overlay(alignment: .top) {
@@ -383,8 +473,6 @@ struct DensePhotoGrid: View {
             // 핀치는 **열 수만** 바꾼다 — 3열 ↔ 5열. 페이지를 같이 확대/축소하지 않는다
             // (2026-09-22 오너 지적: 화면 전체가 작아지는 건 시스템 확대전환의 "핀치로 닫기"였다.
             //  그래서 이 화면에서는 확대전환을 쓰지 않는다 — 아래 `zoomSource` 를 뗀 이유).
-            // 문턱을 넘기 전 "핀치가 먹고 있다"는 느낌만 준다.
-            .scaleEffect(liveScale, anchor: .center)
             .padding(.horizontal, Spacing.page)
             .padding(.top, Spacing.s2)
             .onAppear {
@@ -394,25 +482,24 @@ struct DensePhotoGrid: View {
             // 캡처·검증용 — 시뮬레이터엔 핀치가 없어서 열 전환을 눈으로 볼 방법이 이것뿐이다.
             // 실제 핀치와 **같은 경로**(`step(to:)`)를 타야 녹화한 게 의미가 있다.
             .onChange(of: app.devWideColumns) { _, w in if w != wideColumns { step(to: w) } }
-            .gesture(PinchColumnsGesture(
-                onBegan: {
+            .onChange(of: app.devPinchScale) { _, v in
+                guard v > 0 else { return }
+                pinchPoint = CGPoint(x: gridWidth / 2, y: 320)
+                track(CGFloat(v))
+            }
+            // 손가락을 끝까지 따라간다(오너 2026-10-15) — 배율 그대로 줄고 커지며 다음 열 수가 겹쳐 비친다.
+            .gesture(PinchTrackGesture(
+                onBegan: { loc in
                     pinching = true
                     scheduleUnlock(after: 3)   // 종료 콜백을 놓쳐도 잠금이 영원히 남지 않게
+                    // 바깥 여백만큼 빼서 격자 좌표로.
+                    pinchPoint = CGPoint(x: loc.x - Spacing.page, y: loc.y - Spacing.s2)
                 },
-                // 문턱을 넘기 전에도 손가락을 따라 조금 움직인다 — 핀치가 먹고 있다는 느낌.
-                onProgress: { s in liveScale = 1 + (s - 1) * 0.1 },
-                onStep: { zoomIn in
-                    let next = !zoomIn  // 벌림 = 확대 = 3열(wideColumns false), 오므림 = 5열
-                    guard next != wideColumns else {
-                        withAnimation(.snappy(duration: 0.2)) { liveScale = 1 }
-                        return
-                    }
-                    step(to: next)
-                },
-                onEnd: {
-                    withAnimation(.snappy(duration: 0.2)) { liveScale = 1 }
+                onChanged: { s in track(s) },
+                onEnded: { _, v in
+                    finish(velocity: v)
                     // 손을 뗀 직후 한 박자 뒤에 푼다 — 떼는 순간의 잔여 터치가 탭으로 새지 않게.
-                    scheduleUnlock(after: 0.25)
+                    scheduleUnlock(after: 0.3)
                 }
             ))
         }
