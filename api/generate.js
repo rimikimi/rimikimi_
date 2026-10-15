@@ -15,6 +15,7 @@ import { saveToGallery } from "./_lib/gallery.js";
 import { buildDressroom, expectedHem, checkHem } from "./_lib/dressroom.js";
 import { buildEditorialStrip } from "./_lib/fourcutEditorial.js";
 import { buildGlowStrip } from "./_lib/fourcutGlow.js";
+import { buildBlueStrip, BLUE_RATIO } from "./_lib/fourcutBlue.js";
 import { SPRITE_CONCEPT_IDS, describeForSprite, refineSpriteFace } from "./_lib/sprite.js";
 import { checkIdentity, inspectImage, checkScene } from "./_lib/qa.js";
 import { runRetouch } from "./_lib/retouch.js";
@@ -1338,6 +1339,9 @@ async function handleGenerate(req, res, hold) {
     editorial: { mood: "raw direct-flash fashion editorial aesthetic on a pure white #FFFFFF seamless backdrop, hard on-camera flash, crushed blacks #0A0A0A, Kodak Portra 400 film grain, 90s magazine test-shoot vibe",
                  acc: "a single thin silver #C0C0C0 ring and nothing else", extra: "wearing a fitted black #0A0A0A sleeveless camisole tank top with thin spaghetti straps, deep crimson matte red #7A1B2E lipstick, loose undone waves" },
     // 글로우(오너 레퍼런스 2026-09-23): 스트립은 api/_lib/fourcutGlow.js 전용 프롬프트. 아래는 구버전 앱(컷별) 호환용.
+    // 블루 무드(오너 레퍼런스 2026-10-15): 스트립은 api/_lib/fourcutBlue.js 전용(가로로 붙인 세로 컷). 아래는 컷별 생성 호환용.
+    bluemood:  { mood: "cool lavender-blue self-photo-booth aesthetic on a plain lavender-grey #8D93B0 backdrop, soft frontal booth light with a cool #9AA6CF colour grade, slightly desaturated, dreamy",
+                 acc: "no jewelry", extra: "wearing an oversized pastel periwinkle-blue #AFC0E6 crewneck sweatshirt with long cuffs covering part of the hands" },
     glow:      { mood: "fresh idol self-photo-booth aesthetic on a plain light grey-white #E9EAEC backdrop, soft bright beauty-dish lighting, dewy glass skin, subtle dreamy bloom",
                  acc: "no jewelry at all", extra: "wearing a fitted white #FFFFFF ribbed sleeveless mock-neck top, glossy peach-coral #EE8E86 gradient lips, long glossy voluminous hair with face-framing layers" },
   };
@@ -1370,6 +1374,8 @@ async function handleGenerate(req, res, hold) {
     ? buildEditorialStrip(stripN, STRIP_GRID[stripN])
     : fourcutStyle === "glow"
     ? buildGlowStrip(stripN, STRIP_GRID[stripN])
+    : fourcutStyle === "bluemood"
+    ? buildBlueStrip(stripN)
     : `Create a Korean photo-booth (인생네컷) PHOTO STRIP as ONE single image, using the person in the provided photo.\n\n` +
     `LAYOUT: exactly ${stripN} photo cells arranged in ${STRIP_GRID[stripN]} on one clean strip. ` +
     `Even gutters between cells, a wider margin at the bottom. Each cell has slightly rounded corners. ` +
@@ -1646,7 +1652,7 @@ async function handleGenerate(req, res, hold) {
   //   다시 그리는 것이라 원본 비율 유지).
   const keepSourceRatio = isRestore || !!skipFacePrecheck;
   const ratioFor = () =>
-    isStrip ? STRIP_RATIO[stripN] : isDressroom || isSprite ? "3:4" : keepSourceRatio ? null : "3:4";
+    isStrip ? (fourcutStyle === "bluemood" ? BLUE_RATIO[stripN] : STRIP_RATIO[stripN]) : isDressroom || isSprite ? "3:4" : keepSourceRatio ? null : "3:4";
   const bodyFor = (isPro, shotIdx = 0) => ({
     contents: [
       {
