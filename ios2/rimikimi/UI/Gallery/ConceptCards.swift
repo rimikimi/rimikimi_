@@ -242,6 +242,8 @@ struct DensePhotoGrid: View {
     @State private var pinchCols: Int?
     @State private var pinchScale: CGFloat = 1
     @State private var pinchOpacity: CGFloat = 0
+    /// 뒤(지금 격자)의 불투명도 — 다음 격자가 드러나는 만큼 같이 흐려진다.
+    @State private var baseFade: CGFloat = 1
     @State private var gridWidth: CGFloat = 0
     /// 사라지는 쪽 격자의 열 수. 전환하는 동안만 값이 있고, 위에 겹쳐서 흐려진다.
     @State private var fadingColumns: Int?
@@ -380,7 +382,7 @@ struct DensePhotoGrid: View {
         let from = columnCount
         let to: Int? = s < 1 ? (from == 3 ? 5 : nil) : s > 1 ? (from == 5 ? 3 : nil) : nil
         guard let to else {
-            pinchCols = nil; pinchOpacity = 0
+            pinchCols = nil; pinchOpacity = 0; baseFade = 1
             liveScale = 1 + (s - 1) * 0.12
             return
         }
@@ -393,6 +395,7 @@ struct DensePhotoGrid: View {
         // 손가락만큼 커지기만 하고, 뒤쪽에서야 다음 격자가 비쳐 나온다. 진행 0.3→0.85 구간에 부드럽게.
         let f = min(1, max(0, (p - 0.3) / 0.55))
         pinchOpacity = f * f * (3 - 2 * f)
+        baseFade = 1 - pinchOpacity
     }
 
     /// 지금 진행(0…1) — 손을 뗄 때 넘어갈지 정한다.
@@ -412,12 +415,12 @@ struct DensePhotoGrid: View {
         let flick = to == 5 ? v < -0.6 : v > 0.6
         if liveProgress() > 0.5 || flick {
             withAnimation(.spring(duration: 0.26, bounce: 0), completionCriteria: .logicallyComplete) {
-                liveScale = r; pinchScale = 1; pinchOpacity = 1
+                liveScale = r; pinchScale = 1; pinchOpacity = 1; baseFade = 0
             } completion: {
                 // 위 장(다음 격자)은 이미 1배로 다 보인다 → 그 **뒤에서** 아래 장을 같은 열 수로 갈아끼우고,
                 // 한 프레임 뒤에 위 장을 뗀다(같은 프레임에 둘 다 바꾸면 한 프레임 허옇게 뜬다 — step(to:) 주석).
                 var t = Transaction(); t.disablesAnimations = true
-                withTransaction(t) { wideColumns = (to == 5); liveScale = 1 }
+                withTransaction(t) { wideColumns = (to == 5); liveScale = 1; baseFade = 1 }
                 HapticPlayer.selection()
                 DispatchQueue.main.async {
                     withTransaction(t) { pinchCols = nil; pinchOpacity = 0; pinchScale = 1 }
@@ -425,7 +428,7 @@ struct DensePhotoGrid: View {
             }
         } else {
             withAnimation(.spring(duration: 0.24, bounce: 0), completionCriteria: .logicallyComplete) {
-                liveScale = 1; pinchScale = 1 / r; pinchOpacity = 0
+                liveScale = 1; pinchScale = 1 / r; pinchOpacity = 0; baseFade = 1
             } completion: {
                 pinchCols = nil
             }
@@ -445,6 +448,9 @@ struct DensePhotoGrid: View {
         } else {
             grid(columnCount)
                 .scaleEffect(liveScale, anchor: anchor(columnCount))
+                // 뒤에 깔린 지금 격자도 다음 격자가 드러나는 만큼 **같이 흐려진다** — 안 그러면 끝나는 순간 한 번에
+                // 툭 사라졌다(오너 녹화 2026-10-16 "뒤에 남아있던 게 한 순간에 사라지는 게 아니라 저것도 페이드").
+                .opacity(baseFade)
                 .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { gridWidth = $0 }
                 // 핀치하는 동안 — 다음 열 수의 격자를 같은 점 기준으로 겹쳐 진행만큼 비춘다.
                 .overlay(alignment: .top) {
