@@ -53,7 +53,13 @@ const PROMPT_BY_ID = new Map(
 /** conceptId 로 서버 프롬프트를 찾는다. 없으면 앱이 보낸 것(구버전 호환). */
 function resolvePrompt(conceptId, clientPrompt) {
   const mine = conceptId != null ? PROMPT_BY_ID.get(String(conceptId)) : null;
-  return (mine || clientPrompt || "").replace(/\{\{LUCKY6\}\}/g, lucky6);
+  return (mine || clientPrompt || "").replace(/\{\{LUCKY6\}\}/g, lucky6).replace(/\{\{NOW_KST\}\}/g, nowKst);
+}
+
+// 프롬프트의 {{NOW_KST}} → 지금 한국 시각 "2026.10.15 14:32" (모델은 오늘 날짜를 몰라 아무 날짜나 찍는다).
+function nowKst() {
+  const d = new Date(Date.now() + 9 * 3600e3), p = (n) => String(n).padStart(2, "0");
+  return `${d.getUTCFullYear()}.${p(d.getUTCMonth() + 1)}.${p(d.getUTCDate())} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())}`;
 }
 
 // 프롬프트의 {{LUCKY6}} → 생성마다 다른 "행운의 숫자" 6개(1~45, 중복 없음, 오름차순). 영수증 컨셉용 — 모델에게 맡기면 매번 비슷한 숫자를 낸다.
