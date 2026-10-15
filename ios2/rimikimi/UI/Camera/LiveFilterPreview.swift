@@ -104,6 +104,42 @@ final class LiveFilterRenderer: NSObject, AVCaptureVideoDataOutputSampleBufferDe
         }
     }
 
+    // 켜질 때·전환할 때의 깜빡임 막기(오너 2026-10-15 "카메라 전환할 때 한 번 깜빡거림" — 녹화 프레임으로 보면
+    // ① 지난번 마지막 화면이 한 번 보이고 ② 다시 켜진 센서의 첫 2~3장이 노출·화이트밸런스가 안 맞아 파랗고 어둡다).
+    private var _skipUntil = Date.distantPast
+    private var _revealPending = false
+
+    /// 세션을 켜거나 렌즈를 바꾸기 **직전**에 부른다 — 잠깐(기본 0.3초) 들어오는 프레임을 버려 노출·색이 맞은 뒤부터 그린다.
+    /// `hide` = 켤 때: 옛 화면을 즉시 가리고(검정) 첫 정상 프레임에서 부드럽게 드러낸다. 전환 때는 마지막 화면을 그대로 둔다.
+    @MainActor
+    func settle(hide: Bool, for seconds: TimeInterval = 0.3) {
+        let layer = lock.withLock { () -> CAMetalLayer? in
+            _skipUntil = Date().addingTimeInterval(seconds)
+            _revealPending = hide
+            return _layer
+        }
+        guard hide, let layer else { return }
+        CATransaction.begin(); CATransaction.setDisableActions(true)
+        layer.removeAnimation(forKey: "reveal")
+        layer.opacity = 0
+        CATransaction.commit()
+    }
+
+    private func revealIfNeeded(_ layer: CAMetalLayer) {
+        let go = lock.withLock { () -> Bool in
+            guard _revealPending else { return false }
+            _revealPending = false; return true
+        }
+        guard go else { return }
+        DispatchQueue.main.async {
+            let a = CABasicAnimation(keyPath: "opacity")
+            a.fromValue = 0; a.toValue = 1; a.duration = 0.2
+            a.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            layer.opacity = 1
+            layer.add(a, forKey: "reveal")
+        }
+    }
+
     func setDrawableSize(_ size: CGSize) {
         lock.withLock { _drawableSize = size }
     }
@@ -112,6 +148,7 @@ final class LiveFilterRenderer: NSObject, AVCaptureVideoDataOutputSampleBufferDe
         guard let pb = CMSampleBufferGetImageBuffer(sampleBuffer), let context, let commandQueue else { return }
         let (key, layer, size, fxAmt) = lock.withLock { (_presetKey, _layer, _drawableSize, _fxAmount) }
         guard let layer, size.width > 0, size.height > 0 else { return }
+        if Date() < lock.withLock({ _skipUntil }) { return }   // 노출·색이 맞을 때까지 버린다(settle)
 
         // 버퍼(P3 등) → 작업 공간 sRGB 로 변환돼 들어온다. 센서 원본(가로)이면 여기서 세운다:
         // 후면·거울 끔 = 시계방향 90°(.right), 거울 켠 전면 = .leftMirrored(= .right + 좌우 뒤집기).
@@ -154,6 +191,7 @@ final class LiveFilterRenderer: NSObject, AVCaptureVideoDataOutputSampleBufferDe
         do { _ = try context.startTask(toRender: img, to: dest) } catch { return }
         cb.present(drawable)
         cb.commit()
+        revealIfNeeded(layer)
     }
 }
 

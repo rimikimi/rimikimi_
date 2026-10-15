@@ -98,6 +98,7 @@ final class BurstCameraModel {
     }
 
     private func run() async {
+        live?.settle(hide: true)   // 옛 화면을 가리고, 센서가 노출·색을 맞춘 뒤부터 드러낸다(깜빡임 방지)
         await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in
             queue.async { [session] in session.startRunning(); c.resume() }
         }
@@ -160,6 +161,7 @@ final class BurstCameraModel {
 
     func flip() {
         position = position == .back ? .front : .back
+        live?.settle(hide: false)  // 새 렌즈의 첫 몇 장(파랗고 어두움)은 버리고 마지막 화면을 잠깐 유지
         session.beginConfiguration()
         if let old = input { session.removeInput(old) }
         addInput(for: position)
