@@ -53,7 +53,14 @@ const PROMPT_BY_ID = new Map(
 /** conceptId 로 서버 프롬프트를 찾는다. 없으면 앱이 보낸 것(구버전 호환). */
 function resolvePrompt(conceptId, clientPrompt) {
   const mine = conceptId != null ? PROMPT_BY_ID.get(String(conceptId)) : null;
-  return mine || clientPrompt || "";
+  return (mine || clientPrompt || "").replace(/\{\{LUCKY6\}\}/g, lucky6);
+}
+
+// 프롬프트의 {{LUCKY6}} → 생성마다 다른 "행운의 숫자" 6개(1~45, 중복 없음, 오름차순). 영수증 컨셉용 — 모델에게 맡기면 매번 비슷한 숫자를 낸다.
+function lucky6() {
+  const s = new Set();
+  while (s.size < 6) s.add(1 + Math.floor(Math.random() * 45));
+  return [...s].sort((a, b) => a - b).map((n) => String(n).padStart(2, "0")).join("  ");
 }
 
 // Vertex 의 나노바나나 프로는 2K 요청이 ~42s 걸리고, 묶음 생성(3/6/12장)은 그보다

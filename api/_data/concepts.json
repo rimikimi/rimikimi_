@@ -1,5 +1,38 @@
 [
  {
+  "id": "1064",
+  "title": "라떼 아트",
+  "title_en": "Latte Art",
+  "category": "🪄 매직 부스",
+  "categories": [
+   "🪄 매직 부스"
+  ],
+  "sensitive": false,
+  "text": "Create a real photo of a cappuccino in a white ceramic cup on a café table, shot from above, where the LATTE ART in the milk foam is a portrait of the subject of the provided image — drawn with steamed milk and cocoa-brown espresso crema only: soft rounded milk-foam shapes, etched lines made with a latte-art pen, slightly bubbly microfoam texture, a little foam spill on the rim. The likeness comes from the hairstyle outline and face shape. Natural café light, a saucer and teaspoon, realistic. Keep the person recognizable by hairstyle, hair colour, glasses, outfit colours and pose (if it is an animal or object, keep its colours, markings and silhouette). Flattering and charming, never ugly. No extra text unless stated, no watermark."
+ },
+ {
+  "id": "1065",
+  "title": "코바늘 인형",
+  "title_en": "Crochet Doll",
+  "category": "🪄 매직 부스",
+  "categories": [
+   "🪄 매직 부스"
+  ],
+  "sensitive": false,
+  "text": "Turn the subject of the provided image into a handmade crochet AMIGURUMI doll photographed as a real object on a soft knit blanket: chunky yarn stitches clearly visible, round chubby proportions with a big head, little safety-eye or button eyes, embroidered smile, yarn hair in the same style and colour, tiny crocheted clothes in the same colours as the photo, a few loose fuzz fibres. Cosy warm daylight, real product photo. Keep the person recognizable by hairstyle, hair colour, glasses, outfit colours and pose (if it is an animal or object, keep its colours, markings and silhouette). Flattering and charming, never ugly. No extra text unless stated, no watermark."
+ },
+ {
+  "id": "1066",
+  "title": "행운 영수증",
+  "title_en": "Lucky Receipt",
+  "category": "🪄 매직 부스",
+  "categories": [
+   "🪄 매직 부스"
+  ],
+  "sensitive": false,
+  "text": "Create a real photo of a slightly crumpled thermal-paper RECEIPT lying on a counter, printed as a fun \"lucky receipt\" (행운 영수증): the subject of the provided image is printed in the middle by the thermal printer as a low-resolution grainy black dot-matrix/halftone portrait with faded uneven print and horizontal print streaks. Receipt layout in monospace thermal print, Korean: at the top an invented cute shop name \"럭키 포토\" and today's date and time; under the portrait a bold line \"오늘의 행운의 숫자\" followed by exactly these six numbers printed large in a row: {{LUCKY6}} ; then a short line \"행운을 빕니다 ♡\" and a barcode at the bottom. No prices, no item list, no real brand or store chain names, no lottery logos. Natural light, the curled paper casting a soft shadow. Keep the person recognizable by hairstyle, hair colour, glasses, outfit colours and pose (if it is an animal or object, keep its colours, markings and silhouette). Flattering and charming, never ugly. No extra text unless stated, no watermark."
+ },
+ {
   "id": "1063",
   "title": "몇 줄 드로잉",
   "title_en": "Few-Line Sketch",
