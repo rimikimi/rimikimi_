@@ -8799,19 +8799,6 @@
   ]
  },
  {
-  "id": "1068",
-  "title": "인생네컷 · 블루 무드",
-  "title_en": "Life Cut · Blue Mood",
-  "category": "📸 인생네컷",
-  "categories": [
-   "📸 인생네컷"
-  ],
-  "mode": "fourcut",
-  "fourcutStyle": "bluemood",
-  "text": "",
-  "sensitive": false
- },
- {
   "id": 410,
   "title": "인생네컷",
   "title_en": "Life Cut",
@@ -8911,11 +8898,6 @@
     "key": "glow",
     "label": "글로우",
     "emoji": "🤍"
-   },
-   {
-    "key": "bluemood",
-    "label": "블루 무드",
-    "emoji": "🩵"
    }
   ]
  },

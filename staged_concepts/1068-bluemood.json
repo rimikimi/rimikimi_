@@ -1,0 +1,21 @@
+{
+ "note": "인생네컷 블루 무드 — 오너 '대기'(2026-10-16). 공개하려면 concept 를 410 앞에 넣고 410.fourcutStyles 에 style 을 다시 추가. 서버 코드(api/_lib/fourcutBlue.js)는 이미 배포돼 있다.",
+ "concept": {
+  "id": "1068",
+  "title": "인생네컷 · 블루 무드",
+  "title_en": "Life Cut · Blue Mood",
+  "category": "📸 인생네컷",
+  "categories": [
+   "📸 인생네컷"
+  ],
+  "mode": "fourcut",
+  "fourcutStyle": "bluemood",
+  "text": "",
+  "sensitive": false
+ },
+ "style": {
+  "key": "bluemood",
+  "label": "블루 무드",
+  "emoji": "🩵"
+ }
+}
