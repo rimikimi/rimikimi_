@@ -42,12 +42,22 @@ export function CoachAnchor({ id, children, style }: { id: string; children: Rea
   );
 }
 
-export function CoachHost({ keys }: { keys: string[] }) {
+/** 화면이 스크롤로 자리를 맞출 때 쓴다 — 등록된 자리(창 기준)와 다시 재기. */
+export const coachAnchorRect = (id: string): Rect | undefined => anchors.get(id);
+export const remeasureCoach = (id: string) => measurers.get(id)?.();
+
+/** 설명 카드가 들어갈 수 있는 화면 아래 끝 — 아래 메뉴(탭바)·안드로이드 하단 버튼 영역을 뺀다
+ *  (오너 2026-10-15 "튜토리얼이 아래 메뉴에 가려서 안 보이자나", 갤럭시). */
+export const coachUsableBottom = (height: number, insetBottom: number, hasTabBar: boolean) =>
+  height - insetBottom - (hasTabBar ? chrome.tabBarH + chrome.tabBarBottom : 0) - 12;
+
+export function CoachHost({ keys, hasTabBar = false }: { keys: string[]; hasTabBar?: boolean }) {
   const { coachStep, coachIndex, coachTotal, advanceCoach, skipCoach } = useApp21();
   const focused = useIsFocused();
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [, setTick] = useState(0);
+  const [bubbleH, setBubbleH] = useState(160);
   useEffect(() => {
     const f = () => setTick((n) => n + 1);
     listeners.add(f);
@@ -67,8 +77,11 @@ export function CoachHost({ keys }: { keys: string[] }) {
   const hx = rect.x - 6, hy = rect.y - 6, hw = rect.w + 12, hh = rect.h + 12, r = 16;
   const hole = `M${hx + r},${hy} H${hx + hw - r} A${r},${r} 0 0 1 ${hx + hw},${hy + r} V${hy + hh - r} A${r},${r} 0 0 1 ${hx + hw - r},${hy + hh} H${hx + r} A${r},${r} 0 0 1 ${hx},${hy + hh - r} V${hy + r} A${r},${r} 0 0 1 ${hx + r},${hy} Z`;
   const d = `M0,0 H${width} V${height} H0 Z ${hole}`;
-  const below = hy + hh + 170 < height;
-  const top = below ? hy + hh + 12 : Math.max(40, hy - 160);
+  // 카드는 자리 아래가 기본, 아래 메뉴와 겹치면 위로. 어느 쪽이든 화면 안(상단 안전영역 ~ 아래 메뉴 위)에 가둔다.
+  const bottomLimit = coachUsableBottom(height, insets.bottom, hasTabBar);
+  const below = hy + hh + 12 + bubbleH <= bottomLimit;
+  const want = below ? hy + hh + 12 : hy - 12 - bubbleH;
+  const top = Math.min(Math.max(insets.top + 8, want), bottomLimit - bubbleH);
   const last = coachIndex + 1 === coachTotal;
   return (
     <Animated.View style={StyleSheet.absoluteFill} entering={FadeIn.duration(250)} exiting={FadeOut.duration(200)} pointerEvents="box-none">
@@ -78,7 +91,7 @@ export function CoachHost({ keys }: { keys: string[] }) {
           <Path d={d} fill="rgba(0,0,0,0.62)" fillRule="evenodd" />
         </Svg>
       </Pressable>
-      <View style={[styles.bubble, { top }]}>
+      <View style={[styles.bubble, { top }]} onLayout={(e) => { const h = Math.ceil(e.nativeEvent.layout.height); if (Math.abs(h - bubbleH) > 2) setBubbleH(h); }}>
         <Text size="headline">{coachStep.title}</Text>
         <Text size="callout" tone="muted">{coachStep.text}</Text>
         <View style={styles.row}>

@@ -419,7 +419,7 @@ export default function CameraFilterTab() {
           </Pressable>
         </View>
       </View>
-      <CoachHost keys={["filterStrip"]} />
+      <CoachHost hasTabBar keys={["filterStrip"]} />
     </View>
   );
 }

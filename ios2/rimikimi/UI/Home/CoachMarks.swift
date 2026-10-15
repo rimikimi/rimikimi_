@@ -72,9 +72,22 @@ private struct CoachOverlay: View {
     var total: Int
     var next: () -> Void
     var skip: () -> Void
+    @State private var bubbleH: CGFloat = 160
+    /// 기기 아래 안전영역(홈 인디케이터) — 오버레이가 안전영역을 무시해서 직접 읽는다.
+    private var safeBottom: CGFloat {
+        (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.keyWindow?.safeAreaInsets.bottom ?? 34
+    }
+    private var safeTop: CGFloat {
+        (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.keyWindow?.safeAreaInsets.top ?? 47
+    }
     var body: some View {
         let h = hole.insetBy(dx: -6, dy: -6)
-        let bubbleBelow = h.maxY + 170 < size.height
+        // 카드는 아래 메뉴(탭바 ~70pt)와 홈 인디케이터 위, 상단 안전영역 아래에 가둔다 — 자리가 화면 밖이어도
+        // 카드는 항상 보이게(오너 2026-10-15, 갤럭시에서 카드가 메뉴에 가림 — iOS 도 같은 계산이었다).
+        let bottomLimit = size.height - safeBottom - 82
+        let bubbleBelow = h.maxY + 12 + bubbleH <= bottomLimit
+        let wantY = bubbleBelow ? h.maxY + 12 : h.minY - 12 - bubbleH
+        let bubbleY = min(max(safeTop + 8, wantY), bottomLimit - bubbleH)
         ZStack(alignment: .topLeading) {
             // 화면 전체에서 설명할 자리만 뚫는다(짝홀 채우기 — 마스크 합성보다 확실하다).
             Path { p in
@@ -103,8 +116,9 @@ private struct CoachOverlay: View {
             .padding(Spacing.s4)
             .background(Color.card, in: RoundedRectangle(cornerRadius: Radius.sheet, style: .continuous))
             .shadow(color: .black.opacity(0.25), radius: 20, y: 8)
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { bubbleH = $0 }
             .padding(.horizontal, Spacing.page)
-            .offset(y: bubbleBelow ? h.maxY + 12 : max(40, h.minY - 160))
+            .offset(y: bubbleY)
         }
         .animation(.easeOut(duration: 0.25), value: step)
     }

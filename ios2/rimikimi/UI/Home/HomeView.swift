@@ -7,9 +7,10 @@ struct HomeView: View {
     @Environment(AppState.self) private var app
 
     var body: some View {
+        ScrollViewReader { proxy in
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.s4) {
-                HomeHeader()
+                HomeHeader().id("coach.top")
                 FeatureCards().coachAnchor("cards")
                 PurposeGrid().coachAnchor("purposes")
                 if app.concepts.isLoading && app.concepts.concepts.isEmpty {
@@ -24,6 +25,7 @@ struct HomeView: View {
                     }
                     Text(Copy.purposeConcept).font(AppFont.headline).tracking(Tracking.headline)
                         .foregroundStyle(Color.ink).padding(.horizontal, Spacing.page).padding(.top, Spacing.s2)
+                        .id("coach.albums")
                     AlbumsGrid(tiles: app.concepts.albumTiles)
                 }
             }
@@ -38,6 +40,13 @@ struct HomeView: View {
         .onAppear {
             app.startHomeCoach()
             if !app.cart.isEmpty { app.enqueueCoach(Coach.badge) }
+        }
+        // 튜토리얼 "컨셉 앨범" 단계 — 앨범은 추천·새로 나왔어요 밑이라 보통 화면 밖이다. 그 자리와 설명 카드가
+        // 아래 메뉴 위에 보이게 끌어올린다(오너 2026-10-15 "튜토리얼이 아래 메뉴에 가려서 안 보이자나").
+        .onChange(of: app.coachQueue.first?.key) { _, key in
+            if key == "albums" { withAnimation(.easeInOut(duration: 0.35)) { proxy.scrollTo("coach.albums", anchor: UnitPoint(x: 0.5, y: 0.3)) } }
+            else if key == "cards" || key == "purposes" { withAnimation(.easeInOut(duration: 0.35)) { proxy.scrollTo("coach.top", anchor: .top) } }
+        }
         }
     }
 }

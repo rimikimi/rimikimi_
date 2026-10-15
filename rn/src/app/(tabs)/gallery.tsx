@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
 import { router, useFocusEffect } from "expo-router";
 import { Image } from "expo-image";
@@ -9,7 +9,7 @@ import { Logo } from "@/ui/Logo";
 import { Spinner } from "@/ui/Spinner";
 import { Thumb, photoHeight } from "@/ui/Thumb";
 import { CartBar } from "@/ui/CartBar";
-import { CoachAnchor, CoachHost } from "@/ui/Coach";
+import { CoachAnchor, CoachHost, coachAnchorRect, coachUsableBottom, remeasureCoach } from "@/ui/Coach";
 import { IconClockBack, IconGear, IconPencilLine } from "@/ui/icons21";
 import { FavoriteBadge } from "@/ui/FavoriteBits";
 import { ConceptRail } from "@/ui/ConceptCard";
@@ -32,10 +32,34 @@ import { chrome, color, radius, space, themedStyles } from "@/theme/tokens";
 
 export default function HomeTab() {
   const { concepts, loading, reload, seasons, favoriteCategories, favoriteConcepts, isFavoriteCategory, home } = useStore();
-  const { cart, startHomeCoach, enqueueCoach, labelsVersion } = useApp21();
+  const { cart, startHomeCoach, enqueueCoach, labelsVersion, coachStep } = useApp21();
   const insets = useSafeAreaInsets();
   const [refreshing, setRefreshing] = useState(false);
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
+  const scrollRef = useRef<ScrollView>(null);
+  const scrollY = useRef(0);
+
+  // 튜토리얼이 가리키는 자리가 화면 아래(앨범은 추천·새로 나왔어요 밑이라 보통 화면 밖)면 그 자리와
+  // 설명 카드가 아래 메뉴 위에 다 보이게 스크롤한 뒤 다시 잰다(오너 2026-10-15, 갤럭시에서 카드가 메뉴에 가림).
+  useEffect(() => {
+    const key = coachStep?.key;
+    if (!key || key === "cameraTab") return;
+    let alive = true;
+    // 스크롤 → 다시 재기 → 아직 모자라면 한 번 더(앨범 위 가로 슬라이드가 늦게 그려져 첫 측정이 틀릴 수 있다).
+    const ensure = (attempt: number) => {
+      if (!alive) return;
+      const r = coachAnchorRect(key);
+      if (!r) return;
+      const room = 210; // 설명 카드 자리(카드 높이 + 여백)
+      const bottom = coachUsableBottom(height, insets.bottom, true);
+      const over = r.y + Math.min(r.h, 260) + room - bottom;
+      if (over <= 4 || attempt > 3) return;
+      scrollRef.current?.scrollTo({ y: scrollY.current + over, animated: true });
+      setTimeout(() => { remeasureCoach(key); setTimeout(() => ensure(attempt + 1), 200); }, 500);
+    };
+    const t = setTimeout(() => { remeasureCoach(key); setTimeout(() => ensure(0), 150); }, 120);
+    return () => { alive = false; clearTimeout(t); };
+  }, [coachStep, height, insets.bottom]);
 
   const tiles = useMemo(
     () => albumTiles(concepts, seasons, favoriteCategories, favoriteConcepts),
@@ -60,6 +84,9 @@ export default function HomeTab() {
   return (
     <View style={styles.root}>
       <ScrollView
+        ref={scrollRef}
+        onScroll={(e) => { scrollY.current = e.nativeEvent.contentOffset.y; }}
+        scrollEventThrottle={16}
         contentContainerStyle={{ paddingTop: insets.top + space.s2, paddingBottom: insets.bottom + chrome.tabBarH + chrome.tabBarBottom + space.s7 + (cart.length ? 60 : 0), gap: space.s4 }}
         showsVerticalScrollIndicator={false}
         overScrollMode="never"
@@ -88,7 +115,7 @@ export default function HomeTab() {
         )}
       </ScrollView>
       <CartBar compactOnHome hasTabBar />
-      <CoachHost keys={["cards", "purposes", "albums", "cameraTab", "cartBadge"]} />
+      <CoachHost hasTabBar keys={["cards", "purposes", "albums", "cameraTab", "cartBadge"]} />
     </View>
   );
 }
