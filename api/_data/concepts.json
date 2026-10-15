@@ -1,5 +1,16 @@
 [
  {
+  "id": "1067",
+  "title": "종이접기",
+  "title_en": "Origami",
+  "category": "🪄 매직 부스",
+  "categories": [
+   "🪄 매직 부스"
+  ],
+  "sensitive": false,
+  "text": "Recreate the provided image with EXACTLY the same composition, framing, camera angle, pose and background layout — but the entire scene is a handmade ORIGAMI paper diorama, and it must obviously look like folded paper, not a photo: the person is a stylised origami figure made of large flat faceted paper planes (low-poly folded paper, sharp creases, no skin texture, no realistic face — the face is a simple folded paper surface with at most tiny folded or drawn eyes), the hair is layers of folded black paper strips, the clothes are folded coloured paper sheets; the background walls, floor, plants, furniture and props are also folded and cut paper with visible creases, layered paper edges and matte paper grain, in the same colours as the photo. Photographed as a real paper model with soft light. Keep the person recognizable by hairstyle, hair colour, glasses, outfit colours and pose (if it is an animal or object, keep its colours, markings and silhouette). Flattering and charming, never ugly. No extra text unless stated, no watermark."
+ },
+ {
   "id": "1064",
   "title": "라떼 아트",
   "title_en": "Latte Art",
