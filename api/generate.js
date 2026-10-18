@@ -324,6 +324,12 @@ const PHOTOREALISM =
   "Do NOT change the person's face shape, features, proportions or identity while doing this. " +
   "Keep natural facial asymmetry (eyes, brows and mouth are never perfectly symmetrical on a real face). " +
   "Keep real hair detail: individual strands, natural flyaways, a real hairline that is not painted-on. " +
+  // 대두 금지(오너 2026-10-18 "실제로 생성할 때도 대두 만들면 안됨") — 얼굴 참조가 클로즈업이라 모델이 얼굴을
+  // 닮게 하려다 머리를 키운다. 전신·반신일수록 심했다(일상 스냅 50종 중 21종이 대두로 나와 다시 뽑음).
+  "BODY PROPORTIONS — realistic adult proportions: a naturally small head relative to the body (about one-eighth of " +
+  "total height on a full-length shot), normal-width shoulders and a slim neck. The face is only as large as it would " +
+  "naturally appear at this camera distance — never enlarge the head to show the face better; no big-head, bobblehead " +
+  "or chibi look. " +
   // 아래 금지 목록은 "AI 티" 에 대한 것이지 피부 결점에 대한 게 아니다.
   // 예전엔 여기 "too-perfect flawless appearance 금지" 가 있어서 위 리터칭 지시와 싸웠다.
   "STRICTLY AVOID the typical AI/CGI look: waxy or plastic skin, blurred or melted-looking faces, " +

@@ -53,6 +53,10 @@ function buildPrompt({ people, panels, art }) {
         "fabric, table or room around the craft is fine; only flag when the SUBJECT itself is partly a real photo.\n"
       : "") +
     // 오너 지시(2026-10-08): 모든 생성에 물리법칙도 같이 본다 — 명백한 것만.
+    // 대두(오너 2026-10-18): 사실 사진에서 머리가 몸에 비해 확연히 큰 것 — 그림체는 제외(위 8번·아래 Do NOT flag).
+    (art ? "" : "8b. PROPORTIONS: in a photograph, the person's head is clearly too big for their body (an obviously " +
+      "oversized, bobblehead-like head on a full-length or half-length shot, or shoulders far too narrow for the head). " +
+      "Only flag when it is obvious at a glance; a close-up selfie where the face fills the frame is fine.\n") +
     "9. PHYSICS: an object clearly floating with nothing holding or supporting it (a cup or phone hovering in the air, " +
     "a bag hanging from nothing); a person or object passing through a solid object (a hand inside a table, legs merged " +
     "into a chair); liquid, hair or fabric clearly defying gravity with no wind or motion to explain it; a mirror or window " +
