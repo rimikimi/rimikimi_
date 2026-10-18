@@ -1490,6 +1490,15 @@ async function handleGenerate(req, res, hold) {
       "Exactly two people in frame. Apply the following concept:\n" + prompt
     : "Using the person in the provided photo, generate a new portrait. " +
       "Keep the same face, identity, and facial features clearly recognizable. " +
+      // 2026-10-18 신고 #1848(339 바람결 셀피 "남녀가 바뀜"): 컨셉 글 상당수가 "a young woman"
+      // 처럼 성별을 박아 둬서, 남자 사진을 넣으면 여자로 바뀌어 나왔다(재현 2회 중 1회).
+      // 컨셉은 그대로 두고 여기서 "성별·나이는 사진이 정한다"를 못박는다.
+      "The person's sex, age and ethnicity always come from the provided photo, never from the " +
+      "concept text. If the concept describes a woman/girl but the photo shows a man (or the other " +
+      "way round), keep the person exactly as they are in the photo and translate the concept's " +
+      "gendered details — clothing, hairstyle and hair length, makeup, jewellery, pronouns — into " +
+      "the natural equivalent for this person, while keeping the scene, pose, framing, mood, " +
+      "colours and lighting of the concept. Never change the person's sex. " +
       "Apply the following concept:\n" + prompt;
 
   // ── 페이스 프로필: 얼굴 참조 절 (face-profile-v1.md §3) ──
