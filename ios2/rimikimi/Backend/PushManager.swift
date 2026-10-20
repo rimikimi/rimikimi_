@@ -42,8 +42,8 @@ final class PushManager: NSObject {
         UNUserNotificationCenter.current().delegate = self
         configured = true
         Task { await refreshAuthorization() }
-        // 알림을 켜 둔 사용자는 앱 언어에 맞는 드롭 토픽으로 맞춘다(언어를 바꿨거나 2.0.1 에서 올라온 영어 사용자).
-        syncDropTopic()
+        // 토픽 구독은 여기서 하지 않는다 — APNs 토큰이 오기 전이라 subscribe 가 조용히 실패한다.
+        // FCM 토큰이 생기는 순간(didRegister / didReceiveRegistrationToken)에 syncDropTopic 을 부른다.
     }
 
     /// 알림을 켜 둔 사용자의 드롭 토픽을 **지금 앱 언어** 쪽으로 맞춘다 — 실행 때, 그리고 프로필에서 언어를 바꿨을 때.
@@ -54,8 +54,10 @@ final class PushManager: NSObject {
         topicSync = Task {
             await previous?.value
             guard newConceptAlerts else { return } // 기다리는 사이 알림을 껐으면 다시 구독하지 않는다
+            guard Messaging.messaging().apnsToken != nil else { return } // 토큰이 오면 다시 불린다
             let ko = L.ko
-            try? await Messaging.messaging().subscribe(toTopic: Self.topic(ko: ko))
+            do { try await Messaging.messaging().subscribe(toTopic: Self.topic(ko: ko)) }
+            catch { AppLog.ui.error("push.subscribe.failed \(error.localizedDescription, privacy: .public)") }
             try? await Messaging.messaging().unsubscribe(fromTopic: Self.topic(ko: !ko))
         }
     }
@@ -74,15 +76,13 @@ final class PushManager: NSObject {
             await refreshAuthorization()
             guard granted else { newConceptAlerts = false; UserDefaults.standard.set(false, forKey: "push.newConcept.v1"); return }
             UIApplication.shared.registerForRemoteNotifications()
-            try? await Messaging.messaging().subscribe(toTopic: Self.dropTopic)
-            // 기기 언어를 바꿨으면 반대 언어 토픽은 끊는다(두 번 받지 않게)
-            try? await Messaging.messaging().unsubscribe(fromTopic: Self.topic(ko: !L.ko))
         } else {
             try? await Messaging.messaging().unsubscribe(fromTopic: Self.topic(ko: true))
             try? await Messaging.messaging().unsubscribe(fromTopic: Self.topic(ko: false))
         }
         newConceptAlerts = on
         UserDefaults.standard.set(on, forKey: "push.newConcept.v1")
+        if on { syncDropTopic() } // APNs 토큰이 아직이면 didRegister 에서 다시 불린다
         HapticPlayer.selection()
     }
 
@@ -153,6 +153,8 @@ final class PushManager: NSObject {
         Messaging.messaging().apnsToken = deviceToken
         Task {
             if let t = try? await Messaging.messaging().token() { fcmToken = t }
+            // 2026-10-20 오너 "8시 새로운 컨셉 알림이 안 옴": 예전엔 실행 직후(APNs 토큰 전)에 구독해서 조용히 실패했다.
+            syncDropTopic()
         }
     }
 
@@ -164,7 +166,10 @@ final class PushManager: NSObject {
 
 extension PushManager: MessagingDelegate {
     nonisolated func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
-        Task { @MainActor in self.fcmToken = fcmToken }
+        Task { @MainActor in
+            self.fcmToken = fcmToken
+            self.syncDropTopic() // FCM 토큰이 새로 발급·교체되면 구독도 새 토큰에 다시 건다
+        }
     }
 }
 
