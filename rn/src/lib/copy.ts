@@ -178,7 +178,7 @@ const copyKo = {
     restoreOk: "구매 내역을 복원했어요.",
     restoreFail: "복원할 구매 내역을 찾지 못했어요.",
     // 가격 태그는 한국어 화면에서도 영문으로(오너 2026-10-22).
-    badge: { first: "첫 구매", best: "Best value", cheapest: "Lowest per photo", recommended: "Recommended", popular: "Most popular", firstDiscount: "첫 구매 30% 할인" },
+    badge: { first: "첫 구매", best: "Best Value", cheapest: "Lowest per photo", recommended: "Most Popular", popular: "Most popular", firstDiscount: "첫 구매 30% 할인" },
     /** 구독 첫 결제 할인 한 줄 — iOS Copy.introLine 과 같다 */
     introLine: (period: "week" | "month" | "year", intro: string, regular: string) =>
       `첫 결제 30% 할인 · 첫 ${period === "week" ? "주" : period === "year" ? "해" : "달"} ${intro}, 이후 ${regular}`,
@@ -554,7 +554,7 @@ const copyEn: Copy = {
     restoring: "Restoring…",
     restoreOk: "Purchases restored.",
     restoreFail: "No purchases found to restore.",
-    badge: { first: "First purchase", best: "Best value", cheapest: "Lowest per photo", recommended: "Recommended", popular: "Most popular", firstDiscount: "30% off your first purchase" },
+    badge: { first: "First purchase", best: "Best Value", cheapest: "Lowest per photo", recommended: "Most Popular", popular: "Most popular", firstDiscount: "30% off your first purchase" },
     introLine: (period: "week" | "month" | "year", intro: string, regular: string) =>
       `30% off your first payment · ${intro} for the first ${period}, then ${regular}`,
     subTitle: "rimikimi+",
