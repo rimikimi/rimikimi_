@@ -40,6 +40,8 @@ interface NativeProps {
   look: LookProps;
   onReady?: (e: NativeSyntheticEvent<LiveReady>) => void;
   onCameraError?: (e: NativeSyntheticEvent<{ message: string }>) => void;
+  /** 앞뒤 전환 뒤 새 카메라의 첫 프레임 — 덮개를 이때 걷는다(안드로이드, 117+). */
+  onFirstFrame?: (e: NativeSyntheticEvent<{ front: boolean }>) => void;
 }
 
 /** 네이티브 뷰가 실제로 내놓는 함수 — renderStill 은 look 맵을 받는다(presetKey → look 변환은 JS lookFor). */

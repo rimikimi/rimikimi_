@@ -21,7 +21,7 @@ class LiveCameraModule : Module() {
     }
 
     View(LiveCameraView::class) {
-      Events("onReady", "onCameraError")
+      Events("onReady", "onCameraError", "onFirstFrame")
 
       Prop("active") { view: LiveCameraView, v: Boolean -> view.setActive(v) }
       Prop("facing") { view: LiveCameraView, v: String -> view.setFacing(v) }

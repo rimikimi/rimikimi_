@@ -50,11 +50,12 @@ const config: ExpoConfig = {
 
   android: {
     package: "com.rimikimi.app",
-    versionCode: 116,
+    versionCode: 118,
     // FCM (rimikimi-ad8aa) — 1.x android/app/google-services.json 사본. 완료 푸시 + 드롭 토픽(drop_p540).
     googleServicesFile: "./google-services.json",
     adaptiveIcon: {
-      backgroundColor: BG,
+      // iOS 아이콘 바탕(#FFFDF9)과 같게 — BG(#FBF8F3)는 스플래시용이라 아이콘만 따로.
+      backgroundColor: "#FFFDF9",
       foregroundImage: "./assets/images/adaptive-icon.png",
     },
     // OAuth 딥링크: com.rimikimi.app://login-callback — scheme 만으로 intent-filter 가 생긴다.

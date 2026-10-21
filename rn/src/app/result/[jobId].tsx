@@ -74,7 +74,7 @@ export default function Result() {
     if (!(await adGate())) return;
     setSaving(true);
     try {
-      const MediaLibrary = await import("expo-media-library");
+      const MediaLibrary = await import("expo-media-library/legacy");
       const perm = await MediaLibrary.requestPermissionsAsync(true);
       if (!perm.granted) throw new Error("no permission");
       const f = await toLocalFile(img, `rimikimi_${String(concept?.id ?? "photo")}_${idx}.png`);

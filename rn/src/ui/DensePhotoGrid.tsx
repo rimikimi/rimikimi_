@@ -16,7 +16,7 @@ import { color } from "@/theme/tokens";
 import { radius, space } from "@/theme/tokens";
 import { ease } from "@/theme/motion";
 
-// 카테고리 화면의 빽빽한 사진 격자 — 핀치로 3열 ↔ 5열(두 단계만). iOS 2.0 과 같은 동작.
+// 카테고리 화면의 빽빽한 사진 격자 — 핀치로 3열 ↔ 5열(두 단계만). 손가락을 따라 줄고 커지며 겹쳐 바뀐다(iOS 71 과 같은 동작).
 // 2.1: 탭 = 크게 보기(필름스트립), 길게 누르기(0.35초) = 담기/빼기 — **0.35초가 차는 순간**(손 떼기 전)
 // 무거운 햅틱과 함께 담긴다(iOS TileLongPressGesture). 셀카 한 장으로 못 만드는 컨셉은 담지 않고 알려 준다.
 // 담긴 칸은 강조색 테두리 + 순서 번호.
@@ -24,11 +24,6 @@ import { ease } from "@/theme/motion";
 const GAP = 4;
 const NARROW = 3;
 const WIDE = 5;
-/** 문턱 — "조금 벌린 것"에는 반응하지 않되 한 번의 자연스러운 핀치로는 확실히 넘는 값. */
-const ZOOM_IN = 1.25;
-const ZOOM_OUT = 0.8;
-/** 열 바뀜을 덮는 크로스페이드 길이. */
-const FADE_MS = 240;
 
 /**
  * ⚠️ **내림**해야 한다. 나눠떨어지지 않으면 타일 폭 합이 가용 폭을 소수점만큼 넘어서
@@ -42,23 +37,41 @@ export function DensePhotoGrid({
   items,
   onOpen,
   startWide,
+  pinchPreview,
 }: {
   items: Concept[];
   onOpen: (c: Concept) => void;
   /** 캡처·검증용 — 5열로 바로 띄운다(에뮬레이터엔 핀치가 없다). */
   startWide?: boolean;
+  /** 캡처·검증용 — 핀치 도중 배율(예 0.8)로 멈춘 화면을 띄운다. */
+  pinchPreview?: number;
 }) {
   const { width } = useWindowDimensions();
   const { isGenerated, isFavoriteConcept } = useStore();
   const { cartIndex, toggleCart, toast } = useApp21();
   const [wide, setWide] = useState(!!startWide);
-  /** 사라지는 쪽 격자의 열 수. 전환하는 동안만 값이 있고, 위에 겹쳐서 흐려진다. */
-  const [fadingCols, setFadingCols] = useState<number | null>(null);
-  const fade = useSharedValue(0);
+  /** 핀치하는 동안 위에 겹쳐 서서히 드러나는 다음 열 수의 격자. 핀치 시작 때 붙이고 끝나면 뗀다. */
+  const [target, setTarget] = useState<number | null>(null);
   /** 핀치 도중에는 탭을 무시한다 — 손을 뗀 지점이 탭으로 잡혀 엉뚱한 사진이 열린다. */
   const pinching = useRef(false);
 
   const cols = wide ? WIDE : NARROW;
+  const other = wide ? NARROW : WIDE;
+
+  // iOS ConceptCards 와 같은 방식(오너 2026-10-15·16 녹화 "손가락 끝까지 따라붙고, 뒤에 남은 것도 페이드"):
+  // 지금 격자는 손가락 배율 그대로 두 손가락 가운데를 기준으로 줄고/커지고, 다음 열 수의 격자가 같은 점을
+  // 기준으로 겹쳐 진행 후반(0.3→0.85)에 비쳐 나오며, 그만큼 뒤 격자도 같이 흐려진다.
+  const fromCols = useSharedValue(cols);
+  const liveScale = useSharedValue(1);
+  const nextScale = useSharedValue(1);
+  const nextOpacity = useSharedValue(0);
+  const baseFade = useSharedValue(1);
+  const ox = useSharedValue(0);
+  const oy = useSharedValue(0);
+  /** 손을 뗀 뒤 넘어가기로 한 열 수 — 상태가 바뀐 다음 프레임에 겹친 장을 뗀다. */
+  const committing = useRef<number | null>(null);
+
+  React.useEffect(() => { fromCols.value = cols; }, [cols, fromCols]);
 
   // 5열로 좁히면 화면에 칸이 세 배 가까이 늘어난다. 미리 받아 두지 않으면 그 칸들이 빈 바탕으로
   // 있다가 하나씩 뜬다. 썸네일은 장당 수십 KB라 한 화면 분량은 미리 받아 두는 게 낫다.
@@ -66,26 +79,26 @@ export function DensePhotoGrid({
     Image.prefetch(items.slice(0, 60).map((c) => conceptThumb(c)), { cachePolicy: "memory-disk" }).catch(() => {});
   }, [items]);
 
-  /**
-   * 열 수를 바꾼다 — **배치는 한 번에 갈아끼우고, 옛 화면을 위에 겹쳐 흐린다.**
-   *
-   * 네이티브 사진 앱이 정확히 이렇게 한다(오너가 전환 순간을 캡처해 왔다 — 타일 자리는 이미 최종
-   * 배열이고 칸 안에서 두 사진이 겹쳐 있었다). 자리를 옮기는 게 아니라 **크로스페이드**다.
-   * 칸마다 제 자리로 움직이게도 해 봤는데(iOS 에서 `Layout` 까지 짰다) 이동 거리가 제각각이라
-   * 중간 프레임이 계단처럼 벌어진다. 사진 앱이 그 방식을 안 쓰는 이유다.
-   */
-  const step = useCallback(
-    (next: boolean) => {
-      setFadingCols(next ? NARROW : WIDE);
-      fade.value = 1;
-      setWide(next);
-      fade.value = withTiming(0, { duration: FADE_MS, easing: ease.standard }, (done) => {
-        if (done) runOnJS(setFadingCols)(null);
-      });
-      Haptics.selectionAsync().catch(() => {});
-    },
-    [fade],
-  );
+  // 넘어간 뒤: 아래 장이 새 열 수로 다시 그려졌다(위 장과 똑같은 모습) → 아래를 원래대로 돌리고,
+  // 한 프레임 뒤에 위 장을 뗀다. 같은 프레임에 둘 다 바꾸면 한 프레임 허옇게 뜬다(iOS 에서 확인).
+  React.useLayoutEffect(() => {
+    if (committing.current == null) return;
+    committing.current = null;
+    liveScale.value = 1;
+    baseFade.value = 1;
+    requestAnimationFrame(() => {
+      nextOpacity.value = 0;
+      nextScale.value = 1;
+      setTarget(null);
+    });
+  }, [wide, liveScale, baseFade, nextOpacity, nextScale]);
+
+  const commit = useCallback((to: number) => {
+    committing.current = to;
+    setWide(to === WIDE);
+    Haptics.selectionAsync().catch(() => {});
+  }, []);
+  const dropTarget = useCallback(() => setTarget(null), []);
 
   const setPinching = useCallback((v: boolean) => {
     pinching.current = v;
@@ -97,26 +110,95 @@ export function DensePhotoGrid({
   const releasePinchSoon = useCallback(() => {
     setTimeout(() => { pinching.current = false; }, 250);
   }, []);
+  const startPinch = useCallback((to: number) => {
+    pinching.current = true;
+    setTarget(to);
+  }, []);
 
   const pinch = useMemo(
     () =>
       Gesture.Pinch()
-        .onStart(() => {
-          runOnJS(setPinching)(true);
+        .onStart((e) => {
+          // 격자 좌표의 핀치 중심(시작 순간 고정). 바깥 여백만큼 뺀다.
+          ox.value = e.focalX - space.screen;
+          oy.value = e.focalY - space.s2;
+          const from = fromCols.value;
+          runOnJS(startPinch)(from === NARROW ? WIDE : NARROW);
         })
         .onUpdate((e) => {
-          // 문턱을 넘는 **즉시** 바꾼다(손을 뗄 때가 아니라) — 사진 앱도 핀치 도중에 열이 바뀐다.
-          if (e.scale >= ZOOM_IN) runOnJS(step)(false);
-          else if (e.scale <= ZOOM_OUT) runOnJS(step)(true);
+          const s = e.scale;
+          const from = fromCols.value;
+          const to = s < 1 ? (from === NARROW ? WIDE : 0) : s > 1 ? (from === WIDE ? NARROW : 0) : 0;
+          if (!to) {
+            // 더 갈 단계가 없는 쪽 — 고무줄처럼 살짝만.
+            nextOpacity.value = 0;
+            baseFade.value = 1;
+            liveScale.value = 1 + (s - 1) * 0.12;
+            return;
+          }
+          const r = from / to; // 3→5 = 0.6, 5→3 ≈ 1.67
+          const p = Math.min(1, Math.max(0, (s - 1) / (r - 1)));
+          liveScale.value = 1 + p * (r - 1);
+          nextScale.value = liveScale.value / r; // 다음 격자는 끝에서 정확히 1배
+          const f = Math.min(1, Math.max(0, (p - 0.3) / 0.55));
+          nextOpacity.value = f * f * (3 - 2 * f);
+          baseFade.value = 1 - nextOpacity.value;
+        })
+        .onEnd((e) => {
+          const from = fromCols.value;
+          const to = from === NARROW ? WIDE : NARROW;
+          const r = from / to;
+          const p = Math.min(1, Math.max(0, (liveScale.value - 1) / (r - 1)));
+          const flick = to === WIDE ? e.velocity < -0.6 : e.velocity > 0.6;
+          const cfg = { duration: 260, easing: ease.standard };
+          if (p > 0.5 || flick) {
+            nextScale.value = withTiming(1, cfg);
+            nextOpacity.value = withTiming(1, cfg);
+            baseFade.value = withTiming(0, cfg);
+            liveScale.value = withTiming(r, cfg, (done) => {
+              if (done) runOnJS(commit)(to);
+            });
+          } else {
+            nextScale.value = withTiming(1 / r, { duration: 240, easing: ease.standard });
+            nextOpacity.value = withTiming(0, { duration: 240, easing: ease.standard });
+            baseFade.value = withTiming(1, { duration: 240, easing: ease.standard });
+            liveScale.value = withTiming(1, { duration: 240, easing: ease.standard }, (done) => {
+              if (done) runOnJS(dropTarget)();
+            });
+          }
         })
         .onFinalize(() => {
-          // 떼는 순간의 잔여 터치가 탭으로 새지 않게 한 박자 뒤에 푼다.
           runOnJS(releasePinchSoon)();
         }),
-    [step, setPinching, releasePinchSoon],
+    [fromCols, liveScale, nextScale, nextOpacity, baseFade, ox, oy, startPinch, commit, dropTarget, releasePinchSoon],
   );
 
-  const fadeStyle = useAnimatedStyle(() => ({ opacity: fade.value }));
+  // 검증용 — 핀치 도중 한 장면으로 멈춘다(에뮬레이터엔 두 손가락이 없다).
+  React.useEffect(() => {
+    if (!pinchPreview) return;
+    const from = cols, to = other, s = pinchPreview;
+    setTarget(to);
+    ox.value = (width - space.screen * 2) / 2; oy.value = 300;
+    const r = from / to;
+    const p = Math.min(1, Math.max(0, (s - 1) / (r - 1)));
+    liveScale.value = 1 + p * (r - 1);
+    nextScale.value = liveScale.value / r;
+    const f = Math.min(1, Math.max(0, (p - 0.3) / 0.55));
+    nextOpacity.value = f * f * (3 - 2 * f);
+    baseFade.value = 1 - nextOpacity.value;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pinchPreview]);
+
+  const baseStyle = useAnimatedStyle(() => ({
+    opacity: baseFade.value,
+    transformOrigin: [ox.value, oy.value, 0],
+    transform: [{ scale: liveScale.value }],
+  }));
+  const nextStyle = useAnimatedStyle(() => ({
+    opacity: nextOpacity.value,
+    transformOrigin: [ox.value, oy.value, 0],
+    transform: [{ scale: nextScale.value }],
+  }));
 
   /** 길게 누르기 = 담기/빼기. 핀치 중이면 무시. */
   const onLong = useCallback((c: Concept) => {
@@ -169,11 +251,11 @@ export function DensePhotoGrid({
   return (
     <GestureDetector gesture={pinch}>
       <View style={styles.wrap}>
-        {grid(cols, true)}
-        {fadingCols !== null ? (
-          // 자리를 차지하지 않게 절대배치로 얹는다 — 아래 새 배치가 스크롤 높이를 정한다.
-          <Animated.View style={[styles.fadeLayer, fadeStyle]} pointerEvents="none">
-            {grid(fadingCols, false)}
+        <Animated.View style={baseStyle}>{grid(cols, true)}</Animated.View>
+        {target !== null ? (
+          // 자리를 차지하지 않게 절대배치로 얹는다 — 아래 지금 배치가 스크롤 높이를 정한다.
+          <Animated.View style={[styles.fadeLayer, nextStyle]} pointerEvents="none">
+            {grid(target, false)}
           </Animated.View>
         ) : null}
       </View>
@@ -182,7 +264,8 @@ export function DensePhotoGrid({
 }
 
 const styles = StyleSheet.create({
-  wrap: { paddingHorizontal: space.screen, paddingTop: space.s2 },
+  // 핀치로 커지는 격자가 위 제목줄을 덮지 않게 자른다.
+  wrap: { paddingHorizontal: space.screen, paddingTop: space.s2, overflow: "hidden" },
   grid: { flexDirection: "row", flexWrap: "wrap" },
   fadeLayer: { position: "absolute", left: space.screen, right: space.screen, top: space.s2 },
   // 즐겨찾기 별은 왼쪽 위 — 오른쪽 위는 담기 번호 자리(iOS 와 같다).

@@ -6,7 +6,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Haptics from "expo-haptics";
 import * as ImageManipulator from "expo-image-manipulator";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, { FadeIn, FadeOut, runOnJS, useAnimatedStyle, useSharedValue, withSequence, withTiming } from "react-native-reanimated";
+import Animated, { FadeIn, FadeOut, runOnJS, useAnimatedStyle, useSharedValue, withDelay, withSequence, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Text } from "@/ui/Text";
 import { Button } from "@/ui/Button";
@@ -296,11 +296,36 @@ export default function CameraFilterTab() {
     Haptics.selectionAsync().catch(() => {});
   }, [toast]);
 
-  const flip = useCallback(() => {
+  // 앞뒤 전환 — 카메라를 다시 묶는 사이 멈춘 옛 프레임이 뒤집히고 새 화면이 툭 들어와 한 번 깜빡였다
+  // (오너 iOS 녹화 2026-10-15, iOS 69 에서 같은 방식으로 고침). 미리보기를 짧게 어둡게 덮고 바꾼 뒤,
+  // 새 카메라의 **첫 프레임**이 오면(onFirstFrame) 걷는다 — onReady 는 프레임보다 먼저 와서 멈춘 옛 화면이 비쳤다.
+  // 이벤트가 안 와도 1.5초 뒤엔 걷는다.
+  // 켤 때도 덮고 시작한다 — 첫 프레임이 오면 걷는다(검은 화면에서 툭 튀어나오지 않게, iOS e4fd5ac 와 같다).
+  const flipCover = useSharedValue(1);
+  const flipCoverStyle = useAnimatedStyle(() => ({ opacity: flipCover.value }));
+  const flipTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const revealAfterFlip = useCallback(() => {
+    if (flipTimer.current) { clearTimeout(flipTimer.current); flipTimer.current = null; }
+    // 첫 0.25초는 노출·화이트밸런스가 아직 안 잡힌 프레임이라(iOS 실측: 파랗고 어둡다) 기다렸다 0.22초 페이드.
+    flipCover.value = withDelay(250, withTiming(0, { duration: 220 }));
+  }, [flipCover]);
+  // 탭에 다시 들어올 때(카메라를 다시 켤 때)도 덮고 시작 — 멈춘 옛 화면이 비치지 않게.
+  useEffect(() => {
+    if (!active) return;
+    flipCover.value = 1;
+    if (flipTimer.current) clearTimeout(flipTimer.current);
+    flipTimer.current = setTimeout(revealAfterFlip, 2500);
+  }, [active, flipCover, revealAfterFlip]);
+  const doFlip = useCallback(() => {
     setFacing((f) => (f === "back" ? "front" : "back"));
     setZoomState(1); setMark(null); setLocked(false); setBias(0); setReady(null);
+    if (flipTimer.current) clearTimeout(flipTimer.current);
+    flipTimer.current = setTimeout(revealAfterFlip, 1500);
+  }, [revealAfterFlip]);
+  const flip = useCallback(() => {
     Haptics.selectionAsync().catch(() => {});
-  }, []);
+    flipCover.value = withTiming(1, { duration: 90 }, (done) => { if (done) runOnJS(doFlip)(); });
+  }, [flipCover, doFlip]);
 
   const toggleMirror = useCallback(() => {
     setMirror((m) => { void AsyncStorage.setItem(MIRROR_KEY, m ? "0" : "1"); return !m; });
@@ -341,7 +366,9 @@ export default function CameraFilterTab() {
             intensity={fxAmount}
             presetKey={selected}
             onReady={(e) => { setReady(e.nativeEvent); setZoomState(1); }}
+            onFirstFrame={revealAfterFlip}
           />
+          <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: "#000000" }, flipCoverStyle]} />
           {mark ? <FocusBox mark={mark} bias={bias} /> : null}
         </View>
       </GestureDetector>

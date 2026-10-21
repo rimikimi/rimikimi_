@@ -15,7 +15,7 @@ import { albumName } from "@/lib/home21";
 // 카테고리 더보기 — 빽빽한 격자(핀치로 3열 ↔ 5열), 최신순. 탭 = 필름스트립 브라우저.
 // 2열 카드 격자였던 것을 iOS 2.0 과 맞췄다(오너 지시 2026-09-22 "안드로이드도 동일하게").
 export default function CategoryScreen() {
-  const { name, cols } = useLocalSearchParams<{ name: string; cols?: string }>();
+  const { name, cols, pinch } = useLocalSearchParams<{ name: string; cols?: string; pinch?: string }>();
   const { concepts, favoriteConcepts, isFavoriteCategory, toggleFavoriteCategory } = useStore();
   const { enqueueCoach } = useApp21();
   const items = useMemo(
@@ -46,6 +46,7 @@ export default function CategoryScreen() {
       <DensePhotoGrid
         items={items}
         startWide={cols === "5"}
+        pinchPreview={pinch ? Number(pinch) : undefined}
         onOpen={(c) =>
           router.push({ pathname: "/browse/[name]", params: { name: name ?? "", start: String(c.id) } })
         }

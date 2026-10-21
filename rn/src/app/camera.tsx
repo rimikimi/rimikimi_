@@ -6,7 +6,7 @@ import * as ImageManipulator from "expo-image-manipulator";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withDelay, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebTool } from "@/ui/WebTool";
 import { Text } from "@/ui/Text";
@@ -127,13 +127,26 @@ export default function CameraScreen() {
     Haptics.selectionAsync().catch(() => {});
   }, []);
 
-  const flip = useCallback(() => {
+  // 앞뒤 전환 깜빡임 — 필터 화면과 같은 방식: 짧게 어둡게 덮고 바꾼 뒤, 준비되면(onCameraReady) 걷는다.
+  const flipCover = useSharedValue(0);
+  const flipCoverStyle = useAnimatedStyle(() => ({ opacity: flipCover.value }));
+  const flipTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const revealAfterFlip = useCallback(() => {
+    if (flipTimer.current) { clearTimeout(flipTimer.current); flipTimer.current = null; }
+    flipCover.value = withDelay(140, withTiming(0, { duration: 220 }));
+  }, [flipCover]);
+  const doFlip = useCallback(() => {
     setFacing((f) => (f === "back" ? "front" : "back"));
     setZoom(0);
     zoomBase.value = 0;
     zoomLive.value = 0;
+    if (flipTimer.current) clearTimeout(flipTimer.current);
+    flipTimer.current = setTimeout(revealAfterFlip, 1200);
+  }, [zoomBase, zoomLive, revealAfterFlip]);
+  const flip = useCallback(() => {
     Haptics.selectionAsync().catch(() => {});
-  }, [zoomBase, zoomLive]);
+    flipCover.value = withTiming(1, { duration: 90 }, (done) => { if (done) runOnJS(doFlip)(); });
+  }, [flipCover, doFlip]);
 
   // MARK: 줌 — 손가락 간격의 배수를 0~1 로 옮긴다.
 
@@ -269,8 +282,10 @@ export default function CameraScreen() {
           // 전면엔 하드웨어 플래시가 없다. 아이폰도 후면일 때만 요청한다.
           flash={flashOn && facing === "back" ? "on" : "off"}
           animateShutter={false}
+          onCameraReady={revealAfterFlip}
         />
       </GestureDetector>
+      <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: "#000000" }, flipCoverStyle]} pointerEvents="none" />
 
       <Animated.View style={[StyleSheet.absoluteFill, styles.flash, flashStyle]} pointerEvents="none" />
 

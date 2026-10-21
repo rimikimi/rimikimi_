@@ -52,6 +52,12 @@ import kotlin.math.roundToInt
 class LiveCameraView(context: Context, appContext: AppContext) : ExpoView(context, appContext) {
   private val onReady by EventDispatcher()
   private val onCameraError by EventDispatcher()
+  /** 앞뒤 전환 뒤 **새 카메라의 첫 프레임**이 들어왔을 때 — JS 가 이때 덮개를 걷는다(onReady 는 프레임보다 먼저 와서
+   *  멈춘 옛 후면 화면이 잠깐 비쳤다, 에뮬레이터 녹화 2026-10-21). */
+  private val onFirstFrame by EventDispatcher()
+  @Volatile private var waitFrame = false
+  /** 새 카메라가 묶인 뒤에만 첫 프레임을 센다(묶기 전 남은 옛 프레임은 무시). */
+  @Volatile private var frameArmed = false
 
   private val glView = GLSurfaceView(context)
   val renderer: LiveRenderer
@@ -76,6 +82,12 @@ class LiveCameraView(context: Context, appContext: AppContext) : ExpoView(contex
       onSurfaceTexture = { st -> post { surfaceTexture = st; rebind() } },
       requestRender = { glView.requestRender() },
     )
+    renderer.onFrame = {
+      if (frameArmed) {
+        frameArmed = false
+        post { onFirstFrame(mapOf("front" to front)) }
+      }
+    }
     glView.setEGLContextClientVersion(2)
     glView.preserveEGLContextOnPause = true
     glView.setRenderer(renderer)
@@ -103,7 +115,8 @@ class LiveCameraView(context: Context, appContext: AppContext) : ExpoView(contex
     val f = v == "front"
     if (f == front) return
     front = f
-    applyMirror()
+    waitFrame = true
+    // 거울은 새 카메라가 묶인 뒤(rebind 끝)에 맞춘다 — 여기서 바로 뒤집으면 멈춘 옛 후면 프레임이 좌우로 튀었다.
     rebind()
   }
 
@@ -187,6 +200,8 @@ class LiveCameraView(context: Context, appContext: AppContext) : ExpoView(contex
         }
         camera = cam; imageCapture = ic; preview = pv; bound = true
         applyMirror()
+        // 켤 때·앞뒤 전환 때 모두 — 새로 묶인 카메라의 첫 프레임을 JS 에 알린다(덮개를 그때 걷는다).
+        waitFrame = false; frameArmed = true
         sendReady(cam)
       } catch (e: Exception) {
         Log.e("LiveCamera", "bind failed", e)

@@ -38,6 +38,8 @@ class Look {
 }
 
 class LiveRenderer(private val onSurfaceTexture: (SurfaceTexture) -> Unit, private val requestRender: () -> Unit) : GLSurfaceView.Renderer {
+  /** 카메라 프레임이 도착할 때마다(아무 스레드) — 앞뒤 전환 뒤 첫 프레임을 알리는 데 쓴다. */
+  @Volatile var onFrame: (() -> Unit)? = null
   val look = Look()
 
   // 화면 맞춤(카메라 쪽이 정한다)
@@ -132,7 +134,7 @@ class LiveRenderer(private val onSurfaceTexture: (SurfaceTexture) -> Unit, priva
     look.lutDirty = true
     loc.clear()
     val s = SurfaceTexture(oesTex)
-    s.setOnFrameAvailableListener { requestRender() }
+    s.setOnFrameAvailableListener { onFrame?.invoke(); requestRender() }
     st?.release()
     st = s
     onSurfaceTexture(s)

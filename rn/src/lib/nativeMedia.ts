@@ -28,9 +28,12 @@ async function toLocalFile(src: string, name: string) {
  * (아래 saveDataUrlToAlbum 은 data URL/원격 URL 을 캐시 파일로 받아쓰는 경로라, 이미 파일인
  *  것을 굳이 다시 받아 쓸 이유가 없다. ios2 의 CameraAlbum.save 와 같은 자리.)
  */
+// ⚠️ 반드시 `expo-media-library/legacy` 에서 가져온다. expo-media-library 57 의 루트 export 에 있는
+//    saveToLibraryAsync 는 **항상 throw 하는 껍데기**다(경고만 찍고 실패) — 2.0 안드로이드 출시부터 사진첩 저장이
+//    전부 조용히 실패하고 있었다(2026-10-21 에뮬레이터에서 셔터 4번 → 사진첩 0장으로 발견).
 export async function saveFileToAlbum(uri: string): Promise<{ ok: true } | { error: string }> {
   try {
-    const MediaLibrary = await import("expo-media-library");
+    const MediaLibrary = await import("expo-media-library/legacy");
     const perm = await MediaLibrary.requestPermissionsAsync(true); // writeOnly
     if (!perm.granted) return { error: "permission denied" };
     await MediaLibrary.saveToLibraryAsync(uri);
@@ -43,7 +46,7 @@ export async function saveFileToAlbum(uri: string): Promise<{ ok: true } | { err
 /** 앨범 저장(writeOnly) — 성공하면 {ok:true}, 실패하면 {error}. src/nativeBridge.js nativeSaveToAlbum 과 같은 반환 모양. */
 export async function saveDataUrlToAlbum(src: string, filename = "rimikimi"): Promise<{ ok: true } | { error: string }> {
   try {
-    const MediaLibrary = await import("expo-media-library");
+    const MediaLibrary = await import("expo-media-library/legacy");
     const perm = await MediaLibrary.requestPermissionsAsync(true);
     if (!perm.granted) return { error: "permission denied" };
     const f = await toLocalFile(src, filename.endsWith(".png") || filename.endsWith(".jpg") ? filename : `${filename}.png`);
