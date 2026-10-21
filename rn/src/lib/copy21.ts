@@ -220,9 +220,9 @@ export const c21 = {
   get consentAgree() { return t("허용하고 계속", "Allow and continue"); },
   get consentLater() { return t("허용 안 함", "Don't allow"); },
   // 필터 이용권(scratchpad filterpass_spec.md) — "무료 체험"을 구독과 묶어 쓰지 않는다.
-  get fpTitle() { return t("필터 이용권", "Filter Pass"); },
+  get fpTitle() { return t("카메라 이용권", "Camera Pass"); },
   get fpLeadExpired() { return t("무료로 쓰는 3일이 끝났어요. 이용권으로 모든 필터를 계속 저장하고 공유해 보세요.", "Your 3 free days are over. Get a pass to keep saving and sharing with every filter."); },
-  get fpLead() { return t("폰카·필름·카메라·재미·인플 필터를 전부 저장하고 공유할 수 있어요. 처음 3일은 무료로 써 보세요.", "Save and share with every Phone, Film, Camera, Fun and Beauty filter. Use them all free for your first 3 days."); },
+  get fpLead() { return t("폰카·빈티지·감성 필터를 전부 저장하고 공유할 수 있어요. 처음 3일은 무료로 써 보세요.", "Save and share with every Phone, Vintage and Mood filter. Use them all free for your first 3 days."); },
   get fpAnnual() { return t("1년", "1 year"); },
   get fpMonthly() { return t("1개월", "1 month"); },
   get fpLifetime() { return t("평생", "Lifetime"); },
@@ -230,7 +230,7 @@ export const c21 = {
   get fpMonthlyNote() { return t("매월 자동 갱신", "Renews every month"); },
   get fpLifetimeNote() { return t("한 번 결제하고 계속 사용", "Pay once, keep forever"); },
   get fpLaunchPill() { return t("런칭 기념", "Launch price"); },
-  fpLaunchNote: (regular: string) => (isKo ? `11월 13일까지 · 정가 ${regular}` : `Until Nov 13 · reg. ${regular}`),
+  fpLaunchNote: (regular: string | null) => (regular ? (isKo ? `11월 13일까지 · 정가 ${regular}` : `Until Nov 13 · reg. ${regular}`) : (isKo ? "11월 13일까지" : "Until Nov 13")),
   get fpBest() { return t("추천", "Best value"); },
   get fpSettingsRow() { return t("카메라 이용권", "Camera Pass"); },
   /** 스토어에 첫 달 무료 오퍼(Play first-month-free)가 있을 때 요금제 아래 한 줄. {price} = 갱신가(월). */

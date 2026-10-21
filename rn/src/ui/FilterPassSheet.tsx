@@ -97,8 +97,12 @@ export function FilterPassSheet({ open, onClose, onUnlocked }: { open: boolean; 
           const isBusy = busy === plan;
           const disabled = !!busy || restoring || (!p && !loading) || !available;
           const launch = plan === "lifetime" && promo;
+          // 정가(₩9,900)는 원화 스토어에서만 보인다 — 미국 등 다른 통화 스토어에서 "₩9,900 취소선 + $2.99"가
+          // 같이 뜨던 결함(오너 2026-10-22). 스토어 가격을 못 받아 원화 참고가를 쓰는 경우도 원화로 본다.
+          const shownPrice = p?.priceString || won(filterPlanFallbackKrw(plan));
+          const krwStore = /₩|원|KRW/.test(shownPrice);
           const note = p?.freeTrial ? c21.fpIntroNote(p.renewPrice || p.priceString)
-            : launch ? c21.fpLaunchNote(won(FILTER_PLAN_KRW.lifetime)) : PLAN_NOTE[plan]();
+            : launch ? c21.fpLaunchNote(krwStore ? won(FILTER_PLAN_KRW.lifetime) : null) : PLAN_NOTE[plan]();
           return (
             <Pressable
               key={plan}
@@ -122,7 +126,7 @@ export function FilterPassSheet({ open, onClose, onUnlocked }: { open: boolean; 
               <View style={styles.trail}>
                 {isBusy ? <Spinner size={20} color={color.accent} /> : (
                   <View style={styles.priceRow}>
-                    {launch ? <Text size="footnote" tone="subtle" tabular style={styles.strike}>{won(FILTER_PLAN_KRW.lifetime)}</Text> : null}
+                    {launch && krwStore ? <Text size="footnote" tone="subtle" tabular style={styles.strike}>{won(FILTER_PLAN_KRW.lifetime)}</Text> : null}
                     <Text size="callout" weight="semibold" tabular>{(p?.freeTrial ? p.renewPrice : p?.priceString) || won(filterPlanFallbackKrw(plan))}</Text>
                   </View>
                 )}

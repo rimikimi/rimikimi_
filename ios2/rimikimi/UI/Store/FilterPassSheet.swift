@@ -112,7 +112,8 @@ struct FilterPassSheet: View {
                 }
                 Spacer()
                 VStack(alignment: .trailing, spacing: 1) {
-                    if p.kind == .lifetime && StoreManager.lifetimePromoActive {
+                    // 정가(₩9,900)는 원화 스토어에서만 — 다른 통화 스토어에서 "₩9,900 취소선 + $2.99"가 같이 뜨던 결함(오너 2026-10-22).
+                    if p.kind == .lifetime && StoreManager.lifetimePromoActive && p.displayPrice.contains("₩") {
                         Text(Copy.krw(9900)).font(AppFont.footnote).strikethrough().foregroundStyle(Color.ink3)
                     }
                     Text(store.filterIntroEligible && p.kind == .monthly ? L.t("첫 달 0원", "First month free") : p.displayPrice)

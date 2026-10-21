@@ -1054,8 +1054,8 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
       {passPrompt && (
         <div style={ES.passBack} onClick={() => setPassPrompt(false)}>
           <div style={ES.passCard} onClick={(e) => e.stopPropagation()}>
-            <div style={{ fontSize: 17, fontWeight: 800 }}>{getLang() === "ko" ? "이 필터는 이용권이 필요해요" : "This filter needs a Filter Pass"}</div>
-            <div style={{ fontSize: 14, opacity: 0.75, lineHeight: 1.5 }}>{getLang() === "ko" ? "리미키미 앱에서 이용권으로 모든 필터를 계속 쓸 수 있어요. 원본은 언제나 무료예요." : "Keep using every filter with a Filter Pass in the rimikimi app. Original is always free."}</div>
+            <div style={{ fontSize: 17, fontWeight: 800 }}>{getLang() === "ko" ? "이 필터는 이용권이 필요해요" : "This filter needs a Camera Pass"}</div>
+            <div style={{ fontSize: 14, opacity: 0.75, lineHeight: 1.5 }}>{getLang() === "ko" ? "리미키미 앱에서 이용권으로 모든 필터를 계속 쓸 수 있어요. 원본은 언제나 무료예요." : "Keep using every filter with a Camera Pass in the rimikimi app. Original is always free."}</div>
             <a href="/download" style={ES.passBtn}>{getLang() === "ko" ? "앱 받기" : "Get the app"}</a>
             <button type="button" style={ES.passClose} onClick={() => setPassPrompt(false)}>{getLang() === "ko" ? "닫기" : "Close"}</button>
           </div>
