@@ -455,9 +455,12 @@ enum Copy {
         }
         return "30% off your first payment · \(intro) for the \(first), then \(regular)"
     }
-    static var badgeBest: String { L.t("베스트 가치", "Best value") }
-    static var badgeCheapest: String { L.t("장당 최저", "Lowest per photo") }
-    static var badgeLowest: String { L.t("가장 저렴", "Best price") }
+    // 가격 태그는 한국어 화면에서도 영문으로(오너 2026-10-22).
+    static var badgeBest: String { "Best value" }
+    static var badgeCheapest: String { "Lowest per photo" }
+    /// 스탠다드 — "Best value" 는 장당 가장 싼 프로 몫이라 겹치지 않게(오너 "장당 최저랑 베스트 밸류가 공존할 수가 있냐").
+    static var badgeRecommended: String { "Recommended" }
+    static var badgeLowest: String { "Best price" }
     static var payNotReady: String { L.t("결제가 아직 준비되지 않았어요.", "Payments aren't ready yet.") }
     static var storeNoProducts: String { L.t("스토어가 상품 0개를 반환했어요. 잠시 후 다시 시도해 주세요.", "The store returned no products. Please try again in a moment.") }
     // MARK: 필터 이용권 (filterpass_spec.md — '무료 체험'을 구독과 묶어 쓰지 않는다)
@@ -474,7 +477,7 @@ enum Copy {
     static var filterPassAnnualLine: String { L.t("1년마다 자동 갱신", "Renews every year") }
     static var filterPassMonthlyLine: String { L.t("1개월마다 자동 갱신", "Renews every month") }
     static var filterPassLifetimeLine: String { L.t("한 번 결제, 계속 사용", "Pay once, keep forever") }
-    static var filterPassBest: String { L.t("추천", "Best value") }
+    static var filterPassBest: String { "Best value" }
     /// 첫 달 무료 체험 자격이 있을 때 월간 행 아래 줄(3.1.2 — 기간·이후 가격·자동 갱신을 한 줄에).
     static func filterPassIntroLine(_ price: String) -> String { L.t("첫 1개월 무료 · 이후 월 \(price) 자동 갱신", "First month free · then \(price)/month, auto-renews") }
     static var adFreeTitle: String { L.t("광고 없이 만들고 싶다면", "Create without ads") }

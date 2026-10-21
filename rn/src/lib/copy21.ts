@@ -231,7 +231,7 @@ export const c21 = {
   get fpLifetimeNote() { return t("한 번 결제하고 계속 사용", "Pay once, keep forever"); },
   get fpLaunchPill() { return t("런칭 기념", "Launch price"); },
   fpLaunchNote: (regular: string | null) => (regular ? (isKo ? `11월 13일까지 · 정가 ${regular}` : `Until Nov 13 · reg. ${regular}`) : (isKo ? "11월 13일까지" : "Until Nov 13")),
-  get fpBest() { return t("추천", "Best value"); },
+  get fpBest() { return "Best value"; },
   get fpSettingsRow() { return t("카메라 이용권", "Camera Pass"); },
   /** 스토어에 첫 달 무료 오퍼(Play first-month-free)가 있을 때 요금제 아래 한 줄. {price} = 갱신가(월). */
   fpIntroNote: (price: string) => (isKo ? `첫 1개월 무료 · 이후 월 ${price} 자동 갱신` : `First month free · then ${price}/month, auto-renews`),

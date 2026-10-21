@@ -33,8 +33,8 @@ final class StoreManager {
         .init(id: "rimikimi.pack.single", credits: 1, krw: 1900, label: Copy.packSingle, badge: nil, isSubscription: false, period: nil),
         .init(id: "rimikimi.pack.trial", credits: 3, krw: 3900, label: Copy.packIntro, badge: nil, isSubscription: false, period: nil),
         .init(id: "rimikimi.pack.mini", credits: 12, krw: 11900, label: Copy.packMini, badge: nil, isSubscription: false, period: nil),
-        .init(id: "rimikimi.pack.standard", credits: 24, krw: 22900, label: Copy.packStandard, badge: Copy.badgeBest, isSubscription: false, period: nil),
-        .init(id: "rimikimi.pack.pro", credits: 48, krw: 44900, label: Copy.packPro, badge: Copy.badgeCheapest, isSubscription: false, period: nil),
+        .init(id: "rimikimi.pack.standard", credits: 24, krw: 22900, label: Copy.packStandard, badge: Copy.badgeRecommended, isSubscription: false, period: nil),
+        .init(id: "rimikimi.pack.pro", credits: 48, krw: 44900, label: Copy.packPro, badge: Copy.badgeBest, isSubscription: false, period: nil),
     ] }
     /// 첫 구매 30% 할인 — 소모품엔 애플 할인 기능이 없어 **별도 상품**이다(같은 장수). 한 번도 산 적 없는 계정
     /// (서버 quota `firstPurchase`)에게만, 그리고 스토어가 그 상품을 돌려줄 때만(심사 전이면 없음) 정가 팩 대신 보여 준다.
