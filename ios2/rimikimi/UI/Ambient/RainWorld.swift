@@ -192,7 +192,7 @@ final class RainWorld {
     struct Ring { var x, y, age: CGFloat }
     /// 액자 앞면에 묻은 물방울(카드 기준 좌표 rx, ry — 스크롤해도 카드에 붙어 다닌다).
     /// 작으면 붙어 있고, 커지면(합쳐지면) 중력 방향으로 흘러내리며 작은 물자국을 남기고, 아랫변에 모여 맺혔다가 떨어진다.
-    struct FaceDrop { var id: String; var rx, ry, r: CGFloat; var vx: CGFloat = 0; var vy: CGFloat = 0; var sliding = false; var age: CGFloat = 0; var trail: [CGPoint] = [] }
+    struct FaceDrop { var id: String; var rx, ry, r: CGFloat; var vx: CGFloat = 0; var vy: CGFloat = 0; var sliding = false; var age: CGFloat = 0; var trail: [CGPoint] = []; var life: CGFloat = 6 }
     private(set) var faceDrops: [FaceDrop] = []
     /// 흐른 뒤 남은 물길(서서히 마른다)
     struct Wet { var id: String; var pts: [CGPoint]; var age: CGFloat; var w: CGFloat }
@@ -249,13 +249,14 @@ final class RainWorld {
                     streaks[i].lastHitY = l.frame.minY
                                         pour(into: id, x: p.x, volume: streaks[i].near ? 0.22 : 0.12)
                     // 일부는 튀면서 액자 앞면 윗부분에 묻는다
-                    if faceDrops.count < 90, CGFloat.random(in: 0...1, using: &rng) < 0.45 {
+                    if faceDrops.count < 70, CGFloat.random(in: 0...1, using: &rng) < 0.3 {
                         let n = Int.random(in: 1...2, using: &rng)
                         for _ in 0..<n {
                             let r = CGFloat.random(in: 0.8...2.2, using: &rng)
-                            let (x, y, _) = Self.insideRounded(x: p.x - l.frame.minX + .random(in: -8...8, using: &rng), y: .random(in: 3...22, using: &rng),
+                            let yy: CGFloat = CGFloat.random(in: 0...1, using: &rng) < 0.6 ? .random(in: 3...l.frame.height * 0.35, using: &rng) : .random(in: 3...l.frame.height * 0.9, using: &rng)
+                            let (x, y, _) = Self.insideRounded(x: p.x - l.frame.minX + .random(in: -14...14, using: &rng), y: yy,
                                                                w: l.frame.width, h: l.frame.height, R: Radius.card, margin: r * 1.1)
-                            faceDrops.append(FaceDrop(id: id, rx: x, ry: y, r: r))
+                            faceDrops.append(FaceDrop(id: id, rx: x, ry: y, r: r, life: .random(in: 4...10, using: &rng)))
                         }
                     }
                     // 왕관 물보라 — 떨어진 자리에서 사방으로 비스듬히 튀는 작은 물방울 + 납작한 물결 고리
@@ -321,11 +322,24 @@ final class RainWorld {
             if d.sliding {
                 let speed = (26 + 30 * (d.r - slideR)) * min(1, gLen)
                 let tx = g.dx / max(gLen, 0.001), ty = g.dy / max(gLen, 0.001)
-                // 유리 위 물줄기는 곧지 않다 — 미세한 얼룩에 걸려 멈칫하고 옆으로 꺾인다
-                let snag: CGFloat = CGFloat.random(in: 0...1, using: &rng) < dt * 1.5 ? 0.15 : 1
-                let wob = sin(d.age * 3.1 + d.rx * 0.7) * 0.35 + CGFloat.random(in: -0.15...0.15, using: &rng)
-                d.vx += ((tx + wob * ty) * speed * snag - d.vx) * min(1, dt * 6)
-                d.vy += (ty * speed * snag - d.vy) * min(1, dt * 6)
+                // 폰 기울기(중력) 방향 그대로 흐른다 — 상시 좌우 흔들림 없음. 아주 미세한 떨림만.
+                // 꺾이는 건 가까운 방울에 끌려갈 때뿐(아래 '끌림'). 가끔 유리 얼룩에 걸려 잠깐 느려진다.
+                let snag: CGFloat = CGFloat.random(in: 0...1, using: &rng) < dt * 0.8 ? 0.35 : 1
+                var ax = tx, ay = ty
+                // 끌림 — 진행 방향 앞쪽 가까이에 있는 방울 쪽으로 살짝 당겨진다(만나면 합쳐짐)
+                var bestD: CGFloat = 1e9, pull = CGVector.zero
+                for o in faceDrops where o.id == d.id && !o.sliding && o.r > 0.5 {
+                    let ox = o.rx - d.rx, oy = o.ry - d.ry
+                    let ahead = ox * tx + oy * ty
+                    let dist = hypot(ox, oy)
+                    if ahead > 0 && dist < d.r * 6 && dist < bestD { bestD = dist; pull = CGVector(dx: ox / dist, dy: oy / dist) }
+                }
+                if bestD < 1e9 { ax = ax * 0.8 + pull.dx * 0.2; ay = ay * 0.8 + pull.dy * 0.2 }
+                let jitter = CGFloat.random(in: -0.03...0.03, using: &rng)
+                ax += -ty * jitter; ay += tx * jitter
+                let al = max(0.001, hypot(ax, ay)); ax /= al; ay /= al
+                d.vx += (ax * speed * snag - d.vx) * min(1, dt * 6)
+                d.vy += (ay * speed * snag - d.vy) * min(1, dt * 6)
                 d.rx += d.vx * dt; d.ry += d.vy * dt
                 d.r -= dt * 0.25                                    // 지나간 자리에 물을 남긴다
                 // 물길 — 지나간 자리(2pt 마다) 기록, 최근 24점
@@ -337,7 +351,10 @@ final class RainWorld {
                 }
             } else {
                 d.vx = 0; d.vy = 0
-                if d.r < 1.0 && d.age > 6 { d.r -= dt * 0.08 }      // 작은 물자국은 마른다
+                // 한자리에 영원히 있지 않다 — 수명이 다하면 큰 건 이웃과 합쳐져 흘러내리고, 작은 건 마른다
+                if d.age > d.life {
+                    if d.r > 1.3 && CGFloat.random(in: 0...1, using: &rng) < dt * 0.6 { d.r = 1.9 } else { d.r -= dt * 0.25 }
+                }
             }
             // 가장자리 — 액자는 둥근 모서리다. 물은 넘어가지 않고 테두리(직선·곡선)를 따라 흐른다.
             //   아래 모서리에선 곡선을 타고 안쪽으로 굴러 들어와 평평한 아랫변에 맺힌다.

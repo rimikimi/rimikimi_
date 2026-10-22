@@ -130,7 +130,14 @@ struct WeatherBackdrop: View {
         // 왕관 물보라 — 떨어진 자리에서 6프레임으로 피어나 사라진다(20pt 정사각)
         for r in w.rings {
             let f = min(5, Int(r.age / 0.22 * 6))
-            g.draw(crown[f], in: CGRect(x: r.x - 10, y: r.y - 15.6, width: 20, height: 20))
+            // 물보라 모양이 매번 같지 않게 — 위치값으로 좌우 뒤집기·크기·살짝 기울기를 바꾼다
+            let seed = Int(abs(r.x * 13 + r.y * 7)) 
+            let sc: CGFloat = 0.75 + CGFloat(seed % 5) * 0.12
+            var c = g
+            c.translateBy(x: r.x, y: r.y)
+            c.rotate(by: .degrees(Double(seed % 9) - 4))
+            c.scaleBy(x: seed % 2 == 0 ? sc : -sc, y: sc)
+            c.draw(crown[f], in: CGRect(x: -10, y: -15.6, width: 20, height: 20))
         }
         // 튀는·떨어지는 물방울 — 떨어지는 방울은 크기 제각각, 빨라질수록 늘어나고 살짝 흔들린다
         for p in w.splashes {
