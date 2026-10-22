@@ -31,7 +31,8 @@ struct RootTabView: View {
                 }
             }
         }
-        .tabBarMinimizeBehavior(.onScrollDown)
+        // 스크롤해도 하단 메뉴가 왼쪽으로 줄어들지 않고 그 자리에 고정(오너 2026-10-22)
+        .tabBarMinimizeBehavior(.never)
         .tint(Color.accent)
         .environment(\.zoomNamespace, zoomNS)
         // ⚠️ 탭바 배경을 강제하려 들지 말 것 (2026-09-16 에 한 번 헛수고했다).
