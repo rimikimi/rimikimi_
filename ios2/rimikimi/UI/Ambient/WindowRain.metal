@@ -1,4 +1,4 @@
-// 유리창 빗물 — 게임·데모신에서 쓰는 방식(셰이더 안에서 격자별로 물방울 하나씩: 크게 맺혀 미끄러지며
+// 유리창 빗물(발수 코팅 유리 — 물이 번지지 않고 또렷한 구슬로 맺혔다 자국 없이 빠르게 굴러떨어짐, 오너 2026-10-22) — 게임·데모신에서 쓰는 방식(셰이더 안에서 격자별로 물방울 하나씩: 크게 맺혀 미끄러지며
 // 작은 물방울 자국을 남기고, 정지한 잔방울이 반짝이고, 렌즈 굴절로 뒤 장면이 비친다).
 // CPU 시뮬레이션 없이 매 픽셀 계산 → 합쳐짐·떨어짐·자국이 자연스럽게 나온다.
 // 중력(기울기) = uv 를 회전시켜 '아래' 방향을 바꾼다. t = 시간(초), amount = 비 세기 0…1.
@@ -32,13 +32,13 @@ static float2 DropLayer(float2 uv, float t) {
     x += wiggle * (.5 - abs(x)) * (n.z - .5);
     x *= .7;
     float ti = fract(t + n.z);
-    y = (Saw(.85, ti) - .5) * .9 + .5;
+    y = (Saw(.94, ti) - .5) * .9 + .5;
     float2 p = float2(x, y);
     float d = length((st - p) * a.yx);
-    float mainDrop = smoothstep(.4, .0, d);
+    float mainDrop = smoothstep(.30, .22, d);          // 또렷한 구슬 테두리
     float r = sqrt(smoothstep(1., y, st.y));
     float cd = abs(st.x - x);
-    float trail = smoothstep(.23 * r, .15 * r * r, cd);
+    float trail = smoothstep(.23 * r, .15 * r * r, cd) * 0.1;
     float trailFront = smoothstep(-.02, .02, st.y - y);
     trail *= trailFront * r * r;
     y = UV.y;
@@ -47,7 +47,7 @@ static float2 DropLayer(float2 uv, float t) {
     y = fract(y * 10.) + (st.y - .5);
     float dd = length(st - float2(x, y));
     droplets = smoothstep(.3, 0., dd);
-    float m = mainDrop + droplets * r * trailFront;
+    float m = mainDrop + droplets * r * trailFront * 0.15;   // 발수 — 지나간 자리에 물이 거의 안 남는다
     return float2(m, trail);
 }
 
@@ -59,8 +59,8 @@ static float StaticDrops(float2 uv, float t) {
     float3 n = N13(id.x * 107.45 + id.y * 3543.654);
     float2 p = (n.xy - .5) * .7;
     float d = length(uv - p);
-    float fade = Saw(.025, fract(t + n.z));
-    return smoothstep(.3, 0., d) * fract(n.z * 10.) * fade;
+    float fade = Saw(.02, fract(t * 0.6 + n.z));
+    return smoothstep(.20, .14, d) * step(.35, fract(n.z * 10.)) * fade;
 }
 
 static float2 Drops(float2 uv, float t, float l0, float l1, float l2) {
@@ -68,7 +68,7 @@ static float2 Drops(float2 uv, float t, float l0, float l1, float l2) {
     float2 m1 = DropLayer(uv, t) * l1;
     float2 m2 = DropLayer(uv * 1.85, t) * l2;
     float c = s + m1.x + m2.x;
-    c = smoothstep(.3, 1., c);
+    c = smoothstep(.45, .75, c);
     return float2(c, max(m1.y * l0, m2.y * l1));
 }
 
@@ -93,13 +93,16 @@ static float2 Drops(float2 uv, float t, float l0, float l1, float l2) {
     float cy = Drops(uv * .9 + e.yx, T, staticDrops, l1, l2).x;
     float2 n = float2(cx - c.x, cy - c.x);
     // 굴절된 장면 — 물방울 안은 장면이 휘어 보이고, 자국은 아주 옅게
-    float2 off = n * size.y * 1.6;
+    float2 off = n * size.y * 2.4;
     off = float2(cs * off.x + sn * off.y, -sn * off.x + cs * off.y);   // 회전 되돌림
     off.y = -off.y;
     half4 col = layer.sample(pos + off);
     // 방울 테두리 살짝 어둡게·반사광
+    // 구슬 — 가장자리 가늘고 진한 테, 위쪽 또렷한 반사점
     float edge = smoothstep(.0, .4, length(n) * 60.);
-    col.rgb *= half(1. - .18 * edge * c.x);
-    col.rgb += half3(.07 * c.x * smoothstep(.7, 1., c.x));
+    col.rgb *= half(1. - .30 * edge * c.x);
+    float2 nn = normalize(n + 1e-5);
+    float spec = smoothstep(.85, 1., dot(nn, float2(.5, .7))) * c.x * smoothstep(.2, .6, length(n) * 60.);
+    col.rgb += half3(.45 * spec);
     return col;
 }

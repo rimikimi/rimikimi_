@@ -187,7 +187,7 @@ final class RainWorld {
 
     /// 바깥에 걸린 액자에 내리는 비(오너 2026-10-22): 50% 액자 뒤 · 30% 액자 윗면에 맞음 · 20% 액자 앞.
     enum Plane { case back, hit, front }
-    struct Streak { var x, y, len, speed: CGFloat; var near: Bool; var hit = false; var alpha: CGFloat = 1; var lastHitY: CGFloat = -9999; var macro = false; var plane: Plane = .back }
+    struct Streak { var x, y, len, speed: CGFloat; var near: Bool; var hit = false; var alpha: CGFloat = 1; var lastHitY: CGFloat = -9999; var macro = false; var plane: Plane = .back; var stopY: CGFloat = -1 }
     struct Splash { var x, y, vx, vy, life: CGFloat; var size: CGFloat = 0 }
     struct Ring { var x, y, age: CGFloat }
     /// 액자 앞면에 묻은 물방울(카드 기준 좌표 rx, ry — 스크롤해도 카드에 붙어 다닌다).
@@ -244,6 +244,23 @@ final class RainWorld {
             let p = CGPoint(x: streaks[i].x, y: streaks[i].y)
             // 카드 윗변을 막 지난 가까운 빗줄기 일부만 윗면에 떨어져 튀고 고인다 — 나머지 비는 카드 앞을 그대로 지나간다(레퍼런스처럼)
             // 액자 윗면에 맞는 20% 만 — 처음 만나는 액자 윗면에서 멈추고 튀고 고인다. 뒤·앞으로 떨어지는 비는 그냥 지나간다.
+            // 액자 표면에 맞는 20% — 액자 앞을 지나다 앞면 어딘가에서 멈추고 작게 튄다(그 자리엔 셰이더가 발수 구슬을 맺는다)
+            if streaks[i].plane == .front && !streaks[i].macro {
+                for (_, l) in ledges where l.frame.contains(p) {
+                    if streaks[i].stopY < 0 { streaks[i].stopY = .random(in: max(p.y, l.frame.minY + 6)...max(p.y + 1, l.frame.maxY - 6), using: &rng) }
+                    if p.y >= streaks[i].stopY {
+                        if rings.count < 60 { rings.append(Ring(x: p.x, y: p.y, age: 0.06)) }     // 작은 물보라(뒷 프레임부터)
+                        if splashes.count < 160 {
+                            for _ in 0..<Int.random(in: 1...2, using: &rng) {
+                                splashes.append(Splash(x: p.x, y: p.y, vx: .random(in: -30...30, using: &rng), vy: .random(in: -45 ... -15, using: &rng),
+                                                       life: .random(in: 0.10...0.18, using: &rng)))
+                            }
+                        }
+                        streaks[i].y = size.height + 999
+                    }
+                    break
+                }
+            }
             if streaks[i].plane == .hit {
                 for (id, l) in ledges where p.x > l.frame.minX && p.x < l.frame.maxX && p.y > l.frame.minY && p.y < l.frame.minY + streaks[i].speed * dt + 2 && abs(streaks[i].lastHitY - l.frame.minY) > 1 {
                     streaks[i].lastHitY = l.frame.minY
