@@ -5,12 +5,15 @@
 //   - CDN 5분 캐시 (자주 안 바뀌고, 매 요청 DB 안 때리도록).
 // ============================================================
 import { makeAdmin } from "./_lib/auth.js";
+import ambientHandler from "./_lib/ambient.js";
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin","*");
   res.setHeader("Access-Control-Allow-Methods","GET,POST,DELETE,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers","authorization,content-type");
   if (req.method === "OPTIONS") return res.status(204).end();
+  // /api/ambient → 여기(함수 개수 한도 때문에 같은 함수에 얹었다)
+  if (req.query?.kind === "ambient") return ambientHandler(req, res);
   if (req.method !== "GET") {
     return res.status(405).json({ error: "GET 만 받습니다." });
   }

@@ -17,7 +17,9 @@ function classify(code) {
   return "clear";
 }
 
-export default async function handler(req, res) {
+// ⚠️ 독립 함수(api/ambient.js)로 두면 Vercel Hobby 함수 12개 한도를 넘어 배포 전체가 실패한다(2026-10-22, 13개).
+//    /api/ambient 는 vercel.json rewrite 로 /api/popular?kind=ambient 에 붙인다.
+export default async function ambientHandler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Cache-Control", "private, max-age=600");
   const lat = parseFloat(req.headers["x-vercel-ip-latitude"]);

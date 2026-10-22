@@ -3,6 +3,10 @@
   "framework": "vite",
   "rewrites": [
     {
+      "source": "/api/ambient",
+      "destination": "/api/popular?kind=ambient"
+    },
+    {
       "source": "/en/c/:name",
       "destination": "/en/c/:name.html"
     },
