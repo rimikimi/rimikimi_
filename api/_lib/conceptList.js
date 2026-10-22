@@ -51,12 +51,15 @@ export function supportsConcept(c, caps) {
 // 커플 템플릿을 빼라. 안드로이드·웹은 그대로. 다시 넣으려면 접촉 없는 버전으로 고쳐 정식 심사를 받는다.
 // 2026-10-13 오너: 빼지 않고 App Review Board 이의 신청으로 간다 → 숨김 끔. 다시 숨기려면 true 로.
 const IOS_HIDE_CONTACT_COUPLES = true;
+import { moodOf } from "./mood.js";
 export function publishedConcepts(ALL, now, caps = new Set(), { ios = false } = {}) {
   const list = ALL.filter((c) => isPublished(c, now) && supportsConcept(c, caps) && !(IOS_HIDE_CONTACT_COUPLES && ios && c.iosHidden));
 
   for (const c of list) {
     const at = PINNED[Number(c.id)];
     if (at) c.pinFeatured = at;
+    // 무드 꼬리표(시간대·날씨) — 프롬프트를 안 보내므로 여기서 붙인다
+    if (!c.mood) c.mood = moodOf(c);
   }
 
   const rank = (c) => (c.publishAt ? Date.parse(c.publishAt) : 0);
