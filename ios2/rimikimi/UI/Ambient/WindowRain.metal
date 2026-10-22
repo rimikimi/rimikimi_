@@ -83,7 +83,7 @@ static float2 Drops(float2 uv, float t, float l0, float l1, float l2) {
     uv += float2(seed * 3.17, seed * 1.73);     // 카드마다 다른 무늬
     float T = t * .2;
     float rain = clamp(amount, 0., 1.);
-    float staticDrops = smoothstep(-.5, 1., rain) * 2.;
+    float staticDrops = smoothstep(-.5, 1., rain) * 0.9;   // 잔방울 — 사진이 가려지지 않게 절제
     float l1 = smoothstep(.25, .75, rain);
     float l2 = smoothstep(.0, .5, rain);
     float2 c = Drops(uv * .9, T, staticDrops, l1, l2);
@@ -100,6 +100,6 @@ static float2 Drops(float2 uv, float t, float l0, float l1, float l2) {
     // 방울 테두리 살짝 어둡게·반사광
     float edge = smoothstep(.0, .4, length(n) * 60.);
     col.rgb *= half(1. - .18 * edge * c.x);
-    col.rgb += half3(.12 * c.x * smoothstep(.6, 1., c.x));
+    col.rgb += half3(.07 * c.x * smoothstep(.7, 1., c.x));
     return col;
 }
