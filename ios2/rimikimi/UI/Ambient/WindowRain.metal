@@ -63,45 +63,52 @@ static float StaticDrops(float2 uv, float t) {
     return smoothstep(.3, 0., d) * fract(n.z * 10.) * fade;
 }
 
-static float2 Drops(float2 uv, float t, float l0, float l1, float l2) {
-    float s = StaticDrops(uv, t) * l0;
-    float2 m1 = DropLayer(uv, t) * l1;
-    float2 m2 = DropLayer(uv * 1.85, t) * l2;
-    float c = s + m1.x + m2.x;
-    c = smoothstep(.3, 1., c);
-    return float2(c, max(m1.y * l0, m2.y * l1));
+// 물 양 — 잔방울은 액자에 붙어 있으니 화면 좌표 그대로(기울여도 안 돈다).
+// 흐르는 방울은 무늬 전체를 돌리면 액자 물이 통째로 빙글 도는 것처럼 보인다(오너 10/22 "전체가 돌아가는 게 아니고
+// 흐르는 물방울의 방향만 따라서"). 그래서 세로로 흐르는 층과 가로로 흐르는 층 두 개를 90° 단위로만 두고,
+// 기울기에 따라 둘의 양을 섞는다 → 기울이면 새 방울이 그 방향으로 흐르기 시작하고 기존 무늬는 돌지 않는다.
+// p = 화면 비율 보정 좌표(위쪽 +y). v = (가로 비중, 세로 비중, 가로 부호, 세로 부호).
+static float Water(float2 p, float4 v, float2 seedOff, float t, float l0, float l1, float l2) {
+    float s = StaticDrops(p * .9 + seedOff, t) * l0;
+    float m = 0.;
+    if (v.y > 0.01) {                                   // 아래(또는 위)로 흐르는 층
+        float2 q = p * v.w * .9 + seedOff;
+        m += (DropLayer(q, t).x * l1 + DropLayer(q * 1.85, t).x * l2) * v.y;
+    }
+    if (v.x > 0.01) {                                   // 옆으로 흐르는 층 — 좌표를 정확히 90° 돌린 것
+        float2 q = float2(p.y, -p.x) * v.z * .9 + seedOff.yx + 7.3;
+        m += (DropLayer(q, t).x * l1 + DropLayer(q * 1.85, t).x * l2) * v.x;
+    }
+    return smoothstep(.3, 1., s + m);
 }
 
 [[ stitchable ]] half4 windowRain(float2 pos, SwiftUI::Layer layer, float2 size, float t, float amount, float2 down, float seed) {
-    // 화면 비율 보정 좌표(짧은 변 기준) — 카드마다 다르게 보이도록 위치로 시간 오프셋
-    float2 uv = (pos - size * .5) / size.y;
-    // 중력 방향으로 회전: down = 화면 좌표의 아래 방향(단위벡터). 기본 (0,1).
-    float ang = atan2(down.x, down.y);
-    float cs = cos(ang), sn = sin(ang);
-    uv = float2(cs * uv.x - sn * uv.y, sn * uv.x + cs * uv.y);
-    uv.y = -uv.y;                               // 셰이더 원본은 위쪽이 +y
-    uv += float2(seed * 3.17, seed * 1.73);     // 카드마다 다른 무늬
+    // 화면 비율 보정 좌표(짧은 변 기준), 위쪽 +y
+    float2 p = (pos - size * .5) / size.y;
+    p.y = -p.y;
+    // down = 화면 좌표의 아래 방향(단위벡터). 세로·가로 비중은 제곱 비율(합 1).
+    float dx2 = down.x * down.x, dy2 = down.y * down.y, dd = max(1e-4, dx2 + dy2);
+    float4 v = float4(dx2 / dd, dy2 / dd, down.x >= 0. ? 1. : -1., down.y >= 0. ? 1. : -1.);
+    float2 seedOff = float2(seed * 3.17, seed * 1.73);     // 카드마다 다른 무늬
     float T = t * .2;
     float rain = clamp(amount, 0., 1.);
-    float staticDrops = smoothstep(-.5, 1., rain) * 0.9;   // 잔방울 — 사진이 가려지지 않게 절제
+    float l0 = smoothstep(-.5, 1., rain) * 0.9;   // 잔방울 — 사진이 가려지지 않게 절제
     float l1 = smoothstep(.25, .75, rain);
     float l2 = smoothstep(.0, .5, rain);
-    float2 c = Drops(uv * .9, T, staticDrops, l1, l2);
-    // 대부분 픽셀은 물이 없다 — 굴절용 2번 더 계산하지 않고 바로 원본(성능: 픽셀당 계산 1/3)
-    if (c.x < 0.001) return layer.sample(pos);
-    // 법선(굴절) — 주변 차분
-    float2 e = float2(.001, 0.);
-    float cx = Drops(uv * .9 + e, T, staticDrops, l1, l2).x;
-    float cy = Drops(uv * .9 + e.yx, T, staticDrops, l1, l2).x;
-    float2 n = float2(cx - c.x, cy - c.x);
-    // 굴절된 장면 — 물방울 안은 장면이 휘어 보이고, 자국은 아주 옅게
+    float c = Water(p, v, seedOff, T, l0, l1, l2);
+    // 대부분 픽셀은 물이 없다 — 굴절용 2번 더 계산하지 않고 바로 원본
+    if (c < 0.001) return layer.sample(pos);
+    // 법선(굴절) — 화면 좌표에서 주변 차분
+    float e = .001;
+    float cx = Water(p + float2(e, 0.), v, seedOff, T, l0, l1, l2);
+    float cy = Water(p + float2(0., e), v, seedOff, T, l0, l1, l2);
+    float2 n = float2(cx - c, cy - c);
     float2 off = n * size.y * 1.6;
-    off = float2(cs * off.x + sn * off.y, -sn * off.x + cs * off.y);   // 회전 되돌림
     off.y = -off.y;
     half4 col = layer.sample(pos + off);
     // 방울 테두리 살짝 어둡게·반사광
     float edge = smoothstep(.0, .4, length(n) * 60.);
-    col.rgb *= half(1. - .18 * edge * c.x);
-    col.rgb += half3(.07 * c.x * smoothstep(.7, 1., c.x));
+    col.rgb *= half(1. - .18 * edge * c);
+    col.rgb += half3(.07 * c * smoothstep(.7, 1., c));
     return col;
 }
