@@ -44,7 +44,7 @@ export default function handler(req, res) {
 
   // 2) returnTo (브라우저가 ?redirectTo=... 로 알려주거나 기본값 "/")
   const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
-  const returnTo = url.searchParams.get("redirectTo") || "/";
+  const returnTo = url.searchParams.get("redirectTo") || "/";   // 검사는 콜백에서(safeRedirectTarget)
 
   // 3) 쿠키 두 개 굽기
   const isHttps = req.headers["x-forwarded-proto"] === "https";

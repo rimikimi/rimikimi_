@@ -12,6 +12,7 @@
 // ============================================================
 
 import { createClient } from "@supabase/supabase-js";
+import { safeRedirectTarget } from "../../_lib/safeRedirect.js";
 
 export default async function handler(req, res) {
   const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
@@ -103,7 +104,7 @@ export default async function handler(req, res) {
     await supabaseAdmin.auth.admin.generateLink({
       type: "magiclink",
       email,
-      options: { redirectTo: makeAbsoluteUrl(req, returnTo) },
+      options: { redirectTo: safeRedirectTarget(req, returnTo) },
     });
 
   if (linkErr || !linkData?.properties?.action_link) {
@@ -134,17 +135,7 @@ function parseCookies(header) {
   return out;
 }
 
-function makeAbsoluteUrl(req, path) {
-  const isHttps = req.headers["x-forwarded-proto"] === "https";
-  const proto = isHttps ? "https" : "http";
-  const host = req.headers.host;
-  // path 가 이미 절대 URL 이면 그대로
-  try {
-    return new URL(path).toString();
-  } catch {
-    return `${proto}://${host}${path.startsWith("/") ? path : "/" + path}`;
-  }
-}
+// 복귀 주소는 _lib/safeRedirect.js safeRedirectTarget — 예전 로컬 makeAbsoluteUrl 은 절대 URL 을 그대로 통과시켜 오픈 리다이렉트였다(?redirectTo=https://외부, 2026-10-23 실측).
 
 function goHomeWithError(res, message) {
   const params = new URLSearchParams({ auth_error: message });
