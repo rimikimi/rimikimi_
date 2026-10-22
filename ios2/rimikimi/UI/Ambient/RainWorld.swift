@@ -112,7 +112,7 @@ final class RainWorld {
 
     // MARK: 비 — 빗줄기(배경으로 쏟아짐, 카드 뒤) · 카드 윗면에 닿으면 튀고 고임
 
-    struct Streak { var x, y, len, speed: CGFloat; var near: Bool; var hit = false; var alpha: CGFloat = 1 }
+    struct Streak { var x, y, len, speed: CGFloat; var near: Bool; var hit = false; var alpha: CGFloat = 1; var lastHitY: CGFloat = -9999 }
     struct Splash { var x, y, vx, vy, life: CGFloat }
     private(set) var streaks: [Streak] = []
     private(set) var splashes: [Splash] = []
@@ -130,9 +130,14 @@ final class RainWorld {
             spawnClock -= 1
             guard streaks.count < (heavyRain ? 340 : 220) else { continue }
             let near = CGFloat.random(in: 0...1, using: &rng) < 0.35
-            let pad = size.height * abs(rainDir.dx) / max(0.3, rainDir.dy)
-            let x = CGFloat.random(in: (rainDir.dx < 0 ? 0 : -pad)...(size.width + (rainDir.dx < 0 ? pad : 0)), using: &rng)
-            streaks.append(Streak(x: x, y: .random(in: -120 ... -10, using: &rng),
+            // 비스듬하면 바람 불어오는 쪽 옆면에서도 들어온다 — 위쪽만에서 내리면 아래 반대편이 빈다
+            var x = CGFloat.random(in: 0...size.width, using: &rng), y = CGFloat.random(in: -120 ... -10, using: &rng)
+            let sideShare = min(0.6, abs(rainDir.dx) / max(0.3, rainDir.dy) * size.height / (size.width + size.height))
+            if CGFloat.random(in: 0...1, using: &rng) < sideShare {
+                x = rainDir.dx > 0 ? -10 : size.width + 10
+                y = .random(in: -20...size.height, using: &rng)
+            }
+            streaks.append(Streak(x: x, y: y,
                                   len: near ? .random(in: 55...95, using: &rng) : .random(in: 28...50, using: &rng),
                                   speed: near ? .random(in: 1700...2100, using: &rng) : .random(in: 1150...1450, using: &rng),
                                   near: near, alpha: .random(in: 0.75...1.15, using: &rng)))
@@ -143,23 +148,23 @@ final class RainWorld {
             streaks[i].y += rainDir.dy * streaks[i].speed * dt
             let p = CGPoint(x: streaks[i].x, y: streaks[i].y)
             // 카드 윗변을 막 지난 가까운 빗줄기 일부만 윗면에 떨어져 튀고 고인다 — 나머지 비는 카드 앞을 그대로 지나간다(레퍼런스처럼)
-            if streaks[i].near && !streaks[i].hit {
-                for (id, l) in ledges where p.x > l.frame.minX && p.x < l.frame.maxX && p.y > l.frame.minY && p.y < l.frame.minY + streaks[i].speed * dt + 2 {
-                    streaks[i].hit = true
-                    guard CGFloat.random(in: 0...1, using: &rng) < 0.35 else { break }
-                    pour(into: id, x: p.x, volume: 0.22)
-                    if splashes.count < 90 {
-                        for _ in 0..<Int.random(in: 1...2, using: &rng) {
+            // 빗줄기는 계속 내린다(앞쪽 평면). 카드 윗변을 지나는 순간마다 그 자리에 물보라·고인 물만 남긴다.
+            do {
+                for (id, l) in ledges where p.x > l.frame.minX && p.x < l.frame.maxX && p.y > l.frame.minY && p.y < l.frame.minY + streaks[i].speed * dt + 2 && abs(streaks[i].lastHitY - l.frame.minY) > 1 {
+                    streaks[i].lastHitY = l.frame.minY
+                    guard CGFloat.random(in: 0...1, using: &rng) < (streaks[i].near ? 0.9 : 0.6) else { break }
+                    pour(into: id, x: p.x, volume: streaks[i].near ? 0.16 : 0.08)
+                    if splashes.count < 160 {
+                        for _ in 0..<Int.random(in: 2...3, using: &rng) {
                             splashes.append(Splash(x: p.x, y: l.frame.minY - 1, vx: .random(in: -35...35, using: &rng),
                                                    vy: .random(in: -70 ... -25, using: &rng), life: .random(in: 0.12...0.22, using: &rng)))
                         }
                     }
-                    streaks[i].y = size.height + 999   // 떨어진 빗줄기는 끝
                     break
                 }
             }
         }
-        streaks.removeAll { $0.y - $0.len > size.height || $0.x < -80 || $0.x > size.width + 80 }
+        streaks.removeAll { $0.y - $0.len > size.height || $0.x < -150 || $0.x > size.width + 150 }
         // 3) 튀는 물방울 · 카드 모서리에서 떨어지는 물방울 — 중력으로 낙하
         for i in splashes.indices {
             splashes[i].vy += 900 * dt
