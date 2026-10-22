@@ -308,6 +308,8 @@ final class AppState {
     var devWideColumns = false
     /// 캡처용 — 카테고리 격자에 이 배율로 핀치하고 있는 상태를 그대로 띄운다(시뮬레이터엔 핀치가 없다). 0 = 끔.
     var devPinchScale: Double = 0
+    /// dev — 홈을 앨범 위치로 스크롤(시뮬레이터 캡처용, 손으로 못 내린다).
+    var devScrollAlbums = 0
     /// 캡처·검증용 — 브라우저가 떠 있는 동안 이 id 로 **건너뛴다**(스와이프를 흉내 내는 용도).
     /// 시뮬레이터에서는 좌우 스와이프를 못 하니, 열린 뒤 필름스트립이 따라오는지 이걸로 확인한다.
     var devBrowseJump: String?

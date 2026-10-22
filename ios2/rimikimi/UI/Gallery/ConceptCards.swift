@@ -108,6 +108,10 @@ struct AlbumGridTile: View {
                     }
                 }
                 .clipShape(RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
+                // 광원 그림자 — 실제 일출·일몰에 맞춰 방향·길이가 바뀐다
+                .sunShadow()
+                // 비·눈 — 카드는 루버(차양) 아래라 사진엔 물이 안 묻고, 윗면에만 물이 고이거나 눈이 쌓인다(2026-10-22 오너)
+                .weatherLedge(id: tile.name)
         }
         .buttonStyle(PressScaleButtonStyle())
     }

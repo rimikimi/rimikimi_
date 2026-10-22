@@ -32,9 +32,13 @@ struct HomeView: View {
             .padding(.bottom, app.contentBottomPad)
         }
         .scrollIndicators(.hidden)
+        // 비·눈 — 화면 전체 유리(카드 뒤에 깔려 카드엔 물이 안 묻는다)
+        .background { WeatherBackdrop() }
         .background(Color.bg)
         .toolbar(.hidden, for: .navigationBar)
         .refreshable { await app.concepts.load() }
+        // 앨범 '창문' 날씨·광원(10분 캐시)
+        .task { await Ambient.shared.refresh() }
         .safeAreaInset(edge: .bottom) { CartBar(compactOnHome: true) }
         .coachHost()
         .onAppear {
@@ -43,6 +47,7 @@ struct HomeView: View {
         }
         // 튜토리얼 "컨셉 앨범" 단계 — 앨범은 추천·새로 나왔어요 밑이라 보통 화면 밖이다. 그 자리와 설명 카드가
         // 아래 메뉴 위에 보이게 끌어올린다(오너 2026-10-15 "튜토리얼이 아래 메뉴에 가려서 안 보이자나").
+        .onChange(of: app.devScrollAlbums) { _, _ in proxy.scrollTo("coach.albums", anchor: .top) }
         .onChange(of: app.coachQueue.first?.key) { _, key in
             if key == "albums" { withAnimation(.easeInOut(duration: 0.35)) { proxy.scrollTo("coach.albums", anchor: UnitPoint(x: 0.5, y: 0.3)) } }
             else if key == "cards" || key == "purposes" { withAnimation(.easeInOut(duration: 0.35)) { proxy.scrollTo("coach.top", anchor: .top) } }

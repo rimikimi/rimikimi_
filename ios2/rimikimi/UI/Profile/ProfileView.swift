@@ -64,6 +64,10 @@ struct ProfileView: View {
                                     systemImage: "camera.aperture") { app.openFilterPass() }
                     }
                 }
+                // TestFlight 전용 — 앨범 '창문' 날씨 미리보기(실제 날씨가 맑아도 비·눈을 실기기에서 보려고, 2026-10-22).
+                if Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt" {
+                    CardGroup { WeatherPreviewRow() }
+                }
                 CardGroup {
                     SettingsRow(title: Copy.terms, systemImage: "doc.text") { open(Config.termsURL, Copy.terms) }
                     SettingsRow(title: Copy.privacy, systemImage: "hand.raised") { open(Config.privacyURL, Copy.privacy) }
@@ -323,5 +327,23 @@ struct StartScreenRow: View {
         }
         .menuStyle(.button)
         .buttonStyle(.plain)
+    }
+}
+
+
+/// TestFlight 전용 날씨 미리보기 — 자동(실제 날씨) / 비 / 눈 / 맑음.
+private struct WeatherPreviewRow: View {
+    @State private var sel: String = Ambient.shared.preview?.rawValue ?? "auto"
+    var body: some View {
+        HStack {
+            Label("날씨 미리보기 (TestFlight)", systemImage: "cloud.rain").font(AppFont.body).foregroundStyle(Color.ink)
+            Spacer()
+            Picker("", selection: $sel) {
+                Text("자동").tag("auto"); Text("비").tag("rain"); Text("뇌우").tag("storm"); Text("눈").tag("snow"); Text("맑음").tag("clear")
+            }
+            .pickerStyle(.menu)
+            .onChange(of: sel) { _, v in Ambient.shared.preview = v == "auto" ? nil : Ambient.Weather(rawValue: v) }
+        }
+        .padding(.horizontal, Spacing.s4).padding(.vertical, Spacing.s2)
     }
 }

@@ -64,6 +64,16 @@ enum DevRoutes {
             app.showBurstCamera = true
         case "/facescan":
             app.showFaceScan = true
+        case "/weather":
+            // 앨범 '창문' 날씨 미리보기 — set=rain|snow|clear|cloud|auto, gx·gy = 기울기 고정(시뮬레이터엔 센서가 없다)
+            if let w = q["set"] { Ambient.shared.preview = w == "auto" ? nil : Ambient.Weather(rawValue: w) }
+            if let gx = q["gx"].flatMap(Double.init), let gy = q["gy"].flatMap(Double.init) {
+                Ambient.shared.fakeGravity = CGVector(dx: gx, dy: gy)
+            } else { Ambient.shared.fakeGravity = nil }
+            app.tab = .gallery
+            app.galleryPath.removeAll()
+            Ambient.shared.previewWind = q["wind"].flatMap(Double.init)
+            if q["scroll"] == "albums" { DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { app.devScrollAlbums += 1 } }
         case "/category":
             // 카테고리 그리드로 바로 — 시뮬레이터에서는 앨범 타일을 탭할 수 없다(캡처·검증용).
             // 여기서 카메라 원이 그대로 보이는지 확인한다(2026-09-22 결함).

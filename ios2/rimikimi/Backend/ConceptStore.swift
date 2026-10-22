@@ -68,6 +68,18 @@ final class ConceptStore {
             list += pool.sorted(by: Self.byNewest).filter { !have.contains($0.id) }
         }
         list = Array(list.prefix(5))
+        // 지금 날씨·시간 무드에 맞는 컨셉 2개를 맨 앞에(2026-10-22 오너 "무드에 어울리는 컨셉을 추천에 실시간으로").
+        // 점수가 같으면 한 시간마다 돌아가게(매번 같은 것만 뜨지 않게).
+        let hour = Calendar.current.component(.hour, from: Date())
+        let moodPicks = pool.filter { !$0.isFeature }
+            .map { ($0, Ambient.shared.moodScore($0.mood)) }
+            .filter { $0.1 >= 3 }
+            .sorted { $0.1 != $1.1 ? $0.1 > $1.1 : (abs($0.0.id.hashValue &+ hour) % 997) < (abs($1.0.id.hashValue &+ hour) % 997) }
+            .prefix(2).map(\.0)
+        if !moodPicks.isEmpty {
+            list.removeAll { c in moodPicks.contains { $0.id == c.id } }
+            list = Array((moodPicks + list).prefix(5))
+        }
         let pinned = pool.filter { ($0.pinFeatured ?? 0) > 0 }.sorted { ($0.pinFeatured ?? 0) < ($1.pinFeatured ?? 0) }
         for p in pinned {
             list.removeAll { $0.id == p.id }

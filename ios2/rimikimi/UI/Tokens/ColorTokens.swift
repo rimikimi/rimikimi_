@@ -6,10 +6,11 @@ import UIKit
 /// 전부 교체(그룹 배경·2차 그룹 배경·label 계열). 다크 모드·고대비·틴트 반응이 애플 앱과 똑같아진다. 강조 빨강만 브랜드로 남긴다.
 extension Color {
     // MARK: 바탕 · 카드
-    /// 바탕 `#FBF8F3` (다크 `#17161A`)
-    static let bg = Color(uiColor: .systemGroupedBackground)
-    /// 카드·행 `#FFFFFF` (다크 `#201E23`)
-    static let card = Color(uiColor: .secondarySystemGroupedBackground)
+    /// 바탕 — 흰색(다크 검정). 2026-10-22 오너 "네이티브랑 반대 아님? 똑같이 맞춰": 사진 앱처럼 **바탕 흰색 + 카드 연회색**.
+    /// (예전: 그룹 배경 회색 + 카드 흰색 — 설정 앱 방식이라 사진 앱과 반대로 보였다.)
+    static let bg = Color(uiColor: .systemBackground)
+    /// 카드·행 — 연회색 `#F2F2F7`(다크 `#1C1C1E`), 사진 앱 공유 앨범 박스와 같은 색.
+    static let card = Color(uiColor: .secondarySystemBackground)
     /// 회색 채움(2차 버튼·칩) `#F1ECE4`
     static let fill = Color(uiColor: .tertiarySystemFill)
     /// 눌림 `#E4DCD0`

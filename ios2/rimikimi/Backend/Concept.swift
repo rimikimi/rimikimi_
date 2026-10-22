@@ -17,6 +17,10 @@ struct Concept: Identifiable, Hashable, Decodable {
     let sensitive: Bool
     /// 홈 목적 칸(이력서·프로필 / 프사·소개팅 / 웨딩·커플)에 들어가는지 — 서버 데이터가 정한다(빌드 없이 분류를 바꿀 수 있게).
     let purposes: [String]
+    /// 무드 꼬리표(서버 api/_lib/mood.js) — tod: morning|day|golden|night|any, wx: rain|snow|sunny|cloudy|indoor|any.
+    /// 홈 추천을 지금 날씨·시간에 맞춰 올리는 데 쓴다(2026-10-22).
+    struct Mood: Decodable, Hashable { let tod: String; let wx: String }
+    let mood: Mood?
     /// 2026-10-09 이식: 리미키미 컨셉이 아닌 담기 항목(브루클린 룩 · 조세핀 드레스)을 같은 격자·담기 줄에 태우려고
     /// 컨셉 모양을 빌린다. 서버엔 conceptId 대신 studio / wedding 으로 보낸다(RimikimiAPI.generate).
     var customThumb: URL? = nil
@@ -26,7 +30,7 @@ struct Concept: Identifiable, Hashable, Decodable {
     var isSynthetic: Bool { studioPreset != nil || dressCode != nil }
 
     enum CodingKeys: String, CodingKey {
-        case id, title, title_en, category, categories, text, mode, fourcutStyle, fourcutStyles, pinFeatured, publishAt, sensitive, purposes
+        case id, title, title_en, category, categories, text, mode, fourcutStyle, fourcutStyles, pinFeatured, publishAt, sensitive, purposes, mood
     }
 
     init(from decoder: Decoder) throws {
@@ -53,6 +57,7 @@ struct Concept: Identifiable, Hashable, Decodable {
         else { publishAt = nil }
         sensitive = (try? c.decode(Bool.self, forKey: .sensitive)) ?? false
         purposes = (try? c.decode([String].self, forKey: .purposes)) ?? []
+        mood = try? c.decode(Mood.self, forKey: .mood)
     }
 
     /// 브루클린 룩 · 조세핀 드레스용 — 서버 카탈로그에서 만든다.
@@ -60,7 +65,7 @@ struct Concept: Identifiable, Hashable, Decodable {
          studioPurpose: String? = nil, studioPreset: String? = nil, dressCode: String? = nil) {
         id = syntheticID; self.title = title; self.titleEn = titleEn; categories = []; text = ""
         mode = nil; fourcutStyle = nil; fourcutStyles = nil; pinFeatured = nil; publishAt = nil
-        sensitive = false; purposes = []
+        sensitive = false; purposes = []; mood = nil
         customThumb = thumb; self.studioPurpose = studioPurpose; self.studioPreset = studioPreset; self.dressCode = dressCode
     }
 
