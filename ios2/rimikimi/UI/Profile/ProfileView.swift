@@ -6,6 +6,8 @@ struct ProfileView: View {
     @Environment(AppState.self) private var app
     @State private var confirmDelete = false
     @State private var deleting = false
+    @AppStorage("dev.weatherUnlocked") private var devWeatherUnlocked = false
+    @State private var bizTaps = 0
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -66,7 +68,8 @@ struct ProfileView: View {
                     }
                 }
                 // TestFlight 전용 — 앨범 '창문' 날씨 미리보기(실제 날씨가 맑아도 비·눈을 실기기에서 보려고, 2026-10-22).
-                if Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt" {
+                // 심사 기기도 sandboxReceipt 라 그것만으론 심사관에게 보인다 → 사업자 정보를 7번 눌러야 나타나게(10/23 버그 점검)
+                if devWeatherUnlocked && Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt" {
                     CardGroup { WeatherPreviewRow() }
                 }
                 CardGroup {
@@ -81,6 +84,12 @@ struct ProfileView: View {
                 }
                 .font(AppFont.caption).foregroundStyle(Color.ink3).multilineTextAlignment(.center)
                 .padding(.top, Spacing.s3)
+                // TestFlight 개발 메뉴 열기 — 사업자 정보 7번 탭(TestFlight·심사 빌드에서만 의미 있음)
+                .onTapGesture {
+                    guard Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt" else { return }
+                    bizTaps += 1
+                    if bizTaps >= 7 { devWeatherUnlocked.toggle(); bizTaps = 0; HapticPlayer.selection() }
+                }
                 Color.clear.frame(height: 1).id("bottomAnchor")
             }
             .padding(.top, Spacing.s2)

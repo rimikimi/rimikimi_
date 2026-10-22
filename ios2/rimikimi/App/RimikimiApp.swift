@@ -55,6 +55,7 @@ struct RimikimiApp: App {
                     }
                 }
                 .onChange(of: scenePhase) { _, phase in
+                    Ambient.shared.setAppActive(phase == .active)   // 비활성이면 기울기 센서 끔, 돌아오면 날씨 새로
                     if phase == .active {
                         app.push.clearBadge()
                         // 실행 직후 .task 시점엔 아직 .active 가 아니면 ATT 가 조용히 건너뛰어진다 → 활성화될 때 다시 시도(이미 물었으면 즉시 반환).

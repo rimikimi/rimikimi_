@@ -35,7 +35,7 @@ final class Ambient {
     var current: Weather { preview ?? weather }
     /// 설정 '날씨 효과' 토글(기본 켬). 끄면 비·눈·번개·어둡게·햇빛 그림자 다 없이 예전처럼(추천 무드는 그대로).
     var effectsOn: Bool = UserDefaults.standard.object(forKey: "ambient.effects") == nil ? true : UserDefaults.standard.bool(forKey: "ambient.effects") {
-        didSet { UserDefaults.standard.set(effectsOn, forKey: "ambient.effects") }
+        didSet { UserDefaults.standard.set(effectsOn, forKey: "ambient.effects"); applyMotion() }
     }
     /// 화면 효과에 쓸 날씨 — 효과를 끄면 아무 효과 없는 '흐림'.
     var visual: Weather { effectsOn ? current : .cloud }
@@ -46,11 +46,23 @@ final class Ambient {
     @ObservationIgnored var fakeGravity: CGVector?
 
     @ObservationIgnored private let motion = CMMotionManager()
-    @ObservationIgnored private var motionUsers = 0
+    /// 기울기 센서를 원하는가(비 오는 홈이 보일 때) · 앱이 활성인가 — 둘 다 참일 때만 센서를 켠다.
+    /// 예전엔 begin/end 횟수를 셌는데, 홈이 가려진 채 설정에서 효과를 껐다 켜면 횟수가 어긋나 센서가 계속 돌았다(10/23 버그 점검).
+    @ObservationIgnored private var motionWanted = false
+    @ObservationIgnored private var appActive = true
     @ObservationIgnored private var lastFetch: Date?
+    @ObservationIgnored private var lastFetchDay: Int?
 
     private init() {
-        if let raw = UserDefaults.standard.string(forKey: "ambient.preview") { preview = Weather(rawValue: raw) }
+        // 날씨 미리보기는 TestFlight 전용 — 앱스토어 빌드에선 남아 있던 값을 지운다
+        // (TestFlight 에서 '비'를 골라 둔 사람이 앱스토어 버전을 받으면 가짜 비가 영영 남던 문제, 10/23 버그 점검).
+        if Bundle.main.appStoreReceiptURL?.lastPathComponent != "sandboxReceipt" {
+            UserDefaults.standard.removeObject(forKey: "ambient.preview")
+        } else if let raw = UserDefaults.standard.string(forKey: "ambient.preview") {
+            preview = Weather(rawValue: raw)
+        }
+        NotificationCenter.default.addObserver(forName: .NSProcessInfoPowerStateDidChange, object: nil, queue: .main) { [weak self] _ in self?.applyMotion() }
+        NotificationCenter.default.addObserver(forName: UIAccessibility.reduceMotionStatusDidChangeNotification, object: nil, queue: .main) { [weak self] _ in self?.applyMotion() }
     }
 
     /// 움직임을 꺼야 하는가 — 동작 줄이기·저전력.
@@ -60,30 +72,49 @@ final class Ambient {
 
     // MARK: 날씨
 
+    /// 날씨 다시 받기 — 10분 캐시. 날짜가 바뀌면(일출·일몰이 어제 것) 바로 다시. 실패하면 다음 기회에 바로 재시도.
     func refresh() async {
-        if let lastFetch, Date().timeIntervalSince(lastFetch) < 600 { return }
-        lastFetch = Date()
-        struct R: Decodable { let weather: String; let sunrise: Double?; let sunset: Double?; let wind: Double?; let windDir: Double? }
+        let today = Calendar.current.ordinality(of: .day, in: .era, for: Date())
+        if let lastFetch, Date().timeIntervalSince(lastFetch) < 600, lastFetchDay == today { return }
+        struct R: Decodable { let weather: String; let sunrise: Double?; let sunset: Double?; let wind: Double?; let windDir: Double?; let known: Bool? }
         do {
             var req = URLRequest(url: Config.apiBase.appendingPathComponent("api/ambient"))
             req.timeoutInterval = 6
-            let (data, _) = try await URLSession.shared.data(for: req)
+            req.cachePolicy = .reloadIgnoringLocalCacheData
+            let (data, resp) = try await URLSession.shared.data(for: req)
+            guard (resp as? HTTPURLResponse)?.statusCode == 200 else { return }
             let r = try JSONDecoder().decode(R.self, from: data)
             weather = Weather(rawValue: r.weather) ?? .clear
             sunrise = r.sunrise.map { Date(timeIntervalSince1970: $0) }
             sunset = r.sunset.map { Date(timeIntervalSince1970: $0) }
             wind = r.wind ?? 0; windDir = r.windDir ?? 0
+            // 서버가 날씨를 못 받았으면(known=false) 캐시하지 않고 다음에 다시
+            if r.known != false { lastFetch = Date(); lastFetchDay = today }
             AppLog.api.info("ambient weather=\(r.weather, privacy: .public)")
+        } catch is CancellationError {
+            return
         } catch {
             AppLog.api.error("ambient failed \(error.localizedDescription, privacy: .public)")
         }
     }
 
+    /// 앱이 활성/비활성으로 바뀔 때(RimikimiApp scenePhase) — 비활성이면 센서를 끄고, 활성이 되면 날씨를 다시 받는다.
+    func setAppActive(_ active: Bool) {
+        appActive = active
+        applyMotion()
+        if active { Task { await refresh() } }
+    }
+
     // MARK: 기울기
 
-    func beginMotion() {
-        motionUsers += 1
-        guard motionUsers == 1, !reduced, motion.isDeviceMotionAvailable else { return }
+    func beginMotion() { motionWanted = true; applyMotion() }
+    func endMotion() { motionWanted = false; applyMotion() }
+
+    /// 원하는 상태대로 센서를 켜거나 끈다 — 몇 번을 불러도 같은 결과(멱등).
+    private func applyMotion() {
+        let on = motionWanted && appActive && effectsOn && !reduced && motion.isDeviceMotionAvailable
+        if on == motion.isDeviceMotionActive { return }
+        guard on else { motion.stopDeviceMotionUpdates(); return }
         motion.deviceMotionUpdateInterval = 1.0 / 30.0
         motion.startDeviceMotionUpdates(to: .main) { [weak self] m, _ in
             guard let self, let g = m?.gravity else { return }
@@ -92,11 +123,6 @@ final class Ambient {
             let raw = CGVector(dx: g.x, dy: -g.y)
             self.gravity = CGVector(dx: self.gravity.dx * 0.85 + raw.dx * 0.15, dy: self.gravity.dy * 0.85 + raw.dy * 0.15)
         }
-    }
-
-    func endMotion() {
-        motionUsers = max(0, motionUsers - 1)
-        if motionUsers == 0 { motion.stopDeviceMotionUpdates() }
     }
 
     /// 시뮬레이션이 읽는 중력 — 고정값이 있으면 그것.
