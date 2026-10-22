@@ -33,7 +33,10 @@ struct HomeView: View {
         }
         .scrollIndicators(.hidden)
         // 비·눈·번개 — 화면 전체에 앞으로(넷플릭스 웬즈데이 레퍼런스). 카드 얼굴엔 방울이 안 맺히고(루버), 윗면에만 물이 고인다.
-        .overlay { WeatherBackdrop() }
+        // 카드 앞: 물보라·물결·매달린 물방울·번개
+        .overlay { WeatherBackdrop(layer: .front) }
+        // 카드 뒤: 빗줄기·눈송이(오너 "액자 뒤로 비가 내리도록, 물 튀는 건 그대로")
+        .background { WeatherBackdrop(layer: .back) }
         // 비 오는 날 배경만 살짝 어둡게(앨범·카드는 그대로)
         .background { WeatherDim() }
         .background(Color.bg)
