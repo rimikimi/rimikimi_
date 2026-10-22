@@ -18,7 +18,7 @@ static float Saw(float b, float t) { return smoothstep(0., b, t) * smoothstep(1.
 static float2 DropLayer(float2 uv, float t) {
     float2 UV = uv;
     uv.y += t * 0.75;
-    float2 a = float2(6., 1.);
+    float2 a = float2(3.5, 1.);   // 굴러가는 큰 구슬 — 듬성듬성
     float2 grid = a * 2.;
     float2 id = floor(uv * grid);
     float colShift = N(id.x);
@@ -35,7 +35,7 @@ static float2 DropLayer(float2 uv, float t) {
     y = (Saw(.94, ti) - .5) * .9 + .5;
     float2 p = float2(x, y);
     float d = length((st - p) * a.yx);
-    float mainDrop = sqrt(max(0., 1. - pow(d / .28, 2.)));   // 발수 구슬 = 반구 돔(안쪽까지 굴절, 가장자리는 가파르게)
+    float mainDrop = sqrt(max(0., 1. - pow(d / .19, 2.)));   // 발수 구슬 = 반구 돔(안쪽까지 굴절, 가장자리는 가파르게)
     float r = sqrt(smoothstep(1., y, st.y));
     float cd = abs(st.x - x);
     float trail = smoothstep(.23 * r, .15 * r * r, cd) * 0.1;
@@ -47,26 +47,26 @@ static float2 DropLayer(float2 uv, float t) {
     y = fract(y * 10.) + (st.y - .5);
     float dd = length(st - float2(x, y));
     droplets = sqrt(max(0., 1. - pow(dd / .25, 2.)));
-    float m = mainDrop + droplets * r * trailFront * 0.15;   // 발수 — 지나간 자리에 물이 거의 안 남는다
+    float m = mainDrop;   // 발수 — 지나간 자리에 물이 안 남는다   // 발수 — 지나간 자리에 물이 거의 안 남는다
     return float2(m, trail);
 }
 
 // 정지한 잔방울 — 깜빡이듯 생겼다 사라지는 작은 물방울
 static float StaticDrops(float2 uv, float t) {
-    uv *= 40.;
+    uv *= 22.;   // 잔구슬 칸 — 듬성듬성
     float2 id = floor(uv);
     uv = fract(uv) - .5;
     float3 n = N13(id.x * 107.45 + id.y * 3543.654);
     float2 p = (n.xy - .5) * .7;
     float d = length(uv - p);
     float fade = Saw(.02, fract(t * 0.6 + n.z));
-    return sqrt(max(0., 1. - pow(d / .19, 2.))) * step(.68, fract(n.z * 10.)) * fade;
+    return sqrt(max(0., 1. - pow(d / .19, 2.))) * step(.86, fract(n.z * 10.)) * fade;
 }
 
 static float2 Drops(float2 uv, float t, float l0, float l1, float l2) {
     float s = StaticDrops(uv, t) * l0;
     float2 m1 = DropLayer(uv, t) * l1;
-    float2 m2 = DropLayer(uv * 1.85, t) * l2;
+    float2 m2 = DropLayer(uv * 1.85, t) * l2 * 0.0;   // 둘째 층 끔(물이 너무 많았다)
     float c = s + m1.x + m2.x;
     c = clamp(c, 0., 1.);
     return float2(c, max(m1.y * l0, m2.y * l1));
@@ -83,8 +83,9 @@ static float2 Drops(float2 uv, float t, float l0, float l1, float l2) {
     uv += float2(seed * 3.17, seed * 1.73);     // 카드마다 다른 무늬
     float T = t * .2;
     float rain = clamp(amount, 0., 1.);
-    float staticDrops = smoothstep(-.5, 1., rain) * 0.9;   // 잔방울 — 사진이 가려지지 않게 절제
-    float l1 = smoothstep(.25, .75, rain);
+    float staticDrops = smoothstep(-.5, 1., rain) * 0.9;
+    float l1b = 1.0;   // 잔방울 — 사진이 가려지지 않게 절제
+    float l1 = 0.5 + rain;   // 큰 구슬 층은 항상 조금
     float l2 = smoothstep(.0, .5, rain);
     float2 c = Drops(uv * .9, T, staticDrops, l1, l2);
     // 법선(굴절) — 주변 차분
