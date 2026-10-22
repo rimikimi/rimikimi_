@@ -16,7 +16,7 @@ def streak(W, H, seed, core=1.0):
     prof_core = np.exp(-(x / 0.22) ** 2)                   # 밝은 심
     prof_rim = np.exp(-((np.abs(x) - 0.55) / 0.18) ** 2)   # 어두운 테
     along = np.clip(y ** 1.6, 0, 1) * np.clip((1 - y) / 0.06, 0, 1)   # 꼬리→머리 진해짐, 머리 끝 살짝 둥글게
-    flick = 1 + 0.18 * np.convolve(r.normal(0, 1, H), np.ones(9) / 9, mode='same')
+    flick = 1 + 0.18 * np.convolve(r.normal(0, 1, H), np.ones(17) / 17, mode='same')
     a = np.zeros((H, W, 4))
     lum = np.outer(along * flick, prof_core) * core
     dark = np.outer(along, prof_rim) * 0.35
@@ -27,7 +27,7 @@ def streak(W, H, seed, core=1.0):
     a[..., 3] = np.clip(lum * 0.9 + dark, 0, 1)
     return a
 
-for i, (W, H, c) in enumerate([(9, 240, 1.0), (7, 200, 0.9), (11, 300, 1.0), (6, 160, 0.8), (14, 360, 0.85)]):
+for i, (W, H, c) in enumerate([(18, 480, 1.0), (14, 400, 0.9), (22, 600, 1.0), (12, 320, 0.8), (28, 720, 0.85)]):
     save(streak(W, H, 10 + i, c), f'streak{i}.png')
 
 # ── 물방울(정면, 반구 렌즈): 어두운 테 · 아래쪽 안쪽에 모인 빛(캐스틱) · 위 왼쪽 반사광 · 몸통은 거의 투명
@@ -53,17 +53,16 @@ def drop(S, elong=1.0):
     a[..., 3] = np.clip(np.maximum(body * (1 - lum), lum), 0, 1) * edge * inside
     return a
 
-save(drop(48), 'drop.png')
-save(drop(40, 1.6), 'drop_fall.png')
+
 
 # ── 물보라 왕관(6프레임): 가운데서 바깥으로 퍼지는 작은 방울들 + 아래 납작한 물결 고리
-def crown(frame, N=6, S=96):
+def crown(frame, N=6, S=192):
     t = (frame + 1) / N
     img = np.zeros((S, S, 4))
     yy, xx = np.mgrid[0:S, 0:S].astype(float)
     cx, cy = S / 2, S * 0.78
     # 물결 고리
-    rad = 6 + 34 * t
+    rad = 12 + 68 * t
     ring = np.exp(-((np.sqrt(((xx - cx) / rad) ** 2 + ((yy - cy) / (rad * 0.28)) ** 2) - 1) / 0.06) ** 2) * (1 - t)
     img[..., :3] += ring[..., None] * np.array([1, 1, 1])
     img[..., 3] += ring * 0.7
@@ -71,9 +70,9 @@ def crown(frame, N=6, S=96):
     for k in range(9):
         ang = np.pi * (0.12 + 0.76 * (k + r.uniform(0, 0.8)) / 9)
         sp = r.uniform(0.7, 1.0)
-        px = cx + np.cos(ang) * 40 * sp * t
-        py = cy - np.sin(ang) * 46 * sp * t + 40 * t * t * sp
-        rd = 2.6 * (1 - 0.5 * t) + 0.6
+        px = cx + np.cos(ang) * 80 * sp * t
+        py = cy - np.sin(ang) * 92 * sp * t + 80 * t * t * sp
+        rd = 5.2 * (1 - 0.5 * t) + 1.2
         d = np.exp(-(((xx - px) / rd) ** 2 + ((yy - py) / (rd * 1.3)) ** 2))
         hl = np.exp(-(((xx - px + rd * 0.35) / (rd * 0.35)) ** 2 + ((yy - py + rd * 0.45) / (rd * 0.35)) ** 2))
         img[..., :3] += (d * 0.75 + hl)[..., None]
