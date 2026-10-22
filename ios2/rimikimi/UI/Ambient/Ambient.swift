@@ -82,7 +82,9 @@ final class Ambient {
         motion.startDeviceMotionUpdates(to: .main) { [weak self] m, _ in
             guard let self, let g = m?.gravity else { return }
             // 기기 좌표(오른쪽 +x, 위 +y) → 화면 좌표(아래 +y). 폰을 눕히면 z 로 빠져 x·y 가 작아진다 = 물이 덜 흐른다.
-            self.gravity = CGVector(dx: g.x, dy: -g.y)
+            // 부드럽게(저역 통과) — 손떨림·센서 잡음에 물 방향이 출렁이지 않게
+            let raw = CGVector(dx: g.x, dy: -g.y)
+            self.gravity = CGVector(dx: self.gravity.dx * 0.85 + raw.dx * 0.15, dy: self.gravity.dy * 0.85 + raw.dy * 0.15)
         }
     }
 
@@ -92,7 +94,13 @@ final class Ambient {
     }
 
     /// 시뮬레이션이 읽는 중력 — 고정값이 있으면 그것.
-    var simGravity: CGVector { fakeGravity ?? gravity }
+    /// 폰을 거의 눕히면(화면 평면 성분이 작으면) 방향이 무의미하게 빙빙 돈다 — 그땐 '아래'로 고정하고 세기만 줄인다.
+    var simGravity: CGVector {
+        let g = fakeGravity ?? gravity
+        let len = hypot(g.dx, g.dy)
+        if len < 0.35 { return CGVector(dx: 0, dy: max(0.2, len)) }
+        return g
+    }
     /// 바람이 화면 가로로 미는 정도(-1…1). 화면엔 동서만 의미 있다 — 서풍(270°에서 불어옴)이면 오른쪽(+)으로.
     /// 10km/h 아래는 무시, 45km/h 이상이면 최대.
     var windPush: CGFloat {

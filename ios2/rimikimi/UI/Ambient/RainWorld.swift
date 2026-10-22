@@ -211,14 +211,15 @@ final class RainWorld {
 
     private func stepRain(_ dt: CGFloat, _ size: CGSize, _ g: CGVector) {
         // 방향: 화면 중력(기울기) + 바람. 빗줄기는 거의 수직이라 기울기 영향은 절반만.
-        let gx = g.dx * 0.5 + wind * 0.45 + 0.12   // 기본으로 살짝 사선(레퍼런스처럼)
-        let gy = max(0.5, abs(g.dy) + 0.3)
+        // 하늘에서 내리는 비는 폰 기울기와 상관없이 위→아래(+바람만). 기울기를 따르는 건 액자 위 물뿐(오너 "비가 다 돌아가면 어쩔").
+        let gx = wind * 0.45 + 0.08
+        let gy: CGFloat = 1
         let L = hypot(gx, gy); rainDir = CGVector(dx: gx / L, dy: gy / L)
         // 1) 새 빗줄기 — 먼 층(가늘고 느림)·가까운 층(굵고 길고 빠름) 두 겹(넷플릭스 웬즈데이 레퍼런스: 촘촘하고 긴 사선)
-        spawnClock += dt * (heavyRain ? 420 : 260)
+        spawnClock += dt * (heavyRain ? 260 : 150)
         while spawnClock >= 1 {
             spawnClock -= 1
-            guard streaks.count < (heavyRain ? 340 : 220) else { continue }
+            guard streaks.count < (heavyRain ? 200 : 120) else { continue }
             let roll = CGFloat.random(in: 0...1, using: &rng)
             let near = roll < 0.35
             let macro = roll > 0.985          // 아주 가까운(초점 나간) 굵고 흐린 빗줄기 — 깊이감

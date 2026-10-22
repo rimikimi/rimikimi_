@@ -87,6 +87,8 @@ static float2 Drops(float2 uv, float t, float l0, float l1, float l2) {
     float l1 = smoothstep(.25, .75, rain);
     float l2 = smoothstep(.0, .5, rain);
     float2 c = Drops(uv * .9, T, staticDrops, l1, l2);
+    // 대부분 픽셀은 물이 없다 — 굴절용 2번 더 계산하지 않고 바로 원본(성능: 픽셀당 계산 1/3)
+    if (c.x < 0.001) return layer.sample(pos);
     // 법선(굴절) — 주변 차분
     float2 e = float2(.001, 0.);
     float cx = Drops(uv * .9 + e, T, staticDrops, l1, l2).x;
