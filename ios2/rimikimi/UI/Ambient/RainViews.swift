@@ -1,4 +1,17 @@
 import SwiftUI
+import UIKit
+
+/// 비 스프라이트 — 사진처럼 음영을 넣어 미리 렌더한 이미지(scripts/rain-sprites.py). 코드로 그린 선·점은 납작해 보였다(오너 "그래픽을 끌어올려").
+enum RainSprites {
+    static func load(_ n: String) -> Image {
+        let ui = UIImage(contentsOfFile: Bundle.main.path(forResource: n, ofType: "png") ?? "") ?? UIImage()
+        return Image(uiImage: ui)
+    }
+    static let streaks = (0..<5).map { load("streak\($0)") }
+    static let drop = load("drop")
+    static let dropFall = load("drop_fall")
+    static let crown = (0..<6).map { load("crown\($0)") }
+}
 
 /// 홈 배경(색은 그대로) 위로 쏟아지는 빗줄기(바람·기울기만큼 비스듬히) 또는 내리는 눈송이. 카드 **뒤**에 깔리므로 카드 사진엔 물이 안 묻는다(루버). 뇌우면 가끔 번개(화면이 두어 번 번쩍).
 /// 비 오는 날 배경만 살짝 어둡게(해가 가려진 빛) — 앨범·카드는 그대로. 홈 `.background` 에 깐다. 2초에 걸쳐 서서히.
@@ -65,64 +78,60 @@ struct WeatherBackdrop: View {
 
     private func drawStreaks(_ w: RainWorld, in g: inout GraphicsContext, front: Bool = false) {
         let d = w.rainDir
-        // 뒤 층: 액자 뒤로 떨어지는 비 + 액자 윗면에 맞을 비(위에서 내려오는 동안) · 앞 층: 액자 앞으로 떨어지는 비
+        // 뒤 층: 액자 뒤로 떨어지는 비 + 액자 윗면에 맞을 비 · 앞 층: 액자 앞으로 떨어지는 비
         let mine = w.streaks.filter { front ? $0.plane == .front : $0.plane != .front }
-        // 빗줄기 — 모션 블러(살짝 흐린 가장자리), 밝은 부분에서 빛을 받아 반짝이게 더하기 혼합.
-        // 먼 층: 가늘고 선명 · 가까운 층: 조금 굵고 흐림 · 초점 나간 아주 가까운 줄: 굵고 아주 흐리고 옅게.
-        func stroke(_ s: RainWorld.Streak, width: CGFloat, alpha: Double, in c: inout GraphicsContext) {
-            let head = CGPoint(x: s.x, y: s.y), tail = CGPoint(x: s.x - d.dx * s.len, y: s.y - d.dy * s.len)
-            var p = Path(); p.move(to: tail); p.addLine(to: head)
-            c.stroke(p, with: .linearGradient(Gradient(stops: [.init(color: .white.opacity(0), location: 0),
-                                                               .init(color: .white.opacity(alpha * 0.6), location: 0.35),
-                                                               .init(color: .white.opacity(alpha), location: 0.88),
-                                                               .init(color: .white.opacity(0), location: 1)]),
-                                              startPoint: tail, endPoint: head),
-                     style: StrokeStyle(lineWidth: width, lineCap: .butt))
+        let imgs = RainSprites.streaks.map { g.resolve($0) }
+        let angle = Angle.radians(atan2(d.dy, d.dx) - .pi / 2)
+        func put(_ s: RainWorld.Streak, width: CGFloat, alpha: Double, in c: inout GraphicsContext) {
+            var t = c
+            t.translateBy(x: s.x, y: s.y)
+            t.rotate(by: angle)
+            t.opacity = alpha
+            // 이미지 위 = 꼬리, 아래 = 머리(빗줄기 앞쪽이 진하다)
+            let k = Int(abs(s.x * 7 + s.len)) % imgs.count
+            t.draw(imgs[k], in: CGRect(x: -width / 2, y: -s.len, width: width, height: s.len))
         }
         g.drawLayer { far in
-            far.blendMode = .plusLighter
-            for s in mine where !s.near { stroke(s, width: 0.7, alpha: 0.45 * s.alpha, in: &far) }
+            for s in mine where !s.near { put(s, width: 2.2, alpha: 0.55 * s.alpha, in: &far) }
         }
         g.drawLayer { near in
-            near.addFilter(.blur(radius: 0.45))
-            near.blendMode = .plusLighter
-            for s in mine where s.near && !s.macro { stroke(s, width: 1.3, alpha: 0.75 * s.alpha, in: &near) }
+            near.addFilter(.blur(radius: 0.3))
+            for s in mine where s.near && !s.macro { put(s, width: 3.4, alpha: 0.85 * s.alpha, in: &near) }
         }
         g.drawLayer { macro in
-            macro.addFilter(.blur(radius: 2.2))
-            for s in mine where s.macro { stroke(s, width: 3.2, alpha: 0.22, in: &macro) }
+            macro.addFilter(.blur(radius: 2.4))
+            for s in mine where s.macro { put(s, width: 7, alpha: 0.35, in: &macro) }
         }
     }
 
     private func drawSplashes(_ w: RainWorld, in g: inout GraphicsContext) {
-        // 물결 고리 — 떨어진 자리에서 납작하게 퍼지며 사라진다
+        let crown = RainSprites.crown.map { g.resolve($0) }
+        let drop = g.resolve(RainSprites.drop), fall = g.resolve(RainSprites.dropFall)
+        // 왕관 물보라 — 떨어진 자리에서 6프레임으로 피어나 사라진다(20pt 정사각)
         for r in w.rings {
-            let t = r.age / 0.22, rad = 1.5 + 6 * t
-            g.stroke(Path(ellipseIn: CGRect(x: r.x - rad, y: r.y - rad * 0.28, width: rad * 2, height: rad * 0.56)),
-                     with: .color(.white.opacity(0.7 * (1 - t))), lineWidth: 0.6)
+            let f = min(5, Int(r.age / 0.22 * 6))
+            g.draw(crown[f], in: CGRect(x: r.x - 10, y: r.y - 15.6, width: 20, height: 20))
         }
-        // 물보라·떨어지는 물방울 — 진행 방향으로 늘어난 물방울(위 하이라이트, 가는 그늘 테)
+        // 튀는·떨어지는 물방울 — 진행 방향으로 늘어난 물방울 이미지
         for p in w.splashes {
             let v = max(1, hypot(p.vx, p.vy)), falling = p.life > 1
-            let r: CGFloat = falling ? 1.4 : 0.75, stretch = min(3.2, 1 + v / (falling ? 80 : 60))
+            let wdt: CGFloat = falling ? 3.6 : 2.0, h = wdt * min(2.4, 1 + v / (falling ? 120 : 90))
             var c = g
             c.translateBy(x: p.x, y: p.y)
             c.rotate(by: .radians(atan2(p.vy, p.vx) - .pi / 2))
-            let body = Path(ellipseIn: CGRect(x: -r, y: -r * stretch, width: r * 2, height: r * stretch * 2))
-            c.fill(body, with: .color(.white.opacity(0.85)))
-            c.stroke(body, with: .color(.black.opacity(0.14)), lineWidth: 0.4)
+            c.draw(fall, in: CGRect(x: -wdt / 2, y: -h / 2, width: wdt, height: h))
         }
-        // 모서리에 매달린 물방울 — 위쪽은 가는 목, 아래는 둥근 방울
+        // 모서리에 매달린 물방울 — 가는 목 + 물방울 이미지(커질수록 아래로 늘어진다)
         for dr in w.drips.values where dr.r > 0.6 {
-            var p = Path()
-            p.move(to: CGPoint(x: dr.x - 0.5, y: dr.y - 1.5))
-            p.addQuadCurve(to: CGPoint(x: dr.x - dr.r, y: dr.y + dr.r), control: CGPoint(x: dr.x - 0.6, y: dr.y + dr.r * 0.2))
-            p.addArc(center: CGPoint(x: dr.x, y: dr.y + dr.r), radius: dr.r, startAngle: .degrees(180), endAngle: .degrees(0), clockwise: true)
-            p.addQuadCurve(to: CGPoint(x: dr.x + 0.5, y: dr.y - 1.5), control: CGPoint(x: dr.x + 0.6, y: dr.y + dr.r * 0.2))
-            p.closeSubpath()
-            g.fill(p, with: .color(.white.opacity(0.8)))
-            g.stroke(p, with: .color(.black.opacity(0.15)), lineWidth: 0.4)
-            g.fill(Path(ellipseIn: CGRect(x: dr.x - dr.r * 0.45, y: dr.y + dr.r * 0.55, width: dr.r * 0.5, height: dr.r * 0.4)), with: .color(.white))
+            var neck = Path()
+            neck.move(to: CGPoint(x: dr.x - 0.45, y: dr.y - 1.2))
+            neck.addLine(to: CGPoint(x: dr.x + 0.45, y: dr.y - 1.2))
+            neck.addLine(to: CGPoint(x: dr.x + dr.r * 0.35, y: dr.y + dr.r * 0.4))
+            neck.addLine(to: CGPoint(x: dr.x - dr.r * 0.35, y: dr.y + dr.r * 0.4))
+            neck.closeSubpath()
+            g.fill(neck, with: .color(Color(white: 0.9).opacity(0.55)))
+            let sz = dr.r * 2.2
+            g.draw(drop, in: CGRect(x: dr.x - sz / 2, y: dr.y + dr.r * 0.1, width: sz, height: sz * (1 + dr.r * 0.08)))
         }
     }
 
