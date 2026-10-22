@@ -32,8 +32,10 @@ struct HomeView: View {
             .padding(.bottom, app.contentBottomPad)
         }
         .scrollIndicators(.hidden)
-        // 비·눈 — 화면 전체 유리(카드 뒤에 깔려 카드엔 물이 안 묻는다)
-        .background { WeatherBackdrop() }
+        // 비·눈·번개 — 화면 전체에 앞으로(넷플릭스 웬즈데이 레퍼런스). 카드 얼굴엔 방울이 안 맺히고(루버), 윗면에만 물이 고인다.
+        .overlay { WeatherBackdrop() }
+        // 비 오는 날 배경만 살짝 어둡게(앨범·카드는 그대로)
+        .background { WeatherDim() }
         .background(Color.bg)
         .toolbar(.hidden, for: .navigationBar)
         .refreshable { await app.concepts.load() }

@@ -52,7 +52,7 @@ final class RainWorld {
         } else {
             var l = Ledge(frame: frame); l.seen = Date()
             // 처음 보일 때부터 조금 고여(쌓여) 있게 — 빈 상태로 시작하면 밋밋하다
-            for i in 0..<Self.cols { l.level[i] = mode == .rain ? 1.6 : 2.5 + .random(in: 0...1.5, using: &rng) }
+            for i in 0..<Self.cols { l.level[i] = mode == .rain ? .random(in: 0.3...1.2, using: &rng) : 2.5 + .random(in: 0...1.5, using: &rng) }
             ledges[id] = l
         }
     }
@@ -80,17 +80,17 @@ final class RainWorld {
             flash = boltPulses.map { p in let t = now.timeIntervalSince(p); return t < 0 ? 0 : max(0, 0.55 * exp(-t * 14)) }.max() ?? 0
         } else { flash = 0 }
         heavyRain = heavy
-        if newMode != mode { mode = newMode; drops.removeAll(); flakes.removeAll(); ledges.removeAll() }
+        if newMode != mode { mode = newMode; drops.removeAll(); flakes.removeAll(); ledges.removeAll(); streaks.removeAll(); splashes.removeAll() }
         screen = size
         #if DEBUG
         if Int(now.timeIntervalSince1970 * 2) % 6 == 0 && Int(last.timeIntervalSince1970 * 2) % 6 != 0 { AppLog.ui.info("rainworld.step drops=\(self.drops.count) ledges=\(self.ledges.count) size=\(Int(size.width))x\(Int(size.height))") }
         #endif
         let dt = CGFloat(min(now.timeIntervalSince(last), 1.0 / 20.0))
+        // 빗줄기 길이가 한 프레임 이동 거리보다 짧으면 끊겨 보인다 — 최소 길이 보장은 그리기 쪽 len 로 처리
         last = now
         guard dt > 0, size.width > 0 else { return }
         // 화면에서 사라진 카드는 잊는다(스크롤로 나갔다 다시 오면 다시 쌓인다)
         ledges = ledges.filter { now.timeIntervalSince($0.value.seen) < 1.5 }
-        if drops.isEmpty && mode == .rain { seedRain(size) }
         if flakes.isEmpty && mode == .snow { for _ in 0..<26 { flakes.append(newFlake(size, anywhere: true)) } }
         switch mode {
         case .rain: stepRain(dt, size, g)
@@ -110,75 +110,65 @@ final class RainWorld {
         }
     }
 
-    // MARK: 비
+    // MARK: 비 — 빗줄기(배경으로 쏟아짐, 카드 뒤) · 카드 윗면에 닿으면 튀고 고임
+
+    struct Streak { var x, y, len, speed: CGFloat; var near: Bool; var hit = false; var alpha: CGFloat = 1 }
+    struct Splash { var x, y, vx, vy, life: CGFloat }
+    private(set) var streaks: [Streak] = []
+    private(set) var splashes: [Splash] = []
+    /// 빗줄기 방향(단위 벡터) — 아래로 + 바람·기울기만큼 비스듬히. 그리기에서도 쓴다.
+    private(set) var rainDir = CGVector(dx: 0, dy: 1)
 
     private func stepRain(_ dt: CGFloat, _ size: CGSize, _ g: CGVector) {
-        // 1) 새 빗방울 — 카드 자리엔 안 생긴다(루버)
-        spawnClock += dt * (heavyRain ? 16 : 9)
+        // 방향: 화면 중력(기울기) + 바람. 빗줄기는 거의 수직이라 기울기 영향은 절반만.
+        let gx = g.dx * 0.5 + wind * 0.45 + 0.12   // 기본으로 살짝 사선(레퍼런스처럼)
+        let gy = max(0.5, abs(g.dy) + 0.3)
+        let L = hypot(gx, gy); rainDir = CGVector(dx: gx / L, dy: gy / L)
+        // 1) 새 빗줄기 — 먼 층(가늘고 느림)·가까운 층(굵고 길고 빠름) 두 겹(넷플릭스 웬즈데이 레퍼런스: 촘촘하고 긴 사선)
+        spawnClock += dt * (heavyRain ? 420 : 260)
         while spawnClock >= 1 {
             spawnClock -= 1
-            let p = CGPoint(x: .random(in: 0...size.width, using: &rng), y: .random(in: 0...size.height, using: &rng))
-            if blocked(p) { continue }
-            if drops.count < maxDrops {
-                let r = CGFloat.random(in: 1.4...4.0, using: &rng)
-                drops.append(Drop(x: p.x, y: p.y, r: r * 0.35, grow: r))
-            } else if let i = drops.indices.filter({ !drops[$0].sliding }).randomElement(using: &rng) {
-                drops[i].r = min(drops[i].r + 0.6, slideR * 1.3)
-            }
+            guard streaks.count < (heavyRain ? 340 : 220) else { continue }
+            let near = CGFloat.random(in: 0...1, using: &rng) < 0.35
+            let pad = size.height * abs(rainDir.dx) / max(0.3, rainDir.dy)
+            let x = CGFloat.random(in: (rainDir.dx < 0 ? 0 : -pad)...(size.width + (rainDir.dx < 0 ? pad : 0)), using: &rng)
+            streaks.append(Streak(x: x, y: .random(in: -120 ... -10, using: &rng),
+                                  len: near ? .random(in: 55...95, using: &rng) : .random(in: 28...50, using: &rng),
+                                  speed: near ? .random(in: 1700...2100, using: &rng) : .random(in: 1150...1450, using: &rng),
+                                  near: near, alpha: .random(in: 0.75...1.15, using: &rng)))
         }
-        let gLen = hypot(g.dx, g.dy)
-        var born: [Drop] = []
-        // 2) 이동
-        for i in drops.indices {
-            var d = drops[i]
-            if d.grow > 0 { d.r = min(d.grow, d.r + dt * 30); if d.r >= d.grow { d.grow = 0 } }
-            if d.r < 1.4 && !d.sliding { d.life += dt; if d.life > 3.5 { d.r -= dt * 0.5 } }   // 물자국 방울은 마른다
-            d.sliding = d.r >= slideR && gLen > 0.15
-            if d.sliding {
-                let speed = (38 + 22 * (d.r - slideR)) * min(1, gLen)          // pt/초
-                let tx = g.dx / max(gLen, 0.001), ty = g.dy / max(gLen, 0.001)
-                let wob = CGFloat.random(in: -0.4...0.4, using: &rng)
-                d.vx += ((tx + wob * ty * 0.35 + wind * 0.55) * speed - d.vx) * min(1, dt * 7)
-                d.vy += ((ty - wob * tx * 0.35) * speed - d.vy) * min(1, dt * 7)
-                d.x += d.vx * dt; d.y += d.vy * dt
-                d.r -= dt * 0.35
-                if CGFloat.random(in: 0...1, using: &rng) < dt * 20, born.count < 8 {
-                    let v = max(0.001, hypot(d.vx, d.vy))
-                    born.append(Drop(x: d.x - d.vx / v * d.r * 1.2, y: d.y - d.vy / v * d.r * 1.2, r: d.r * .random(in: 0.2...0.34, using: &rng)))
-                }
-            } else { d.vx = 0; d.vy = 0 }
-            drops[i] = d
-        }
-        // 3) 합쳐짐 — 닿으면 큰 쪽이 삼킨다(면적 보존). 흐르는 방울은 길 위의 방울을 쓸어 담는다.
-        for i in drops.indices where drops[i].r > 0 {
-            for j in drops.indices where j > i && drops[j].r > 0 {
-                let dx = drops[i].x - drops[j].x, dy = drops[i].y - drops[j].y
-                let reach = (drops[i].sliding || drops[j].sliding) ? (drops[i].r + drops[j].r) * 0.95 : (drops[i].r + drops[j].r) * 0.8
-                if dx * dx + dy * dy < reach * reach {
-                    let (a, b) = drops[i].r >= drops[j].r ? (i, j) : (j, i)
-                    drops[a].r = sqrt(drops[a].r * drops[a].r + drops[b].r * drops[b].r)
-                    drops[a].grow = 0
-                    drops[b].r = 0
+        // 2) 이동 · 카드 윗면 충돌(튀고 고임) · 화면 밖 제거
+        for i in streaks.indices {
+            streaks[i].x += rainDir.dx * streaks[i].speed * dt
+            streaks[i].y += rainDir.dy * streaks[i].speed * dt
+            let p = CGPoint(x: streaks[i].x, y: streaks[i].y)
+            // 카드 윗변을 막 지난 가까운 빗줄기 일부만 윗면에 떨어져 튀고 고인다 — 나머지 비는 카드 앞을 그대로 지나간다(레퍼런스처럼)
+            if streaks[i].near && !streaks[i].hit {
+                for (id, l) in ledges where p.x > l.frame.minX && p.x < l.frame.maxX && p.y > l.frame.minY && p.y < l.frame.minY + streaks[i].speed * dt + 2 {
+                    streaks[i].hit = true
+                    guard CGFloat.random(in: 0...1, using: &rng) < 0.35 else { break }
+                    pour(into: id, x: p.x, volume: 0.22)
+                    if splashes.count < 90 {
+                        for _ in 0..<Int.random(in: 1...2, using: &rng) {
+                            splashes.append(Splash(x: p.x, y: l.frame.minY - 1, vx: .random(in: -35...35, using: &rng),
+                                                   vy: .random(in: -70 ... -25, using: &rng), life: .random(in: 0.12...0.22, using: &rng)))
+                        }
+                    }
+                    streaks[i].y = size.height + 999   // 떨어진 빗줄기는 끝
+                    break
                 }
             }
         }
-        // 4) 카드 윗면에 닿으면 고인 물로, 카드 안으로 들어가면(옆에서) 사라짐, 화면 밖이면 사라짐
-        for i in drops.indices where drops[i].r > 0 {
-            let d = drops[i]
-            for (id, l) in ledges {
-                let f = l.frame
-                guard d.x > f.minX - 1, d.x < f.maxX + 1, d.y > f.minY - d.r - 2, d.y < f.maxY else { continue }
-                if d.y < f.minY + 6 && d.vy >= 0 {
-                    pour(into: id, x: d.x, volume: d.r * d.r * 0.55)
-                }
-                drops[i].r = 0
-                break
-            }
-            if drops[i].x < -10 || drops[i].x > size.width + 10 || drops[i].y > size.height + 10 || drops[i].y < -10 { drops[i].r = 0 }
+        streaks.removeAll { $0.y - $0.len > size.height || $0.x < -80 || $0.x > size.width + 80 }
+        // 3) 튀는 물방울 · 카드 모서리에서 떨어지는 물방울 — 중력으로 낙하
+        for i in splashes.indices {
+            splashes[i].vy += 900 * dt
+            splashes[i].vx += wind * 120 * dt
+            splashes[i].x += splashes[i].vx * dt; splashes[i].y += splashes[i].vy * dt
+            splashes[i].life -= dt
         }
-        drops.removeAll { $0.r < 0.5 }
-        drops.append(contentsOf: born.prefix(max(0, maxDrops + 10 - drops.count)))
-        // 5) 카드 윗면 물 — 출렁이며 낮은 쪽으로, 넘치거나 기울면 모서리에서 흘러내림
+        splashes.removeAll { $0.life <= 0 || $0.y > size.height }
+        // 4) 카드 윗면 물 — 출렁이며 낮은 쪽으로, 넘치거나 기울면 모서리로 쪼르르
         for id in Array(ledges.keys) { stepLedgeWater(id, dt, g) }
     }
 
@@ -191,7 +181,10 @@ final class RainWorld {
         ledges[id] = l
     }
 
-    private func col(_ x: CGFloat, _ f: CGRect) -> Int { min(Self.cols - 1, max(0, Int((x - f.minX) / f.width * CGFloat(Self.cols)))) }
+    private func col(_ x: CGFloat, _ f: CGRect) -> Int {
+        let r = Radius.card, w = max(1, f.width - r * 2)
+        return min(Self.cols - 1, max(0, Int((x - f.minX - r) / w * CGFloat(Self.cols))))
+    }
 
     private func stepLedgeWater(_ id: String, _ dt: CGFloat, _ g: CGVector) {
         guard var l = ledges[id] else { return }
@@ -214,9 +207,11 @@ final class RainWorld {
         if spill > 0.01 {
             let take = min(spill, l.level[e] * 0.9); l.level[e] -= take
             // 모서리에서 방울이 떨어져 카드 옆면을 타고 흘러내린다(다시 유리 위 방울)
-            if CGFloat.random(in: 0...1, using: &rng) < min(1, take * 1.6), drops.count < maxDrops + 10 {
-                let x = left ? l.frame.minX - 3 : l.frame.maxX + 3
-                drops.append(Drop(x: x, y: l.frame.minY + 2, r: .random(in: 4.8...6.0, using: &rng), vx: g.dx * 30, vy: 30, sliding: true))
+            // 모서리에서 물방울이 줄지어 떨어진다(쪼르르)
+            if CGFloat.random(in: 0...1, using: &rng) < min(1, take * 3), splashes.count < 90 {
+                let x = left ? l.frame.minX + Radius.card * 0.35 : l.frame.maxX - Radius.card * 0.35   // 평평한 끝이 둥근 모서리로 넘어가는 자리
+                splashes.append(Splash(x: x, y: l.frame.minY + 1, vx: (left ? -1 : 1) * .random(in: 4...10, using: &rng),
+                                       vy: .random(in: 0...30, using: &rng), life: 1.2))
             }
         }
         for i in 0..<n { l.level[i] = max(0, l.level[i] - dt * 0.05) }   // 아주 천천히 마른다
