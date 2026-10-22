@@ -35,7 +35,7 @@ static float2 DropLayer(float2 uv, float t) {
     y = (Saw(.94, ti) - .5) * .9 + .5;
     float2 p = float2(x, y);
     float d = length((st - p) * a.yx);
-    float mainDrop = smoothstep(.30, .22, d);          // 또렷한 구슬 테두리
+    float mainDrop = sqrt(max(0., 1. - pow(d / .28, 2.)));   // 발수 구슬 = 반구 돔(안쪽까지 굴절, 가장자리는 가파르게)
     float r = sqrt(smoothstep(1., y, st.y));
     float cd = abs(st.x - x);
     float trail = smoothstep(.23 * r, .15 * r * r, cd) * 0.1;
@@ -46,7 +46,7 @@ static float2 DropLayer(float2 uv, float t) {
     float droplets = max(0., (sin(y * (1. - y) * 120.) - st.y)) * trail2 * trailFront * n.z;
     y = fract(y * 10.) + (st.y - .5);
     float dd = length(st - float2(x, y));
-    droplets = smoothstep(.3, 0., dd);
+    droplets = sqrt(max(0., 1. - pow(dd / .25, 2.)));
     float m = mainDrop + droplets * r * trailFront * 0.15;   // 발수 — 지나간 자리에 물이 거의 안 남는다
     return float2(m, trail);
 }
@@ -60,7 +60,7 @@ static float StaticDrops(float2 uv, float t) {
     float2 p = (n.xy - .5) * .7;
     float d = length(uv - p);
     float fade = Saw(.02, fract(t * 0.6 + n.z));
-    return smoothstep(.20, .14, d) * step(.35, fract(n.z * 10.)) * fade;
+    return sqrt(max(0., 1. - pow(d / .19, 2.))) * step(.68, fract(n.z * 10.)) * fade;
 }
 
 static float2 Drops(float2 uv, float t, float l0, float l1, float l2) {
@@ -68,7 +68,7 @@ static float2 Drops(float2 uv, float t, float l0, float l1, float l2) {
     float2 m1 = DropLayer(uv, t) * l1;
     float2 m2 = DropLayer(uv * 1.85, t) * l2;
     float c = s + m1.x + m2.x;
-    c = smoothstep(.45, .75, c);
+    c = clamp(c, 0., 1.);
     return float2(c, max(m1.y * l0, m2.y * l1));
 }
 
@@ -100,7 +100,7 @@ static float2 Drops(float2 uv, float t, float l0, float l1, float l2) {
     // 방울 테두리 살짝 어둡게·반사광
     // 구슬 — 가장자리 가늘고 진한 테, 위쪽 또렷한 반사점
     float edge = smoothstep(.0, .4, length(n) * 60.);
-    col.rgb *= half(1. - .30 * edge * c.x);
+    col.rgb *= half(1. - .22 * edge * c.x);
     float2 nn = normalize(n + 1e-5);
     float spec = smoothstep(.85, 1., dot(nn, float2(.5, .7))) * c.x * smoothstep(.2, .6, length(n) * 60.);
     col.rgb += half3(.45 * spec);
