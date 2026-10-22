@@ -252,8 +252,10 @@ final class RainWorld {
                     if faceDrops.count < 90, CGFloat.random(in: 0...1, using: &rng) < 0.45 {
                         let n = Int.random(in: 1...2, using: &rng)
                         for _ in 0..<n {
-                            faceDrops.append(FaceDrop(id: id, rx: min(l.frame.width - 3, max(3, p.x - l.frame.minX + .random(in: -8...8, using: &rng))),
-                                                      ry: .random(in: 3...22, using: &rng), r: .random(in: 0.8...2.2, using: &rng)))
+                            let r = CGFloat.random(in: 0.8...2.2, using: &rng)
+                            let (x, y, _) = Self.insideRounded(x: p.x - l.frame.minX + .random(in: -8...8, using: &rng), y: .random(in: 3...22, using: &rng),
+                                                               w: l.frame.width, h: l.frame.height, R: Radius.card, margin: r * 1.1)
+                            faceDrops.append(FaceDrop(id: id, rx: x, ry: y, r: r))
                         }
                     }
                     // 왕관 물보라 — 떨어진 자리에서 사방으로 비스듬히 튀는 작은 물방울 + 납작한 물결 고리
@@ -289,6 +291,22 @@ final class RainWorld {
         for id in Array(ledges.keys) { stepLedgeWater(id, dt, g) }
     }
 
+    /// 둥근 사각형(w×h, 모서리 R) 안쪽 margin 만큼 들어온 영역으로 점을 밀어 넣는다. 밀었으면 onEdge = true.
+    nonisolated static func insideRounded(x: CGFloat, y: CGFloat, w: CGFloat, h: CGFloat, R: CGFloat, margin m: CGFloat) -> (CGFloat, CGFloat, Bool) {
+        var px = min(max(x, m), w - m), py = min(max(y, m), h - m)
+        var edge = px != x || py != y
+        let rr = max(0.1, R - m)
+        for (cx, cy) in [(R, R), (w - R, R), (R, h - R), (w - R, h - R)] {
+            let inX = cx == R ? px < R : px > w - R
+            let inY = cy == R ? py < R : py > h - R
+            if inX && inY {
+                let dx = px - cx, dy = py - cy, dl = hypot(dx, dy)
+                if dl > rr { px = cx + dx / dl * rr; py = cy + dy / dl * rr; edge = true }
+            }
+        }
+        return (px, py, edge)
+    }
+
     private func stepFaceDrops(_ dt: CGFloat, _ g: CGVector) {
         let gLen = hypot(g.dx, g.dy)
         let slideR: CGFloat = 1.8
@@ -321,14 +339,23 @@ final class RainWorld {
                 d.vx = 0; d.vy = 0
                 if d.r < 1.0 && d.age > 6 { d.r -= dt * 0.08 }      // 작은 물자국은 마른다
             }
-            // 옆변 — 넘어가지 않고 가장자리를 따라 흐른다(물은 모서리에 붙는다)
+            // 가장자리 — 액자는 둥근 모서리다. 물은 넘어가지 않고 테두리(직선·곡선)를 따라 흐른다.
+            //   아래 모서리에선 곡선을 타고 안쪽으로 굴러 들어와 평평한 아랫변에 맺힌다.
             let m = d.r * 1.1
-            if d.rx < m { d.rx = m; d.vx = 0 } else if d.rx > l.frame.width - m { d.rx = l.frame.width - m; d.vx = 0 }
-            // 아랫변 — 그 자리에 맺힌다
-            if d.ry >= l.frame.height - 1.5 {
+            let (px, py, onEdge) = Self.insideRounded(x: d.rx, y: d.ry, w: l.frame.width, h: l.frame.height, R: Radius.card, margin: m)
+            if onEdge {
+                // 테두리에 막힌 성분은 없애고 테두리를 따라 미끄러지게(접선 방향만 남김)
+                let nx = d.rx - px, ny = d.ry - py, nl = max(0.001, hypot(nx, ny))
+                let ux = nx / nl, uy = ny / nl
+                let into = d.vx * ux + d.vy * uy
+                if into > 0 { d.vx -= into * ux; d.vy -= into * uy }
+                d.rx = px; d.ry = py
+            }
+            // 아랫변(평평한 구간) — 그 자리에 맺힌다
+            if d.ry >= l.frame.height - m - 0.6 && d.rx >= Radius.card * 0.9 && d.rx <= l.frame.width - Radius.card * 0.9 {
                 var list = hangs[d.id] ?? []
                 if let k = list.firstIndex(where: { abs($0.rx - d.rx) < 4 }) { list[k].r = sqrt(list[k].r * list[k].r + d.r * d.r) }
-                else { list.append(Hang(rx: min(l.frame.width - 1.5, max(1.5, d.rx)), r: d.r * 0.8, limit: .random(in: 2.2...3.6, using: &rng))) }
+                else { list.append(Hang(rx: min(l.frame.width - Radius.card, max(Radius.card, d.rx)), r: d.r * 0.8, limit: .random(in: 2.2...3.6, using: &rng))) }
                 hangs[d.id] = list
                 d.r = 0
             }
@@ -360,7 +387,7 @@ final class RainWorld {
                 h.r += dt * 0.03
                 h.wobble += dt
                 // 기울이면 아랫변을 따라 낮은 쪽으로 기어간다
-                h.rx = min(l.frame.width - 1.5, max(1.5, h.rx + g.dx * dt * 8))
+                h.rx = min(l.frame.width - Radius.card, max(Radius.card, h.rx + g.dx * dt * 8))   // 둥근 모서리 시작점까지만
                 if h.r > h.limit {
                     // 목이 끊기며 떨어진다 — 큰 방울 + 가끔 뒤따르는 작은 방울(위성 방울)
                     let x = l.frame.minX + h.rx, y = l.frame.maxY + h.r
@@ -422,9 +449,13 @@ final class RainWorld {
             // 모서리에서 방울이 떨어져 카드 옆면을 타고 흘러내린다(다시 유리 위 방울)
             // 넘친 물은 둥근 모서리를 넘어 액자 옆면을 타고 흘러내린다(크기·간격 제각각) — 아랫모서리에 모였다가 떨어진다
             if faceDrops.count < 130, CGFloat.random(in: 0...1, using: &rng) < min(1, take * 2.6) {
-                let rx = left ? CGFloat.random(in: 2.2...4.0, using: &rng) : l.frame.width - .random(in: 2.2...4.0, using: &rng)
-                faceDrops.append(FaceDrop(id: id, rx: rx, ry: .random(in: Radius.card * 0.3...Radius.card * 0.8, using: &rng),
-                                          r: .random(in: 0.9...2.1, using: &rng), vx: 0, vy: 10, sliding: true))
+                // 윗모서리 곡선 위 한 점에서 시작해 곡선을 타고 옆면으로 내려간다
+                let r = CGFloat.random(in: 0.9...2.1, using: &rng)
+                let ang = CGFloat.random(in: 0.15...0.6, using: &rng) * .pi / 2          // 곡선 위쪽 부분
+                let R = Radius.card, mm = r * 1.1
+                let rx = left ? R - (R - mm) * cos(ang) : l.frame.width - R + (R - mm) * cos(ang)
+                let ry = R - (R - mm) * sin(ang)
+                faceDrops.append(FaceDrop(id: id, rx: rx, ry: ry, r: r, vx: left ? -6 : 6, vy: 8, sliding: true))
             }
         }
         for i in 0..<n { l.level[i] = max(0, l.level[i] - dt * 0.05) }   // 아주 천천히 마른다
