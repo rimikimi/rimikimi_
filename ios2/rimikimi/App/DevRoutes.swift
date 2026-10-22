@@ -186,6 +186,7 @@ enum DevRoutes {
                 app.galleryPath = [.purpose("profile")]
                 if q["step"] == "1" { try? await Task.sleep(nanoseconds: 800_000_000); app.generateCart() }
             }
+        case "/settings": app.tab = .gallery; app.galleryPath = [.settings]
         case "/store": app.tab = .gallery; app.galleryPath = [.settings, .store]
         case "/invite": app.tab = .gallery; app.galleryPath = [.settings, .invite]
         case "/profile": app.tab = .gallery; app.galleryPath = [.settings]

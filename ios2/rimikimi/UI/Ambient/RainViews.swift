@@ -24,22 +24,15 @@ struct WeatherDim: View {
     @State private var level: Double = 0
     var body: some View {
         let a = Ambient.shared
-        let rainy = a.current == .rain || a.current == .storm || a.current == .snow
+        let rainy = a.visual == .rain || a.visual == .storm || a.visual == .snow
         TimelineView(.periodic(from: .now, by: 60)) { ctx in
             let night = a.phase(at: ctx.date) == "night"
-            Color(red: 0.10, green: 0.13, blue: 0.19).opacity((night ? 0.42 : (a.current == .storm ? 0.32 : a.current == .snow ? 0.14 : 0.24)) * level)
+            Color(red: 0.10, green: 0.13, blue: 0.19).opacity((night ? 0.42 : (a.visual == .storm ? 0.32 : a.visual == .snow ? 0.14 : 0.24)) * level)
         }
         .ignoresSafeArea()
         .allowsHitTesting(false)
         .onAppear { withAnimation(.easeInOut(duration: 2.0)) { level = rainy ? 1 : 0 } }
         .onChange(of: rainy) { _, now in withAnimation(.easeInOut(duration: 2.0)) { level = now ? 1 : 0 } }
-    }
-
-    /// 물 묻는 액자 — 4개 중 1개꼴. id 로 고정해서 스크롤해도 같은 액자가 젖어 있다(hashValue 는 실행마다 바뀌어서 안 씀).
-    static func isWet(_ id: String) -> Bool {
-        var h: UInt32 = 2166136261
-        for b in id.utf8 { h = (h ^ UInt32(b)) &* 16777619 }
-        return h % 4 == 0
     }
 }
 
@@ -58,7 +51,7 @@ struct WeatherBackdrop: View {
     @State private var level: Double = 0
     var body: some View {
         let a = Ambient.shared
-        let w = a.current
+        let w = a.visual
         let wet = (w == .rain || w == .snow || w == .storm) && !WxDebug.noBack
         ZStack {
             if wet || level > 0.001 {
@@ -249,7 +242,7 @@ struct WeatherLedgeModifier: ViewModifier {
     @State private var level: Double = 0
     func body(content: Content) -> some View {
         let a = Ambient.shared
-        let w = a.current
+        let w = a.visual
         let wet = (w == .rain || w == .snow || w == .storm) && !WxDebug.noLedge
         content
             .overlay(alignment: .top) {
@@ -363,7 +356,7 @@ struct FaceWaterModifier: ViewModifier {
         // ⚠️ 성능: 액자마다 셰이더를 돌리면 매 프레임 액자 전체를 다시 그려서 CPU·GPU 를 거의 다 먹었다(측정: 비 82% → 셰이더 끄면 6%).
         //    그래서 물이 묻는 액자를 몇 개로만 고른다(오너 "창문에 묻는 물방울이 넘 많음"도 같이 해결) — 나머지는 셰이더·타임라인 아예 꺼짐.
         let wet = Self.isWet(id)
-        let rainy = (a.current == .rain || a.current == .storm) && !WxDebug.noFace && wet
+        let rainy = (a.visual == .rain || a.visual == .storm) && !WxDebug.noFace && wet
         TimelineView(.animation(minimumInterval: 1.0 / 24.0, paused: a.reduced || (!rainy && level < 0.001))) { ctx in
             let g = a.simGravity
             let gl = max(0.2, hypot(g.dx, g.dy))
@@ -371,7 +364,7 @@ struct FaceWaterModifier: ViewModifier {
             let t = Float(ctx.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 10000))
             let seed = Float(abs(id.hashValue % 97)) / 97
             content.visualEffect { v, proxy in
-                v.layerEffect(ShaderLibrary.windowRain(.float2(proxy.size), .float(t), .float(Float(level) * (a.current == .storm ? 0.4 : 0.24)),
+                v.layerEffect(ShaderLibrary.windowRain(.float2(proxy.size), .float(t), .float(Float(level) * (a.visual == .storm ? 0.4 : 0.24)),
                                                        .float2(down), .float(seed)),
                               maxSampleOffset: CGSize(width: 30, height: 30), isEnabled: level > 0.001)
             }

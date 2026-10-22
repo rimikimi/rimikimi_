@@ -33,6 +33,12 @@ final class Ambient {
     }
     /// 화면에 쓸 날씨.
     var current: Weather { preview ?? weather }
+    /// 설정 '날씨 효과' 토글(기본 켬). 끄면 비·눈·번개·어둡게·햇빛 그림자 다 없이 예전처럼(추천 무드는 그대로).
+    var effectsOn: Bool = UserDefaults.standard.object(forKey: "ambient.effects") == nil ? true : UserDefaults.standard.bool(forKey: "ambient.effects") {
+        didSet { UserDefaults.standard.set(effectsOn, forKey: "ambient.effects") }
+    }
+    /// 화면 효과에 쓸 날씨 — 효과를 끄면 아무 효과 없는 '흐림'.
+    var visual: Weather { effectsOn ? current : .cloud }
 
     /// 화면 좌표 중력(크기 ≤ 1). 폰을 세워 들면 (0, 1), 오른쪽으로 기울이면 x 가 +.
     @ObservationIgnored private(set) var gravity = CGVector(dx: 0, dy: 1)
@@ -143,6 +149,8 @@ final class Ambient {
 
     func light(at now: Date = Date()) -> Light {
         let w = current
+        // 날씨 효과 끔 — 햇빛 그림자 없이 기본 그림자
+        if !effectsOn { return Light(dx: 0, dy: 3, radius: 6, opacity: 0.10, warm: 0) }
         let clarity: Double = switch w { case .clear: 1; case .cloud: 0.55; case .fog: 0.35; case .rain, .snow, .storm: 0.3 }
         guard let rise = sunrise, let set = sunset, set > rise, now > rise, now < set else {
             return Light(dx: 0, dy: 3, radius: 6, opacity: 0.10, warm: 0)  // 밤 — 바로 아래 옅게

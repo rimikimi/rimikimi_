@@ -496,6 +496,7 @@ enum Copy {
     static var filterPassLaunchLine: String { L.t("한 번 결제, 계속 사용 · 11월 13일까지", "Pay once, keep forever · until Nov 13") }
     static var filterPassStartFree: String { L.t("첫 달 0원으로 시작", "Start with first month free") }
     static var appearance: String { L.t("화면 모드", "Appearance") }
+    static var weatherEffects: String { L.t("날씨 효과", "Weather effects") }
     static func appearanceOption(_ a: AppAppearance) -> String {
         switch a { case .system: L.t("시스템 설정", "System"); case .light: L.t("라이트", "Light"); case .dark: L.t("다크", "Dark") }
     }

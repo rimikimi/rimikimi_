@@ -54,6 +54,7 @@ struct ProfileView: View {
                 CardGroup {
                     StartScreenRow()
                     AppearanceRow()
+                    WeatherEffectsRow()
                     LanguageRow()
                 }
                 // 카메라 이용권 — 심사관·사용자가 결제 시트와 구매 복원에 닿는 자리(3일 무료 중엔 카메라에서 안 뜨므로).
@@ -198,6 +199,23 @@ enum AppAppearance: String, CaseIterable, Identifiable {
         for scene in UIApplication.shared.connectedScenes {
             for w in (scene as? UIWindowScene)?.windows ?? [] { w.overrideUserInterfaceStyle = a.style }
         }
+    }
+}
+
+/// 날씨 효과 켜기/끄기 — 홈 배경의 비·눈·번개, 액자 물방울, 햇빛 그림자(오너 2026-10-22).
+struct WeatherEffectsRow: View {
+    @State private var on = Ambient.shared.effectsOn
+    var body: some View {
+        Toggle(isOn: $on) {
+            HStack(spacing: Spacing.s3) {
+                Image(systemName: "cloud.sun").font(.system(size: 16, weight: .medium)).foregroundStyle(Color.ink2).frame(width: 24)
+                Text(Copy.weatherEffects).font(AppFont.body).foregroundStyle(Color.ink)
+            }
+        }
+        .tint(Color.accent)
+        .padding(.horizontal, Spacing.s4)
+        .frame(minHeight: ControlHeight.row)
+        .onChange(of: on) { _, v in withAnimation(.easeInOut(duration: 0.6)) { Ambient.shared.effectsOn = v }; HapticPlayer.selection() }
     }
 }
 
