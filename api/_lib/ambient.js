@@ -10,7 +10,8 @@ const TTL = 10 * 60 * 1000;
 
 function classify(code) {
   if (code == null) return "clear";
-  if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82) || code >= 95) return "rain";
+  if (code >= 95) return "storm";
+  if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82)) return "rain";
   if ((code >= 71 && code <= 77) || code === 85 || code === 86) return "snow";
   if (code === 45 || code === 48) return "fog";
   if (code >= 1 && code <= 3) return "cloud";
@@ -29,11 +30,11 @@ export default async function ambientHandler(req, res) {
   const hit = cache.get(key);
   if (hit && Date.now() - hit.at < TTL) return res.status(200).json(hit.body);
   try {
-    const u = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(2)}&longitude=${lon.toFixed(2)}&current=weather_code,is_day&daily=sunrise,sunset&timezone=auto&forecast_days=1&timeformat=unixtime`;
+    const u = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(2)}&longitude=${lon.toFixed(2)}&current=weather_code,is_day,wind_speed_10m,wind_direction_10m&daily=sunrise,sunset&timezone=auto&forecast_days=1&timeformat=unixtime`;
     const r = await fetch(u, { signal: AbortSignal.timeout(4000) });
     const j = await r.json();
     // 해 뜨는·지는 시각(unix 초) — 앱이 광원 위치(그림자 방향)를 하루 동안 옮기는 데 쓴다(vibesette useSky 와 같은 방식).
-    const body = { weather: classify(j?.current?.weather_code), isDay: j?.current?.is_day !== 0, sunrise: j?.daily?.sunrise?.[0] ?? null, sunset: j?.daily?.sunset?.[0] ?? null, known: true };
+    const body = { weather: classify(j?.current?.weather_code), isDay: j?.current?.is_day !== 0, sunrise: j?.daily?.sunrise?.[0] ?? null, sunset: j?.daily?.sunset?.[0] ?? null, wind: j?.current?.wind_speed_10m ?? 0, windDir: j?.current?.wind_direction_10m ?? 0, known: true };
     cache.set(key, { at: Date.now(), body });
     return res.status(200).json(body);
   } catch (_) {
