@@ -76,7 +76,7 @@ final class LiveFilterRenderer: NSObject, AVCaptureVideoDataOutputSampleBufferDe
         }
     }
 
-    private var _fxAmount: Double = 1
+    private var _fxAmount: Double = 0.7
     /// "효과" 슬라이더 값(0..1).
     var fxAmount: Double {
         get { lock.withLock { _fxAmount } }

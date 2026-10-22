@@ -11,6 +11,9 @@ enum RainSprites {
     static let drop = load("drop")
     static let dropFall = load("drop_fall")
     static let crown = (0..<6).map { load("crown\($0)") }
+    static let flakes = (0..<4).map { load("flake\($0)") }
+    static let flakeBokeh = load("flake_bokeh")
+    static let snowTex = load("snow_tex")
 }
 
 /// 홈 배경(색은 그대로) 위로 쏟아지는 빗줄기(바람·기울기만큼 비스듬히) 또는 내리는 눈송이. 카드 **뒤**에 깔리므로 카드 사진엔 물이 안 묻는다(루버). 뇌우면 가끔 번개(화면이 두어 번 번쩍).
@@ -19,10 +22,10 @@ struct WeatherDim: View {
     @State private var level: Double = 0
     var body: some View {
         let a = Ambient.shared
-        let rainy = a.current == .rain || a.current == .storm
+        let rainy = a.current == .rain || a.current == .storm || a.current == .snow
         TimelineView(.periodic(from: .now, by: 60)) { ctx in
             let night = a.phase(at: ctx.date) == "night"
-            Color(red: 0.10, green: 0.13, blue: 0.19).opacity((night ? 0.42 : (a.current == .storm ? 0.32 : 0.24)) * level)
+            Color(red: 0.10, green: 0.13, blue: 0.19).opacity((night ? 0.42 : (a.current == .storm ? 0.32 : a.current == .snow ? 0.14 : 0.24)) * level)
         }
         .ignoresSafeArea()
         .allowsHitTesting(false)
@@ -56,11 +59,28 @@ struct WeatherBackdrop: View {
                             Canvas { g, size in
                                 _ = frameT
                                 if layer == .back {
-                                    if world.mode == .rain { drawStreaks(world, in: &g) } else { drawFlakes(world.flakes, in: &g) }
-                                } else if world.mode == .rain { drawStreaks(world, in: &g, front: true); drawSplashes(world, in: &g) }
+                                    if world.mode == .rain { drawStreaks(world, in: &g) } else { drawFlakes(world, front: false, in: &g) }
+                                } else if world.mode == .rain { drawStreaks(world, in: &g, front: true); drawFaceWater(world, in: &g); drawSplashes(world, in: &g) }
+                                else { drawFlakes(world, front: true, in: &g) }
                             }
                             .opacity(level)
-                            if w == .storm && layer == .front { Color.white.opacity(world.flash).allowsHitTesting(false) }
+                            if w == .storm && layer == .back && world.flash > 0.01 {
+                                // 번개 — 액자 뒤 하늘이 밝아지고, 갈라지는 줄기가 번쩍(바깥 번짐 + 흰 심)
+                                Color(red: 0.86, green: 0.88, blue: 1.0).opacity(world.flash * 0.35)
+                                Canvas { g, _ in
+                                    for (pass, blur, wmul, a) in [(0, 9.0, 5.0, 0.45), (1, 2.5, 2.2, 0.75), (2, 0.0, 1.0, 1.0)] as [(Int, Double, CGFloat, Double)] {
+                                        _ = pass
+                                        g.drawLayer { l in
+                                            if blur > 0 { l.addFilter(.blur(radius: blur)) }
+                                            for b in world.bolts {
+                                                var p = Path(); p.addLines(b.pts)
+                                                l.stroke(p, with: .color(Color(red: 0.92, green: 0.94, blue: 1.0).opacity(a * world.flash)),
+                                                         style: StrokeStyle(lineWidth: b.width * wmul, lineCap: .round, lineJoin: .round))
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -112,13 +132,14 @@ struct WeatherBackdrop: View {
             let f = min(5, Int(r.age / 0.22 * 6))
             g.draw(crown[f], in: CGRect(x: r.x - 10, y: r.y - 15.6, width: 20, height: 20))
         }
-        // 튀는·떨어지는 물방울 — 진행 방향으로 늘어난 물방울 이미지
+        // 튀는·떨어지는 물방울 — 떨어지는 방울은 크기 제각각, 빨라질수록 늘어나고 살짝 흔들린다
         for p in w.splashes {
             let v = max(1, hypot(p.vx, p.vy)), falling = p.life > 1
-            let wdt: CGFloat = falling ? 3.6 : 2.0, h = wdt * min(2.4, 1 + v / (falling ? 120 : 90))
+            let wdt: CGFloat = falling ? max(1.2, p.size > 0 ? p.size : 3.4) : 2.0
+            let h = wdt * min(falling ? 2.8 : 2.4, 1 + v / (falling ? 160 : 90))
             var c = g
             c.translateBy(x: p.x, y: p.y)
-            c.rotate(by: .radians(atan2(p.vy, p.vx) - .pi / 2))
+            c.rotate(by: .radians(atan2(p.vy, p.vx) - .pi / 2 + (falling ? Double(sin(p.y * 0.09)) * 0.05 : 0)))
             c.draw(fall, in: CGRect(x: -wdt / 2, y: -h / 2, width: wdt, height: h))
         }
         // 모서리에 매달린 물방울 — 가는 목 + 물방울 이미지(커질수록 아래로 늘어진다)
@@ -135,12 +156,66 @@ struct WeatherBackdrop: View {
         }
     }
 
-    private func drawFlakes(_ flakes: [RainWorld.Flake], in g: inout GraphicsContext) {
-        for f in flakes {
-            g.drawLayer { l in
-                l.addFilter(.blur(radius: f.r * 0.3))
-                l.fill(Path(ellipseIn: CGRect(x: f.x - f.r, y: f.y - f.r, width: f.r * 2, height: f.r * 2)),
-                       with: .color(Color(red: 0.80, green: 0.85, blue: 0.93).opacity(0.9)))
+    private func drawFlakes(_ w: RainWorld, front: Bool, in g: inout GraphicsContext) {
+        let flakes = RainSprites.flakes.map { g.resolve($0) }, bokeh = g.resolve(RainSprites.flakeBokeh)
+        let mine = w.flakes.filter { front ? $0.plane == .front : $0.plane != .front }
+        // 흰 바탕에서도 보이게 아주 옅은 그늘을 깐 뒤 눈송이
+        g.drawLayer { l in
+            l.addFilter(.shadow(color: Color(red: 0.2, green: 0.25, blue: 0.35).opacity(0.38), radius: 1.0, y: 0.5))
+            for f in mine where !f.bokeh {
+                let s = f.r * 2.6
+                var c = l; c.translateBy(x: f.x, y: f.y); c.rotate(by: .radians(Double(f.phase) * 0.4))
+                c.draw(flakes[f.kind], in: CGRect(x: -s / 2, y: -s / 2, width: s, height: s))
+            }
+        }
+        g.drawLayer { l in
+            l.addFilter(.blur(radius: 1.5))
+            for f in mine where f.bokeh { l.draw(bokeh, in: CGRect(x: f.x - f.r, y: f.y - f.r, width: f.r * 2, height: f.r * 2)) }
+        }
+        guard front else { return }
+        // 미끄러져 떨어지는 눈 덩어리
+        g.drawLayer { l in
+            l.addFilter(.shadow(color: .black.opacity(0.2), radius: 1, y: 0.5))
+            for c in w.snowClumps { l.draw(flakes[Int(c.r * 10) % 4], in: CGRect(x: c.x - c.r * 1.6, y: c.y - c.r * 1.6, width: c.r * 3.2, height: c.r * 3.2)) }
+        }
+        // 액자 앞면에 내려앉아 녹는 눈 — 흰 송이가 점점 투명한 물방울로
+        let drop = g.resolve(RainSprites.drop)
+        for m in w.melts {
+            guard let l = w.ledgeFrame(m.id) else { continue }
+            let t = min(1, m.age / 4)
+            let x = l.minX + m.rx, y = l.minY + m.ry + t * 2
+            let s = m.r * (2.4 - 1.2 * t)
+            var c = g; c.opacity = Double(1 - t) * (m.age > 6 ? Double(7 - m.age) : 1)
+            c.draw(flakes[Int(m.rx) % 4], in: CGRect(x: x - s / 2, y: y - s / 2, width: s, height: s))
+            var c2 = g; c2.opacity = Double(t) * (m.age > 6 ? Double(7 - m.age) : 1)
+            let ds = m.r * 1.3
+            c2.draw(drop, in: CGRect(x: x - ds / 2, y: y - ds / 2, width: ds, height: ds))
+        }
+    }
+
+    /// 액자 앞면에 묻은 물방울·흘러내림·아랫변에 맺힌 물방울
+    private func drawFaceWater(_ w: RainWorld, in g: inout GraphicsContext) {
+        let drop = g.resolve(RainSprites.drop)
+        // 앞면 물방울·물길은 카드 셰이더(.faceWater)가 굴절로 그린다. 여기선 아랫변에 맺힌 방울만.
+        for (id, list) in w.hangs {
+            guard let f = w.ledgeFrame(id) else { continue }
+            for h in list where h.r > 0.4 {
+                let x = f.minX + h.rx, sz = h.r * 2.2
+                let ripe = max(0, (h.r - h.limit * 0.7) / (h.limit * 0.3))          // 떨어지기 직전 — 목이 늘어진다
+                let sway = sin(h.wobble * 9) * 0.08 * ripe
+                let neckLen = sz * 0.45 * ripe
+                if neckLen > 0.3 {
+                    var neck = Path()
+                    neck.move(to: CGPoint(x: x - sz * 0.22, y: f.maxY))
+                    neck.addQuadCurve(to: CGPoint(x: x - sz * 0.12, y: f.maxY + neckLen), control: CGPoint(x: x - sz * 0.08, y: f.maxY + neckLen * 0.4))
+                    neck.addLine(to: CGPoint(x: x + sz * 0.12, y: f.maxY + neckLen))
+                    neck.addQuadCurve(to: CGPoint(x: x + sz * 0.22, y: f.maxY), control: CGPoint(x: x + sz * 0.08, y: f.maxY + neckLen * 0.4))
+                    g.fill(neck, with: .color(Color(white: 0.92).opacity(0.5)))
+                }
+                var c = g
+                c.translateBy(x: x, y: f.maxY + neckLen)
+                c.rotate(by: .radians(Double(sway)))
+                c.draw(drop, in: CGRect(x: -sz / 2, y: -sz * 0.3, width: sz, height: sz * (1 + 0.25 * ripe)))
             }
         }
     }
@@ -198,10 +273,22 @@ private struct LedgeShape: View {
             p.addLine(to: CGPoint(x: size.width, y: size.height))
             p.closeSubpath()
             if snow {
+                // 쌓인 눈 — 알갱이 결 텍스처 + 아래 그늘 + 윗면 반짝임 + 가장자리 보송보송
+                let tex = g.resolve(RainSprites.snowTex)
                 g.drawLayer { l in
-                    l.addFilter(.shadow(color: .black.opacity(0.12), radius: 1.5, y: 0.5))
-                    l.fill(p, with: .linearGradient(Gradient(colors: [.white, Color(red: 0.88, green: 0.91, blue: 0.97)]),
-                                                    startPoint: CGPoint(x: 0, y: size.height - 9), endPoint: CGPoint(x: 0, y: size.height)))
+                    l.addFilter(.shadow(color: .black.opacity(0.16), radius: 1.6, y: 0.6))
+                    l.clip(to: p)
+                    l.draw(tex, in: CGRect(x: 0, y: size.height - 12, width: max(size.width, 128), height: 12))
+                }
+                var ridge = Path(); ridge.move(to: pts[0])
+                for i in 1..<n { ridge.addQuadCurve(to: CGPoint(x: (pts[i - 1].x + pts[i].x) / 2, y: (pts[i - 1].y + pts[i].y) / 2), control: pts[i - 1]) }
+                g.drawLayer { l in
+                    l.addFilter(.blur(radius: 0.6))
+                    l.stroke(ridge, with: .color(.white), lineWidth: 1.4)
+                }
+                for i in stride(from: 1, to: n - 1, by: 2) where levels[i] > 2 {
+                    let q = pts[i]
+                    g.fill(Path(ellipseIn: CGRect(x: q.x - 0.6 + CGFloat(i % 3), y: q.y + 1.2, width: 1.2, height: 1.2)), with: .color(.white))
                 }
             } else {
                 // 물 — 거의 투명한 띠, 수면에 가는 밝은 선, 아랫면은 카드 위라 살짝 어둡게
@@ -241,4 +328,24 @@ struct SunShadowModifier: ViewModifier {
 
 extension View {
     func sunShadow() -> some View { modifier(SunShadowModifier()) }
+}
+
+
+/// 액자 앞면 물방울 굴절 — 카드 사진 위에 렌즈처럼(뒤 장면이 거꾸로 비침). 자르기·그림자 전에 붙인다.
+struct FaceWaterModifier: ViewModifier {
+    let id: String
+    func body(content: Content) -> some View {
+        let a = Ambient.shared
+        if a.current == .rain || a.current == .storm {
+            TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: a.reduced)) { _ in
+                let drops = RainWorld.shared.faceDropFloats(id), trail = RainWorld.shared.trailFloats(id)
+                content.layerEffect(ShaderLibrary.faceWater(.floatArray(drops), .floatArray(trail)),
+                                    maxSampleOffset: CGSize(width: 24, height: 24), isEnabled: !drops.isEmpty || !trail.isEmpty)
+            }
+        } else { content }
+    }
+}
+
+extension View {
+    func faceWater(id: String) -> some View { modifier(FaceWaterModifier(id: id)) }
 }

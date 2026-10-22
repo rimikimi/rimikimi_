@@ -14,7 +14,7 @@ struct CameraFilterTab: View {
     @State private var biasAtDragStart: Float?
     @State private var lockFired = false
     @State private var uiBias: Float = 0
-    @State private var fxAmount: Double = 1
+    @State private var fxAmount: Double = 0.7   // 카메라 필터 강도 기본 70%(오너)
     struct FocusMark: Equatable { let id = UUID(); let point: CGPoint; var locked = false; var touched = Date(); var adjusting = false; var dim = false }
 
     private var phone: [String] { ["ph16pro", "ph15pro", "ph14pro", "phxs", "ph7", "ph6s", "ph4s", "ph3gs"] }

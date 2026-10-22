@@ -73,6 +73,7 @@ enum DevRoutes {
             app.tab = .gallery
             app.galleryPath.removeAll()
             Ambient.shared.previewWind = q["wind"].flatMap(Double.init)
+            RainWorld.shared.devBoltEvery = q["bolt"].flatMap(Double.init)
             if q["scroll"] == "albums" { DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { app.devScrollAlbums += 1 } }
         case "/category":
             // 카테고리 그리드로 바로 — 시뮬레이터에서는 앨범 타일을 탭할 수 없다(캡처·검증용).

@@ -107,6 +107,8 @@ struct AlbumGridTile: View {
                         FavoriteBadge().padding(Spacing.s2)
                     }
                 }
+                // 액자 앞면 물방울 — 굴절(사진이 거꾸로 비침)·흘러내린 물길
+                .faceWater(id: tile.name)
                 .clipShape(RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
                 // 광원 그림자 — 실제 일출·일몰에 맞춰 방향·길이가 바뀐다
                 .sunShadow()

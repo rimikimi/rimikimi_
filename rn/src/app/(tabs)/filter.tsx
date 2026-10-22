@@ -106,7 +106,7 @@ export default function CameraFilterTab() {
     if (isPaidFilter(k)) void startFilterTrialIfNeeded();
   }, []);
   const [favs, setFavs] = useState<string[]>([]);
-  const [fxAmount, setFxAmount] = useState(1);
+  const [fxAmount, setFxAmount] = useState(0.7); // 카메라 필터 강도 기본 70%(오너)
   const [facing, setFacing] = useState<"back" | "front">("back");
   const [mirror, setMirror] = useState(true);
   const [flash, setFlash] = useState(false);
