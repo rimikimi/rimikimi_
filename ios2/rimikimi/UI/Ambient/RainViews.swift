@@ -338,18 +338,28 @@ extension View {
 }
 
 
-/// 액자 앞면 물방울 굴절 — 카드 사진 위에 렌즈처럼(뒤 장면이 거꾸로 비침). 자르기·그림자 전에 붙인다.
+/// 액자 앞면 빗물 — 게임에서 쓰는 유리창 빗물 셰이더(WindowRain.metal). 칸마다 물방울이 맺혀 커지다 미끄러지며 자국을 남기고,
+/// 잔방울이 생겼다 사라지고, 모두 렌즈처럼 뒤 사진을 굴절시킨다. '아래' = 폰 기울기(중력) 방향.
 struct FaceWaterModifier: ViewModifier {
     let id: String
+    @State private var level: Double = 0
     func body(content: Content) -> some View {
         let a = Ambient.shared
-        if a.current == .rain || a.current == .storm {
-            TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: a.reduced)) { _ in
-                let drops = RainWorld.shared.faceDropFloats(id), trail = RainWorld.shared.trailFloats(id)
-                content.layerEffect(ShaderLibrary.faceWater(.floatArray(drops), .floatArray(trail)),
-                                    maxSampleOffset: CGSize(width: 24, height: 24), isEnabled: !drops.isEmpty || !trail.isEmpty)
+        let rainy = a.current == .rain || a.current == .storm
+        TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: a.reduced || (!rainy && level < 0.001))) { ctx in
+            let g = a.simGravity
+            let gl = max(0.2, hypot(g.dx, g.dy))
+            let down = CGPoint(x: g.dx / gl, y: max(0.15, g.dy) / gl)
+            let t = Float(ctx.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 10000))
+            let seed = Float(abs(id.hashValue % 97)) / 97
+            content.visualEffect { v, proxy in
+                v.layerEffect(ShaderLibrary.windowRain(.float2(proxy.size), .float(t), .float(Float(level) * (a.current == .storm ? 0.9 : 0.6)),
+                                                       .float2(down), .float(seed)),
+                              maxSampleOffset: CGSize(width: 30, height: 30), isEnabled: level > 0.001)
             }
-        } else { content }
+        }
+        .onAppear { withAnimation(.easeInOut(duration: 2.0)) { level = rainy ? 1 : 0 } }
+        .onChange(of: rainy) { _, now in withAnimation(.easeInOut(duration: 2.0)) { level = now ? 1 : 0 } }
     }
 }
 

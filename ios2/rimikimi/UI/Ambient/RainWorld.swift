@@ -249,7 +249,7 @@ final class RainWorld {
                     streaks[i].lastHitY = l.frame.minY
                                         pour(into: id, x: p.x, volume: streaks[i].near ? 0.22 : 0.12)
                     // 일부는 튀면서 액자 앞면 윗부분에 묻는다
-                    if faceDrops.count < 70, CGFloat.random(in: 0...1, using: &rng) < 0.3 {
+                    if false {
                         let n = Int.random(in: 1...2, using: &rng)
                         for _ in 0..<n {
                             let r = CGFloat.random(in: 0.8...2.2, using: &rng)
@@ -464,15 +464,11 @@ final class RainWorld {
         if spill > 0.01 {
             let take = min(spill, l.level[e] * 0.9); l.level[e] -= take
             // 모서리에서 방울이 떨어져 카드 옆면을 타고 흘러내린다(다시 유리 위 방울)
-            // 넘친 물은 둥근 모서리를 넘어 액자 옆면을 타고 흘러내린다(크기·간격 제각각) — 아랫모서리에 모였다가 떨어진다
-            if faceDrops.count < 130, CGFloat.random(in: 0...1, using: &rng) < min(1, take * 2.6) {
-                // 윗모서리 곡선 위 한 점에서 시작해 곡선을 타고 옆면으로 내려간다
-                let r = CGFloat.random(in: 0.9...2.1, using: &rng)
-                let ang = CGFloat.random(in: 0.15...0.6, using: &rng) * .pi / 2          // 곡선 위쪽 부분
-                let R = Radius.card, mm = r * 1.1
-                let rx = left ? R - (R - mm) * cos(ang) : l.frame.width - R + (R - mm) * cos(ang)
-                let ry = R - (R - mm) * sin(ang)
-                faceDrops.append(FaceDrop(id: id, rx: rx, ry: ry, r: r, vx: left ? -6 : 6, vy: 8, sliding: true))
+            // 넘친 물은 낮은 쪽 윗모서리에서 방울로 떨어진다(크기·간격 제각각)
+            if splashes.count < 120, CGFloat.random(in: 0...1, using: &rng) < min(1, take * 2.0) {
+                let x = left ? l.frame.minX + 1.5 : l.frame.maxX - 1.5
+                splashes.append(Splash(x: x, y: l.frame.minY + Radius.card * 0.5, vx: (left ? -1 : 1) * .random(in: 4...14, using: &rng),
+                                       vy: .random(in: 5...30, using: &rng), life: 1.4, size: .random(in: 1.6...3.2, using: &rng)))
             }
         }
         for i in 0..<n { l.level[i] = max(0, l.level[i] - dt * 0.05) }   // 아주 천천히 마른다
