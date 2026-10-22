@@ -112,7 +112,7 @@ final class RainWorld {
 
     // MARK: 비 — 빗줄기(배경으로 쏟아짐, 카드 뒤) · 카드 윗면에 닿으면 튀고 고임
 
-    /// 바깥에 걸린 액자에 내리는 비(오너 2026-10-22): 50% 액자 뒤 · 20% 액자 윗면에 맞음 · 30% 액자 앞.
+    /// 바깥에 걸린 액자에 내리는 비(오너 2026-10-22): 50% 액자 뒤 · 30% 액자 윗면에 맞음 · 20% 액자 앞.
     enum Plane { case back, hit, front }
     struct Streak { var x, y, len, speed: CGFloat; var near: Bool; var hit = false; var alpha: CGFloat = 1; var lastHitY: CGFloat = -9999; var macro = false; var plane: Plane = .back }
     struct Splash { var x, y, vx, vy, life: CGFloat }
@@ -151,7 +151,7 @@ final class RainWorld {
                                   speed: near ? .random(in: 1700...2100, using: &rng) : .random(in: 1150...1450, using: &rng),
                                   near: near || macro, alpha: .random(in: 0.75...1.15, using: &rng), macro: macro))
             let pr = CGFloat.random(in: 0...1, using: &rng)
-            streaks[streaks.count - 1].plane = macro ? .front : (pr < 0.5 ? .back : pr < 0.7 ? .hit : .front)
+            streaks[streaks.count - 1].plane = macro ? .front : (pr < 0.5 ? .back : pr < 0.8 ? .hit : .front)
             if macro { streaks[streaks.count - 1].len = .random(in: 130...190, using: &rng); streaks[streaks.count - 1].speed = 2400 }
         }
         // 2) 이동 · 카드 윗면 충돌(튀고 고임) · 화면 밖 제거
