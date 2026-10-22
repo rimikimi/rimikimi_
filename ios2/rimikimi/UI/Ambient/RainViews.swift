@@ -353,7 +353,7 @@ struct FaceWaterModifier: ViewModifier {
             let t = Float(ctx.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 10000))
             let seed = Float(abs(id.hashValue % 97)) / 97
             content.visualEffect { v, proxy in
-                v.layerEffect(ShaderLibrary.windowRain(.float2(proxy.size), .float(t), .float(Float(level) * (a.current == .storm ? 0.42 : 0.24)),
+                v.layerEffect(ShaderLibrary.windowRain(.float2(proxy.size), .float(t), .float(Float(level) * (a.current == .storm ? 0.5 : 0.32)),
                                                        .float2(down), .float(seed)),
                               maxSampleOffset: CGSize(width: 30, height: 30), isEnabled: level > 0.001)
             }
