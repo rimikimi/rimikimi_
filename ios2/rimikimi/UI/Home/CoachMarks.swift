@@ -24,17 +24,19 @@ enum Coach {
     static func markSeen(_ key: String) { UserDefaults.standard.set(true, forKey: "coach.\(key)") }
 }
 
-struct CoachAnchorKey: PreferenceKey {
-    static var defaultValue: [String: Anchor<CGRect>] = [:]
-    static func reduce(value: inout [String: Anchor<CGRect>], nextValue: () -> [String: Anchor<CGRect>]) {
-        value.merge(nextValue()) { $1 }
-    }
+/// 튜토리얼이 가리킬 자리들 — 창(window) 기준 좌표.
+/// ⚠️ 예전엔 anchorPreference + overlayPreferenceValue 의 GeometryReader 로 풀었는데, iOS 27 에서 그 GeometryReader 가
+///    엉뚱하게 작게 잡혀 막·구멍·카드가 전부 틀어지고 화면 터치만 막혔다(애플 2.1(a) 반려 2026-10-24 "만들기 화면 버튼이 하나도 안 눌림").
+///    → 각 자리가 자기 창 좌표를 직접 알리고, 오버레이는 창 크기로 그린다.
+@Observable final class CoachRects {
+    static let shared = CoachRects()
+    var rects: [String: CGRect] = [:]
 }
 
 extension View {
     /// 튜토리얼이 가리킬 수 있는 자리.
     func coachAnchor(_ key: String) -> some View {
-        anchorPreference(key: CoachAnchorKey.self, value: .bounds) { [key: $0] }
+        onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { CoachRects.shared.rects[key] = $0 }
     }
     /// 이 화면에서 `app.coachQueue` 의 첫 단계를 그린다. 자리가 이 화면에 없으면 그리지 않는다
     /// (`cameraTab` 은 탭바라 자리 대신 화면 아래 가운데를 쓴다).
@@ -44,23 +46,37 @@ extension View {
 private struct CoachHost: ViewModifier {
     @Environment(AppState.self) private var app
     func body(content: Content) -> some View {
-        content.overlayPreferenceValue(CoachAnchorKey.self) { anchors in
-            GeometryReader { geo in
-                if let step = app.coachQueue.first, let rect = rect(step.key, anchors, geo) {
-                    CoachOverlay(step: step, hole: rect, size: geo.size,
-                                 index: app.coachIndex, total: app.coachTotal) { app.advanceCoach() } skip: { app.skipCoach() }
-                }
+        content.overlay {
+            let full = Self.windowSize
+            if let step = app.coachQueue.first, let rect = rect(step.key, full), rect.width > 1, rect.height > 1 {
+                CoachOverlay(step: step, hole: rect, size: full,
+                             index: app.coachIndex, total: app.coachTotal) { app.advanceCoach() } skip: { app.skipCoach() }
+                    .frame(width: full.width, height: full.height)
+                    .ignoresSafeArea()
             }
-            .ignoresSafeArea()
         }
+        #if DEBUG
+        // 검증용: -dev.coachStep N → 튜토리얼을 N 단계 자동으로 넘긴다(시뮬레이터엔 탭을 못 보내서)
+        .task {
+            let n = UserDefaults.standard.integer(forKey: "dev.coachStep")
+            guard n > 0 else { return }
+            try? await Task.sleep(for: .seconds(4))
+            for _ in 0..<n { app.advanceCoach(); try? await Task.sleep(for: .seconds(1)) }
+        }
+        #endif
     }
-    private func rect(_ key: String, _ anchors: [String: Anchor<CGRect>], _ geo: GeometryProxy) -> CGRect? {
-        if let a = anchors[key] { return geo[a] }
+    private func rect(_ key: String, _ full: CGSize) -> CGRect? {
+        if let r = CoachRects.shared.rects[key] { return r }
         if key == "cameraTab" {
-            let w = geo.size.width / 3
-            return CGRect(x: w + 8, y: geo.size.height - geo.safeAreaInsets.bottom - 70, width: w - 16, height: 62)
+            let w = full.width / 3
+            let bottomInset = (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.keyWindow?.safeAreaInsets.bottom ?? 34
+            return CGRect(x: w + 8, y: full.height - bottomInset - 44, width: w - 16, height: 60)   // 탭바(하단 고정, 막 위에 그려짐) 뒤에 숨는 자리 — 막 구멍이 탭바 위로 삐져나오지 않게(10/24 실측)
         }
         return nil
+    }
+    /// 앱 창 크기(아이패드 호환 창 포함).
+    static var windowSize: CGSize {
+        (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.keyWindow?.bounds.size ?? UIScreen.main.bounds.size
     }
 }
 
@@ -88,15 +104,27 @@ private struct CoachOverlay: View {
         let bubbleBelow = h.maxY + 12 + bubbleH <= bottomLimit
         let wantY = bubbleBelow ? h.maxY + 12 : h.minY - 12 - bubbleH
         let bubbleY = min(max(safeTop + 8, wantY), bottomLimit - bubbleH)
-        ZStack(alignment: .topLeading) {
-            // 화면 전체에서 설명할 자리만 뚫는다(짝홀 채우기 — 마스크 합성보다 확실하다).
-            Path { p in
-                p.addRect(CGRect(origin: .zero, size: size))
-                p.addRoundedRect(in: h, cornerSize: CGSize(width: 16, height: 16))
-            }
-            .fill(Color.black.opacity(0.62), style: FillStyle(eoFill: true))
-            .contentShape(Rectangle())
-            .onTapGesture { }  // 뒤를 못 누르게
+        // ⚠️ iOS 27 에서 짝홀 채우기 Path + offset 카드가 엉뚱하게 그려졌다(어두운 막은 왼쪽 위 회색 상자만, 카드는 안 보이는데
+        //    탭은 화면 전체가 막혀 '만들기 화면 버튼이 하나도 안 눌림' — 애플 2.1(a) 반려 2026-10-24, 시뮬레이터 iOS 27 재현).
+        //    → 막은 마스크로 구멍 내고, 카드는 position 으로 화면 좌표에 직접 놓는다. 크기는 전부 화면 크기로 고정.
+        let cardW = max(0, size.width - Spacing.page * 2)
+        ZStack {
+            Rectangle()
+                .fill(Color.black.opacity(0.62))
+                .mask {
+                    Rectangle()
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .frame(width: h.width, height: h.height)
+                                .position(x: h.midX, y: h.midY)
+                                .blendMode(.destinationOut)
+                        }
+                        .compositingGroup()
+                }
+                .frame(width: size.width, height: size.height)
+                .contentShape(Rectangle())
+                // 뒤는 못 누르게 하되, 어두운 곳을 누르면 다음으로 — 카드가 어떤 이유로든 안 보여도 갇히지 않게
+                .onTapGesture { next() }
             VStack(alignment: .leading, spacing: Spacing.s2) {
                 Text(step.title).font(AppFont.headline).foregroundStyle(Color.ink)
                 Text(step.text).font(AppFont.callout).foregroundStyle(Color.ink2).fixedSize(horizontal: false, vertical: true)
@@ -114,12 +142,13 @@ private struct CoachOverlay: View {
                 .font(AppFont.bodyEmphasis)
             }
             .padding(Spacing.s4)
+            .frame(width: cardW, alignment: .leading)
             .background(Color.card, in: RoundedRectangle(cornerRadius: Radius.sheet, style: .continuous))
             .shadow(color: .black.opacity(0.25), radius: 20, y: 8)
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { bubbleH = $0 }
-            .padding(.horizontal, Spacing.page)
-            .offset(y: bubbleY)
+            .position(x: size.width / 2, y: bubbleY + bubbleH / 2)
         }
+        .frame(width: size.width, height: size.height)
         .animation(.easeOut(duration: 0.25), value: step)
     }
 }

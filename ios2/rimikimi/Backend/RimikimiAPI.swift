@@ -124,6 +124,8 @@ final class RimikimiAPI {
         cfg.timeoutIntervalForRequest = 240
         cfg.timeoutIntervalForResource = 300
         cfg.urlCache = URLCache(memoryCapacity: 64 << 20, diskCapacity: 512 << 20)
+        // 서버가 iOS 앱임을 User-Agent 추측 없이 알게(iOS 에서 숨기는 커플 컨셉 — 애플 1.1). 프록시가 UA 를 바꿔도 남는다.
+        cfg.httpAdditionalHeaders = ["X-Rimikimi-Platform": "ios"]
         session = URLSession(configuration: cfg)
     }
 
