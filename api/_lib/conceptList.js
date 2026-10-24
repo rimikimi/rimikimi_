@@ -51,9 +51,11 @@ export function supportsConcept(c, caps) {
 // 커플 템플릿을 빼라. 안드로이드·웹은 그대로. 다시 넣으려면 접촉 없는 버전으로 고쳐 정식 심사를 받는다.
 // 2026-10-13 오너: 빼지 않고 App Review Board 이의 신청으로 간다 → 숨김 끔. 다시 숨기려면 true 로.
 const IOS_HIDE_CONTACT_COUPLES = true;
+// 2026-10-24 두 번째 반려(1.1 이 다시 사유에 붙음) — 오너 "ㅇㅇ": 접촉 여부 상관없이 두 사람 컨셉(mode "couple") 전부 iOS 에서 숨김.
+export function iosHiddenConcept(c) { return !!(c && (c.iosHidden || c.mode === "couple")); }
 import { moodOf } from "./mood.js";
 export function publishedConcepts(ALL, now, caps = new Set(), { ios = false } = {}) {
-  const list = ALL.filter((c) => isPublished(c, now) && supportsConcept(c, caps) && !(IOS_HIDE_CONTACT_COUPLES && ios && c.iosHidden));
+  const list = ALL.filter((c) => isPublished(c, now) && supportsConcept(c, caps) && !(IOS_HIDE_CONTACT_COUPLES && ios && iosHiddenConcept(c)));
 
   for (const c of list) {
     const at = PINNED[Number(c.id)];

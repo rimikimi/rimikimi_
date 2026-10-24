@@ -11,7 +11,7 @@
 // ============================================================
 
 import ALL from "./_data/concepts.json" with { type: "json" };
-import { publishedConcepts, isPublished } from "./_lib/conceptList.js";
+import { publishedConcepts, isPublished, iosHiddenConcept } from "./_lib/conceptList.js";
 import { studioCatalog } from "./_lib/studio.js";
 import { weddingCatalog } from "./_lib/wedding.js";
 
@@ -56,6 +56,12 @@ function countResponse(req, res, now) {
 // iOS 네이티브 앱(SwiftUI, URLSession) — UA 가 "rimikimi/64 CFNetwork/… Darwin/…" 이고 브라우저(Mozilla)가 아니다.
 // 안드로이드(RN)는 okhttp, 웹은 Mozilla 라 여기 안 걸린다.
 function isIOSApp(req) {
+  // 1) iOS 앱(빌드 80+)은 직접 알려 준다 — 프록시가 User-Agent 를 바꿔도 남는 헤더
+  if (String(req.headers?.["x-rimikimi-platform"] || "").toLowerCase() === "ios") return true;
+  // 2) 애플 회사망(17.0.0.0/8 — 앱 심사 기기가 여기서 온다)은 iOS 기준 목록. 2026-10-24 반려 대응.
+  const ip = String(req.headers?.["x-real-ip"] || req.headers?.["x-forwarded-for"] || "").split(",")[0].trim();
+  if (/^17\./.test(ip)) return true;
+  // 3) 예전 빌드 — URLSession 기본 User-Agent
   const ua = String(req.headers?.["user-agent"] || "");
   return /CFNetwork|Darwin/i.test(ua) && !/Mozilla/i.test(ua);
 }
@@ -98,7 +104,7 @@ export default function handler(req, res) {
   } catch (_) {
     // 필터가 터져도 빈 갤러리보다 낫게 내보내되, 미공개 컨셉과 iOS 에서 숨긴 커플(애플 1.1)은 절대 섞지 않는다
     const ios = isIOSApp(req);
-    list = ALL.filter((c) => { try { return c && !Array.isArray(c.requires) && isPublished(c, now) && !(ios && c.iosHidden); } catch { return false; } });
+    list = ALL.filter((c) => { try { return c && !Array.isArray(c.requires) && isPublished(c, now) && !(ios && iosHiddenConcept(c)); } catch { return false; } });
   }
 
   // ⚠️ 응답이 기기(iOS 앱 여부)마다 다르다 → CDN 공유 캐시 금지. URL 이 같아서 CDN 에 걸리면
