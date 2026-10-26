@@ -201,6 +201,27 @@ export const FILM_PRESETS = [
   // 마스크: effects.personMask({w,h,data}) — 없으면 흔적 없이 배경 처리만. iOS 는 LiveFilter.swift slowSync.
   { key: "flashsoft", ko: "소프트 플래시", en: "Soft Flash", group: "mood", special: "flashsoft", fx: { grain: 0.25 } },
   { key: "flashhard", ko: "하드 플래시", en: "Hard Flash", group: "mood", special: "flashhard", fx: { grain: 0.25 }, hidden: true }, // 오너 2026-10-26: 소프트만 노출
+  /* ── 효과 5종 추가(오너 2026-10-27 "효과 카테고리 10개") — 기존 엔진 효과(빛샘·뽀샤시·흐림·비네트·입자)만 써서 iOS 카메라에서도 같게 나온다. */
+  { key: "lightleak", ko: "빛샘",        en: "Light Leak", group: "mood",
+    temp: 14, tint: 4, ex: 0.06, con: 0.08, fade: 10, whitePull: 6, sat: 0.06, vib: 0.1, sh: [6, 0, -4], hi: [14, 6, -6],
+    fx: { leak: 1.8, grain: 0.3 } },
+  { key: "softfocus", ko: "소프트 포커스", en: "Soft Focus", group: "mood",
+    temp: 4, tint: 4, ex: 0.1, con: -0.2, fade: 14, whitePull: 10, sat: -0.06, vib: 0.06, sh: [4, 2, 4], hi: [8, 6, 4],
+    fx: { glow: 1.0, blur: 0.1 } },
+  { key: "spotlight", ko: "스포트라이트", en: "Spotlight", group: "mood",
+    temp: 6, tint: 0, ex: -0.06, con: 0.32, fade: 0, whitePull: 0, sat: 0.04, vib: 0.06, sh: [-8, -8, -6], hi: [10, 8, 4],
+    fx: { vignette: 2.6, grain: 0.15 } },
+  { key: "grainy",    ko: "거친 입자",   en: "Heavy Grain", group: "mood",
+    temp: 6, tint: 2, ex: 0, con: 0.22, fade: 14, whitePull: 8, sat: -0.3, vib: 0, sh: [4, 2, -2], hi: [6, 4, -4],
+    fx: { grain: 2.2, vignette: 0.35 } },
+  { key: "haze",      ko: "안개",        en: "Haze", group: "mood",
+    temp: -8, tint: 2, ex: 0.12, con: -0.3, fade: 34, whitePull: 24, sat: -0.22, vib: 0, sh: [6, 8, 12], hi: [6, 8, 10],
+    fx: { glow: 0.6, blur: 0.12 } },
+  // 네온 빛번짐(오너 2026-10-27) — 마젠타·시안 채도↑ + 보랏빛 그림자 + 빛번짐. 밤 네온·조명 사진용.
+  { key: "neonglow",  ko: "네온",        en: "Neon Glow", group: "mood",
+    temp: -12, tint: 14, ex: 0.02, con: 0.3, fade: 0, whitePull: 0, sat: 0.3, vib: 0.2, sh: [6, -6, 22], hi: [10, 0, 14],
+    hsl: [{ c: 300, w: 50, s: 0.5, l: 0.04 }, { c: 190, w: 40, s: 0.45, l: 0.04 }],
+    fx: { glow: 0.8 } },
   { key: "twinkle",  ko: "트윙클",    en: "Twinkle", group: "mood",
     temp: 4, tint: 0, ex: 0.03, con: 0.1, fade: 6, whitePull: 6, sat: 0.06, vib: 0.2,
     sh: [0, 0, 4], hi: [8, 6, 0],
