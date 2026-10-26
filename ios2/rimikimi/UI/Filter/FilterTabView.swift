@@ -39,14 +39,14 @@ struct FilterTabView: View {
         ]),
         // 효과 — 색감보다 효과가 주인 필터(2026-10-26 필터 탭 개편 시안: 폰카·빈티지·감성·효과)
         .init(key: "fx", title: L.t("효과", "Effects"), emoji: "✨", presets: [
-            .init(key: "bloom"), .init(key: "vhs"), .init(key: "glitch"), .init(key: "pixelate"),
+            .init(key: "flashsoft"), .init(key: "bloom"), .init(key: "vhs"), .init(key: "glitch"), .init(key: "pixelate"),
         ]),
     ] }
 
     /// 추천 필터 — 사용 기록이 쌓이기 전까지는 직접 고른 목록(시안, 2026-10-26).
     static let featuredKeys = ["ph7", "golden", "vintC", "peach", "ph4s", "bloom", "cine", "vintS"]
     /// 신규 필터 — 월 3개 드롭 자리. 지금은 가장 최근에 추가된 빈티지 3종(시안).
-    static let newKeys = ["vintF", "vintG", "vintP"]
+    static let newKeys = ["flashsoft", "vintF", "vintG"]
 
     /// 오늘의 필터 — 날짜로 고르므로 하루 동안 고정이고 매일 바뀐다.
     private var todays: (group: Group, preset: Preset) {
@@ -95,7 +95,7 @@ struct FilterTabView: View {
                 LazyHStack(alignment: .top, spacing: CardMetrics.railGap) {
                     ForEach(keys, id: \.self) { k in
                         Button { app.requireLogin(.filterPick(presetKey: k)) } label: {
-                            RemoteImage(url: Config.thumbURL("ff_\(k)"), cornerRadius: 0, fallback: Config.thumbURL("fs_\(k)"))
+                            FilterWipeCard(key: k)
                                 .photoRatio()
                                 .overlay(alignment: .bottomLeading) { PhotoCaption(title: Copy.filterName(k), size: 16) }
                                 .overlay(alignment: .topTrailing) { FilterFavorites.starButton(k, favs: $favs, app: app) }
@@ -251,7 +251,7 @@ struct FilterGroupGrid: View {
                 ForEach(group.presets) { p in
                     Button { app.requireLogin(.filterPick(presetKey: p.key)) } label: {
                         VStack(spacing: 6) {
-                            RemoteImage(url: Config.thumbURL("ff_\(p.key)"), cornerRadius: Radius.card - 2, fallback: Config.thumbURL("fs_\(p.key)")).photoRatio()
+                            FilterWipeCard(key: p.key, cornerRadius: Radius.card - 2).photoRatio()
                                 .overlay(alignment: .topTrailing) { FilterFavorites.starButton(p.key, favs: $favs, app: app, size: 26) }
                             Text(p.label).font(AppFont.footnote).foregroundStyle(Color.ink).lineLimit(1).minimumScaleFactor(0.85)
                         }

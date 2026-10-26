@@ -67,7 +67,14 @@ enum Config {
     /// (`src/PortraitStudio.jsx` `openBrooklyn()`과 같은 목적지 — iOS 앱스토어 상세 페이지).
     static let brooklynAppStoreURL = URL(string: "https://apps.apple.com/app/id6784226620")!
 
-    static func thumbURL(_ id: String) -> URL { apiBase.appendingPathComponent("thumbs/\(id).webp") }
+    static func thumbURL(_ id: String) -> URL { thumbBase.appendingPathComponent("thumbs/\(id).webp") }
+    /// DEBUG: 아직 서버에 안 올린 썸네일을 시뮬레이터에서 보려고 `-dev.thumbBase http://localhost:8099` 로 바꿔 끼운다.
+    private static let thumbBase: URL = {
+        #if DEBUG
+        if let s = UserDefaults.standard.string(forKey: "dev.thumbBase"), let u = URL(string: s) { return u }
+        #endif
+        return apiBase
+    }()
     /// 크게 보여주는 자리(브라우저 큰 사진·옵션 화면 히어로·앨범 표지)용 1200px WebP.
     /// 썸네일은 400px 라 전체 폭(402pt = 1206px)에 깔면 3배 확대돼 뭉갠다(오너 지적 2026-09-22).
     /// 아직 `large/` 가 없는 컨셉은 `RemoteImage(fallback:)` 이 썸네일로 되돌아간다.
