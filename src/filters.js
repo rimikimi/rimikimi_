@@ -163,7 +163,7 @@ export const FILM_PRESETS = [
     temp: -2, tint: -10, ex: 0.04, con: 0.14, fade: 14, whitePull: 10, sat: 0.06, vib: 0.14, sh: [-4, 8, 6], hi: [6, 8, 2],
     hsl: [{ c: 120, w: 60, h: 12, s: 0.1, l: -0.02 }, { c: 220, w: 55, s: 0.12 }, { c: 30, w: 22, h: -4, s: -0.04 }],
     fx: { grain: 0.4, vignette: 0.2 } },
-  { key: "haduri", ko: "하두리", en: "Webcam '03", group: "vintage", // 옛날 웹캠(하두리) — 320×240·형광등 누런빛·피부 하얗게·뽀얀 글로우·노이즈(오너 2026-10-26)
+  { key: "haduri", ko: "웹캠", en: "Webcam '03", group: "vintage", // 옛날 웹캠(하두리) — 320×240·형광등 누런빛·피부 하얗게·뽀얀 글로우·노이즈(오너 2026-10-26)
     temp: 12, tint: 8,  ex: 0.18, con: -0.1, fade: 26, whitePull: 20, sat: -0.2,  vib: 0,    sh: [6, 6, -4],   hi: [8, 6, -10],
     fx: { lowres: 0.004, blur: 0.15, glow: 0.7, grain: 0.45 } },
   { key: "sepia",    ko: "세피아",    en: "Sepia", group: "mood", hidden: true,
