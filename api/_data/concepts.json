@@ -1,5 +1,16 @@
 [
  {
+  "id": 1127,
+  "title": "1.5등신 피규어",
+  "title_en": "Chibi Figure",
+  "category": "🪄 매직 부스",
+  "categories": [
+   "🪄 매직 부스"
+  ],
+  "text": "Turn the person in the reference photo into a super-deformed (SD / chibi) 3D figure with 1.5-head proportions: the head is as tall as the entire rest of the body — a huge round head, a tiny stubby body with short arms and legs, big expressive eyes, a small simple nose and mouth. This must be the SAME person, instantly recognisable: keep the exact face shape, eye shape and colour, eyebrows, skin tone, hairstyle and hair colour and length, glasses or earrings if any, and the SAME outfit — same clothing items, colours, patterns and shoes, simplified into the chibi form. Keep the same facial expression and roughly the same pose and gesture as the photo, shown full-body and standing, centred, feet visible, cheerful and playful. Rendering: a glossy 3D vinyl designer toy — smooth matte plastic skin, soft rounded shapes, subtle subsurface glow, clean studio lighting, soft drop shadow under the feet. Background: a seamless pastel studio backdrop in a colour that suits the outfit, filling the frame edge to edge. If the photo has several people, turn each one into a chibi figure standing together, keeping each person's features. If the subject is a pet, make it a chibi pet figure with the same fur colour and markings. Vertical 3:4, one single full-frame image. Do not: realistic proportions, photorealistic skin, change the hairstyle or clothes, add text, watermark, border or white margin, split screen, before/after.",
+  "sensitive": false
+ },
+ {
   "id": "1126",
   "title": "주말 브런치 친구컷",
   "title_en": "Weekend Brunch Laughs",
