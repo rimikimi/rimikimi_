@@ -21,11 +21,11 @@ struct FilterTabView: View {
         .init(key: "phone", title: Copy.filterGroupPhone, emoji: "📱", presets: [
             .init(key: "ph16pro"), .init(key: "ph15pro"), .init(key: "ph14pro"),
             .init(key: "phxs"), .init(key: "ph7"), .init(key: "ph6s"),
-            .init(key: "ph4s"), .init(key: "ph3gs"),
+            .init(key: "ph4s"), .init(key: "ph3gs"), .init(key: "folder"),
         ]),
         .init(key: "vintage", title: Copy.filterGroupVintage, emoji: "📸", presets: [
             .init(key: "vintC"), .init(key: "vintL"), .init(key: "vintP"),
-            .init(key: "vintG"), .init(key: "vintS"), .init(key: "vintF"),
+            .init(key: "vintG"), .init(key: "vintS"), .init(key: "vintF"), .init(key: "haduri"),
         ]),
         // 감성 = 예전 필름·카메라·재미를 한 칸으로(오너 2026-10-12 "폰카, 빈티지, 감성 3개")
         .init(key: "mood", title: Copy.filterGroupMood, emoji: "🎞️", presets: [
@@ -34,7 +34,7 @@ struct FilterTabView: View {
             .init(key: "pastel"), .init(key: "cine"), .init(key: "newtro"),
             .init(key: "softmono"),
             .init(key: "warm"), .init(key: "cool"), .init(key: "vintage"),
-            .init(key: "docu"), .init(key: "mono"), .init(key: "digicam"),
+            .init(key: "docu"), .init(key: "mono"), .init(key: "digicam"), .init(key: "y2k"),
             .init(key: "toy"), .init(key: "dispo"), .init(key: "instant"),
         ]),
         // 효과 — 색감보다 효과가 주인 필터(2026-10-26 필터 탭 개편 시안: 폰카·빈티지·감성·효과)
@@ -46,7 +46,7 @@ struct FilterTabView: View {
     /// 추천 필터 — 사용 기록이 쌓이기 전까지는 직접 고른 목록(시안, 2026-10-26).
     static let featuredKeys = ["ph7", "golden", "vintC", "peach", "ph4s", "bloom", "cine", "vintS"]
     /// 신규 필터 — 월 3개 드롭 자리. 지금은 가장 최근에 추가된 빈티지 3종(시안).
-    static let newKeys = ["flashsoft", "vintF", "vintG"]
+    static let newKeys = ["folder", "y2k", "haduri", "flashsoft"]
 
     /// 오늘의 필터 — 날짜로 고르므로 하루 동안 고정이고 매일 바뀐다.
     private var todays: (group: Group, preset: Preset) {
