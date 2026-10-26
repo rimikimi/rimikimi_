@@ -168,7 +168,7 @@ enum Copy {
         "vintG": ("빈티지G", "Vintage G"), "vintS": ("빈티지S", "Vintage S"), "vintF": ("빈티지F", "Vintage F"),
         "sepia": ("세피아", "Sepia"), "duopink": ("듀오 핑크", "Duo Pink"), "neon": ("네온", "Neon"),
         "thermal": ("서모", "Thermal"), "glitch": ("글리치", "Glitch"), "vhs": ("VHS", "VHS"),
-        "pixelate": ("모자이크", "Pixel"), "sketch": ("스케치", "Sketch"), "bloom": ("빛번짐", "Bloom"), "flashsoft": ("소프트 플래시", "Soft Flash"), "folder": ("폴더폰", "Flip Phone"), "y2k": ("Y2K", "Y2K"), "haduri": ("웹캠", "Webcam '03"), "lightleak": ("빛샘", "Light Leak"), "softfocus": ("소프트 포커스", "Soft Focus"), "spotlight": ("스포트라이트", "Spotlight"), "grainy": ("거친 입자", "Heavy Grain"), "haze": ("안개", "Haze"), "neonglow": ("네온", "Neon Glow"), "flashhard": ("하드 플래시", "Hard Flash"),
+        "pixelate": ("모자이크", "Pixel"), "sketch": ("스케치", "Sketch"), "bloom": ("빛번짐", "Bloom"), "flashsoft": ("소프트 플래시", "Soft Flash"), "folder": ("폴더폰", "Flip Phone"), "y2k": ("Y2K", "Y2K"), "haduri": ("웹캠", "Webcam '03"), "lightleak": ("빛샘", "Light Leak"), "softfocus": ("소프트 포커스", "Soft Focus"), "spotlight": ("스포트라이트", "Spotlight"), "grainy": ("거친 입자", "Heavy Grain"), "haze": ("안개", "Haze"), "neonglow": ("네온", "Neon Glow"), "subjectglow": ("피사체 글로우", "Subject Glow"), "flashhard": ("하드 플래시", "Hard Flash"),
         "infl": ("인플", "Influencer"),
     ]
     static func filterName(_ key: String) -> String {

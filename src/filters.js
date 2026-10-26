@@ -222,6 +222,8 @@ export const FILM_PRESETS = [
     temp: -12, tint: 14, ex: 0.02, con: 0.3, fade: 0, whitePull: 0, sat: 0.3, vib: 0.2, sh: [6, -6, 22], hi: [10, 0, 14],
     hsl: [{ c: 300, w: 50, s: 0.5, l: 0.04 }, { c: 190, w: 40, s: 0.45, l: 0.04 }],
     fx: { glow: 0.8 } },
+  // 피사체 글로우(오너 2026-10-27, 아이폰 '스티커 들어 올리기' 느낌) — 인물 윤곽 바깥에 하얀 글로우 + 배경 어둡게. 인물 마스크 필요(effects.personMask).
+  { key: "subjectglow", ko: "피사체 글로우", en: "Subject Glow", group: "mood", special: "subjectglow" },
   { key: "twinkle",  ko: "트윙클",    en: "Twinkle", group: "mood",
     temp: 4, tint: 0, ex: 0.03, con: 0.1, fade: 6, whitePull: 6, sat: 0.06, vib: 0.2,
     sh: [0, 0, 4], hi: [8, 6, 0],
@@ -268,6 +270,8 @@ export function applyLookWithStrength(data, w, h, preset, effects = {}, strength
     dreamyRGBA(data, w, h, k, effects.faces, effects.seed); // 색감 슬라이더 = 빛번짐 세기(70% = 기본 룩)
   } else if (p?.special === "flashsoft" || p?.special === "flashhard") {
     slowSyncRGBA(data, w, h, k, effects.personMask, p.special === "flashhard");
+  } else if (p?.special === "subjectglow") {
+    subjectGlowRGBA(data, w, h, Math.min(1.4, k), effects.personMask);
   } else if (p) {
     if (Math.abs(k - 1) > 0.01) {
       const orig = new Uint8ClampedArray(data);
@@ -489,6 +493,11 @@ export function applyLook(data, w, h, preset, effects = {}) {
   if (preset?.special === "dreamy") {
     dreamyRGBA(data, w, h, 1, effects.faces, effects.seed);
     const { faces: _f, ...rest } = effects;
+    return applyLook(data, w, h, null, rest);
+  }
+  if (preset?.special === "subjectglow") {
+    subjectGlowRGBA(data, w, h, 1, effects.personMask);
+    const { personMask: _m, faces: _f, ...rest } = effects;
     return applyLook(data, w, h, null, rest);
   }
   if (preset?.special === "flashsoft" || preset?.special === "flashhard") {
@@ -1638,6 +1647,32 @@ function slowSyncRGBA(data, w, h, a, maskIn, hard) {
     }
     const r = Math.min(1, rgb[0] * 1.05 + 0.01) * vig, g = rgb[1] * vig, b = rgb[2] * (hard ? 0.93 : 0.96) * vig;
     data[j] = clamp8(data[j] + (r * 255 - data[j]) * a); data[j + 1] = clamp8(data[j + 1] + (g * 255 - data[j + 1]) * a); data[j + 2] = clamp8(data[j + 2] + (b * 255 - data[j + 2]) * a);
+  }
+}
+
+/* 피사체 글로우 — scratchpad glow/glow.py(오너 확인 2026-10-27)와 같은 단계: 배경 채도↓·어둡게(×0.62),
+   인물 윤곽 바깥에만 하얀 글로우(넓게 0.55 + 가까이 0.85, screen). 마스크 없으면 배경만 살짝 어둡게. */
+function subjectGlowRGBA(data, w, h, a, maskIn) {
+  if (!(a > 0.001)) return;
+  const n = w * h, m3 = new Float32Array(n * 3);
+  if (maskIn) for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const mx = Math.min(maskIn.w - 1, Math.floor(x * maskIn.w / w)), my = Math.min(maskIn.h - 1, Math.floor(y * maskIn.h / h));
+    const v = maskIn.data[my * maskIn.w + mx] / 255, o = (y * w + x) * 3; m3[o] = m3[o + 1] = m3[o + 2] = v;
+  }
+  const m = maskIn ? gaussApprox(m3, w, h, Math.max(1, w * 0.0015)) : m3;
+  const near = maskIn ? gaussApprox(m, w, h, w * 0.0036) : m3, far = maskIn ? gaussApprox(m, w, h, w * 0.012) : m3;
+  for (let i = 0, j = 0; i < n; i++, j += 4) {
+    const mm = m[i * 3], out = 1 - mm;
+    const H = maskIn ? Math.min(1, Math.min(1, far[i * 3] * 1.8) * out * 0.55 + Math.min(1, near[i * 3] * 1.6) * out * 0.85) * 0.9 : 0;
+    const r = data[j] / 255, g = data[j + 1] / 255, b = data[j + 2] / 255, L = (r + g + b) / 3;
+    const dark = maskIn ? 0.62 : 0.8;
+    const warm = [1.0, 0.98, 0.95], src = [r, g, b];
+    for (let c = 0; c < 3; c++) {
+      const bg = (L + (src[c] - L) * 0.85) * dark;
+      let v = src[c] * mm + bg * (1 - mm);
+      v = v + (1 - v) * H * warm[c];
+      data[j + c] = clamp8(data[j + c] + (v * 255 - data[j + c]) * a);
+    }
   }
 }
 

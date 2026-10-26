@@ -35,7 +35,7 @@ enum LiveFilter {
         return i.transformed(by: .init(translationX: -i.extent.minX, y: -i.extent.minY))
     }
 
-    enum Special { case duotone, thermal, glitch, vhs, pixelate, sketch, flashSoft, flashHard }
+    enum Special { case duotone, thermal, glitch, vhs, pixelate, sketch, flashSoft, flashHard, subjectGlow }
 
     /// 색상 대역(HSL) 조정 한 줄 — c: 중심 색상, w: 반경, h: 색상 이동, s·l: 배율 δ
     struct Band { var c: Double; var w: Double; var h: Double; var s: Double; var l: Double }
@@ -152,6 +152,8 @@ enum LiveFilter {
         // 배경은 어둡고 살짝 흐름. 소프트 = 디퓨저(부드럽고 뽀얗게), 하드 = 직광(대비·배경 더 어둡게, 과하지 않게).
         "flashsoft": .init(fx: .init(grain: 0.25), special: .flashSoft),
         "flashhard": .init(fx: .init(grain: 0.25), special: .flashHard),
+        // 피사체 글로우(오너 2026-10-27) — 인물 윤곽 바깥에 하얀 글로우 + 배경 어둡게. filters.js subjectGlowRGBA 와 같은 단계.
+        "subjectglow": .init(special: .subjectGlow),
     ]
 
     // MARK: ① 채널 LUT — filters.js channelGains / toneCurve / buildLuts 를 Double 로 그대로
@@ -702,6 +704,8 @@ final class LiveFilterEngine {
         case .flashSoft?, .flashHard?:
             let r = slowSync(img, hard: p.special == .flashHard)
             return effects ? effectsPass(r, p) : r
+        case .subjectGlow?:
+            return subjectGlow(img)
         case .vhs?:
             let ch = max(1, jsRound(W * 0.004))
             img = run("lfShift", ext, [img], [img, ch, W, H])
@@ -820,6 +824,33 @@ final class LiveFilterEngine {
         out = out.applyingFilter("CITemperatureAndTint", parameters: ["inputNeutral": CIVector(x: 6500, y: 0), "inputTargetNeutral": CIVector(x: hard ? 5700 : 5900, y: 0)])
             .applyingFilter("CIVignette", parameters: [kCIInputIntensityKey: hard ? 0.5 : 0.35, kCIInputRadiusKey: 1.7])
         return out.cropped(to: ext)
+    }
+
+    /// 피사체 글로우 — 배경 채도↓·×0.62, 인물 윤곽 바깥에만 하얀 글로우(넓게 0.55 + 가까이 0.85). 사람이 없으면 배경만 살짝 어둡게.
+    func subjectGlow(_ img: CIImage) -> CIImage {
+        let ext = img.extent, W = ext.width, H = ext.height
+        func mul(_ i: CIImage, _ k: CGFloat, bias: CGFloat = 0) -> CIImage {
+            i.applyingFilter("CIColorMatrix", parameters: ["inputRVector": CIVector(x: k, y: 0, z: 0, w: 0), "inputGVector": CIVector(x: 0, y: k, z: 0, w: 0),
+                                                         "inputBVector": CIVector(x: 0, y: 0, z: k, w: 0), "inputBiasVector": CIVector(x: bias, y: bias, z: bias, w: 0)])
+                .applyingFilter("CIColorClamp")
+        }
+        guard (try? VNImageRequestHandler(ciImage: img).perform([segReq])) != nil, let pb = segReq.results?.first?.pixelBuffer else {
+            return mul(img, 0.6).cropped(to: ext)
+        }
+        // 마스크는 색이 아니라 데이터 — 색공간 없이 읽어야 감마로 값이 줄지 않는다(실측: 머리 쪽 글로우가 빠졌다).
+        let raw = CIImage(cvPixelBuffer: pb, options: [.colorSpace: NSNull()])
+        let m = raw.transformed(by: .init(scaleX: W / raw.extent.width, y: H / raw.extent.height)).clampedToExtent()
+            .applyingGaussianBlur(sigma: Double(W) * 0.0015).cropped(to: ext)
+        // CI 는 선형 공간에서 곱한다 — 웹(sRGB)의 ×0.62 와 같게 보이려면 0.62^2.2 ≈ 0.35(실측: 0.62 면 0.8 처럼 보였다).
+        let bg = mul(img.applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 0.85]), 0.35)
+        let base = img.applyingFilter("CIBlendWithMask", parameters: [kCIInputBackgroundImageKey: bg, kCIInputMaskImageKey: m])
+        let inv = m.applyingFilter("CIColorInvert")
+        let near = mul(m.clampedToExtent().applyingGaussianBlur(sigma: Double(W) * 0.0036).cropped(to: ext), 1.6)
+        let far = mul(m.clampedToExtent().applyingGaussianBlur(sigma: Double(W) * 0.012).cropped(to: ext), 1.8)
+        let halo = mul(mul(far, 0.55).applyingFilter("CIAdditionCompositing", parameters: [kCIInputBackgroundImageKey: mul(near, 0.85)]), 0.9)
+            .applyingFilter("CIMultiplyCompositing", parameters: [kCIInputBackgroundImageKey: inv]).cropped(to: ext)
+        let white = CIImage(color: CIColor(red: 1, green: 0.98, blue: 0.95)).cropped(to: ext)
+        return white.applyingFilter("CIBlendWithMask", parameters: [kCIInputBackgroundImageKey: base, kCIInputMaskImageKey: halo]).cropped(to: ext)
     }
 
     private func gauss(_ img: CIImage, _ sigma: CGFloat, _ W: CGFloat, _ H: CGFloat) -> CIImage {

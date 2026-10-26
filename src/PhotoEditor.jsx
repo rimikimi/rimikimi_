@@ -463,7 +463,7 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
       const copy = new ImageData(new Uint8ClampedArray(base.data), w, h);
       // 기하 보정(정방향·렌즈)은 룩보다 먼저, 한 번의 리샘플로
       if (lens || geo.tilt || geo.pv || geo.ph) applyGeometry(copy.data, w, h, { ...geo, lens });
-      if ((presetKey === "flashsoft" || presetKey === "flashhard") && !(idx in personMaskRef.current)) {
+      if ((presetKey === "flashsoft" || presetKey === "flashhard" || presetKey === "subjectglow") && !(idx in personMaskRef.current)) {
         personMaskRef.current[idx] = null;
         personMaskFor(baseRef.current).then((m) => { personMaskRef.current[idx] = m; setMaskTick((t) => t + 1); });
       }
@@ -923,7 +923,7 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
           data: id.data, w, h,
           preset: hasLook ? presetByKey(lk.presetKey) : null,
           effects: hasLook ? { ...lk.fx, seed: GRAIN_SEED, faces: facesFor(i, lk.lens, lk.geo),
-            personMask: (lk.presetKey === "flashsoft" || lk.presetKey === "flashhard") ? (personMaskRef.current[i] || await personMaskFor(id)) || undefined : undefined } : {},
+            personMask: (lk.presetKey === "flashsoft" || lk.presetKey === "flashhard" || lk.presetKey === "subjectglow") ? (personMaskRef.current[i] || await personMaskFor(id)) || undefined : undefined } : {},
           strength: lk.strength,
           geo: hasGeo ? g : null, lens: lk.lens || 0,
         });
