@@ -21,8 +21,13 @@ struct RootTabView: View {
                         .navigationDestination(for: Route.self) { RouteDestination(route: $0) }
                 }
             }
-            Tab(Copy.tabCameraFilter, systemImage: "camera", value: .filter) {
+            Tab(Copy.tabCamera, systemImage: "camera", value: .filter) {
                 NavigationStack { CameraFilterTab() }
+            }
+            // 필터 탭 — 앨범에 있는 사진에 필터 입히기(오너 2026-10-26 "4 tabs": 만들기·카메라·필터·내 사진).
+            // 오늘의 필터 + 그룹별 격자 → 필터를 누르면 사진 고르기 → 편집기.
+            Tab(Copy.tabFilter, systemImage: "camera.filters", value: .edit) {
+                NavigationStack { FilterTabView() }
             }
             Tab(Copy.tabMyPhotos, systemImage: "photo.on.rectangle", value: .myPhotos) {
                 NavigationStack(path: $app.myPhotosPath) {

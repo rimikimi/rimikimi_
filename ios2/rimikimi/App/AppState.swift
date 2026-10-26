@@ -3,7 +3,7 @@ import Observation
 import UIKit
 
 /// 탭 밖에서 공유되는 화면 상태 — 탭 선택, 스택 경로, 로그인 시트, 하던 동작(pending) 재개.
-enum TabID: Hashable { case gallery, filter, camera, myPhotos, profile }
+enum TabID: Hashable { case gallery, filter, edit, camera, myPhotos, profile }   // filter=카메라 탭, edit=필터 탭(앨범 사진에 필터, 2026-10-26)
 
 /// 각 탭 스택의 목적지.
 enum Route: Hashable {
@@ -70,7 +70,7 @@ final class AppState {
         case .gallery: return galleryPath
         case .myPhotos: return myPhotosPath
         case .profile: return profilePath
-        case .filter, .camera: return []
+        case .filter, .edit, .camera: return []
         }
     }
     /// 떠 있는 카메라 원을 그릴지 — 탭바가 실제로 보이는 화면에서만.
@@ -83,7 +83,7 @@ final class AppState {
         case .gallery: galleryPath.append(route)
         case .myPhotos: myPhotosPath.append(route)
         case .profile: profilePath.append(route)
-        case .filter, .camera: break
+        case .filter, .edit, .camera: break
         }
     }
 

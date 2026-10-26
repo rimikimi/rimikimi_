@@ -53,7 +53,7 @@ struct FilterTabView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 hero
-                cameraRow
+                // 카메라 진입 줄은 뺐다 — 카메라는 이제 자기 탭이 있다(4탭, 2026-10-26)
                 ForEach(Self.groups) { g in
                     sectionHeader(g)
                     LazyVGrid(columns: columns, spacing: Spacing.s3) {

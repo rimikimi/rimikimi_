@@ -43,6 +43,7 @@ enum Copy {
     // MARK: 2026-10-09 개편 — 탭 3개 · 목적 칸 · 여러 장 담기
     static var tabMake: String { L.t("만들기", "Create") }
     static var tabCameraFilter: String { L.t("카메라·필터", "Camera") }
+    static var tabCamera: String { L.t("카메라", "Camera") }
     static var settingsTitle: String { L.t("설정", "Settings") }
     static var featureRetouch: String { LabelStore.t("feature.retouch", "말로 고치기", "Fix with words") }
     static var featureRestore: String { LabelStore.t("feature.restore", "옛날 사진 복원", "Restore old photo") }

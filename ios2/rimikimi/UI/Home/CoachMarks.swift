@@ -13,7 +13,7 @@ enum Coach {
         [CoachStep(key: "cards", title: L.t("내 사진 고치기", "Fix your photos"), text: L.t("말로 적으면 그 부분만 고치고, 옛날 사진은 선명하게 되살려요.", "Describe a fix and only that part changes. Old photos come back sharp.")),
          CoachStep(key: "purposes", title: L.t("목적 고르기", "Pick a purpose"), text: L.t("이력서·프사·웨딩·화보 중 고르면 거기에 맞는 룩이 나와요.", "Résumé, profile, wedding or concept — looks that fit appear.")),
          CoachStep(key: "albums", title: L.t("컨셉 앨범", "Concept albums"), text: L.t("카테고리별로 모아 뒀어요. 앨범을 열어 둘러봐요.", "Grouped by category. Open one to browse.")),
-         CoachStep(key: "cameraTab", title: L.t("카메라·필터", "Camera"), text: L.t("찍고 필터를 입히는 건 여기서. 무료예요.", "Shoot and add filters here. Free."))]
+         CoachStep(key: "cameraTab", title: L.t("카메라", "Camera"), text: L.t("필터를 입혀서 바로 찍어요. 앨범 사진엔 옆 '필터' 탭에서. 무료예요.", "Shoot with live filters. For album photos, use the Filters tab next to it. Free."))]
     }
     static let grid = CoachStep(key: "firstTile", title: L.t("여러 개 담기", "Pick several"), text: L.t("길게 누르면 아래에 담겨요. 다른 카테고리와 섞어서 한 번에 8장까지. 탭하면 크게 보기.", "Press and hold to pick. Mix categories, up to 8 at once. Tap to view."))
     static let cart = CoachStep(key: "cartMake", title: L.t("한 번에 만들기", "Make them at once"), text: L.t("담은 건 여기 모여요. 다 골랐으면 누르고 셀카 한 장이면 끝.", "Your picks gather here. Tap and add one selfie."))
@@ -68,7 +68,7 @@ private struct CoachHost: ViewModifier {
     private func rect(_ key: String, _ full: CGSize) -> CGRect? {
         if let r = CoachRects.shared.rects[key] { return r }
         if key == "cameraTab" {
-            let w = full.width / 3
+            let w = full.width / 4   // 탭 4개(만들기·카메라·필터·내 사진) 중 두 번째
             let bottomInset = (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.keyWindow?.safeAreaInsets.bottom ?? 34
             return CGRect(x: w + 8, y: full.height - bottomInset - 44, width: w - 16, height: 60)   // 탭바(하단 고정, 막 위에 그려짐) 뒤에 숨는 자리 — 막 구멍이 탭바 위로 삐져나오지 않게(10/24 실측)
         }
