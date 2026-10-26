@@ -173,6 +173,11 @@ export const FILM_PRESETS = [
   // 빛번짐 — 드리미 글로우 + 펄 + 프리즘 스파클(dreamyRGBA). 오너 2026-10-12 확정. 세기 = 색감 슬라이더.
   { key: "bloom",    ko: "빛번짐",    en: "Bloom", group: "mood",
     special: "dreamy" },
+  // 슬로우싱크 플래시 · 후막(오너 2026-10-26) — 사람(인물 분할 마스크)은 제자리에서 플래시로 또렷,
+  // 지나온 쪽(왼쪽)에 옅은 흔적, 배경은 어둡고 살짝 흐름. 소프트 = 디퓨저, 하드 = 직광(과하지 않게).
+  // 마스크: effects.personMask({w,h,data}) — 없으면 흔적 없이 배경 처리만. iOS 는 LiveFilter.swift slowSync.
+  { key: "flashsoft", ko: "소프트 플래시", en: "Soft Flash", group: "mood", special: "flashsoft", fx: { grain: 0.25 } },
+  { key: "flashhard", ko: "하드 플래시", en: "Hard Flash", group: "mood", special: "flashhard", fx: { grain: 0.25 }, hidden: true }, // 오너 2026-10-26: 소프트만 노출
   { key: "twinkle",  ko: "트윙클",    en: "Twinkle", group: "mood",
     temp: 4, tint: 0, ex: 0.03, con: 0.1, fade: 6, whitePull: 6, sat: 0.06, vib: 0.2,
     sh: [0, 0, 4], hi: [8, 6, 0],
@@ -217,6 +222,8 @@ export function applyLookWithStrength(data, w, h, preset, effects = {}, strength
     beautyRGBA(data, w, h, k, effects.faces); // 강도 = 보정 세기 그 자체(보간 아님) — 0 이면 원본 그대로
   } else if (p?.special === "dreamy") {
     dreamyRGBA(data, w, h, k, effects.faces, effects.seed); // 색감 슬라이더 = 빛번짐 세기(70% = 기본 룩)
+  } else if (p?.special === "flashsoft" || p?.special === "flashhard") {
+    slowSyncRGBA(data, w, h, k, effects.personMask, p.special === "flashhard");
   } else if (p) {
     if (Math.abs(k - 1) > 0.01) {
       const orig = new Uint8ClampedArray(data);
@@ -438,6 +445,11 @@ export function applyLook(data, w, h, preset, effects = {}) {
   if (preset?.special === "dreamy") {
     dreamyRGBA(data, w, h, 1, effects.faces, effects.seed);
     const { faces: _f, ...rest } = effects;
+    return applyLook(data, w, h, null, rest);
+  }
+  if (preset?.special === "flashsoft" || preset?.special === "flashhard") {
+    slowSyncRGBA(data, w, h, 1, effects.personMask, preset.special === "flashhard");
+    const { personMask: _m, faces: _f, ...rest } = effects;
     return applyLook(data, w, h, null, rest);
   }
   const p = preset && preset.key !== "none" ? preset : null;
@@ -1500,4 +1512,104 @@ export function autoStraighten(data, w, h, { perspective = true } = {}) {
     pv: Math.round(best.v * 1000) / 1000, ph: Math.round(best.h * 1000) / 1000,
     confident, gain: Math.round(gain * 100) / 100, share: Math.round((best.s / total) * 100) / 100,
   };
+}
+
+
+/* ---------- 슬로우셔터 + 플래시 ---------- */
+// 가로 1D 박스 블러(채널 3개, Float32) — 모션블러 근사(각도 ~4° 는 가로로 충분)
+function hBox(src, w, h, r) {
+  const out = new Float32Array(src.length);
+  for (let y = 0; y < h; y++) {
+    let sr = 0, sg = 0, sb = 0; const row = y * w;
+    for (let i = -r; i <= r; i++) { const x = Math.min(w - 1, Math.max(0, i)), j = (row + x) * 3; sr += src[j]; sg += src[j + 1]; sb += src[j + 2]; }
+    for (let x = 0; x < w; x++) {
+      const o = (row + x) * 3, n = 2 * r + 1;
+      out[o] = sr / n; out[o + 1] = sg / n; out[o + 2] = sb / n;
+      const xa = Math.min(w - 1, x + r + 1), xr = Math.max(0, x - r), ja = (row + xa) * 3, jr = (row + xr) * 3;
+      sr += src[ja] - src[jr]; sg += src[ja + 1] - src[jr + 1]; sb += src[ja + 2] - src[jr + 2];
+    }
+  }
+  return out;
+}
+function vBox(src, w, h, r) {
+  const out = new Float32Array(src.length);
+  for (let x = 0; x < w; x++) {
+    let sr = 0, sg = 0, sb = 0;
+    for (let i = -r; i <= r; i++) { const y = Math.min(h - 1, Math.max(0, i)), j = (y * w + x) * 3; sr += src[j]; sg += src[j + 1]; sb += src[j + 2]; }
+    for (let y = 0; y < h; y++) {
+      const o = (y * w + x) * 3, n = 2 * r + 1;
+      out[o] = sr / n; out[o + 1] = sg / n; out[o + 2] = sb / n;
+      const ya = Math.min(h - 1, y + r + 1), yr = Math.max(0, y - r), ja = (ya * w + x) * 3, jr = (yr * w + x) * 3;
+      sr += src[ja] - src[jr]; sg += src[ja + 1] - src[jr + 1]; sb += src[ja + 2] - src[jr + 2];
+    }
+  }
+  return out;
+}
+const gaussApprox = (a, w, h, s) => { const r = Math.max(1, Math.round(s * 0.9)); let t = a; for (let i = 0; i < 2; i++) t = vBox(hBox(t, w, h, r), w, h, r); return t; };
+// 후막 슬로우싱크 — scratchpad rear.py(오너 승인)와 같은 단계
+function slowSyncRGBA(data, w, h, a, maskIn, hard) {
+  if (!(a > 0.001)) return;
+  const n = w * h, f = new Float32Array(n * 3);
+  for (let i = 0, j = 0; i < n; i++, j += 4) { f[i * 3] = data[j] / 255; f[i * 3 + 1] = data[j + 1] / 255; f[i * 3 + 2] = data[j + 2] / 255; }
+  // 마스크(0..1) — 해상도 맞추고 살짝 부드럽게
+  const m = new Float32Array(n);
+  if (maskIn) for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const mx = Math.min(maskIn.w - 1, Math.floor(x * maskIn.w / w)), my = Math.min(maskIn.h - 1, Math.floor(y * maskIn.h / h));
+    m[y * w + x] = maskIn.data[my * maskIn.w + mx] / 255;
+  }
+  // 배경: 살짝 흐르고 어둡게 + 불빛만 짧게
+  const bgB = hBox(f, w, h, Math.max(1, Math.round(w * 0.0075)));
+  const hi = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) { const o = i * 3, mx = Math.max(f[o], f[o + 1], f[o + 2]), t = Math.max(0, Math.min(1, (mx - 0.62) / 0.38)); hi[o] = f[o] * t; hi[o + 1] = f[o + 1] * t; hi[o + 2] = f[o + 2] * t; }
+  const tr = hBox(hi, w, h, Math.max(1, Math.round(w * 0.015)));
+  const dark = hard ? 0.55 : 0.7;
+  // 흔적: 지나온 자리(왼쪽 0~7%) 사람을 먼 곳부터 가중 누적
+  const tc = new Float32Array(n * 3), ta = new Float32Array(n * 3);
+  let tsum = 0; const N = 10;
+  if (maskIn) for (let k = 1; k < N; k++) {
+    const t = k / (N - 1), dx = Math.round(-0.07 * w * t), wgt = (1 - t) * 0.9 + 0.1; tsum += wgt;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const sx = x - dx; if (sx < 0 || sx >= w) continue;
+      const si = y * w + sx, mm = m[si] * wgt, o = (y * w + x) * 3, so = si * 3;
+      tc[o] += f[so] * mm; tc[o + 1] += f[so + 1] * mm; tc[o + 2] += f[so + 2] * mm; ta[o] += mm; ta[o + 1] += mm; ta[o + 2] += mm;
+    }
+  }
+  const tcB = maskIn ? gaussApprox(tc, w, h, w * 0.006) : tc, taB = maskIn ? gaussApprox(ta, w, h, w * 0.004) : ta;
+  // 사람 평균 밝기(하드 자동 밝기)
+  let ls = 0, lm = 0; for (let i = 0; i < n; i++) { ls += (f[i * 3] + f[i * 3 + 1] + f[i * 3 + 2]) / 3 * m[i]; lm += m[i]; }
+  const gain = Math.min(1.18, Math.max(1, 1 + (0.62 - (lm > 1 ? ls / lm : 0.5)) * 0.6));
+  const cx = w / 2, cy = h * 0.42, v = hard ? 0.32 : 0.22;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = y * w + x, o = i * 3, j = i * 4, mm = m[i];
+    const al = maskIn ? Math.min(0.55, (taB[o] / Math.max(tsum, 1e-3)) * 1.6) : 0;
+    const vig = 1 - v * (1 - Math.exp(-(((x - cx) / (w * 0.6)) ** 2 + ((y - cy) / (h * 0.58)) ** 2)));
+    const rgb = [0, 0, 0];
+    for (let c = 0; c < 3; c++) {
+      const bg = Math.min(1, bgB[o + c] * dark + tr[o + c] * 0.7);
+      const trail = taB[o] > 1e-4 ? Math.min(1, (tcB[o + c] / taB[o + c]) * 0.75) : 0;
+      const comp = bg * (1 - al) + trail * al;
+      const P = hard ? Math.min(1, ((f[o + c] - 0.45) * 1.12 + 0.45) * gain + 0.02)
+                     : Math.min(1, ((f[o + c] - 0.45) * 1.04 + 0.45) * 1.1 + 0.06);
+      rgb[c] = P * mm + comp * (1 - mm);
+    }
+    const r = Math.min(1, rgb[0] * 1.05 + 0.01) * vig, g = rgb[1] * vig, b = rgb[2] * (hard ? 0.93 : 0.96) * vig;
+    data[j] = clamp8(data[j] + (r * 255 - data[j]) * a); data[j + 1] = clamp8(data[j + 1] + (g * 255 - data[j + 1]) * a); data[j + 2] = clamp8(data[j + 2] + (b * 255 - data[j + 2]) * a);
+  }
+}
+
+/* 인물 분할 마스크(웹) — MediaPipe selfie segmenter 를 처음 쓸 때만 불러온다. 실패하면 null(화면 전체 배경 처리). */
+let _segP = null;
+export async function personMaskFor(imageData) {
+  try {
+    if (!_segP) _segP = (async () => {
+      const v = await import(/* @vite-ignore */ "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs");
+      const fs = await v.FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
+      return v.ImageSegmenter.createFromOptions(fs, { baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite" }, outputConfidenceMasks: true, runningMode: "IMAGE" });
+    })();
+    const seg = await _segP;
+    const r = seg.segment(imageData);
+    const cm = r.confidenceMasks[0]; const fl = cm.getAsFloat32Array();
+    const out = new Uint8Array(fl.length); for (let i = 0; i < fl.length; i++) out[i] = Math.round(Math.min(1, fl[i]) * 255);
+    const res = { w: cm.width, h: cm.height, data: out }; r.close && r.close(); return res;
+  } catch (e) { console.warn("personMask 실패", e); return null; }
 }

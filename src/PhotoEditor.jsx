@@ -15,7 +15,7 @@
 // ============================================================
 import { useEffect, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { FILM_PRESETS, presetByKey, applyLook, applyLookWithStrength, applyGeometry, autoStraighten } from "./filters";
+import { FILM_PRESETS, presetByKey, applyLook, applyLookWithStrength, applyGeometry, autoStraighten, personMaskFor } from "./filters";
 import { isNative, nativeSaveToAlbum, nativeOpenPaywall } from "./nativeBridge";
 import { useFilterAccess, isLocked, isPaidPreset, markFilterUsed, trialDaysLeft } from "./filterAccess";
 import { shareImage } from "./share";
@@ -310,6 +310,9 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
   // 인플 얼굴 사각형 — 원본 좌표라서 기울기·원근·렌즈 보정을 켰거나 잘라/채워 맞춤으로 사진이 바뀌면 못 쓴다
   // (그땐 undefined → filters.js 자체 추정).
   const facesStaleRef = useRef(new Set());
+  // 슬로우싱크 플래시(flashsoft/flashhard) 인물 마스크 — 사진별로 한 번 구해 둔다(정규화 좌표라 해상도 무관)
+  const personMaskRef = useRef({});
+  const [maskTick, setMaskTick] = useState(0);
   const facesFor = (i, lensV, g) => {
     const f = initialFaces && initialFaces[i];
     if (!Array.isArray(f) || facesStaleRef.current.has(i) || lensV || (g && (g.tilt || g.pv || g.ph))) return undefined;
@@ -460,11 +463,15 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
       const copy = new ImageData(new Uint8ClampedArray(base.data), w, h);
       // 기하 보정(정방향·렌즈)은 룩보다 먼저, 한 번의 리샘플로
       if (lens || geo.tilt || geo.pv || geo.ph) applyGeometry(copy.data, w, h, { ...geo, lens });
-      applyLookWithStrength(copy.data, w, h, presetByKey(presetKey), { ...fx, seed: GRAIN_SEED, faces: facesFor(idx, lens, geo) }, strength);
+      if ((presetKey === "flashsoft" || presetKey === "flashhard") && !(idx in personMaskRef.current)) {
+        personMaskRef.current[idx] = null;
+        personMaskFor(baseRef.current).then((m) => { personMaskRef.current[idx] = m; setMaskTick((t) => t + 1); });
+      }
+      applyLookWithStrength(copy.data, w, h, presetByKey(presetKey), { ...fx, seed: GRAIN_SEED, faces: facesFor(idx, lens, geo), personMask: personMaskRef.current[idx] || undefined }, strength);
       ctx.putImageData(copy, 0, 0);
       if (dateStyle !== "none") drawDateStamp(ctx, w, h, dateStyle);
     });
-  }, [presetKey, fx, dateStyle, peeking, strength, lens, geo, idx]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [presetKey, fx, dateStyle, peeking, strength, lens, geo, idx, maskTick]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { if (ready) renderPreview(); }, [ready, renderPreview, idx]);
 
@@ -530,6 +537,7 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
     const ctx = c.getContext("2d", { willReadFrequently: true });
     ctx.drawImage(img, 0, 0, w, h);
     fullImgRef.current = img;
+    delete personMaskRef.current[idx];
     facesStaleRef.current.add(idx); // 사진이 바뀌었다 — 앱이 준 얼굴 사각형은 이제 안 맞는다
     baseRef.current = ctx.getImageData(0, 0, w, h);
     baseSmallRef.current = makeSmallBase(baseRef.current);
@@ -914,7 +922,8 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
         const out = await applyLookAsync({
           data: id.data, w, h,
           preset: hasLook ? presetByKey(lk.presetKey) : null,
-          effects: hasLook ? { ...lk.fx, seed: GRAIN_SEED, faces: facesFor(i, lk.lens, lk.geo) } : {},
+          effects: hasLook ? { ...lk.fx, seed: GRAIN_SEED, faces: facesFor(i, lk.lens, lk.geo),
+            personMask: (lk.presetKey === "flashsoft" || lk.presetKey === "flashhard") ? (personMaskRef.current[i] || await personMaskFor(id)) || undefined : undefined } : {},
           strength: lk.strength,
           geo: hasGeo ? g : null, lens: lk.lens || 0,
         });
