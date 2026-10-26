@@ -94,17 +94,9 @@ struct FilterTabView: View {
             ScrollView(.horizontal) {
                 LazyHStack(alignment: .top, spacing: CardMetrics.railGap) {
                     ForEach(keys, id: \.self) { k in
-                        Button { app.requireLogin(.filterPick(presetKey: k)) } label: {
-                            FilterWipeCard(key: k)
-                                .photoRatio()
-                                .overlay(alignment: .bottomLeading) { PhotoCaption(title: Copy.filterName(k), size: 16) }
-                                .overlay(alignment: .topTrailing) { FilterFavorites.starButton(k, favs: $favs, app: app) }
-                                .clipShape(RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
-                                .shadow(color: .black.opacity(0.10), radius: 12, y: 8)
-                        }
-                        .buttonStyle(PressScaleButtonStyle())
-                        .contextMenu { FilterFavorites.menuItem(k, favs: $favs, app: app) }
-                        .containerRelativeFrame(.horizontal) { w, _ in (w * CardMetrics.railCardFraction).rounded() }
+                        FilterFlipCard(key: k, favs: $favs, app: app)
+                            .shadow(color: .black.opacity(0.10), radius: 12, y: 8)
+                            .containerRelativeFrame(.horizontal) { w, _ in (w * CardMetrics.railCardFraction).rounded() }
                     }
                 }
                 .padding(.horizontal, Spacing.page)
@@ -249,15 +241,10 @@ struct FilterGroupGrid: View {
         ScrollView {
             LazyVGrid(columns: columns, spacing: Spacing.s3) {
                 ForEach(group.presets) { p in
-                    Button { app.requireLogin(.filterPick(presetKey: p.key)) } label: {
-                        VStack(spacing: 6) {
-                            FilterWipeCard(key: p.key, cornerRadius: Radius.card - 2).photoRatio()
-                                .overlay(alignment: .topTrailing) { FilterFavorites.starButton(p.key, favs: $favs, app: app, size: 26) }
-                            Text(p.label).font(AppFont.footnote).foregroundStyle(Color.ink).lineLimit(1).minimumScaleFactor(0.85)
-                        }
+                    VStack(spacing: 6) {
+                        FilterFlipCard(key: p.key, favs: $favs, app: app, captionSize: nil, cornerRadius: Radius.card - 2, starSize: 26)
+                        Text(p.label).font(AppFont.footnote).foregroundStyle(Color.ink).lineLimit(1).minimumScaleFactor(0.85)
                     }
-                    .buttonStyle(PressScaleButtonStyle())
-                    .contextMenu { FilterFavorites.menuItem(p.key, favs: $favs, app: app) }
                 }
             }
             .padding(.horizontal, Spacing.page).padding(.top, Spacing.s2)
