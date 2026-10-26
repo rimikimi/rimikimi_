@@ -184,7 +184,7 @@ function drawSticker(ctx, st, w, h) {
 const fxOf = (p) => ({
   grain: p?.fx?.grain || 0, vignette: p?.fx?.vignette || 0, leak: p?.fx?.leak || 0,
   glow: p?.fx?.glow || 0, blur: p?.fx?.blur || 0, shake: p?.fx?.shake || 0,
-  twinkle: p?.fx?.twinkle || 0, lowres: p?.fx?.lowres || 0,
+  twinkle: p?.fx?.twinkle || 0, lowres: p?.fx?.lowres || 0, spot: p?.fx?.spot || 0,
 });
 
 // src(1장) 또는 srcs(여러 장, 최대 10) 를 받는다. 여러 장이면 필터/효과는 전체
@@ -247,11 +247,14 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
     lens: 0,   // 렌즈 왜곡 보정 -1..1 (0 = 원본)
     geo: { tilt: 0, pv: 0, ph: 0 },
     geoAuto: null,
+    spotPos: null,
   });
   const [lookByIdx, setLookByIdx] = useState({});
   const lookOf = (i) => lookByIdx[i] || defaultLook(i);
+  // 스포트라이트 위치(사진별, 0~1) — 스포트라이트 필터일 때 사진을 탭하면 그 자리로(오너 2026-10-27).
+  const [spotPos, setSpotPos] = useState(null);
   function updateLook(patch) {
-    const next = { presetKey, fx, strength, fxAmt, lens, geo, geoAuto, ...patch };
+    const next = { presetKey, fx, strength, fxAmt, lens, geo, geoAuto, spotPos, ...patch };
     setPresetKey(next.presetKey);
     setFx(next.fx);
     setStrength(next.strength);
@@ -259,6 +262,7 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
     setLens(next.lens || 0);
     setGeo(next.geo || ZERO_GEO);
     setGeoAuto(next.geoAuto || null);
+    setSpotPos(next.spotPos || null);
     setLookByIdx((p) => ({ ...p, [idx]: next }));
   }
   function switchPhoto(i) {
@@ -270,6 +274,7 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
     setLens(lk.lens || 0);
     setGeo(lk.geo || ZERO_GEO);
     setGeoAuto(lk.geoAuto || null);
+    setSpotPos(lk.spotPos || null);
     const g = presetByKey(lk.presetKey).group;
     if (g) setChipGroup(g);
     setReady(false);
@@ -467,11 +472,11 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
         personMaskRef.current[idx] = null;
         personMaskFor(baseRef.current).then((m) => { personMaskRef.current[idx] = m; setMaskTick((t) => t + 1); });
       }
-      applyLookWithStrength(copy.data, w, h, presetByKey(presetKey), { ...fx, seed: GRAIN_SEED, faces: facesFor(idx, lens, geo), personMask: personMaskRef.current[idx] || undefined }, strength);
+      applyLookWithStrength(copy.data, w, h, presetByKey(presetKey), { ...fx, seed: GRAIN_SEED, faces: facesFor(idx, lens, geo), personMask: personMaskRef.current[idx] || undefined, spotPos: spotPos || undefined }, strength);
       ctx.putImageData(copy, 0, 0);
       if (dateStyle !== "none") drawDateStamp(ctx, w, h, dateStyle);
     });
-  }, [presetKey, fx, dateStyle, peeking, strength, lens, geo, idx, maskTick]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [presetKey, fx, dateStyle, peeking, strength, lens, geo, idx, maskTick, spotPos]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { if (ready) renderPreview(); }, [ready, renderPreview, idx]);
 
@@ -910,7 +915,7 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
       const lk = lookOf(i);
       const hasLook = lk.presetKey !== "none"
         || lk.fx.grain || lk.fx.vignette || lk.fx.leak || lk.fx.glow || lk.fx.blur || lk.fx.shake
-        || lk.fx.twinkle || lk.fx.lowres;
+        || lk.fx.twinkle || lk.fx.lowres || lk.fx.spot;
       // ⚠️ 왜곡 보정은 룩이 없어도 저장본에 반영돼야 한다 — hasLook 에만 걸어두면
       //    "필터 없이 왜곡만 고친" 사진이 원본 그대로 저장된다.
       const g = lk.geo || {};
@@ -922,7 +927,7 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
         const out = await applyLookAsync({
           data: id.data, w, h,
           preset: hasLook ? presetByKey(lk.presetKey) : null,
-          effects: hasLook ? { ...lk.fx, seed: GRAIN_SEED, faces: facesFor(i, lk.lens, lk.geo),
+          effects: hasLook ? { ...lk.fx, seed: GRAIN_SEED, faces: facesFor(i, lk.lens, lk.geo), spotPos: (i === idx ? spotPos : lk.spotPos) || undefined,
             personMask: (lk.presetKey === "flashsoft" || lk.presetKey === "flashhard" || lk.presetKey === "subjectglow") ? (personMaskRef.current[i] || await personMaskFor(id)) || undefined : undefined } : {},
           strength: lk.strength,
           geo: hasGeo ? g : null, lens: lk.lens || 0,
@@ -1156,6 +1161,11 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
                 if (Date.now() - s.t > 320) return;                       // 길게 누름 = 원본 비교
                 if (Math.hypot(e.clientX - s.x, e.clientY - s.y) > 8) return;
                 if (s.hadSel) return;                                     // 선택 해제만
+                if (presetKey === "spotlight") {                          // 스포트라이트: 탭 = 조명 위치
+                  const r = e.currentTarget.getBoundingClientRect();
+                  const pos = { x: Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), y: Math.min(1, Math.max(0, (e.clientY - r.top) / r.height)) };
+                  hap.tap(); updateLook({ spotPos: pos }); return;
+                }
                 openTextAt(e.clientX, e.clientY);
               }}
               onPointerCancel={(e) => {
@@ -1276,6 +1286,7 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
                     // 프리셋 기본 효과까지 원탭 적용, 색감은 기본값(0.7 = 표준 룩)·효과는 1(프리셋 그대로)로 리셋
                     updateLook({ presetKey: p.key, fx: fxOf(p), strength: 0.7, fxAmt: 1 });
                     markFilterUsed(p.key);
+                    if (p.key === "spotlight") flashToast(getLang() === "ko" ? "사진을 탭하면 조명이 그 자리로 옮겨가요" : "Tap the photo to move the spotlight");
                   }}
                 >
                   <canvas

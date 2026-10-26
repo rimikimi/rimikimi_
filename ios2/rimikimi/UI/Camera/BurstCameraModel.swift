@@ -189,10 +189,10 @@ final class BurstCameraModel {
         }
         // 필터는 **셔터를 누른 순간** 값으로 고정한다 — 사진은 화질 우선 처리라 최대 1초 뒤에 도착하는데, 그때 읽으면
         // 그 사이 바꾼 필터가 들어갔다(오너 2026-10-11 "필터 2개로 1장씩 찍었는데 하나로만 저장됐어").
-        let key = live?.presetKey ?? "none", fx = live?.fxAmount ?? 0.7
+        let key = live?.presetKey ?? "none", fx = live?.fxAmount ?? 0.7, spot = live?.spotPos
         let id = s.uniqueID
         let d = ShotDelegate(wantMirror: want) { [weak self] image in
-            Task { @MainActor in self?.inFlight[id] = nil; self?.add(image, key: key, fx: fx) }
+            Task { @MainActor in self?.inFlight[id] = nil; self?.add(image, key: key, fx: fx, spot: spot) }
         }
         inFlight[id] = d             // 콜백이 올 때까지 살려 둔다
         output.capturePhoto(with: s, delegate: d)
@@ -204,7 +204,7 @@ final class BurstCameraModel {
         }
     }
 
-    private func add(_ image: UIImage?, key: String, fx: Double) {
+    private func add(_ image: UIImage?, key: String, fx: Double, spot: CGPoint? = nil) {
         guard let image else { return }
         if savesOnCapture {
             // 카메라 탭: 원본은 남기지 않는다 — 필터본만 사진첩에(오너 2026-10-11 "원본은 없애고 필터 촬영본만").
@@ -212,6 +212,7 @@ final class BurstCameraModel {
             Self.bakeQueue.async { [weak self] in
                 var out = image
                 if key != "none", let engine = Self.bakeEngine, let ci = CIImage(image: image) {
+                    engine.spotPos = spot
                     let r = engine.render(frame: ci, key: key, intensity: fx)
                     if let cg = Self.bakeCtx.createCGImage(r, from: r.extent, format: .RGBA8, colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!) { out = UIImage(cgImage: cg, scale: 1, orientation: .up) }
                 }

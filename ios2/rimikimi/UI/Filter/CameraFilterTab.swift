@@ -43,6 +43,8 @@ struct CameraFilterTab: View {
                         LiveFilterPreview(renderer: live)
                             .contentShape(Rectangle())
                             .onTapGesture(coordinateSpace: .local) { pt in
+                                // 스포트라이트: 탭한 자리로 조명을 옮긴다(초점도 같이 그 자리로).
+                                if selected == "spotlight", let ip = live.imagePoint(pt, in: geo.size) { live.spotPos = ip }
                                 if let dp = live.devicePoint(pt, in: geo.size) {
                                     model.focus(at: dp)
                                 } else {

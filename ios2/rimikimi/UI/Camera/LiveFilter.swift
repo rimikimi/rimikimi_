@@ -45,7 +45,9 @@ enum LiveFilter {
         var grain: Double = 0, vignette: Double = 0, leak: Double = 0, glow: Double = 0, blur: Double = 0
         /// 저해상도 칸 크기(짧은 변 대비) — filters.js lowres
         var lowres: Double = 0
-        var any: Bool { grain > 0 || vignette > 0 || leak > 0 || glow > 0 || blur > 0 || lowres > 0 }
+        /// 스포트라이트 세기(filters.js spot) — 위치는 엔진의 `spotPos`(세운 프레임, 위가 0인 0~1).
+        var spot: Double = 0
+        var any: Bool { grain > 0 || vignette > 0 || leak > 0 || glow > 0 || blur > 0 || lowres > 0 || spot > 0 }
     }
 
     struct Preset {
@@ -140,7 +142,7 @@ enum LiveFilter {
         // 효과 5종(오너 2026-10-27 "효과 10개") — filters.js 와 같은 값.
         "lightleak": .init(temp: 14, tint: 4, ex: 0.06, con: 0.08, fade: 10, whitePull: 6, sat: 0.06, vib: 0.1, sh: [6, 0, -4], hi: [14, 6, -6], fx: .init(grain: 0.3, leak: 1.8)),
         "softfocus": .init(temp: 4, tint: 4, ex: 0.1, con: -0.2, fade: 14, whitePull: 10, sat: -0.06, vib: 0.06, sh: [4, 2, 4], hi: [8, 6, 4], fx: .init(glow: 1.0, blur: 0.1)),
-        "spotlight": .init(temp: 6, ex: -0.06, con: 0.32, sat: 0.04, vib: 0.06, sh: [-8, -8, -6], hi: [10, 8, 4], fx: .init(grain: 0.15, vignette: 2.6)),
+        "spotlight": .init(temp: 6, ex: -0.02, con: 0.32, sat: 0.04, vib: 0.06, sh: [-8, -8, -6], hi: [10, 8, 4], fx: .init(grain: 0.15, spot: 1)),
         "grainy": .init(temp: 6, tint: 2, con: 0.22, fade: 14, whitePull: 8, sat: -0.3, sh: [4, 2, -2], hi: [6, 4, -4], fx: .init(grain: 2.2, vignette: 0.35)),
         "haze": .init(temp: -8, tint: 2, ex: 0.12, con: -0.3, fade: 34, whitePull: 24, sat: -0.22, sh: [6, 8, 12], hi: [6, 8, 10], fx: .init(glow: 0.6, blur: 0.12)),
         "neonglow": .init(temp: -12, tint: 14, ex: 0.02, con: 0.3, sat: 0.3, vib: 0.2, sh: [6, -6, 22], hi: [10, 0, 14], hsl: [.init(c: 300, w: 50, h: 0, s: 0.5, l: 0.04), .init(c: 190, w: 40, h: 0, s: 0.45, l: 0.04)], fx: .init(glow: 0.8)),
@@ -636,6 +638,8 @@ extern "C" [[stitchable]] float4 lfInfl(coreimage::sampler src, coreimage::sampl
 
 /// 커널 묶음 + 프리셋 적용. 렌더 큐 한 곳에서만 쓴다(LUT 캐시가 잠금 없이 돈다).
 final class LiveFilterEngine {
+    /// 스포트라이트 위치(세운 프레임 기준 0~1, 위가 0). nil = 가운데 약간 위. 카메라 탭에서 화면을 탭하면 바뀐다.
+    var spotPos: CGPoint?
     private let kernels: [String: CIKernel]
     private var lutCache: [String: CIImage] = [:]
 
@@ -737,6 +741,20 @@ final class LiveFilterEngine {
         if p.fx.grain > 0 || p.fx.vignette > 0 || p.fx.leak > 0 {
             img = run("lfFx", ext, [img], [img, p.fx.grain, p.fx.vignette, p.fx.leak, 7, W, H])
         }
+        if p.fx.spot > 0 {
+            // 스포트라이트 — filters.js 와 같은 반경(짧은 변 0.5 × 0.45~1.15), 같은 세기(밖 ×0.1, 안 ×1.06).
+            let pos = spotPos ?? CGPoint(x: 0.5, y: 0.42), R = minWH * 0.5
+            let c = CIVector(x: ext.minX + pos.x * W, y: ext.minY + (1 - pos.y) * H)
+            let grad = CIFilter(name: "CIRadialGradient", parameters: ["inputCenter": c, "inputRadius0": R * 0.45, "inputRadius1": R * 1.15,
+                                                                     "inputColor0": CIColor.white, "inputColor1": CIColor.black])!.outputImage!.cropped(to: ext)
+            // 작업공간이 sRGB(contextOptions)라 웹과 같은 곱셈을 그대로 쓴다.
+            func ks(_ v: CGFloat) -> CIImage {
+                img.applyingFilter("CIColorMatrix", parameters: ["inputRVector": CIVector(x: v, y: 0, z: 0, w: 0), "inputGVector": CIVector(x: 0, y: v, z: 0, w: 0),
+                                                                 "inputBVector": CIVector(x: 0, y: 0, z: v, w: 0)])
+            }
+            let dark = 1 - 0.9 * CGFloat(p.fx.spot), lit = 1 + 0.06 * CGFloat(p.fx.spot)
+            img = ks(lit).applyingFilter("CIBlendWithMask", parameters: [kCIInputBackgroundImageKey: ks(dark), kCIInputMaskImageKey: grad]).cropped(to: ext)
+        }
         if p.fx.glow > 0 {
             let soft = box(img, jsRound(minWH * 0.015) + 2, W, H)
             img = run("lfGlow", ext, [img, soft], [img, soft, p.fx.glow * 0.85, p.fx.glow * 10])
@@ -835,14 +853,14 @@ final class LiveFilterEngine {
                 .applyingFilter("CIColorClamp")
         }
         guard (try? VNImageRequestHandler(ciImage: img).perform([segReq])) != nil, let pb = segReq.results?.first?.pixelBuffer else {
-            return mul(img, 0.6).cropped(to: ext)
+            return mul(img, 0.8).cropped(to: ext)
         }
         // 마스크는 색이 아니라 데이터 — 색공간 없이 읽어야 감마로 값이 줄지 않는다(실측: 머리 쪽 글로우가 빠졌다).
         let raw = CIImage(cvPixelBuffer: pb, options: [.colorSpace: NSNull()])
         let m = raw.transformed(by: .init(scaleX: W / raw.extent.width, y: H / raw.extent.height)).clampedToExtent()
             .applyingGaussianBlur(sigma: Double(W) * 0.0015).cropped(to: ext)
-        // CI 는 선형 공간에서 곱한다 — 웹(sRGB)의 ×0.62 와 같게 보이려면 0.62^2.2 ≈ 0.35(실측: 0.62 면 0.8 처럼 보였다).
-        let bg = mul(img.applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 0.85]), 0.35)
+        // 작업공간이 sRGB(contextOptions)라 웹과 같은 ×0.62 를 그대로 쓴다.
+        let bg = mul(img.applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 0.85]), 0.62)
         let base = img.applyingFilter("CIBlendWithMask", parameters: [kCIInputBackgroundImageKey: bg, kCIInputMaskImageKey: m])
         let inv = m.applyingFilter("CIColorInvert")
         let near = mul(m.clampedToExtent().applyingGaussianBlur(sigma: Double(W) * 0.0036).cropped(to: ext), 1.6)

@@ -209,8 +209,9 @@ export const FILM_PRESETS = [
     temp: 4, tint: 4, ex: 0.1, con: -0.2, fade: 14, whitePull: 10, sat: -0.06, vib: 0.06, sh: [4, 2, 4], hi: [8, 6, 4],
     fx: { glow: 1.0, blur: 0.1 } },
   { key: "spotlight", ko: "스포트라이트", en: "Spotlight", group: "mood",
-    temp: 6, tint: 0, ex: -0.06, con: 0.32, fade: 0, whitePull: 0, sat: 0.04, vib: 0.06, sh: [-8, -8, -6], hi: [10, 8, 4],
-    fx: { vignette: 2.6, grain: 0.15 } },
+    temp: 6, tint: 0, ex: -0.02, con: 0.32, fade: 0, whitePull: 0, sat: 0.04, vib: 0.06, sh: [-8, -8, -6], hi: [10, 8, 4],
+    // 조명 동그라미 밖을 깊게 어둡게(오너 10/27 "더 강하게"). 위치 = effects.spotPos {x,y}(0~1) — 편집기에서 사진을 탭해 옮긴다. 없으면 가운데 약간 위.
+    fx: { spot: 1, grain: 0.15 } },
   { key: "grainy",    ko: "거친 입자",   en: "Heavy Grain", group: "mood",
     temp: 6, tint: 2, ex: 0, con: 0.22, fade: 14, whitePull: 8, sat: -0.3, vib: 0, sh: [4, 2, -2], hi: [6, 4, -4],
     fx: { grain: 2.2, vignette: 0.35 } },
@@ -286,7 +287,7 @@ export function applyLookWithStrength(data, w, h, preset, effects = {}, strength
     }
   }
   // 효과는 항상 원 강도로 (프리셋 위에)
-  if (effects.grain || effects.vignette || effects.leak || effects.blur || effects.shake || effects.glow || effects.lowres) {
+  if (effects.grain || effects.vignette || effects.leak || effects.blur || effects.shake || effects.glow || effects.lowres || effects.spot) {
     applyLook(data, w, h, null, effects);
   }
   return data;
@@ -513,6 +514,8 @@ export function applyLook(data, w, h, preset, effects = {}) {
 
   const grain = effects.grain || 0;
   const vig = effects.vignette || 0;
+  const spot = effects.spot || 0;
+  const spX = (effects.spotPos?.x ?? 0.5) * w, spY = (effects.spotPos?.y ?? 0.42) * h, spR = Math.min(w, h) * 0.5;
   const leak = effects.leak || 0;
   const blur = effects.blur || 0;
   const shake = effects.shake || 0;
@@ -675,6 +678,15 @@ export function applyLook(data, w, h, preset, effects = {}) {
         // 0.55 부터 서서히 어두워짐
         const t = d < 0.55 ? 0 : (d - 0.55) / 0.45;
         const f = 1 - vig * 0.5 * t * t;
+        r *= f; g *= f; b *= f;
+      }
+
+      if (spot) {
+        // 스포트라이트 — 조명 원(반경 = 짧은 변의 ~22%) 안은 살짝 밝게, 밖으로 갈수록 깊게(최대 ×0.1) 어둡게.
+        const d = Math.hypot(x - spX, y - spY) / spR;
+        const t = d < 0.45 ? 0 : d > 1.15 ? 1 : (d - 0.45) / 0.7;
+        const e = t * t * (3 - 2 * t);
+        const f = (1 + 0.06 * spot) * (1 - e) + (1 - 0.9 * spot) * e;
         r *= f; g *= f; b *= f;
       }
 

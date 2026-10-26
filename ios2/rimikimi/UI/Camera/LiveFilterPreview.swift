@@ -31,6 +31,22 @@ final class LiveFilterRenderer: NSObject, AVCaptureVideoDataOutputSampleBufferDe
 
     private var _front = false
     private var _mirrored = false
+    private var _spotPos: CGPoint?
+    /// 스포트라이트 위치(세운 화면 0~1, 위=0) — 스포트라이트 필터일 때 화면 탭으로 옮긴다(오너 2026-10-27).
+    var spotPos: CGPoint? {
+        get { lock.withLock { _spotPos } }
+        set { lock.withLock { _spotPos = newValue } }
+    }
+    /// 화면(뷰) 좌표 → 세운 프레임 0~1(위=0). aspectFill 반영. 프레임 전이면 nil.
+    func imagePoint(_ pt: CGPoint, in view: CGSize) -> CGPoint? {
+        let img = lock.withLock { _imageSize }
+        guard img.width > 0, img.height > 0, view.width > 0, view.height > 0 else { return nil }
+        let s = max(view.width / img.width, view.height / img.height)
+        let u = (pt.x - (view.width - img.width * s) / 2) / (img.width * s)
+        let v = (pt.y - (view.height - img.height * s) / 2) / (img.height * s)
+        guard (0...1).contains(u), (0...1).contains(v) else { return nil }
+        return CGPoint(x: u, y: v)
+    }
     /// 마지막으로 그린 (세로로 세운) 프레임 크기 — 탭 좌표 → 장치 좌표 변환에 쓴다.
     private var _imageSize: CGSize = .zero
 
@@ -172,7 +188,7 @@ final class LiveFilterRenderer: NSObject, AVCaptureVideoDataOutputSampleBufferDe
             }
             faces = lock.withLock { Date().timeIntervalSince(_facesSeen) < 0.5 ? _faces : [] }
         }
-        if key != "none", let engine { img = engine.render(frame: img, key: key, intensity: fxAmt, faces: faces) }
+        if key != "none", let engine { engine.spotPos = spotPos; img = engine.render(frame: img, key: key, intensity: fxAmt, faces: faces) }
 
         // 화면 꽉 채우기(aspectFill) — 기존 미리보기 레이어와 같은 구도
         let e = img.extent
