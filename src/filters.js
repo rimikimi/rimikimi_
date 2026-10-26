@@ -83,6 +83,10 @@ export const FILM_PRESETS = [
     temp: -8, tint: -2, ex: 0.06,  con: 0.22, fade: 0,  whitePull: 0,  sat: 0.15,  vib: 0.1,  sh: [0, 2, 6],    hi: [4, 4, 10],
     hsl: [{ c: 225, w: 60, s: 0.2 }, { c: 180, w: 40, s: 0.15 }],
     fx: { grain: 0.15 } },
+  { key: "y2k",      ko: "Y2K",         en: "Y2K", group: "mood", // 2000년대 디카 정면 플래시 — 얼굴 하얗게·고대비·청록 톤·채도↑·번짐·노이즈·가장자리 어둡게(오너 2026-10-26)
+    temp: -14, tint: 2, ex: 0.2,  con: 0.45, fade: 0,  whitePull: 0,  sat: 0.3,   vib: 0.1,  sh: [-10, 0, 20], hi: [8, 0, 8],
+    hsl: [{ c: 225, w: 60, s: 0.3 }, { c: 180, w: 40, s: 0.2 }],
+    fx: { glow: 0.8, grain: 0.3, vignette: 1.0 } },
   { key: "toy",      ko: "제주 '01",      en: "Jeju '01", group: "mood", // 로모/홀가 토이카메라
     temp: 4,  tint: 6,  ex: 0,     con: 0.3,  fade: 4,  whitePull: 0,  sat: 0.24,  vib: 0,    sh: [0, -4, 8],   hi: [6, 0, -6],
     hsl: [{ c: 225, w: 55, s: 0.3, l: -0.06 }, { c: 0, w: 30, s: 0.15 }],
@@ -125,6 +129,10 @@ export const FILM_PRESETS = [
     // 흐림·픽셀 효과 없음 — 흐림은 초점 나간 사진처럼, 픽셀 칸은 일부러 넣은 모자이크처럼 보였다(오너 2026-10-09).
     fx: { grain: 0.55, vignette: 0.45 } },
 
+  { key: "folder",  ko: "폴더폰",  en: "Flip Phone", group: "phone", // 2004 — 30만 화소 폴더폰: 뭉개짐·블록·뿌연 저채도·청록 캐스트·노이즈·하이라이트 날림(오너 2026-10-26)
+    temp: -10, tint: 6, ex: 0.18, con: 0.22, fade: 24, whitePull: 0,  sat: -0.35, vib: -0.05, sh: [-6, 4, 10], hi: [-2, 2, 8],
+    fx: { lowres: 0.005, blur: 0.08, grain: 0.55, vignette: 0.55 } },
+
   /* ── 재미 (SNOW류 — 특수 렌더 모드, special 필드가 전용 코드 경로를 탄다) ── */
   // 인플 — 얼굴 피부 보정(뷰티). 색 LUT 대신 beautyRGBA 를 탄다. 강도 = 색감 슬라이더(0 = 원본).
   // hidden: 목록에서 뺀다(오너 2026-10-11 "인플 필터는 아직 구리다. 없애자") — 키는 남겨 옛 저장값이 깨지지 않게.
@@ -155,6 +163,9 @@ export const FILM_PRESETS = [
     temp: -2, tint: -10, ex: 0.04, con: 0.14, fade: 14, whitePull: 10, sat: 0.06, vib: 0.14, sh: [-4, 8, 6], hi: [6, 8, 2],
     hsl: [{ c: 120, w: 60, h: 12, s: 0.1, l: -0.02 }, { c: 220, w: 55, s: 0.12 }, { c: 30, w: 22, h: -4, s: -0.04 }],
     fx: { grain: 0.4, vignette: 0.2 } },
+  { key: "haduri", ko: "하두리", en: "Webcam '03", group: "vintage", // 옛날 웹캠(하두리) — 320×240·형광등 누런빛·피부 하얗게·뽀얀 글로우·노이즈(오너 2026-10-26)
+    temp: 12, tint: 8,  ex: 0.18, con: -0.1, fade: 26, whitePull: 20, sat: -0.2,  vib: 0,    sh: [6, 6, -4],   hi: [8, 6, -10],
+    fx: { lowres: 0.004, blur: 0.15, glow: 0.7, grain: 0.45 } },
   { key: "sepia",    ko: "세피아",    en: "Sepia", group: "mood", hidden: true,
     ex: 0.02, con: 0.12, fade: 8, whitePull: 6, bw: [0.3, 0.55, 0.15], sh: [18, 6, -14], hi: [24, 10, -18] },
   { key: "duopink",  ko: "듀오 핑크", en: "Duo Pink", group: "mood", hidden: true,
