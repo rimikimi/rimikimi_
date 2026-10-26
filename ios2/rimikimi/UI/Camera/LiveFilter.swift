@@ -640,6 +640,8 @@ extern "C" [[stitchable]] float4 lfInfl(coreimage::sampler src, coreimage::sampl
 final class LiveFilterEngine {
     /// 스포트라이트 위치(세운 프레임 기준 0~1, 위가 0). nil = 가운데 약간 위. 카메라 탭에서 화면을 탭하면 바뀐다.
     var spotPos: CGPoint?
+    /// 스포트라이트 크기 배율(1 = 기본). filters.js effects.spotSize.
+    var spotSize: CGFloat = 1
     private let kernels: [String: CIKernel]
     private var lutCache: [String: CIImage] = [:]
 
@@ -746,7 +748,7 @@ final class LiveFilterEngine {
         }
         if p.fx.spot > 0 {
             // 스포트라이트 — filters.js 와 같은 반경(짧은 변 0.5 × 0.45~1.15), 같은 세기(밖 ×0.1, 안 ×1.06).
-            let pos = spotPos ?? CGPoint(x: 0.5, y: 0.42), R = minWH * 0.5
+            let pos = spotPos ?? CGPoint(x: 0.5, y: 0.42), R = minWH * 0.5 * spotSize
             let c = CIVector(x: ext.minX + pos.x * W, y: ext.minY + (1 - pos.y) * H)
             let grad = CIFilter(name: "CIRadialGradient", parameters: ["inputCenter": c, "inputRadius0": R * 0.45, "inputRadius1": R * 1.15,
                                                                      "inputColor0": CIColor.white, "inputColor1": CIColor.black])!.outputImage!.cropped(to: ext)

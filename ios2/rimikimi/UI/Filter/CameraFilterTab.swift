@@ -8,6 +8,7 @@ struct CameraFilterTab: View {
     @Environment(\.openURL) private var openURL
     @State private var model = BurstCameraModel(livePreview: true)   // 고른 필터를 미리보기에 실시간으로
     @State private var selected = "none"
+    @State private var spotPinchStart: CGFloat?
     @State private var favs: [String] = UserDefaults.standard.stringArray(forKey: "filter.favorites") ?? []
     @State private var visible = false
     @State private var focusMark: FocusMark?
@@ -91,8 +92,14 @@ struct CameraFilterTab: View {
                                 }
                                 .onEnded { _ in lockFired = false })
                             .simultaneousGesture(MagnifyGesture()
-                                .onChanged { model.setZoom(model.zoomAtGestureStart * $0.magnification) }
-                                .onEnded { _ in model.commitZoom() })
+                                // 스포트라이트일 땐 두 손가락 = 조명 크기(줌은 렌즈 버튼으로). 오너 2026-10-27.
+                                .onChanged {
+                                    if selected == "spotlight" {
+                                        if spotPinchStart == nil { spotPinchStart = live.spotSize }
+                                        live.spotSize = min(2.5, max(0.4, (spotPinchStart ?? 1) * $0.magnification))
+                                    } else { model.setZoom(model.zoomAtGestureStart * $0.magnification) }
+                                }
+                                .onEnded { _ in if selected == "spotlight" { spotPinchStart = nil } else { model.commitZoom() } })
                             .overlay(alignment: .topLeading) {
                                 if let m = focusMark {
                                     HStack(spacing: 8) {

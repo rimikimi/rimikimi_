@@ -32,6 +32,12 @@ final class LiveFilterRenderer: NSObject, AVCaptureVideoDataOutputSampleBufferDe
     private var _front = false
     private var _mirrored = false
     private var _spotPos: CGPoint?
+    private var _spotSize: CGFloat = 1
+    /// 스포트라이트 크기(1 = 기본, 0.4~2.5) — 스포트라이트일 때 두 손가락 핀치로 바뀐다.
+    var spotSize: CGFloat {
+        get { lock.withLock { _spotSize } }
+        set { lock.withLock { _spotSize = newValue } }
+    }
     /// 스포트라이트 위치(세운 화면 0~1, 위=0) — 스포트라이트 필터일 때 화면 탭으로 옮긴다(오너 2026-10-27).
     var spotPos: CGPoint? {
         get { lock.withLock { _spotPos } }
@@ -188,7 +194,7 @@ final class LiveFilterRenderer: NSObject, AVCaptureVideoDataOutputSampleBufferDe
             }
             faces = lock.withLock { Date().timeIntervalSince(_facesSeen) < 0.5 ? _faces : [] }
         }
-        if key != "none", let engine { engine.spotPos = spotPos; img = engine.render(frame: img, key: key, intensity: fxAmt, faces: faces) }
+        if key != "none", let engine { engine.spotPos = spotPos; engine.spotSize = spotSize; img = engine.render(frame: img, key: key, intensity: fxAmt, faces: faces) }
 
         // 화면 꽉 채우기(aspectFill) — 기존 미리보기 레이어와 같은 구도
         let e = img.extent

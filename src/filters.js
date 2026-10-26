@@ -515,7 +515,7 @@ export function applyLook(data, w, h, preset, effects = {}) {
   const grain = effects.grain || 0;
   const vig = effects.vignette || 0;
   const spot = effects.spot || 0;
-  const spX = (effects.spotPos?.x ?? 0.5) * w, spY = (effects.spotPos?.y ?? 0.42) * h, spR = Math.min(w, h) * 0.5;
+  const spX = (effects.spotPos?.x ?? 0.5) * w, spY = (effects.spotPos?.y ?? 0.42) * h, spR = Math.min(w, h) * 0.5 * (effects.spotSize || 1); // 크기 = 두 손가락 핀치(0.4~2.5)
   const leak = effects.leak || 0;
   const blur = effects.blur || 0;
   const shake = effects.shake || 0;

@@ -248,13 +248,17 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
     geo: { tilt: 0, pv: 0, ph: 0 },
     geoAuto: null,
     spotPos: null,
+    spotSize: 1,
   });
   const [lookByIdx, setLookByIdx] = useState({});
   const lookOf = (i) => lookByIdx[i] || defaultLook(i);
   // 스포트라이트 위치(사진별, 0~1) — 스포트라이트 필터일 때 사진을 탭하면 그 자리로(오너 2026-10-27).
   const [spotPos, setSpotPos] = useState(null);
+  // 스포트라이트 크기 — 두 손가락으로 벌리고 오므려 조절(오너 2026-10-27). 1 = 기본.
+  const [spotSize, setSpotSize] = useState(1);
+  const spotPinchRef = useRef({ pts: new Map(), baseDist: 0, baseSize: 1, active: false });
   function updateLook(patch) {
-    const next = { presetKey, fx, strength, fxAmt, lens, geo, geoAuto, spotPos, ...patch };
+    const next = { presetKey, fx, strength, fxAmt, lens, geo, geoAuto, spotPos, spotSize, ...patch };
     setPresetKey(next.presetKey);
     setFx(next.fx);
     setStrength(next.strength);
@@ -263,6 +267,7 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
     setGeo(next.geo || ZERO_GEO);
     setGeoAuto(next.geoAuto || null);
     setSpotPos(next.spotPos || null);
+    setSpotSize(next.spotSize || 1);
     setLookByIdx((p) => ({ ...p, [idx]: next }));
   }
   function switchPhoto(i) {
@@ -275,6 +280,7 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
     setGeo(lk.geo || ZERO_GEO);
     setGeoAuto(lk.geoAuto || null);
     setSpotPos(lk.spotPos || null);
+    setSpotSize(lk.spotSize || 1);
     const g = presetByKey(lk.presetKey).group;
     if (g) setChipGroup(g);
     setReady(false);
@@ -472,11 +478,11 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
         personMaskRef.current[idx] = null;
         personMaskFor(baseRef.current).then((m) => { personMaskRef.current[idx] = m; setMaskTick((t) => t + 1); });
       }
-      applyLookWithStrength(copy.data, w, h, presetByKey(presetKey), { ...fx, seed: GRAIN_SEED, faces: facesFor(idx, lens, geo), personMask: personMaskRef.current[idx] || undefined, spotPos: spotPos || undefined }, strength);
+      applyLookWithStrength(copy.data, w, h, presetByKey(presetKey), { ...fx, seed: GRAIN_SEED, faces: facesFor(idx, lens, geo), personMask: personMaskRef.current[idx] || undefined, spotPos: spotPos || undefined, spotSize }, strength);
       ctx.putImageData(copy, 0, 0);
       if (dateStyle !== "none") drawDateStamp(ctx, w, h, dateStyle);
     });
-  }, [presetKey, fx, dateStyle, peeking, strength, lens, geo, idx, maskTick, spotPos]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [presetKey, fx, dateStyle, peeking, strength, lens, geo, idx, maskTick, spotPos, spotSize]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { if (ready) renderPreview(); }, [ready, renderPreview, idx]);
 
@@ -927,7 +933,7 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
         const out = await applyLookAsync({
           data: id.data, w, h,
           preset: hasLook ? presetByKey(lk.presetKey) : null,
-          effects: hasLook ? { ...lk.fx, seed: GRAIN_SEED, faces: facesFor(i, lk.lens, lk.geo), spotPos: (i === idx ? spotPos : lk.spotPos) || undefined,
+          effects: hasLook ? { ...lk.fx, seed: GRAIN_SEED, faces: facesFor(i, lk.lens, lk.geo), spotPos: (i === idx ? spotPos : lk.spotPos) || undefined, spotSize: (i === idx ? spotSize : lk.spotSize) || 1,
             personMask: (lk.presetKey === "flashsoft" || lk.presetKey === "flashhard" || lk.presetKey === "subjectglow") ? (personMaskRef.current[i] || await personMaskFor(id)) || undefined : undefined } : {},
           strength: lk.strength,
           geo: hasGeo ? g : null, lens: lk.lens || 0,
@@ -1140,6 +1146,19 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
                 // 두 번째 손가락은 **사진 아무 데나** 짚어도 크기·회전에 합류시킨다.
                 // 글자 상자는 작아서 두 손가락을 다 얹을 수 없다 — 인스타도 캔버스 아무 데나 짚는다.
                 if (joinPinch(e)) return;
+                // 스포트라이트: 두 손가락 = 조명 크기(벌리면 크게, 오므리면 작게).
+                if (presetKey === "spotlight" && !dragRef.current) {
+                  const sp = spotPinchRef.current;
+                  sp.pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+                  try { e.currentTarget.setPointerCapture?.(e.pointerId); } catch (_) {}
+                  if (sp.pts.size === 2) {
+                    const [a, b] = [...sp.pts.values()];
+                    sp.baseDist = Math.hypot(a.x - b.x, a.y - b.y) || 1; sp.baseSize = spotSize; sp.active = true;
+                    if (canvasTapRef.current?.timer) window.clearTimeout(canvasTapRef.current.timer);
+                    canvasTapRef.current = null; setPeeking(false);
+                    return;
+                  }
+                }
                 // ⚠️ 여기서 바로 setPeeking(true) 하면 **겹이 전부 사라진다**(아래 목록이
                 //    !peeking 일 때만 그려진다). 글자 가장자리를 살짝 빗맞혀 눌러도 그 순간
                 //    끌려던 글자가 없어져서 "옮겨지지 않는다"가 된다(2026-09-17 실기 지적).
@@ -1149,9 +1168,26 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
                 canvasTapRef.current = tap;
               }}
               onPointerMove={(e) => {
+                const sp = spotPinchRef.current;
+                if (sp.pts.has(e.pointerId)) {
+                  sp.pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+                  if (sp.active && sp.pts.size === 2) {
+                    const [a, b] = [...sp.pts.values()];
+                    setSpotSize(Math.min(2.5, Math.max(0.4, sp.baseSize * Math.hypot(a.x - b.x, a.y - b.y) / sp.baseDist)));
+                    return;
+                  }
+                }
                 if (dragRef.current?.pointers.has(e.pointerId)) stickerPointerMove(e);
               }}
               onPointerUp={(e) => {
+                const sp = spotPinchRef.current;
+                if (sp.pts.has(e.pointerId)) {
+                  sp.pts.delete(e.pointerId);
+                  if (sp.active) {                                        // 핀치가 끝나면 크기를 장부에 남기고, 탭으로 치지 않는다
+                    if (sp.pts.size === 0) { sp.active = false; updateLook({ spotSize }); }
+                    canvasTapRef.current = null; return;
+                  }
+                }
                 if (dragRef.current?.pointers.has(e.pointerId)) { stickerPointerUp(e); return; }
                 const s = canvasTapRef.current;
                 if (s?.timer) window.clearTimeout(s.timer);
@@ -1169,6 +1205,7 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
                 openTextAt(e.clientX, e.clientY);
               }}
               onPointerCancel={(e) => {
+                { const sp = spotPinchRef.current; if (sp.pts.delete(e.pointerId) && sp.active && sp.pts.size === 0) { sp.active = false; updateLook({ spotSize }); } }
                 if (dragRef.current?.pointers.has(e.pointerId)) { stickerPointerUp(e); return; }
                 if (canvasTapRef.current?.timer) window.clearTimeout(canvasTapRef.current.timer);
                 setPeeking(false); canvasTapRef.current = null;
@@ -1286,7 +1323,7 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
                     // 프리셋 기본 효과까지 원탭 적용, 색감은 기본값(0.7 = 표준 룩)·효과는 1(프리셋 그대로)로 리셋
                     updateLook({ presetKey: p.key, fx: fxOf(p), strength: 0.7, fxAmt: 1 });
                     markFilterUsed(p.key);
-                    if (p.key === "spotlight") flashToast(getLang() === "ko" ? "사진을 탭하면 조명이 그 자리로 옮겨가요" : "Tap the photo to move the spotlight");
+                    if (p.key === "spotlight") flashToast(getLang() === "ko" ? "탭하면 조명이 그 자리로, 두 손가락으로 크기를 바꿔요" : "Tap to move the spotlight, pinch to resize");
                   }}
                 >
                   <canvas
