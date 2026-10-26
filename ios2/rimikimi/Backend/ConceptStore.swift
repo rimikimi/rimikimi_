@@ -115,7 +115,8 @@ final class ConceptStore {
     /// 진짜 총합을 따로 조회한다.
     var albumTiles: [AlbumTile] {
         let counts = Dictionary(uniqueKeysWithValues: categories.map { ($0.name, $0.count) })
-        var tiles = rows.map { AlbumTile(name: $0.name, count: counts[$0.name] ?? $0.items.count,
+        var tiles = rows.filter { $0.name != Concept.artCategory }.map {   // 매직 부스는 하단 메뉴 탭으로 뺐다(2026-10-26)
+            AlbumTile(name: $0.name, count: counts[$0.name] ?? $0.items.count,
                                          coverURL: $0.items.first?.largeURL, coverFallbackURL: $0.items.first?.thumbURL) }
         // 즐겨찾기한 카테고리를 위로(오너 지시 2026-09-22 "실제로 배열도 바꿔주고"). 그 안에서는 원래 순서.
         // (`sort` 는 안정 정렬이 아니라 같은 그룹 안 순서가 흔들린다 — 덩어리로 갈라 붙인다.)

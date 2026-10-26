@@ -3,7 +3,7 @@ import Observation
 import UIKit
 
 /// 탭 밖에서 공유되는 화면 상태 — 탭 선택, 스택 경로, 로그인 시트, 하던 동작(pending) 재개.
-enum TabID: Hashable { case gallery, filter, edit, camera, myPhotos, profile }   // filter=카메라 탭, edit=필터 탭(앨범 사진에 필터, 2026-10-26)
+enum TabID: Hashable { case gallery, magic, filter, edit, camera, myPhotos, profile }   // filter=카메라 탭, edit=필터 탭(앨범 사진에 필터, 2026-10-26)
 
 /// 각 탭 스택의 목적지.
 enum Route: Hashable {
@@ -62,6 +62,7 @@ final class AppState {
     var tab: TabID = .gallery
     var galleryPath: [Route] = []
     var myPhotosPath: [Route] = []
+    var magicPath: [Route] = []   // 매직 부스 탭(2026-10-26 하단 메뉴로 분리)
     var profilePath: [Route] = []
 
     /// 지금 보이는 탭의 스택. 필터 탭은 푸시가 없고, 카메라 슬롯은 탭이 아니라 동작이라 빈 스택.
@@ -69,6 +70,7 @@ final class AppState {
         switch tab {
         case .gallery: return galleryPath
         case .myPhotos: return myPhotosPath
+        case .magic: return magicPath
         case .profile: return profilePath
         case .filter, .edit, .camera: return []
         }
@@ -82,6 +84,7 @@ final class AppState {
         switch tab {
         case .gallery: galleryPath.append(route)
         case .myPhotos: myPhotosPath.append(route)
+        case .magic: magicPath.append(route)
         case .profile: profilePath.append(route)
         case .filter, .edit, .camera: break
         }

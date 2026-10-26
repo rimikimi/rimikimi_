@@ -68,9 +68,9 @@ private struct CoachHost: ViewModifier {
     private func rect(_ key: String, _ full: CGSize) -> CGRect? {
         if let r = CoachRects.shared.rects[key] { return r }
         if key == "cameraTab" {
-            let w = full.width / 4   // 탭 4개(만들기·카메라·필터·내 사진) 중 두 번째
+            let w = full.width / 5   // 탭 5개(만들기·매직 부스·카메라·필터·내 사진) 중 세 번째
             let bottomInset = (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.keyWindow?.safeAreaInsets.bottom ?? 34
-            return CGRect(x: w + 8, y: full.height - bottomInset - 44, width: w - 16, height: 60)   // 탭바(하단 고정, 막 위에 그려짐) 뒤에 숨는 자리 — 막 구멍이 탭바 위로 삐져나오지 않게(10/24 실측)
+            return CGRect(x: w * 2 + 4, y: full.height - bottomInset - 44, width: w - 8, height: 60)   // 탭바(하단 고정, 막 위에 그려짐) 뒤에 숨는 자리 — 막 구멍이 탭바 위로 삐져나오지 않게(10/24 실측)
         }
         return nil
     }

@@ -21,6 +21,13 @@ struct RootTabView: View {
                         .navigationDestination(for: Route.self) { RouteDestination(route: $0) }
                 }
             }
+            // 매직 부스 — 그림체 변환·말로 고치기 등. 만들기 앨범에서 빼서 하단 메뉴로(오너 2026-10-26).
+            Tab(Copy.tabMagic, systemImage: "wand.and.stars", value: .magic) {
+                NavigationStack(path: $app.magicPath) {
+                    CategoryListView(name: Concept.artCategory)
+                        .navigationDestination(for: Route.self) { RouteDestination(route: $0) }
+                }
+            }
             Tab(Copy.tabCamera, systemImage: "camera", value: .filter) {
                 NavigationStack { CameraFilterTab() }
             }

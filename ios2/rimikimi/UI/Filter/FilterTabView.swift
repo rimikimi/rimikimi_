@@ -33,10 +33,17 @@ struct FilterTabView: View {
             .init(key: "warm"), .init(key: "cool"), .init(key: "vintage"),
             .init(key: "docu"), .init(key: "mono"), .init(key: "digicam"),
             .init(key: "toy"), .init(key: "dispo"), .init(key: "instant"),
-            .init(key: "glitch"), .init(key: "vhs"), .init(key: "pixelate"),
-            .init(key: "bloom"),
+        ]),
+        // 효과 — 색감보다 효과가 주인 필터(2026-10-26 필터 탭 개편 시안: 폰카·빈티지·감성·효과)
+        .init(key: "fx", title: L.t("효과", "Effects"), emoji: "✨", presets: [
+            .init(key: "bloom"), .init(key: "vhs"), .init(key: "glitch"), .init(key: "pixelate"),
         ]),
     ] }
+
+    /// 추천 필터 — 사용 기록이 쌓이기 전까지는 직접 고른 목록(시안, 2026-10-26).
+    static let featuredKeys = ["ph7", "golden", "vintC", "peach", "ph4s", "bloom", "cine", "vintS"]
+    /// 신규 필터 — 월 3개 드롭 자리. 지금은 가장 최근에 추가된 빈티지 3종(시안).
+    static let newKeys = ["vintF", "vintG", "vintP"]
 
     /// 오늘의 필터 — 날짜로 고르므로 하루 동안 고정이고 매일 바뀐다.
     private var todays: (group: Group, preset: Preset) {
@@ -50,24 +57,68 @@ struct FilterTabView: View {
                            GridItem(.flexible(), spacing: Spacing.s2)]
 
     var body: some View {
+        // 만들기 탭과 같은 짜임(오너 2026-10-26): 추천 · 신규 가로 줄 → 그룹 앨범 3열.
+        // 위 카드(말로 고치기·복원)와 목적 칸은 AI 기능이라 넣지 않는다.
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                hero
-                // 카메라 진입 줄은 뺐다 — 카메라는 이제 자기 탭이 있다(4탭, 2026-10-26)
-                ForEach(Self.groups) { g in
-                    sectionHeader(g)
-                    LazyVGrid(columns: columns, spacing: Spacing.s3) {
-                        ForEach(g.presets) { p in tile(p) }
-                    }
-                    .padding(.horizontal, Spacing.page)
-                    .padding(.bottom, Spacing.s5)
+                rail(L.t("추천 필터", "Featured"), Self.featuredKeys, isNew: false)
+                rail(L.t("신규 필터", "New"), Self.newKeys, isNew: true)
+                Text(L.t("필터 앨범", "Filter albums")).font(AppFont.headline).tracking(Tracking.headline)
+                    .foregroundStyle(Color.ink).padding(.horizontal, Spacing.page).padding(.top, Spacing.s2).padding(.bottom, Spacing.s3)
+                LazyVGrid(columns: columns, spacing: Spacing.s4) {
+                    ForEach(Self.groups) { g in albumTile(g) }
                 }
+                .padding(.horizontal, Spacing.page)
             }
+            .padding(.top, Spacing.s2)
             .padding(.bottom, TabBarMetrics.contentBottomPad)
         }
         .scrollIndicators(.hidden)
         .background(Color.bg)
         .inlineTitle(Copy.filterTitle)
+    }
+
+    private func rail(_ title: String, _ keys: [String], isNew: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .firstTextBaseline, spacing: Spacing.s2) {
+                Text(title).font(AppFont.sectionTitle).tracking(Tracking.sectionTitle)
+                if isNew { NewBadge() }
+                Spacer()
+            }
+            .padding(.horizontal, Spacing.page).padding(.top, Spacing.s1).padding(.bottom, Spacing.s3 - 2)
+            ScrollView(.horizontal) {
+                LazyHStack(alignment: .top, spacing: CardMetrics.railGap) {
+                    ForEach(keys, id: \.self) { k in
+                        Button { app.requireLogin(.filterPick(presetKey: k)) } label: {
+                            RemoteImage(url: Config.thumbURL("fs_\(k)"), cornerRadius: 0)
+                                .photoRatio()
+                                .overlay(alignment: .bottomLeading) { PhotoCaption(title: Copy.filterName(k), size: 16) }
+                                .clipShape(RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
+                                .shadow(color: .black.opacity(0.10), radius: 12, y: 8)
+                        }
+                        .buttonStyle(PressScaleButtonStyle())
+                        .containerRelativeFrame(.horizontal) { w, _ in (w * CardMetrics.railCardFraction).rounded() }
+                    }
+                }
+                .padding(.horizontal, Spacing.page)
+                .scrollTargetLayout()
+            }
+            .scrollIndicators(.hidden)
+            .scrollTargetBehavior(.viewAligned)
+            .padding(.bottom, CardMetrics.railBottom)
+        }
+    }
+
+    private func albumTile(_ g: Group) -> some View {
+        NavigationLink {
+            FilterGroupGrid(group: g)
+        } label: {
+            RemoteImage(url: Config.thumbURL("fs_\(g.presets.first?.key ?? "")"), cornerRadius: 0)
+                .photoRatio()
+                .overlay(alignment: .bottomLeading) { PhotoCaption(title: g.title, subtitle: "\(g.presets.count)", size: 15) }
+                .clipShape(RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
+        }
+        .buttonStyle(PressScaleButtonStyle())
     }
 
     // MARK: 히어로
@@ -177,5 +228,32 @@ struct FilterTabView: View {
             }
         }
         .buttonStyle(PressScaleButtonStyle())
+    }
+}
+
+
+/// 필터 앨범 안 — 그 그룹 필터를 3열 격자로(누르면 사진 고르기 → 편집기).
+struct FilterGroupGrid: View {
+    @Environment(AppState.self) private var app
+    var group: FilterTabView.Group
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: Spacing.s2), count: 3)
+    var body: some View {
+        ScrollView {
+            LazyVGrid(columns: columns, spacing: Spacing.s3) {
+                ForEach(group.presets) { p in
+                    Button { app.requireLogin(.filterPick(presetKey: p.key)) } label: {
+                        VStack(spacing: 6) {
+                            RemoteImage(url: Config.thumbURL("fs_\(p.key)"), cornerRadius: Radius.card - 2).photoRatio()
+                            Text(p.label).font(AppFont.footnote).foregroundStyle(Color.ink).lineLimit(1).minimumScaleFactor(0.85)
+                        }
+                    }
+                    .buttonStyle(PressScaleButtonStyle())
+                }
+            }
+            .padding(.horizontal, Spacing.page).padding(.top, Spacing.s2)
+            .padding(.bottom, TabBarMetrics.contentBottomPad)
+        }
+        .background(Color.bg)
+        .inlineTitle("\(group.emoji) \(group.title)")
     }
 }
