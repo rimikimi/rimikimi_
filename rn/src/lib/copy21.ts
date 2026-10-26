@@ -99,7 +99,9 @@ export const c21 = {
   get rewardedIncomplete() { return t("광고를 끝까지 보면 만들 수 있어요", "Watch the whole ad to create"); },
   // 탭
   get tabMake() { return t("AI 컨셉", "AI Concepts"); },
-  get tabCameraFilter() { return t("카메라·필터", "Camera"); },
+  get tabCameraFilter() { return t("카메라", "Camera"); },
+  get tabMagic() { return t("매직 부스", "Magic Booth"); },
+  get tabFilter() { return t("필터", "Filters"); },
   get tabMyPhotos() { return t("내 사진", "My Photos"); },
   get settingsTitle() { return t("설정", "Settings"); },
   get signIn() { return t("로그인", "Sign in"); },

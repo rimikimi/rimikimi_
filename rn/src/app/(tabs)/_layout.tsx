@@ -5,7 +5,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { Glass } from "@/ui/Screen";
 import { Text } from "@/ui/Text";
-import { IconCamera, IconGallery, IconSparkle, type IconProps } from "@/ui/icons";
+import { IconCamera, IconGallery, IconSparkle, IconWand, type IconProps } from "@/ui/icons";
+import { IconSliders } from "@/ui/icons21";
 import { c21 } from "@/lib/copy21";
 import { chrome, color, radius, shadow, space, themedStyles } from "@/theme/tokens";
 import { CARD_PRESS_SCALE, duration, ease } from "@/theme/motion";
@@ -22,10 +23,14 @@ import { CARD_PRESS_SCALE, duration, ease } from "@/theme/motion";
 // 2.1 개편(iOS RootTabView, 오너 지시 2026-10-09): 탭 3개 — 만들기 · 카메라·필터 · 내 사진.
 // 프로필은 홈 ⚙︎(설정)로. 가운데 떠 있는 카메라 원도 없앴다 — 카메라는 "카메라·필터" 탭 안에 있다.
 // (라우트 이름은 예전 그대로 둔다 — 푸시·딥링크·dev 프리뷰가 이 이름을 본다.)
-type Route = "gallery" | "filter" | "photos";
+// 2026-10-26 5탭(iOS RootTabView 와 같다): AI 컨셉 · 매직 부스 · 카메라 · 필터 · 내 사진.
+// 라우트 "filter" = 카메라(예전 이름 유지 — 딥링크·푸시), "edit" = 필터 탭, "magic" = 매직 부스.
+type Route = "gallery" | "magic" | "filter" | "edit" | "photos";
 const TABS: { name: Route; label: () => string; Icon: React.ComponentType<IconProps> }[] = [
   { name: "gallery", label: () => c21.tabMake, Icon: IconSparkle },
+  { name: "magic", label: () => c21.tabMagic, Icon: IconWand },
   { name: "filter", label: () => c21.tabCameraFilter, Icon: IconCamera },
+  { name: "edit", label: () => c21.tabFilter, Icon: IconSliders },
   { name: "photos", label: () => c21.tabMyPhotos, Icon: IconGallery },
 ];
 
@@ -110,7 +115,9 @@ export default function TabsLayout() {
       screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: color.bg }, animation: "none" }}
     >
       <Tabs.Screen name="gallery" />
+      <Tabs.Screen name="magic" />
       <Tabs.Screen name="filter" />
+      <Tabs.Screen name="edit" />
       <Tabs.Screen name="photos" />
     </Tabs>
   );
@@ -125,5 +132,5 @@ const styles = themedStyles(() => StyleSheet.create({
   bar: { width: "100%", borderRadius: radius.pill, borderWidth: StyleSheet.hairlineWidth, borderColor: color.line, overflow: "hidden" },
   row: { flexDirection: "row", height: chrome.tabBarH, paddingHorizontal: space.s2 },
   item: { flex: 1 },
-  pressable: { flex: 1, minHeight: 48, alignItems: "center", justifyContent: "center", gap: 3 },
+  pressable: { flex: 1, minHeight: 48, alignItems: "center", justifyContent: "center", gap: 3, paddingHorizontal: 1 },
 }));

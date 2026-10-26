@@ -1,4 +1,4 @@
-import { byNewest, categoriesOf, conceptLarge, conceptPool, conceptThumb, isFeatureConcept, type Concept } from "./concepts";
+import { ART_CATEGORY, byNewest, categoriesOf, conceptLarge, conceptPool, conceptThumb, isFeatureConcept, type Concept } from "./concepts";
 import { FAVORITES_ALBUM } from "./favorites";
 import { activeSeasons, type Season } from "./seasons";
 import { c21 } from "./copy21";
@@ -63,6 +63,7 @@ export function albumTiles(all: Concept[], seasons: Season[], favCategories: str
   for (const c of pool) {
     const key = c.publishAt ? Date.parse(c.publishAt) : Number(c.id) || 0;
     for (const cat of categoriesOf(c)) {
+      if (cat === ART_CATEGORY) continue; // 매직 부스는 하단 탭으로 뺐다(iOS ConceptStore.albumTiles, 2026-10-26)
       const g = groups.get(cat) ?? { items: [], latest: -Infinity };
       g.items.push(c);
       if (key > g.latest) g.latest = key;

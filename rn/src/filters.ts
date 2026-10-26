@@ -103,6 +103,10 @@ export const FILM_PRESETS: Preset[] = [
     temp: 4,  tint: 6,  ex: 0,     con: 0.3,  fade: 4,  whitePull: 0,  sat: 0.24,  vib: 0,    sh: [0, -4, 8],   hi: [6, 0, -6],
     hsl: [{ c: 225, w: 55, s: 0.3, l: -0.06 }, { c: 0, w: 30, s: 0.15 }],
     fx: { vignette: 0.65, grain: 0.25 } },
+  { key: "y2k",      ko: "Y2K",         en: "Y2K", group: "mood", // 2000년대 디카 정면 플래시 — 웹 filters.js 와 같은 값
+    temp: -14, tint: 2, ex: 0.2,  con: 0.45, fade: 0,  whitePull: 0,  sat: 0.3,   vib: 0.1,  sh: [-10, 0, 20], hi: [8, 0, 8],
+    hsl: [{ c: 225, w: 60, s: 0.3 }, { c: 180, w: 40, s: 0.2 }],
+    fx: { glow: 0.8, grain: 0.3, vignette: 1.0 } },
   { key: "dispo",    ko: "오키나와 '00",    en: "Okinawa '00", group: "mood", // 일회용 카메라 + 플래시
     temp: 6,  tint: 0,  ex: 0.1,   con: 0.25, fade: 6,  whitePull: 0,  sat: 0.12,  vib: 0.08, sh: [-2, 4, 0],   hi: [10, 8, 2],
     hsl: [{ c: 110, w: 50, h: -8, s: -0.05 }],
@@ -140,6 +144,9 @@ export const FILM_PRESETS: Preset[] = [
     temp: 14, tint: -14, ex: 0.14, con: 0.26, fade: 22, whitePull: 0,  sat: -0.35, vib: -0.05, sh: [-6, 10, 6], hi: [18, 16, -10],
     // 흐림·픽셀 효과 없음(웹 filters.js 2026-10-09)
     fx: { grain: 0.55, vignette: 0.45 } },
+  { key: "folder",  ko: "폴더폰",  en: "Flip Phone", group: "phone", // 웹 filters.js 와 같은 색 값(저해상도·블록은 편집기 웹에서)
+    temp: -10, tint: 6, ex: 0.18, con: 0.22, fade: 24, whitePull: 0,  sat: -0.35, vib: -0.05, sh: [-6, 4, 10], hi: [-2, 2, 8],
+    fx: { grain: 0.55, vignette: 0.55, blur: 0.08 } },
 
   /* ── 재미 (SNOW류 — 특수 렌더 모드, special 필드가 전용 코드 경로를 탄다) ── */
   // 인플 — 얼굴 피부 보정(뷰티). 색 LUT 대신 beautyRGBA(웹 filters.js)를 탄다. 강도 = 색감 슬라이더(0 = 원본).
@@ -171,6 +178,9 @@ export const FILM_PRESETS: Preset[] = [
     temp: -2, tint: -10, ex: 0.04, con: 0.14, fade: 14, whitePull: 10, sat: 0.06, vib: 0.14, sh: [-4, 8, 6], hi: [6, 8, 2],
     hsl: [{ c: 120, w: 60, h: 12, s: 0.1, l: -0.02 }, { c: 220, w: 55, s: 0.12 }, { c: 30, w: 22, h: -4, s: -0.04 }],
     fx: { grain: 0.4, vignette: 0.2 } },
+  { key: "haduri", ko: "웹캠", en: "Webcam '03", group: "vintage", // 옛 웹캠 — 웹 filters.js 와 같은 색 값
+    temp: 12, tint: 8,  ex: 0.18, con: -0.1, fade: 26, whitePull: 20, sat: -0.2,  vib: 0,    sh: [6, 6, -4],   hi: [8, 6, -10],
+    fx: { grain: 0.45, glow: 0.7, blur: 0.15 } },
   { key: "sepia",    ko: "세피아",    en: "Sepia", group: "mood", hidden: true,
     ex: 0.02, con: 0.12, fade: 8, whitePull: 6, bw: [0.3, 0.55, 0.15], sh: [18, 6, -14], hi: [24, 10, -18] },
   { key: "duopink",  ko: "듀오 핑크", en: "Duo Pink", group: "mood", hidden: true,

@@ -19,9 +19,10 @@ import { c21 } from "@/lib/copy21";
 import { isKo } from "@/lib/locale";
 import { pickPhotos } from "@/lib/photo";
 import { saveFileToAlbum } from "@/lib/nativeMedia";
-import { setEditorPayload } from "@/lib/editorPayload";
+import { openEditorWithShots } from "@/lib/openEditor";
 import { isPaidFilter, startFilterTrialIfNeeded, useFilterAccess } from "@/lib/iap";
 import { presetByKey } from "@/filters";
+import { FX, MOOD, PHONE, VINTAGE } from "@/lib/filterGroups";
 import { chrome, space } from "@/theme/tokens";
 
 // ============================================================================
@@ -54,14 +55,8 @@ async function deleteTemp(uri: string) {
   }
 }
 const MIRROR_KEY = "camera.frontMirror";
-const PHONE = ["ph16pro", "ph15pro", "ph14pro", "phxs", "ph7", "ph6s", "ph4s", "ph3gs"];
-// iOS FilterTabView.groups 와 같은 순서 — 폰카 / 빈티지 / 감성(예전 필름·카메라·재미, 오너 2026-10-12).
-const VINTAGE = ["vintC", "vintL", "vintP", "vintG", "vintS", "vintF"];
-const ANALOG = [
-  "golden", "peach", "slide", "retro", "vivid", "green", "pastel", "cine", "newtro", "softmono",
-  "warm", "cool", "vintage", "docu", "mono", "digicam", "toy", "dispo", "instant",
-  "glitch", "vhs", "pixelate", "bloom",
-];
+// 폰카 / 빈티지 / 감성 + 효과 — 묶음은 `@/lib/filterGroups`(필터 탭과 같이 쓴다).
+const ANALOG = [...MOOD, ...FX];
 const filterName = (k: string) => { const p = presetByKey(k); return isKo ? p.ko : p.en; };
 
 function zoomText(z: number, active: boolean): string {
@@ -251,29 +246,7 @@ export default function CameraFilterTab() {
    * 색감(0.7×첫 장 슬라이더). iOS handlePickedPhotos/finishBurstCamera 와 같은 규약.
    * 웹 편집기는 strength 를 한 값만 읽으므로 장마다 다른 색감까지는 못 넘긴다.
    */
-  const openEditor = useCallback(async (list: Shot[]) => {
-    const picked = list.slice(0, 10);
-    // 1~3장 = 4096(12MP 원본 그대로) · 4~10장 = 3072 (iOS 2026-09-30 화질 결정과 같다)
-    const maxLong = picked.length <= 3 ? 4096 : 3072;
-    const srcs: string[] = [];
-    const kept: Shot[] = [];
-    for (const s of picked) {
-      const long = Math.max(s.width || 0, s.height || 0);
-      const actions = long > maxLong ? [{ resize: (s.width >= s.height ? { width: maxLong } : { height: maxLong }) }] : [];
-      const r = await ImageManipulator.manipulateAsync(s.uri, actions, { compress: 0.95, format: ImageManipulator.SaveFormat.JPEG, base64: true });
-      if (r.base64) { srcs.push(`data:image/jpeg;base64,${r.base64}`); kept.push(s); }
-    }
-    if (!srcs.length) return;
-    const presetKeys = kept.map((s) => s.presetKey || "none");
-    const presetKey = presetKeys[0];
-    const payload: Record<string, unknown> = { mode: "edit", srcs, presetKey, presetKeys, strength: 0.7 * (kept[0].fxAmount ?? 1) };
-    // 인플: 편집기(웹)엔 쓸 만한 얼굴 검출기가 없다 — 한 장이라도 인플이면 여기서 찾아 사진별로 넘긴다(미리보기와 같은 사각형 틀).
-    if (presetKeys.some((k) => k === "infl")) {
-      payload.faces = await Promise.all(kept.map((s) => detectFaces(s.uri)));
-    }
-    setEditorPayload(payload);
-    router.push({ pathname: "/editor", params: { preset: presetKey } });
-  }, []);
+  const openEditor = useCallback((list: Shot[]) => openEditorWithShots(list), []);
 
   const pickFromAlbum = useCallback(async () => {
     const picked = await pickPhotos({ multiple: true, limit: 10 });
