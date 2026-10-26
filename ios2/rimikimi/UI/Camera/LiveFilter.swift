@@ -680,7 +680,10 @@ final class LiveFilterEngine {
         let mixed = look.applyingFilter("CIDissolveTransition", parameters: [
             kCIInputImageKey: img, kCIInputTargetImageKey: look, kCIInputTimeKey: t]).cropped(to: img.extent)
         guard p.special == nil || p.special == .vhs else { return mixed }
-        return effectsPass(mixed, p)   // 효과(그레인 등)는 그대로 — 슬라이더는 색감만(오너 지시 2026-10-09)
+        // 효과(그레인 등)는 그대로 — 슬라이더는 색감만(오너 지시 2026-10-09). 단 스포트라이트는 효과 자체가 룩이라
+        // 슬라이더를 따라간다(오너 2026-10-27 "슬라이더로 강도 조절") — 편집기 '효과' 슬라이더와 같은 뜻.
+        var q = p; q.fx.spot *= t
+        return effectsPass(mixed, q)
     }
 
     func apply(_ input: CIImage, key: String, effects: Bool = true) -> CIImage {
