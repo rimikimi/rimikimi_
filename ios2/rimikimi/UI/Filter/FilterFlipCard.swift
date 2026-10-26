@@ -27,6 +27,14 @@ struct FilterFlipCard: View {
         .rotation3DEffect(.degrees(!reduceMotion && flipped ? 180 : 0), axis: (x: 0, y: 1, z: 0), perspective: 0.5)
         .animation(reduceMotion ? .easeOut(duration: 0.2) : .spring(duration: 0.55, bounce: 0.12), value: flipped)
         .onDisappear { flipped = false }
+        #if DEBUG
+        .task {
+            // 캡처용: -dev.flipDemo <key> → 그 카드가 1.5초 뒤 뒤집히고 3초 뒤 돌아온다(시뮬레이터엔 탭을 못 보낸다).
+            guard UserDefaults.standard.string(forKey: "dev.flipDemo") == key else { return }
+            try? await Task.sleep(for: .seconds(1.5)); flipped = true
+            try? await Task.sleep(for: .seconds(3)); flipped = false
+        }
+        #endif
     }
 
     private var front: some View {
