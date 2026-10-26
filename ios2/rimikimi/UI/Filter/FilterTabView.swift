@@ -5,8 +5,11 @@ import SwiftUI
 /// 예전엔 똑같이 생긴 가로 줄 세 개가 세로로 쌓여 있어 필터가 작고 위계도 없었다("배열이 구식임").
 /// 지금은 ① 큰 전/후 비교샷 한 장으로 필터가 뭘 하는지 바로 보여 주고 ② 나머지는 3열 격자로
 /// 훑게 한다. 미리보기는 전부 **3:4**(오너 지시) — `fs_*.webp` 원본이 800px 이라 크게 써도 안 뭉갠다.
+// 2026-10-26: 미리보기는 필터 결과만(ff_*) — 원본과 나란히 놓지 않는다(오너 "샘플만 보여주면 안 됨? 경쟁사 방법").
 struct FilterTabView: View {
     @Environment(AppState.self) private var app
+    /// 즐겨찾는 필터 — 카메라 탭과 같은 저장소("filter.favorites")를 쓴다(한쪽에서 넣으면 양쪽에 보인다).
+    @State private var favs: [String] = UserDefaults.standard.stringArray(forKey: FilterFavorites.key) ?? []
 
     struct Preset: Identifiable { let key: String; var label: String { Copy.filterName(key) }; var id: String { key } }
     struct Group: Identifiable { let key: String; let title: String; let emoji: String; let presets: [Preset]; var id: String { key } }
@@ -61,6 +64,7 @@ struct FilterTabView: View {
         // 위 카드(말로 고치기·복원)와 목적 칸은 AI 기능이라 넣지 않는다.
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
+                if !favs.isEmpty { rail(L.t("즐겨찾는 필터", "Favorites"), favs, isNew: false) }
                 rail(L.t("추천 필터", "Featured"), Self.featuredKeys, isNew: false)
                 rail(L.t("신규 필터", "New"), Self.newKeys, isNew: true)
                 Text(L.t("필터 앨범", "Filter albums")).font(AppFont.headline).tracking(Tracking.headline)
@@ -76,6 +80,7 @@ struct FilterTabView: View {
         .scrollIndicators(.hidden)
         .background(Color.bg)
         .inlineTitle(Copy.filterTitle)
+        .onAppear { favs = FilterFavorites.load() }
     }
 
     private func rail(_ title: String, _ keys: [String], isNew: Bool) -> some View {
@@ -90,13 +95,15 @@ struct FilterTabView: View {
                 LazyHStack(alignment: .top, spacing: CardMetrics.railGap) {
                     ForEach(keys, id: \.self) { k in
                         Button { app.requireLogin(.filterPick(presetKey: k)) } label: {
-                            RemoteImage(url: Config.thumbURL("fs_\(k)"), cornerRadius: 0)
+                            RemoteImage(url: Config.thumbURL("ff_\(k)"), cornerRadius: 0, fallback: Config.thumbURL("fs_\(k)"))
                                 .photoRatio()
                                 .overlay(alignment: .bottomLeading) { PhotoCaption(title: Copy.filterName(k), size: 16) }
+                                .overlay(alignment: .topTrailing) { FilterFavorites.starButton(k, favs: $favs, app: app) }
                                 .clipShape(RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
                                 .shadow(color: .black.opacity(0.10), radius: 12, y: 8)
                         }
                         .buttonStyle(PressScaleButtonStyle())
+                        .contextMenu { FilterFavorites.menuItem(k, favs: $favs, app: app) }
                         .containerRelativeFrame(.horizontal) { w, _ in (w * CardMetrics.railCardFraction).rounded() }
                     }
                 }
@@ -113,7 +120,7 @@ struct FilterTabView: View {
         NavigationLink {
             FilterGroupGrid(group: g)
         } label: {
-            RemoteImage(url: Config.thumbURL("fs_\(g.presets.first?.key ?? "")"), cornerRadius: 0)
+            RemoteImage(url: Config.thumbURL("ff_\(g.presets.first?.key ?? "")"), cornerRadius: 0, fallback: Config.thumbURL("fs_\(g.presets.first?.key ?? "")"))
                 .photoRatio()
                 .overlay(alignment: .bottomLeading) { PhotoCaption(title: g.title, subtitle: "\(g.presets.count)", size: 15) }
                 .clipShape(RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
@@ -220,7 +227,7 @@ struct FilterTabView: View {
         Button { app.requireLogin(.filterPick(presetKey: p.key)) } label: {
             VStack(spacing: 6) {
                 // 미리보기는 무조건 3:4 (오너 지시 2026-09-22).
-                RemoteImage(url: Config.thumbURL("fs_\(p.key)"), cornerRadius: Radius.card - 2)
+                RemoteImage(url: Config.thumbURL("ff_\(p.key)"), cornerRadius: Radius.card - 2, fallback: Config.thumbURL("fs_\(p.key)"))
                     .photoRatio()
                 Text(p.label)
                     .font(AppFont.footnote).foregroundStyle(Color.ink)
@@ -236,6 +243,7 @@ struct FilterTabView: View {
 struct FilterGroupGrid: View {
     @Environment(AppState.self) private var app
     var group: FilterTabView.Group
+    @State private var favs: [String] = FilterFavorites.load()
     private let columns = Array(repeating: GridItem(.flexible(), spacing: Spacing.s2), count: 3)
     var body: some View {
         ScrollView {
@@ -243,11 +251,13 @@ struct FilterGroupGrid: View {
                 ForEach(group.presets) { p in
                     Button { app.requireLogin(.filterPick(presetKey: p.key)) } label: {
                         VStack(spacing: 6) {
-                            RemoteImage(url: Config.thumbURL("fs_\(p.key)"), cornerRadius: Radius.card - 2).photoRatio()
+                            RemoteImage(url: Config.thumbURL("ff_\(p.key)"), cornerRadius: Radius.card - 2, fallback: Config.thumbURL("fs_\(p.key)")).photoRatio()
+                                .overlay(alignment: .topTrailing) { FilterFavorites.starButton(p.key, favs: $favs, app: app, size: 26) }
                             Text(p.label).font(AppFont.footnote).foregroundStyle(Color.ink).lineLimit(1).minimumScaleFactor(0.85)
                         }
                     }
                     .buttonStyle(PressScaleButtonStyle())
+                    .contextMenu { FilterFavorites.menuItem(p.key, favs: $favs, app: app) }
                 }
             }
             .padding(.horizontal, Spacing.page).padding(.top, Spacing.s2)
@@ -255,5 +265,43 @@ struct FilterGroupGrid: View {
         }
         .background(Color.bg)
         .inlineTitle("\(group.emoji) \(group.title)")
+        .onAppear { favs = FilterFavorites.load() }
+    }
+}
+
+
+/// 필터 즐겨찾기 — 카메라 탭(길게 누르기)과 같은 저장소. 필터 탭에선 길게 눌러 메뉴로 넣고 뺀다(2026-10-26 오너).
+@MainActor enum FilterFavorites {
+    static let key = "filter.favorites"
+    static func load() -> [String] { UserDefaults.standard.stringArray(forKey: key) ?? [] }
+    /// 카드 오른쪽 위 별 — 누르면 바로 즐겨찾기(컨셉 별과 같은 노란 별, 꺼져 있으면 흰 테두리 별).
+    static func starButton(_ k: String, favs: Binding<[String]>, app: AppState, size: CGFloat = 32) -> some View {
+        let on = favs.wrappedValue.contains(k)
+        return Button { toggle(k, favs: favs, app: app) } label: {
+            Image(systemName: on ? "star.fill" : "star")
+                .font(.system(size: size * 0.5, weight: .semibold))
+                .foregroundStyle(on ? Color.favoriteStar : .white)
+                .frame(width: size, height: size)
+                .background(.black.opacity(0.35), in: Circle())
+                .contentTransition(.symbolEffect(.replace))
+                .padding(6)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(on ? Copy.favoriteRemove : Copy.favoriteAdd)
+    }
+    static func toggle(_ k: String, favs: Binding<[String]>, app: AppState) {
+        let on = favs.wrappedValue.contains(k)
+        var f = load()
+        if let i = f.firstIndex(of: k) { f.remove(at: i) } else { f.append(k) }
+        UserDefaults.standard.set(f, forKey: key); withAnimation(.snappy) { favs.wrappedValue = f }
+        app.showToast(on ? L.t("즐겨찾는 필터에서 뺐어요", "Removed from favorites") : L.t("즐겨찾는 필터에 넣었어요", "Added to favorites"))
+        HapticPlayer.selection()
+    }
+    @ViewBuilder static func menuItem(_ k: String, favs: Binding<[String]>, app: AppState) -> some View {
+        let on = favs.wrappedValue.contains(k)
+        Button { toggle(k, favs: favs, app: app) } label: {
+            Label(on ? Copy.favoriteRemove : Copy.favoriteAdd, systemImage: on ? "star.slash" : "star")
+        }
     }
 }

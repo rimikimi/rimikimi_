@@ -196,7 +196,7 @@ struct CameraFilterTab: View {
         }
         .toolbar(.hidden, for: .navigationBar)
         .coachHost()
-        .onAppear { visible = true; model.savesOnCapture = true; Task { await model.start() }; app.enqueueCoach(Coach.filter) }
+        .onAppear { favs = UserDefaults.standard.stringArray(forKey: "filter.favorites") ?? []; visible = true; model.savesOnCapture = true; Task { await model.start() }; app.enqueueCoach(Coach.filter) }
         .onDisappear { visible = false; model.stop() }
         .onChange(of: selected, initial: true) {
             model.live?.presetKey = selected
