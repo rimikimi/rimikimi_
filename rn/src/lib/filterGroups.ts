@@ -8,7 +8,7 @@ export const MOOD = [
   "golden", "peach", "slide", "retro", "vivid", "green", "pastel", "cine", "newtro", "softmono",
   "warm", "cool", "vintage", "docu", "mono", "digicam", "y2k", "toy", "dispo", "instant",
 ];
-export const FX = ["bloom", "vhs", "glitch", "pixelate"];
+export const FX = ["neonglow", "bloom", "lightleak", "softfocus", "haze", "spotlight", "grainy", "vhs", "glitch", "pixelate"];
 
 export interface FilterGroupDef { key: string; title: () => string; keys: string[] }
 export const FILTER_GROUPS: FilterGroupDef[] = [

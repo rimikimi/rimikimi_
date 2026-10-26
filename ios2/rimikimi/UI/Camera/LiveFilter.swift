@@ -137,6 +137,13 @@ enum LiveFilter {
         "folder": .init(temp: -10, tint: 6, ex: 0.18, con: 0.22, fade: 24, sat: -0.35, vib: -0.05, sh: [-6, 4, 10], hi: [-2, 2, 8], fx: .init(grain: 0.55, vignette: 0.55, blur: 0.08, lowres: 0.005)),
         "y2k": .init(temp: -14, tint: 2, ex: 0.2, con: 0.45, sat: 0.3, vib: 0.1, sh: [-10, 0, 20], hi: [8, 0, 8], hsl: [.init(c: 225, w: 60, h: 0, s: 0.3, l: 0), .init(c: 180, w: 40, h: 0, s: 0.2, l: 0)], fx: .init(grain: 0.3, vignette: 1.0, glow: 0.8)),
         "haduri": .init(temp: 12, tint: 8, ex: 0.18, con: -0.1, fade: 26, whitePull: 20, sat: -0.2, sh: [6, 6, -4], hi: [8, 6, -10], fx: .init(grain: 0.45, glow: 0.7, blur: 0.15, lowres: 0.004)),
+        // 효과 5종(오너 2026-10-27 "효과 10개") — filters.js 와 같은 값.
+        "lightleak": .init(temp: 14, tint: 4, ex: 0.06, con: 0.08, fade: 10, whitePull: 6, sat: 0.06, vib: 0.1, sh: [6, 0, -4], hi: [14, 6, -6], fx: .init(grain: 0.3, leak: 1.8)),
+        "softfocus": .init(temp: 4, tint: 4, ex: 0.1, con: -0.2, fade: 14, whitePull: 10, sat: -0.06, vib: 0.06, sh: [4, 2, 4], hi: [8, 6, 4], fx: .init(glow: 1.0, blur: 0.1)),
+        "spotlight": .init(temp: 6, ex: -0.06, con: 0.32, sat: 0.04, vib: 0.06, sh: [-8, -8, -6], hi: [10, 8, 4], fx: .init(grain: 0.15, vignette: 2.6)),
+        "grainy": .init(temp: 6, tint: 2, con: 0.22, fade: 14, whitePull: 8, sat: -0.3, sh: [4, 2, -2], hi: [6, 4, -4], fx: .init(grain: 2.2, vignette: 0.35)),
+        "haze": .init(temp: -8, tint: 2, ex: 0.12, con: -0.3, fade: 34, whitePull: 24, sat: -0.22, sh: [6, 8, 12], hi: [6, 8, 10], fx: .init(glow: 0.6, blur: 0.12)),
+        "neonglow": .init(temp: -12, tint: 14, ex: 0.02, con: 0.3, sat: 0.3, vib: 0.2, sh: [6, -6, 22], hi: [10, 0, 14], hsl: [.init(c: 300, w: 50, h: 0, s: 0.5, l: 0.04), .init(c: 190, w: 40, h: 0, s: 0.45, l: 0.04)], fx: .init(glow: 0.8)),
         "pixelate": .init(special: .pixelate),
         "bloom": .init(temp: 8, tint: 2, ex: 0.06, con: -0.06, fade: 16, whitePull: 10, sat: -0.04, vib: 0.18, sh: [6, 4, 0], hi: [14, 10, 2], fx: .init(leak: 0.3)),
         "twinkle": .init(temp: 4, ex: 0.03, con: 0.1, fade: 6, whitePull: 6, sat: 0.06, vib: 0.2, sh: [0, 0, 4], hi: [8, 6, 0]),

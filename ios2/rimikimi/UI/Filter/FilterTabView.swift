@@ -39,7 +39,8 @@ struct FilterTabView: View {
         ]),
         // 효과 — 색감보다 효과가 주인 필터(2026-10-26 필터 탭 개편 시안: 폰카·빈티지·감성·효과)
         .init(key: "fx", title: L.t("효과", "Effects"), emoji: "✨", presets: [
-            .init(key: "flashsoft"), .init(key: "bloom"), .init(key: "vhs"), .init(key: "glitch"), .init(key: "pixelate"),
+            .init(key: "flashsoft"), .init(key: "neonglow"), .init(key: "bloom"), .init(key: "lightleak"), .init(key: "softfocus"), .init(key: "haze"),
+            .init(key: "spotlight"), .init(key: "grainy"), .init(key: "vhs"), .init(key: "glitch"), .init(key: "pixelate"),
         ]),
     ] }
 

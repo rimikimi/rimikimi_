@@ -181,6 +181,12 @@ export const FILM_PRESETS: Preset[] = [
   { key: "haduri", ko: "웹캠", en: "Webcam '03", group: "vintage", // 옛 웹캠 — 웹 filters.js 와 같은 색 값
     temp: 12, tint: 8,  ex: 0.18, con: -0.1, fade: 26, whitePull: 20, sat: -0.2,  vib: 0,    sh: [6, 6, -4],   hi: [8, 6, -10],
     fx: { grain: 0.45, glow: 0.7, blur: 0.15 } },
+  { key: "lightleak", ko: "빛샘", en: "Light Leak", group: "mood", temp: 14, tint: 4, ex: 0.06, con: 0.08, fade: 10, whitePull: 6, sat: 0.06, vib: 0.1, sh: [6, 0, -4], hi: [14, 6, -6], fx: { leak: 1.8, grain: 0.3 } },
+  { key: "softfocus", ko: "소프트 포커스", en: "Soft Focus", group: "mood", temp: 4, tint: 4, ex: 0.1, con: -0.2, fade: 14, whitePull: 10, sat: -0.06, vib: 0.06, sh: [4, 2, 4], hi: [8, 6, 4], fx: { glow: 1.0, blur: 0.1 } },
+  { key: "spotlight", ko: "스포트라이트", en: "Spotlight", group: "mood", temp: 6, tint: 0, ex: -0.06, con: 0.32, fade: 0, whitePull: 0, sat: 0.04, vib: 0.06, sh: [-8, -8, -6], hi: [10, 8, 4], fx: { vignette: 2.6, grain: 0.15 } },
+  { key: "grainy", ko: "거친 입자", en: "Heavy Grain", group: "mood", temp: 6, tint: 2, ex: 0, con: 0.22, fade: 14, whitePull: 8, sat: -0.3, vib: 0, sh: [4, 2, -2], hi: [6, 4, -4], fx: { grain: 2.2, vignette: 0.35 } },
+  { key: "haze", ko: "안개", en: "Haze", group: "mood", temp: -8, tint: 2, ex: 0.12, con: -0.3, fade: 34, whitePull: 24, sat: -0.22, vib: 0, sh: [6, 8, 12], hi: [6, 8, 10], fx: { glow: 0.6, blur: 0.12 } },
+  { key: "neonglow", ko: "네온", en: "Neon Glow", group: "mood", temp: -12, tint: 14, ex: 0.02, con: 0.3, fade: 0, whitePull: 0, sat: 0.3, vib: 0.2, sh: [6, -6, 22], hi: [10, 0, 14], hsl: [{ c: 300, w: 50, s: 0.5, l: 0.04 }, { c: 190, w: 40, s: 0.45, l: 0.04 }], fx: { glow: 0.8 } },
   { key: "sepia",    ko: "세피아",    en: "Sepia", group: "mood", hidden: true,
     ex: 0.02, con: 0.12, fade: 8, whitePull: 6, bw: [0.3, 0.55, 0.15], sh: [18, 6, -14], hi: [24, 10, -18] },
   { key: "duopink",  ko: "듀오 핑크", en: "Duo Pink", group: "mood", hidden: true,
