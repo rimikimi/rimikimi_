@@ -41,7 +41,8 @@ enum Copy {
     static var tabGallery: String { L.t("갤러리", "Gallery") }
     static var tabFilter: String { L.t("필터", "Filter") }
     // MARK: 2026-10-09 개편 — 탭 3개 · 목적 칸 · 여러 장 담기
-    static var tabMake: String { L.t("만들기", "Create") }
+    /// 하단 탭 이름(오너 2026-10-26 "만들기 → AI 컨셉"). 서버 labels.json `tab.make` 로 빌드 없이 바꿀 수 있다(83+).
+    static var tabMake: String { Labels.t("tab.make", "AI 컨셉", "AI Concepts") }
     static var tabCameraFilter: String { L.t("카메라·필터", "Camera") }
     static var tabCamera: String { L.t("카메라", "Camera") }
     static var tabMagic: String { L.t("매직 부스", "Magic Booth") }

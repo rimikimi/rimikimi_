@@ -98,3 +98,5 @@
 - 원인: PushManager.configureAtLaunch 에서 APNs 토큰 오기 전에 subscribe → try? 로 조용히 실패. 토글 켤 때도 같은 경쟁.
 - 수정: didRegister(deviceToken)·didReceiveRegistrationToken 에서 syncDropTopic, apnsToken 없으면 건너뜀, 실패 로그.
 - 서버는 정상 발송 확인(10/20 11:00Z net._http_response 200, drop_p540 ok).
+
+- 하단 첫 탭 이름 "만들기" → "AI 컨셉"(오너 10/26). 코드 반영됨(Copy.tabMake → labels.json tab.make), 83 빌드부터. 82 는 "만들기".

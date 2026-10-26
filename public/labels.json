@@ -79,5 +79,9 @@
  "category.일상(겨울)": {
   "ko": "일상(겨울)",
   "en": "Everyday · Winter"
+ },
+ "tab.make": {
+  "ko": "AI 컨셉",
+  "en": "AI Concepts"
  }
 }
