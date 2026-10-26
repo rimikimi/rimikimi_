@@ -205,6 +205,17 @@ struct CategoryListView: View {
     var name: String
     var body: some View {
         ScrollView {
+            // 매직 부스 탭 — 무엇을 하는 곳인지 한 줄(오너 2026-10-26 "사용자가 넣는 사진을 뭐든지 저 분위기로")
+            if name == Concept.artCategory {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(L.t("어떤 사진이든 이 그림체로", "Any photo, in any of these styles"))
+                        .font(AppFont.headline).foregroundStyle(Color.ink)
+                    Text(L.t("사람·반려동물·풍경 뭐든 올리면 고른 그림체로 바꿔 드려요.", "People, pets or places — upload a photo and it's redrawn in the style you pick."))
+                        .font(AppFont.callout).foregroundStyle(Color.ink2).fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, Spacing.page).padding(.top, Spacing.s2).padding(.bottom, Spacing.s3)
+            }
             DensePhotoGrid(concepts: app.concepts.concepts(in: name), category: name,
                            startWide: app.devWideColumns)
                 .padding(.bottom, app.contentBottomPad)

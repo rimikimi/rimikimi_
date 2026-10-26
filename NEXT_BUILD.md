@@ -1,5 +1,11 @@
 # 다음 앱 빌드에 넣을 것
 
+## 🔴 iOS 빌드 필수: Firebase 설정 파일 (2026-10-15)
+- 빌드 53~67 전부 `GoogleService-Info.plist` 가 빠져 원격 푸시(생성 완료·새 컨셉)가 아예 안 됐다(서버 로그 diag=notConfigured).
+- 원인: 빌드를 git 스냅샷(`bNNsrc`)에서 했는데 이 파일은 `ios2/.gitignore` 라 스냅샷에 안 들어간다.
+- 빌드 전에 `cp ios2/rimikimi/Resources/GoogleService-Info.plist <스냅샷>/ios2/rimikimi/Resources/` 를 하고,
+  아카이브 뒤 `Products/Applications/rimikimi.app/GoogleService-Info.plist` 가 있는지 확인하고 없으면 업로드하지 않는다.
+
 > 2026-09-29 작성 · **09-30 갱신: 1·2번은 iOS 2.0.2 build 16(TestFlight)에 들어갔다, 4번은 Android 2.0.2 재빌드에 들어간다.**
 > 현재 상태(09-30): iOS 2.0.2 build 15 는 9/25 제출 후 심사가 멈춘 상태 → build 16(커스텀 보정·편집기 화질) TestFlight 올리는 중,
 > 오너 확인 후 15 심사 취소·16 으로 재제출 예정. Android 2.0.1 출시 완료 → **2.0.2(vc103, 영어 + 편집기 언어 수정) 09-30 심사 제출**.
@@ -82,3 +88,13 @@
 
 - **iOS:** 2.0.2 심사 결과 확인 → 2.0.3 에 1·2(·3)·5 → `/policy-review` → 제출
 - **Android:** 2.0.1 승인 → 2.0.2 재빌드(4 포함, 가능하면 1도) → `play-upload.mjs --track production --notes … --notes-en …`
+
+## 안드로이드: R8 코드 축소·난독화 켜기 (Play 경고, 기한 2027-02)
+- Play Console "DEX code optimization is below our threshold — Obfuscation 2%". 지금 릴리즈 빌드가 minify 꺼짐.
+- rn/android/gradle.properties(또는 app.config 의 expo-build-properties)에 `android.enableMinifyInReleaseBuilds=true`, `android.enableShrinkResourcesInReleaseBuilds=true`.
+- 켜고 나면 에뮬에서 로그인(카카오·구글)·RevenueCat 결제창·AdMob 보상형 광고·FCM 푸시·생성 1회 꼭 확인(리플렉션 쓰는 SDK가 깨질 수 있음 → proguard-rules.pro keep 규칙 추가).
+
+## iOS: 새 컨셉(8시 드롭) 알림 토픽 구독 타이밍 수정 (be7f1cb)
+- 원인: PushManager.configureAtLaunch 에서 APNs 토큰 오기 전에 subscribe → try? 로 조용히 실패. 토글 켤 때도 같은 경쟁.
+- 수정: didRegister(deviceToken)·didReceiveRegistrationToken 에서 syncDropTopic, apnsToken 없으면 건너뜀, 실패 로그.
+- 서버는 정상 발송 확인(10/20 11:00Z net._http_response 200, drop_p540 ok).

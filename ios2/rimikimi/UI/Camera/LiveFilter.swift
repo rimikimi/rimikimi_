@@ -35,7 +35,7 @@ enum LiveFilter {
         return i.transformed(by: .init(translationX: -i.extent.minX, y: -i.extent.minY))
     }
 
-    enum Special { case duotone, thermal, glitch, vhs, pixelate, sketch }
+    enum Special { case duotone, thermal, glitch, vhs, pixelate, sketch, flashSoft, flashHard }
 
     /// 색상 대역(HSL) 조정 한 줄 — c: 중심 색상, w: 반경, h: 색상 이동, s·l: 배율 δ
     struct Band { var c: Double; var w: Double; var h: Double; var s: Double; var l: Double }
@@ -137,6 +137,10 @@ enum LiveFilter {
         "bloom": .init(temp: 8, tint: 2, ex: 0.06, con: -0.06, fade: 16, whitePull: 10, sat: -0.04, vib: 0.18, sh: [6, 4, 0], hi: [14, 10, 2], fx: .init(leak: 0.3)),
         "twinkle": .init(temp: 4, ex: 0.03, con: 0.1, fade: 6, whitePull: 6, sat: 0.06, vib: 0.2, sh: [0, 0, 4], hi: [8, 6, 0]),
         "sketch": .init(special: .sketch),
+        // 슬로우싱크 플래시 · 후막(오너 2026-10-26) — 사람은 제자리에서 플래시로 또렷, 지나온 쪽(왼쪽)에 옅은 흔적,
+        // 배경은 어둡고 살짝 흐름. 소프트 = 디퓨저(부드럽고 뽀얗게), 하드 = 직광(대비·배경 더 어둡게, 과하지 않게).
+        "flashsoft": .init(fx: .init(grain: 0.25), special: .flashSoft),
+        "flashhard": .init(fx: .init(grain: 0.25), special: .flashHard),
     ]
 
     // MARK: ① 채널 LUT — filters.js channelGains / toneCurve / buildLuts 를 Double 로 그대로
@@ -684,6 +688,9 @@ final class LiveFilterEngine {
             let ch = jsRound(W * 0.008) + 1
             let g = run("lfGlitch", ext, [img], [img, W, H, bandH, ch, 7])
             return run("lfScan", ext, [g], [g, 3, 88, 100, H])
+        case .flashSoft?, .flashHard?:
+            let r = slowSync(img, hard: p.special == .flashHard)
+            return effects ? effectsPass(r, p) : r
         case .vhs?:
             let ch = max(1, jsRound(W * 0.004))
             img = run("lfShift", ext, [img], [img, ch, W, H])
@@ -749,6 +756,59 @@ final class LiveFilterEngine {
         let blurD = gauss(img, I.detail * fw, W, H)
         return run("lfInfl", ext, [img, blurD, mask, base, glow],
                    [img, blurD, mask, base, glow, s, a, ww, wh, I.edgeLo, I.edgeHi])
+    }
+
+    /// 슬로우셔터 + 플래시 — Vision 인물 분할로 사람/배경을 나눠, 사람은 플래시 맞은 듯 밝고 또렷하게,
+    /// 배경은 셔터가 열린 동안 카메라가 움직인 것처럼 이중상(오른쪽으로 2.8%) + 약한 모션블러 + 밝은 불빛만 길게 끌리고 어둡게.
+    /// 사람이 없으면 화면 전체를 배경처럼 처리한다(풍경용 드래그 셔터).
+    private var segReq: VNGeneratePersonSegmentationRequest = {
+        let r = VNGeneratePersonSegmentationRequest(); r.qualityLevel = .balanced
+        r.outputPixelFormat = kCVPixelFormatType_OneComponent8; return r
+    }()
+    /// 후막 슬로우싱크 — scratchpad 시안(rear.py, 오너 승인 2026-10-26)과 같은 단계.
+    func slowSync(_ img: CIImage, hard: Bool) -> CIImage {
+        let ext = img.extent, W = ext.width, H = ext.height
+        var mask: CIImage? = nil
+        if (try? VNImageRequestHandler(ciImage: img).perform([segReq])) != nil, let pb = segReq.results?.first?.pixelBuffer {
+            let m = CIImage(cvPixelBuffer: pb)
+            mask = m.transformed(by: .init(scaleX: W / m.extent.width, y: H / m.extent.height)).applyingGaussianBlur(sigma: 1.5).cropped(to: ext)
+        }
+        let clamp = img.clampedToExtent()
+        func scale(_ i: CIImage, _ k: CGFloat, alpha: CGFloat = 1) -> CIImage {
+            i.applyingFilter("CIColorMatrix", parameters: ["inputRVector": CIVector(x: k, y: 0, z: 0, w: 0), "inputGVector": CIVector(x: 0, y: k, z: 0, w: 0),
+                                                         "inputBVector": CIVector(x: 0, y: 0, z: k, w: 0), "inputAVector": CIVector(x: 0, y: 0, z: 0, w: alpha)])
+        }
+        // 배경: 살짝 흐르고 어둡게 + 불빛만 짧게 번짐
+        let bgBlur = clamp.applyingFilter("CIMotionBlur", parameters: [kCIInputRadiusKey: W * 0.0075, kCIInputAngleKey: 0.05])
+        let hiTrail = clamp.applyingFilter("CIMotionBlur", parameters: [kCIInputRadiusKey: W * 0.015, kCIInputAngleKey: 0.05])
+            .applyingFilter("CIColorMatrix", parameters: ["inputRVector": CIVector(x: 1.6, y: 0, z: 0, w: 0), "inputGVector": CIVector(x: 0, y: 1.6, z: 0, w: 0),
+                                                          "inputBVector": CIVector(x: 0, y: 0, z: 1.6, w: 0), "inputBiasVector": CIVector(x: -0.95, y: -0.95, z: -0.95, w: 0)])
+            .applyingFilter("CIColorClamp")
+        var comp = scale(bgBlur, hard ? 0.55 : 0.7).applyingFilter("CIAdditionCompositing", parameters: [kCIInputBackgroundImageKey: scale(hiTrail, 0.7)])
+        guard let m = mask else { return comp.cropped(to: ext) }
+        // 흔적: 지나온 자리(왼쪽 0~7%)의 사람 — 먼 곳부터 겹쳐 쌓고 흐리게, 최대 55%
+        let person0 = img.applyingFilter("CIBlendWithMask", parameters: [kCIInputBackgroundImageKey: CIImage.empty(), kCIInputMaskImageKey: m])
+        var stack = CIImage.empty()
+        let N = 10
+        for i in stride(from: N - 1, through: 1, by: -1) {
+            let t = CGFloat(i) / CGFloat(N - 1)
+            let wgt = (1 - t) * 0.9 + 0.1
+            let layer = scale(person0.transformed(by: .init(translationX: -0.07 * W * t, y: 0)), 0.75 * wgt * 0.35, alpha: wgt * 0.35)
+            stack = layer.composited(over: stack)
+        }
+        stack = stack.applyingGaussianBlur(sigma: Double(W) * 0.006)
+        comp = stack.composited(over: comp)
+        // 사람: 플래시
+        let person: CIImage = hard
+            ? img.applyingFilter("CIColorControls", parameters: [kCIInputContrastKey: 1.12]).applyingFilter("CIExposureAdjust", parameters: [kCIInputEVKey: 0.12])
+            : {
+                let p = img.applyingFilter("CIColorControls", parameters: [kCIInputContrastKey: 1.04]).applyingFilter("CIExposureAdjust", parameters: [kCIInputEVKey: 0.16])
+                return p.applyingGaussianBlur(sigma: Double(W) * 0.004).applyingFilter("CIDissolveTransition", parameters: [kCIInputTargetImageKey: p, kCIInputTimeKey: 0.85]).cropped(to: ext)
+            }()
+        var out = person.applyingFilter("CIBlendWithMask", parameters: [kCIInputBackgroundImageKey: comp, kCIInputMaskImageKey: m])
+        out = out.applyingFilter("CITemperatureAndTint", parameters: ["inputNeutral": CIVector(x: 6500, y: 0), "inputTargetNeutral": CIVector(x: hard ? 5700 : 5900, y: 0)])
+            .applyingFilter("CIVignette", parameters: [kCIInputIntensityKey: hard ? 0.5 : 0.35, kCIInputRadiusKey: 1.7])
+        return out.cropped(to: ext)
     }
 
     private func gauss(_ img: CIImage, _ sigma: CGFloat, _ W: CGFloat, _ H: CGFloat) -> CIImage {
