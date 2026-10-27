@@ -144,10 +144,13 @@ enum Purpose: String, CaseIterable {
         case .concept: return nil
         }
     }
-    /// 표지 컨셉(오너 지정: 프사·소개팅 = 454 한옥카페 빙수).
+    /// 표지 컨셉 — 서버 labels.json `purpose.<목적>` 의 `cover` 값이 있으면 그것(빌드 없이 교체), 없으면 오너 지정 기본값
+    /// (프사·소개팅 = 454 한옥카페 빙수, 증명·프로필 = 409 증명사진 — 오너 2026-10-27).
     var coverID: String? {
+        if let v = LabelStore.shared.table["purpose.\(rawValue)"]?["cover"], !v.isEmpty { return v }
         switch self {
         case .snap: return "454"
+        case .profile: return "409"
         default: return nil
         }
     }

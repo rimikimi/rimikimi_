@@ -1,7 +1,7 @@
 import { ART_CATEGORY, byNewest, categoriesOf, conceptLarge, conceptPool, conceptThumb, isFeatureConcept, type Concept } from "./concepts";
 import { FAVORITES_ALBUM } from "./favorites";
 import { activeSeasons, type Season } from "./seasons";
-import { c21 } from "./copy21";
+import { c21, labelValue } from "./copy21";
 import { CATEGORY_EN, categoryLabel } from "./locale";
 
 // ============================================================================
@@ -24,8 +24,9 @@ const FALLBACK_CATEGORY: Record<Purpose, string | null> = {
   wedding: "웨딩 / 브라이덜",
   concept: null,
 };
-/** 표지 컨셉(오너 지정: 프사·소개팅 = 454 한옥카페 빙수). */
-const COVER_ID: Partial<Record<Purpose, string>> = { snap: "454" };
+/** 표지 컨셉(오너 지정: 프사·소개팅 = 454 한옥카페 빙수, 증명·프로필 = 409 증명사진 2026-10-27).
+ *  서버 labels.json `purpose.<목적>.cover` 가 있으면 그것(빌드 없이 교체). */
+const COVER_ID: Partial<Record<Purpose, string>> = { snap: "454", profile: "409" };
 
 export function newestOf(pool: Concept[], n = 10): Concept[] {
   return pool.filter((c) => !isFeatureConcept(c)).sort(byNewest).slice(0, n);
@@ -42,7 +43,8 @@ export function conceptsForPurpose(all: Concept[], p: Purpose): Concept[] {
 }
 
 export function purposeCover(all: Concept[], p: Purpose): Concept | undefined {
-  const id = COVER_ID[p];
+  const v = labelValue(`purpose.${p}.cover`);
+  const id = (typeof v === "string" && v) || COVER_ID[p];
   if (id) {
     const c = all.find((x) => String(x.id) === id);
     if (c) return c;
