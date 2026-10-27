@@ -146,7 +146,7 @@ export const FILM_PRESETS: Preset[] = [
     fx: { grain: 0.55, vignette: 0.45 } },
   { key: "folder",  ko: "폴더폰",  en: "Flip Phone", group: "phone", // 웹 filters.js 와 같은 색 값(저해상도·블록은 편집기 웹에서)
     temp: -10, tint: 6, ex: 0.18, con: 0.22, fade: 24, whitePull: 0,  sat: -0.35, vib: -0.05, sh: [-6, 4, 10], hi: [-2, 2, 8],
-    fx: { grain: 0.55, vignette: 0.55, blur: 0.08 } },
+    fx: { grain: 0.55, vignette: 0.55 } },
 
   /* ── 재미 (SNOW류 — 특수 렌더 모드, special 필드가 전용 코드 경로를 탄다) ── */
   // 인플 — 얼굴 피부 보정(뷰티). 색 LUT 대신 beautyRGBA(웹 filters.js)를 탄다. 강도 = 색감 슬라이더(0 = 원본).

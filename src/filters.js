@@ -131,7 +131,8 @@ export const FILM_PRESETS = [
 
   { key: "folder",  ko: "폴더폰",  en: "Flip Phone", group: "phone", // 2004 — 30만 화소 폴더폰: 뭉개짐·블록·뿌연 저채도·청록 캐스트·노이즈·하이라이트 날림(오너 2026-10-26)
     temp: -10, tint: 6, ex: 0.18, con: 0.22, fade: 24, whitePull: 0,  sat: -0.35, vib: -0.05, sh: [-6, 4, 10], hi: [-2, 2, 8],
-    fx: { lowres: 0.005, blur: 0.08, grain: 0.55, vignette: 0.55 } },
+    // 해상도는 건드리지 않는다(오너 10/27 "해상도까지 조져버리지는 말아라") — 3GS 와 같은 원칙: 색감·노이즈·비네팅만.
+    fx: { grain: 0.55, vignette: 0.55 } },
 
   /* ── 재미 (SNOW류 — 특수 렌더 모드, special 필드가 전용 코드 경로를 탄다) ── */
   // 인플 — 얼굴 피부 보정(뷰티). 색 LUT 대신 beautyRGBA 를 탄다. 강도 = 색감 슬라이더(0 = 원본).
@@ -225,6 +226,10 @@ export const FILM_PRESETS = [
     fx: { glow: 0.8 } },
   // 피사체 글로우(오너 2026-10-27, 아이폰 '스티커 들어 올리기' 느낌) — 인물 윤곽 바깥에 하얀 글로우 + 배경 어둡게. 인물 마스크 필요(effects.personMask).
   { key: "subjectglow", ko: "피사체 글로우", en: "Subject Glow", group: "mood", special: "subjectglow" },
+  // 플래시 스타(오너 2026-10-27 거울 셀카 레퍼런스) — 가장 밝은 점(폰 플래시)에서 크게 퍼지는 6갈래 별빛 + 빛 뭉침 +
+  // 반대편 청록 렌즈 고스트 + 살짝 뿌연 톤. 위치 = effects.spotPos(없으면 자동으로 가장 밝은 곳), 크기 = effects.spotSize. 시안 단계라 숨김.
+  { key: "flashstar", ko: "플래시 스타", en: "Flash Star", group: "mood", special: "flashstar", hidden: true,
+    temp: -2, tint: 4, ex: 0.06, con: -0.08, fade: 10, whitePull: 8, sat: -0.04, vib: 0.04, sh: [2, 2, 6], hi: [6, 6, 8] },
   { key: "twinkle",  ko: "트윙클",    en: "Twinkle", group: "mood",
     temp: 4, tint: 0, ex: 0.03, con: 0.1, fade: 6, whitePull: 6, sat: 0.06, vib: 0.2,
     sh: [0, 0, 4], hi: [8, 6, 0],
@@ -271,6 +276,9 @@ export function applyLookWithStrength(data, w, h, preset, effects = {}, strength
     dreamyRGBA(data, w, h, k, effects.faces, effects.seed); // 색감 슬라이더 = 빛번짐 세기(70% = 기본 룩)
   } else if (p?.special === "flashsoft" || p?.special === "flashhard") {
     slowSyncRGBA(data, w, h, k, effects.personMask, p.special === "flashhard");
+  } else if (p?.special === "flashstar") {
+    applyLook(data, w, h, { ...p, special: undefined }, seedOnly);
+    flashStarRGBA(data, w, h, Math.min(1.4, k), effects.spotPos, effects.spotSize || 1);
   } else if (p?.special === "subjectglow") {
     subjectGlowRGBA(data, w, h, Math.min(1.4, k), effects.personMask);
   } else if (p) {
@@ -495,6 +503,12 @@ export function applyLook(data, w, h, preset, effects = {}) {
     dreamyRGBA(data, w, h, 1, effects.faces, effects.seed);
     const { faces: _f, ...rest } = effects;
     return applyLook(data, w, h, null, rest);
+  }
+  if (preset?.special === "flashstar") {
+    const { personMask: _m, faces: _f, ...rest } = effects;
+    applyLook(data, w, h, { ...preset, special: undefined }, rest);    // 색 먼저
+    flashStarRGBA(data, w, h, 1, effects.spotPos, effects.spotSize || 1);
+    return data;
   }
   if (preset?.special === "subjectglow") {
     subjectGlowRGBA(data, w, h, 1, effects.personMask);
@@ -1659,6 +1673,58 @@ function slowSyncRGBA(data, w, h, a, maskIn, hard) {
     }
     const r = Math.min(1, rgb[0] * 1.05 + 0.01) * vig, g = rgb[1] * vig, b = rgb[2] * (hard ? 0.93 : 0.96) * vig;
     data[j] = clamp8(data[j] + (r * 255 - data[j]) * a); data[j + 1] = clamp8(data[j + 1] + (g * 255 - data[j + 1]) * a); data[j + 2] = clamp8(data[j + 2] + (b * 255 - data[j + 2]) * a);
+  }
+}
+
+/* 플래시 스타 — 거울 셀카 플래시처럼 한 점에서 크게 터지는 6갈래 별빛(screen 합성, sRGB).
+   광원: pos(0~1) 가 없으면 64칸 축소본에서 가장 밝은 칸. */
+function flashStarRGBA(data, w, h, a, pos, size) {
+  if (!(a > 0.001)) return;
+  let sx, sy;
+  if (pos) { sx = pos.x * w; sy = pos.y * h; }
+  else {
+    // 자동: 하얗게 날아간 작은 점(조명·전구·해·플래시)만 광원으로 본다 — 평균이 아니라 칸의 최댓값, 250 이상.
+    // 얼굴처럼 넓게 밝은 곳은 고르지 않는다(1차 시안에서 얼굴에 터졌다). 없으면 위쪽 가운데.
+    const G = 48, gw = Math.ceil(w / G), gh = Math.ceil(h / G); let best = -1, bestArea = 1e9;
+    sx = w * 0.5; sy = h * 0.28;
+    for (let gy = 0; gy < G; gy++) for (let gx = 0; gx < G; gx++) {
+      let mx = 0, hot = 0, n = 0;
+      for (let y = gy * gh; y < Math.min(h, (gy + 1) * gh); y += 2) for (let x = gx * gw; x < Math.min(w, (gx + 1) * gw); x += 2) {
+        const i = (y * w + x) * 4, v = Math.min(data[i], data[i + 1], data[i + 2]); if (v > mx) mx = v; if (v >= 250) hot++; n++;
+      }
+      if (mx < 250) continue;
+      const area = hot / Math.max(1, n);                       // 칸 안에서 날아간 비율 — 작을수록 점 광원
+      if (area < 0.6 && (mx > best || (mx === best && area < bestArea))) { best = mx; bestArea = area; sx = (gx + 0.5) * gw; sy = (gy + 0.5) * gh; }
+    }
+  }
+  const M = Math.min(w, h), L = M * 0.42 * size;                         // 갈래 길이 — 짧게(레퍼런스는 금방 흐려진다)
+  const rays = [], phase = -Math.PI / 2 + 0.3;
+  for (let r = 0; r < 6; r++) { const ang = phase + r * Math.PI / 3; rays.push([Math.cos(ang), Math.sin(ang), r % 2 ? 0.8 : 1]); }
+  const core = M * 0.028 * size, halo = M * 0.12 * size, haze = M * 0.55 * size, rw = M * 0.0055 * size;
+  const gx = w - sx, gy = h - sy, gr = M * 0.06 * size;
+  // ① 빛에 젖은 듯 전체를 뿌옇게: 광원에서 멀수록 약하게 + 사진 전체 살짝 밝게(검정 뜸)
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const dx = x - sx, dy = y - sy, d2 = dx * dx + dy * dy, d = Math.sqrt(d2);
+    let v = Math.exp(-d2 / (2 * core * core)) * 1.0 + Math.exp(-d2 / (2 * halo * halo)) * 0.3 + Math.exp(-d2 / (2 * haze * haze)) * 0.2;
+    for (const [cx, cy, wgt] of rays) {
+      const t = dx * cx + dy * cy; if (t <= 0) continue;
+      const tt = t / L; if (tt > 1.6) continue;
+      const p = Math.abs(-dx * cy + dy * cx);
+      const wid = rw * (1.6 - 0.9 * Math.min(1, tt));                 // 뿌리가 굵고 끝으로 갈수록 가늘게
+      const f = Math.exp(-tt * 2.6);                                  // 빠르게 흐려짐
+      v += wgt * f * (Math.exp(-(p * p) / (2 * wid * wid)) * 0.9 + Math.exp(-(p * p) / (2 * (wid * 4) ** 2)) * 0.25);
+    }
+    const gd = Math.hypot(x - gx, y - gy) / gr;
+    const ghost = gd < 1.2 ? Math.exp(-((gd - 0.85) ** 2) / 0.06) * 0.22 + (gd < 1 ? 0.08 : 0) : 0;
+    const i = (y * w + x) * 4;
+    const add = [v * 1.0, v * 0.97, v * 1.0];                             // 살짝 차가운 흰빛
+    const gc = [ghost * 0.3, ghost * 0.85, ghost * 0.8];
+    for (let c = 0; c < 3; c++) {
+      let o = data[i + c] / 255;
+      o = o * (1 - 0.1 * a) + 0.1 * a;                                    // 전체가 빛에 살짝 젖음(검정이 뜸)
+      const e = Math.min(1, (add[c] + gc[c]) * a);
+      data[i + c] = clamp8((1 - (1 - o) * (1 - e)) * 255);                // screen
+    }
   }
 }
 
