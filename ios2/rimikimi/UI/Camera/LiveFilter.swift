@@ -864,17 +864,37 @@ final class LiveFilterEngine {
         }
         // 마스크는 색이 아니라 데이터 — 색공간 없이 읽어야 감마로 값이 줄지 않는다(실측: 머리 쪽 글로우가 빠졌다).
         let raw = CIImage(cvPixelBuffer: pb, options: [.colorSpace: NSNull()])
-        let m = raw.transformed(by: .init(scaleX: W / raw.extent.width, y: H / raw.extent.height)).clampedToExtent()
-            .applyingGaussianBlur(sigma: Double(W) * 0.0015).cropped(to: ext)
-        // 작업공간이 sRGB(contextOptions)라 웹과 같은 ×0.62 를 그대로 쓴다.
+        let up = raw.transformed(by: .init(scaleX: W / raw.extent.width, y: H / raw.extent.height)).clampedToExtent()
+        // 마스크 경계를 사진에 맞춘다(가이드 필터, 밝기 기준) — 분할 마스크는 머리카락 끝을 못 따라가 뭉툭해서 글로우가
+        // 머리에서 떨어져 뜨고 그 사이가 안 어두워졌다(오너 2026-10-27). filters.js subjectGlowRGBA 와 같은 r·eps·대비.
+        // 가이드 필터(He et al.) — filters.js 와 같은 식·같은 r·eps 를 Core Image 기본 필터로 짠다.
+        // (CIGuidedFilter 는 결과가 웹과 크게 달라 쓰지 않는다 — 실측.) 계산은 1/4 크기에서 하고 키운다(실시간).
+        let k: CGFloat = 0.25, ws = W * k, hs = H * k, sext = CGRect(x: ext.minX * k, y: ext.minY * k, width: ws, height: hs)
+        let gS = img.applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 0]).transformed(by: .init(scaleX: k, y: k)).cropped(to: sext)
+        let pS = up.transformed(by: .init(scaleX: k, y: k)).cropped(to: sext)
+        let rad = max(1, W * 0.012 * k)
+        func boxAvg(_ i: CIImage) -> CIImage { i.clampedToExtent().applyingFilter("CIBoxBlur", parameters: [kCIInputRadiusKey: rad * 2 + 1]).cropped(to: sext) }
+        func mulI(_ x: CIImage, _ y: CIImage) -> CIImage { x.applyingFilter("CIMultiplyCompositing", parameters: [kCIInputBackgroundImageKey: y]) }
+        func sub(_ x: CIImage, _ y: CIImage) -> CIImage { x.applyingFilter("CISubtractBlendMode", parameters: [kCIInputBackgroundImageKey: y]) }
+        let mI = boxAvg(gS), mp = boxAvg(pS), cIp = boxAvg(mulI(gS, pS)), mII = boxAvg(mulI(gS, gS))
+        // a = (E[Ip]-E[I]E[p]) / (Var[I]+eps), b = E[p] - a E[I] — 음수가 나오므로 kernel 대신 CIColorKernel 없이: CIColorMatrix 로는 나눗셈이 안 돼서 소형 커널 사용
+        let ab = CIColorKernel(source: "kernel vec4 gfAB(__sample mI, __sample mp, __sample cIp, __sample mII) { float v = mII.r - mI.r*mI.r; float a = (cIp.r - mI.r*mp.r) / (v + 0.001); float b = mp.r - a*mI.r; return vec4(a*0.5+0.5, b*0.5+0.5, 0.0, 1.0); }")!
+            .apply(extent: sext, arguments: [mI, mp, cIp, mII])!
+        let mAB = boxAvg(ab)
+        let outS = CIColorKernel(source: "kernel vec4 gfOut(__sample ab, __sample g) { float a = ab.r*2.0-1.0; float b = ab.g*2.0-1.0; float v = clamp(a*g.r + b, 0.0, 1.0); return vec4(v, v, v, 1.0); }")!
+            .apply(extent: sext, arguments: [mAB, gS])!
+        let refined = outS.transformed(by: .init(scaleX: 1 / k, y: 1 / k)).clampedToExtent().cropped(to: ext)
+        _ = sub
+        let m = mul(refined, 1.6, bias: -0.3).cropped(to: ext)
         let bg = mul(img.applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 0.85]), 0.62)
         let base = img.applyingFilter("CIBlendWithMask", parameters: [kCIInputBackgroundImageKey: bg, kCIInputMaskImageKey: m])
         let inv = m.applyingFilter("CIColorInvert")
-        let near = mul(m.clampedToExtent().applyingGaussianBlur(sigma: Double(W) * 0.0036).cropped(to: ext), 1.6)
-        let far = mul(m.clampedToExtent().applyingGaussianBlur(sigma: Double(W) * 0.012).cropped(to: ext), 1.8)
-        let halo = mul(mul(far, 0.55).applyingFilter("CIAdditionCompositing", parameters: [kCIInputBackgroundImageKey: mul(near, 0.85)]), 0.9)
+        let near = mul(m.clampedToExtent().applyingGaussianBlur(sigma: Double(W) * 0.0018).cropped(to: ext), 1.8)
+        let far = mul(m.clampedToExtent().applyingGaussianBlur(sigma: Double(W) * 0.007).cropped(to: ext), 1.5)
+        let halo = mul(near, 0.9).applyingFilter("CIAdditionCompositing", parameters: [kCIInputBackgroundImageKey: mul(far, 0.35)])
+            .applyingFilter("CIColorClamp")
             .applyingFilter("CIMultiplyCompositing", parameters: [kCIInputBackgroundImageKey: inv]).cropped(to: ext)
-        let white = CIImage(color: CIColor(red: 1, green: 0.98, blue: 0.95)).cropped(to: ext)
+        let white = CIImage(color: CIColor(red: 0.95, green: 0.98, blue: 1)).cropped(to: ext)
         return white.applyingFilter("CIBlendWithMask", parameters: [kCIInputBackgroundImageKey: base, kCIInputMaskImageKey: halo]).cropped(to: ext)
     }
 

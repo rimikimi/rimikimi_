@@ -1729,27 +1729,53 @@ function flashStarRGBA(data, w, h, a, pos, size) {
   }
 }
 
-/* 피사체 글로우 — scratchpad glow/glow.py(오너 확인 2026-10-27)와 같은 단계: 배경 채도↓·어둡게(×0.62),
-   인물 윤곽 바깥에만 하얀 글로우(넓게 0.55 + 가까이 0.85, screen). 마스크 없으면 배경만 살짝 어둡게. */
+/* 피사체 글로우 — scratchpad glow/glow2.py 와 같은 단계: 마스크를 가이드 필터로 사진 경계에 맞춤 → 배경 채도↓·×0.62,
+   경계 바로 바깥에 얇은 하얀 글로우(가까이 0.9 + 넓게 0.35, screen). 마스크 없으면 배경만 살짝 어둡게. */
 function subjectGlowRGBA(data, w, h, a, maskIn) {
   if (!(a > 0.001)) return;
-  const n = w * h, m3 = new Float32Array(n * 3);
+  const n = w * h;
+  const m = new Float32Array(n);
   if (maskIn) for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-    const mx = Math.min(maskIn.w - 1, Math.floor(x * maskIn.w / w)), my = Math.min(maskIn.h - 1, Math.floor(y * maskIn.h / h));
-    const v = maskIn.data[my * maskIn.w + mx] / 255, o = (y * w + x) * 3; m3[o] = m3[o + 1] = m3[o + 2] = v;
+    // 양선형으로 키운다(최근접이면 계단)
+    const fx = Math.min(maskIn.w - 1.001, Math.max(0, (x + 0.5) * maskIn.w / w - 0.5)), fy = Math.min(maskIn.h - 1.001, Math.max(0, (y + 0.5) * maskIn.h / h - 0.5));
+    const x0 = fx | 0, y0 = fy | 0, tx = fx - x0, ty = fy - y0, M = maskIn.data, W = maskIn.w;
+    m[y * w + x] = ((M[y0 * W + x0] * (1 - tx) + M[y0 * W + x0 + 1] * tx) * (1 - ty) + (M[(y0 + 1) * W + x0] * (1 - tx) + M[(y0 + 1) * W + x0 + 1] * tx) * ty) / 255;
   }
-  const m = maskIn ? gaussApprox(m3, w, h, Math.max(1, w * 0.0015)) : m3;
-  const near = maskIn ? gaussApprox(m, w, h, w * 0.0036) : m3, far = maskIn ? gaussApprox(m, w, h, w * 0.012) : m3;
+  if (maskIn) {
+    // 마스크 경계를 사진에 맞춘다 — 가이드 필터(밝기 기준). 분할 모델 마스크는 머리카락 끝을 못 따라가 뭉툭해서
+    // 글로우가 머리에서 떨어져 뜨고 그 사이가 안 어두워졌다(오너 2026-10-27 "왜 이지랄").
+    const g = new Float32Array(n);
+    for (let i = 0, j = 0; i < n; i++, j += 4) g[i] = (data[j] * 0.299 + data[j + 1] * 0.587 + data[j + 2] * 0.114) / 255;
+    const r = Math.max(4, Math.round(w * 0.012)), eps = 1e-3;
+    const box1 = (src) => { // 적분영상 박스 평균
+      const I = new Float64Array((w + 1) * (h + 1));
+      for (let y = 0; y < h; y++) { let row = 0; for (let x = 0; x < w; x++) { row += src[y * w + x]; I[(y + 1) * (w + 1) + x + 1] = I[y * (w + 1) + x + 1] + row; } }
+      const out = new Float32Array(n);
+      for (let y = 0; y < h; y++) { const y0 = Math.max(0, y - r), y1 = Math.min(h, y + r + 1);
+        for (let x = 0; x < w; x++) { const x0 = Math.max(0, x - r), x1 = Math.min(w, x + r + 1);
+          out[y * w + x] = (I[y1 * (w + 1) + x1] - I[y0 * (w + 1) + x1] - I[y1 * (w + 1) + x0] + I[y0 * (w + 1) + x0]) / ((y1 - y0) * (x1 - x0)); } }
+      return out;
+    };
+    const gp = new Float32Array(n), gg = new Float32Array(n);
+    for (let i = 0; i < n; i++) { gp[i] = g[i] * m[i]; gg[i] = g[i] * g[i]; }
+    const mI = box1(g), mp = box1(m), cIp = box1(gp), mII = box1(gg);
+    const A = new Float32Array(n), B = new Float32Array(n);
+    for (let i = 0; i < n; i++) { const v = mII[i] - mI[i] * mI[i]; A[i] = (cIp[i] - mI[i] * mp[i]) / (v + eps); B[i] = mp[i] - A[i] * mI[i]; }
+    const mA = box1(A), mB = box1(B);
+    for (let i = 0; i < n; i++) { const v = mA[i] * g[i] + mB[i]; m[i] = Math.min(1, Math.max(0, (v - 0.5) * 1.6 + 0.5)); }
+  }
+  const m3 = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) m3[i * 3] = m3[i * 3 + 1] = m3[i * 3 + 2] = m[i];
+  const near = maskIn ? gaussApprox(m3, w, h, w * 0.0018) : m3, far = maskIn ? gaussApprox(m3, w, h, w * 0.007) : m3;
+  const dark = maskIn ? 0.62 : 0.8, tint = [0.95, 0.98, 1.0];
   for (let i = 0, j = 0; i < n; i++, j += 4) {
-    const mm = m[i * 3], out = 1 - mm;
-    const H = maskIn ? Math.min(1, Math.min(1, far[i * 3] * 1.8) * out * 0.55 + Math.min(1, near[i * 3] * 1.6) * out * 0.85) * 0.9 : 0;
-    const r = data[j] / 255, g = data[j + 1] / 255, b = data[j + 2] / 255, L = (r + g + b) / 3;
-    const dark = maskIn ? 0.62 : 0.8;
-    const warm = [1.0, 0.98, 0.95], src = [r, g, b];
+    const mm = m[i], out = 1 - mm;
+    const H = maskIn ? Math.min(1, Math.min(1, near[i * 3] * 1.8) * out * 0.9 + Math.min(1, far[i * 3] * 1.5) * out * 0.35) : 0;
+    const r = data[j] / 255, gg2 = data[j + 1] / 255, b = data[j + 2] / 255, L = (r + gg2 + b) / 3, src = [r, gg2, b];
     for (let c = 0; c < 3; c++) {
       const bg = (L + (src[c] - L) * 0.85) * dark;
       let v = src[c] * mm + bg * (1 - mm);
-      v = v + (1 - v) * H * warm[c];
+      v = v + (1 - v) * H * tint[c];
       data[j + c] = clamp8(data[j + c] + (v * 255 - data[j + c]) * a);
     }
   }
