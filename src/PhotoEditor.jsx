@@ -15,7 +15,7 @@
 // ============================================================
 import { useEffect, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { FILM_PRESETS, presetByKey, applyLook, applyLookWithStrength, applyGeometry, autoStraighten, personMaskFor } from "./filters";
+import { FILM_PRESETS, CATALOG, catalogGroupOf, presetByKey, applyLook, applyLookWithStrength, applyGeometry, autoStraighten, personMaskFor } from "./filters";
 import { isNative, nativeSaveToAlbum, nativeOpenPaywall } from "./nativeBridge";
 import { useFilterAccess, isLocked, isPaidPreset, markFilterUsed, trialDaysLeft } from "./filterAccess";
 import { shareImage } from "./share";
@@ -220,7 +220,7 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
   const [presetKey, setPresetKey] = useState((Array.isArray(initialPresetKeys) && initialPresetKeys[0]) || initialPresetKey);
   const scaledFx = (p, amt) => { const b = fxOf(p); const o = {}; for (const k of Object.keys(b)) o[k] = b[k] * amt; return o; };
   const [fx, setFx] = useState(() => scaledFx(presetByKey(initialPresetKey), initialFxAmt));
-  const [chipGroup, setChipGroup] = useState(() => presetByKey(initialPresetKey).group || "phone");
+  const [chipGroup, setChipGroup] = useState(() => catalogGroupOf(initialPresetKey) || "phone");
   // 필터 강도 (오너 지시): %표시 없는 슬라이더, 기본 0.7 = 지금의 풀 프리셋 룩.
   // 1.0 까지 올리면 더 진하게(외삽), 0 이면 원본.
   const [strength, setStrength] = useState(initialStrength);
@@ -281,7 +281,7 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
     setGeoAuto(lk.geoAuto || null);
     setSpotPos(lk.spotPos || null);
     setSpotSize(lk.spotSize || 1);
-    const g = presetByKey(lk.presetKey).group;
+    const g = catalogGroupOf(lk.presetKey);
     if (g) setChipGroup(g);
     setReady(false);
     setIdx(i);
@@ -1294,7 +1294,8 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
           <>
             {/* 폰카 / 빈티지 / 감성 그룹 토글 */}
             <div style={ES.groupRow}>
-              {[["phone", t("filter.gPhone")], ["vintage", t("filter.gVintage")], ["mood", t("filter.gMood")]].map(([g, label]) => (
+              {/* 분류 = filters.js CATALOG(앱 필터 탭·카메라와 같은 4묶음: 폰카·빈티지·감성·효과) */}
+              {CATALOG.groups.map((cg) => [cg.key, getLang() === "ko" ? cg.ko : cg.en]).map(([g, label]) => (
                 <button
                   key={g}
                   style={{ ...ES.groupBtn, ...(chipGroup === g ? ES.groupBtnOn : null) }}
@@ -1312,7 +1313,7 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
               <div style={ES.passNote}>{getLang() === "ko" ? `필터 무료 이용 ${trialDaysLeft(access)}일 남음` : `${trialDaysLeft(access)} days of free filters left`}</div>
             )}
             <div style={ES.chipScroll}>
-              {FILM_PRESETS.filter((p) => p.key === "none" || (p.group === chipGroup && !p.hidden)).map((p) => (
+              {[presetByKey("none"), ...(CATALOG.groups.find((g) => g.key === chipGroup)?.keys || []).map(presetByKey)].map((p) => (
                 // key 에 ready 를 넣는 이유: 사진 전환 시 디코드가 끝난 "뒤"에 캔버스를
                 // 다시 마운트해야 새 사진의 썸네일로 그려진다 (idx 만 넣으면 옛 썸네일로 그림)
                 <button

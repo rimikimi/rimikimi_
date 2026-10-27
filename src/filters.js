@@ -242,6 +242,22 @@ export const FILM_PRESETS = [
 // 필터 목록은 그룹별로 묶어서 보여준다 — 27개를 한 줄로 쭉 펼치면 "다 펼쳐진" 느낌이라
 // 갤러리 홈처럼 그룹 제목 + 가로 줄로 접는다(오너 지시 2026-09-13).
 // 순서 = 화면에 뜨는 순서. 여기 없는 group 은 "재미" 뒤에 자동으로 붙는다.
+// ★ 필터 분류의 단일 원본 — 웹 편집기 탭·칩 순서, 서버 /filters.json(→ iOS·안드 필터 탭·카메라)이 전부 이걸 쓴다.
+//   (오너 2026-10-27 "필터 분류가 다르자나" — 편집기는 효과 묶음이 없고 감성에 섞여 있었다.) 바꾸면 gen-filters-json 다시.
+export const CATALOG = {
+  groups: [
+    { key: "phone", ko: "폰카", en: "Phone", keys: ["ph16pro", "ph15pro", "ph14pro", "phxs", "ph7", "ph6s", "ph4s", "ph3gs", "folder"] },
+    { key: "vintage", ko: "빈티지", en: "Vintage", keys: ["vintC", "vintL", "vintP", "vintG", "vintS", "vintF", "haduri"] },
+    { key: "mood", ko: "감성", en: "Mood", keys: ["golden", "peach", "slide", "retro", "vivid", "green", "pastel", "cine", "newtro", "softmono",
+      "warm", "cool", "vintage", "docu", "mono", "digicam", "y2k", "toy", "dispo", "instant"] },
+    { key: "fx", ko: "효과", en: "Effects", keys: ["flashsoft", "subjectglow", "neonglow", "bloom", "lightleak", "softfocus", "haze", "spotlight", "grainy", "vhs", "glitch", "pixelate"] },
+  ],
+  featured: ["ph7", "golden", "vintC", "peach", "ph4s", "bloom", "cine", "vintS"],
+  new: ["subjectglow", "spotlight", "neonglow", "folder", "y2k", "haduri"],
+};
+/** 프리셋 키 → 분류 키(CATALOG 기준). 없으면 null. */
+export function catalogGroupOf(key) { const g = CATALOG.groups.find((x) => x.keys.includes(key)); return g ? g.key : null; }
+
 export const FILTER_GROUPS = [
   { key: "phone",  labelKey: "filter.gPhone", emoji: "📱" },
   { key: "vintage", labelKey: "filter.gVintage", emoji: "📸" },

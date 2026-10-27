@@ -3,20 +3,13 @@
 // 원본 = src/filters.js(웹 편집기와 같은 값). 여기서 묶음·추천·신규만 정한다. hidden 프리셋(뷰티 등)은 넣지 않는다.
 // 새 필터: filters.js 에 프리셋 추가 → 아래 GROUPS 에 키 추가 → node scripts/gen-filters-json.mjs → sw 올리고 배포. 앱 빌드 불필요.
 // ⚠️ 앱 엔진에 없는 special(새 그리기 방식)은 앱이 모르는 값이라 건너뛴다 — 그건 빌드가 필요.
-import { FILM_PRESETS } from "../src/filters.js";
+import { FILM_PRESETS, CATALOG } from "../src/filters.js";
 import { writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
-const GROUPS = [
-  { key: "phone", ko: "폰카", en: "Phone", keys: ["ph16pro", "ph15pro", "ph14pro", "phxs", "ph7", "ph6s", "ph4s", "ph3gs", "folder"] },
-  { key: "vintage", ko: "빈티지", en: "Vintage", keys: ["vintC", "vintL", "vintP", "vintG", "vintS", "vintF", "haduri"] },
-  { key: "mood", ko: "감성", en: "Mood", keys: ["golden", "peach", "slide", "retro", "vivid", "green", "pastel", "cine", "newtro", "softmono",
-    "warm", "cool", "vintage", "docu", "mono", "digicam", "y2k", "toy", "dispo", "instant"] },
-  { key: "fx", ko: "효과", en: "Effects", keys: ["flashsoft", "subjectglow", "neonglow", "bloom", "lightleak", "softfocus", "haze", "spotlight", "grainy", "vhs", "glitch", "pixelate"] },
-];
-const FEATURED = ["ph7", "golden", "vintC", "peach", "ph4s", "bloom", "cine", "vintS"];
-const NEW = ["subjectglow", "spotlight", "neonglow", "folder", "y2k", "haduri"];
+// 묶음·추천·신규는 src/filters.js CATALOG 하나에서 — 웹 편집기·iOS·안드가 같은 분류를 쓴다(오너 2026-10-27 "필터 분류가 다르자나").
+const { groups: GROUPS, featured: FEATURED, new: NEW } = CATALOG;
 
 const byKey = Object.fromEntries(FILM_PRESETS.map((p) => [p.key, p]));
 const FIELDS = ["temp", "tint", "ex", "con", "fade", "whitePull", "sat", "vib", "sh", "hi", "bw", "hsl", "fx", "special", "c1", "c2"];
