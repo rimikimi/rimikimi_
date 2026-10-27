@@ -22,7 +22,7 @@ export const FILTER_GROUPS: FilterGroupDef[] = [
   { key: "phone", title: () => t("폰카", "Phone"), keys: PHONE },
   { key: "vintage", title: () => t("빈티지", "Vintage"), keys: VINTAGE },
   { key: "mood", title: () => t("감성", "Mood"), keys: MOOD },
-  { key: "fx", title: () => t("효과", "Effects"), keys: FX },
+  { key: "fx", title: () => t("특수효과", "Special FX"), keys: FX },
 ];
 /** 추천·신규 — iOS featuredKeys / newKeys 와 같다. */
 export const FEATURED = ["ph7", "golden", "vintC", "peach", "ph4s", "bloom", "cine", "vintS"];
@@ -57,6 +57,10 @@ export function applyFilterCatalog(j: Remote): boolean {
   if (byKey.vintage) replace(VINTAGE, byKey.vintage);
   if (byKey.mood) replace(MOOD, byKey.mood);
   if (byKey.fx) replace(FX, byKey.fx);
+  for (const g of j.groups) {                                   // 묶음 이름도 서버 것으로(빌드 없이 바꾸게)
+    const def = FILTER_GROUPS.find((x) => x.key === g.key);
+    if (def && g.ko && g.en) { const ko = g.ko, en = g.en; def.title = () => t(ko, en); }
+  }
   if (Array.isArray(j.featured)) replace(FEATURED, j.featured.filter(ok));
   if (Array.isArray(j.new)) replace(NEW_KEYS, j.new.filter(ok));
   clearLookCache();

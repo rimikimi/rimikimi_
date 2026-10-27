@@ -60,8 +60,8 @@
   },
   {
    "key": "fx",
-   "ko": "효과",
-   "en": "Effects",
+   "ko": "특수효과",
+   "en": "Special FX",
    "keys": [
     "flashsoft",
     "subjectglow",

@@ -250,7 +250,7 @@ export const CATALOG = {
     { key: "vintage", ko: "빈티지", en: "Vintage", keys: ["vintC", "vintL", "vintP", "vintG", "vintS", "vintF", "haduri"] },
     { key: "mood", ko: "감성", en: "Mood", keys: ["golden", "peach", "slide", "retro", "vivid", "green", "pastel", "cine", "newtro", "softmono",
       "warm", "cool", "vintage", "docu", "mono", "digicam", "y2k", "toy", "dispo", "instant"] },
-    { key: "fx", ko: "효과", en: "Effects", keys: ["flashsoft", "subjectglow", "neonglow", "bloom", "lightleak", "softfocus", "haze", "spotlight", "grainy", "vhs", "glitch", "pixelate"] },
+    { key: "fx", ko: "특수효과", en: "Special FX", keys: ["flashsoft", "subjectglow", "neonglow", "bloom", "lightleak", "softfocus", "haze", "spotlight", "grainy", "vhs", "glitch", "pixelate"] },
   ],
   featured: ["ph7", "golden", "vintC", "peach", "ph4s", "bloom", "cine", "vintS"],
   new: ["subjectglow", "spotlight", "neonglow", "folder", "y2k", "haduri"],
