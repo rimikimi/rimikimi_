@@ -18,6 +18,7 @@ struct CameraFilterTab: View {
     @State private var fxAmount: Double = 0.7   // 카메라 필터 강도 기본 70%(오너)
     struct FocusMark: Equatable { let id = UUID(); let point: CGPoint; var locked = false; var touched = Date(); var adjusting = false; var dim = false }
 
+    private static let groupIcon = ["phone": "iphone", "vintage": "film", "mood": "heart.circle", "fx": "sparkles"]
     private var phone: [String] { FilterTabView.groups.first { $0.key == "phone" }?.presets.map(\.key) ?? [] }
     private var analog: [String] { FilterTabView.groups.filter { $0.key != "phone" }.flatMap { $0.presets.map(\.key) } }
     private var vintage: [String] { FilterTabView.groups.first { $0.key == "vintage" }?.presets.map(\.key) ?? [] }
@@ -280,13 +281,12 @@ struct CameraFilterTab: View {
                     groupMark("star.fill", tint: Color.favoriteStar)
                     ForEach(favs.filter { $0 != LiveFilter.beautyKey }, id: \.self) { chip($0, Copy.filterName($0)) }
                 }
-                groupMark("iphone")
-                ForEach(phone, id: \.self) { chip($0, Copy.filterName($0)) }
-                // 폰카 / 빈티지 / 감성 — 편집기·필터 탭과 같은 3구분(오너 2026-10-12)
-                groupMark("film")
-                ForEach(vintage, id: \.self) { chip($0, Copy.filterName($0)) }
-                groupMark("heart.circle")
-                ForEach(mood, id: \.self) { chip($0, Copy.filterName($0)) }
+                // 필터 탭과 **같은 묶음·같은 순서**(오너 2026-10-27 "여기 필터랑 카메라 필터가 똑같아야") — 예전엔 효과 묶음이 빠져 있었다.
+                // 서버 카탈로그에 묶음이 늘면 여기도 같이 는다.
+                ForEach(FilterTabView.groups) { g in
+                    groupMark(Self.groupIcon[g.key] ?? "sparkles")
+                    ForEach(g.presets) { p in chip(p.key, Copy.filterName(p.key)) }
+                }
             }
             .padding(.horizontal, Spacing.page)
         }

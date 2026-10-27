@@ -1147,7 +1147,7 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
                 // 글자 상자는 작아서 두 손가락을 다 얹을 수 없다 — 인스타도 캔버스 아무 데나 짚는다.
                 if (joinPinch(e)) return;
                 // 스포트라이트: 두 손가락 = 조명 크기(벌리면 크게, 오므리면 작게).
-                if (presetKey === "spotlight" && !dragRef.current) {
+                if ((presetKey === "spotlight" || presetKey === "flashstar") && !dragRef.current) {
                   const sp = spotPinchRef.current;
                   sp.pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
                   try { e.currentTarget.setPointerCapture?.(e.pointerId); } catch (_) {}
@@ -1197,7 +1197,7 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
                 if (Date.now() - s.t > 320) return;                       // 길게 누름 = 원본 비교
                 if (Math.hypot(e.clientX - s.x, e.clientY - s.y) > 8) return;
                 if (s.hadSel) return;                                     // 선택 해제만
-                if (presetKey === "spotlight") {                          // 스포트라이트: 탭 = 조명 위치
+                if ((presetKey === "spotlight" || presetKey === "flashstar")) {                          // 스포트라이트: 탭 = 조명 위치
                   const r = e.currentTarget.getBoundingClientRect();
                   const pos = { x: Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), y: Math.min(1, Math.max(0, (e.clientY - r.top) / r.height)) };
                   hap.tap(); updateLook({ spotPos: pos }); return;
@@ -1323,7 +1323,7 @@ export default function PhotoEditor({ src, srcs, initialPresetKey = "none", init
                     // 프리셋 기본 효과까지 원탭 적용, 색감은 기본값(0.7 = 표준 룩)·효과는 1(프리셋 그대로)로 리셋
                     updateLook({ presetKey: p.key, fx: fxOf(p), strength: 0.7, fxAmt: 1 });
                     markFilterUsed(p.key);
-                    if (p.key === "spotlight") flashToast(getLang() === "ko" ? "탭하면 조명이 그 자리로, 두 손가락으로 크기를 바꿔요" : "Tap to move the spotlight, pinch to resize");
+                    if (p.key === "spotlight" || p.key === "flashstar") flashToast(getLang() === "ko" ? "탭하면 조명이 그 자리로, 두 손가락으로 크기를 바꿔요" : "Tap to move the spotlight, pinch to resize");
                   }}
                 >
                   <canvas

@@ -166,7 +166,8 @@ export const FILM_PRESETS = [
     fx: { grain: 0.4, vignette: 0.2 } },
   { key: "haduri", ko: "웹캠", en: "Webcam '03", group: "vintage", // 옛날 웹캠(하두리) — 320×240·형광등 누런빛·피부 하얗게·뽀얀 글로우·노이즈(오너 2026-10-26)
     temp: 12, tint: 8,  ex: 0.18, con: -0.1, fade: 26, whitePull: 20, sat: -0.2,  vib: 0,    sh: [6, 6, -4],   hi: [8, 6, -10],
-    fx: { lowres: 0.004, blur: 0.15, glow: 0.7, grain: 0.45 } },
+    // 해상도는 건드리지 않는다(오너 10/27 폴더폰·웹캠) — 뽀얀 글로우·노이즈로만 웹캠 느낌.
+    fx: { glow: 0.6, grain: 0.45 } },
   /* ── 뷰티 v3(2026-10-27 리서치: 베리필름 milk·clean·sweet·butter·hush, SODA 물광, 트렌드 새틴 스킨·레트로 글로우). 피부 대역(hue 28±22)만 밝히고 붉은기↓. 색+glow 만, AI 보정 아님.
      hidden: 아직 배포 전(오너 "배포는 하지 말고") — 열 때 hidden 빼고 FILTER_GROUPS 에 beauty 추가 + 샘플 썸네일 생성. */
   {key: "bMilk",ko: "우유",en: "Milk",temp: -2,tint: 6,ex: 0.18,con: -0.26,fade: 22,whitePull: 20,sat: -0.2,vib: 0.04,sh: [6,4,10],hi: [8,6,10],hsl: [{c: 28,w: 22,h: 0,s: -0.15,l: 0.06}],fx: {glow: 0.6,grain: 0.12},group: "beauty",hidden: true},
