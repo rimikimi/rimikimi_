@@ -172,7 +172,7 @@ enum Copy {
         "infl": ("인플", "Influencer"),
     ]
     static func filterName(_ key: String) -> String {
-        guard let n = filterNames[key] else { return key }
+        guard let n = FilterCatalog.shared.name(key) ?? filterNames[key] else { return key }
         return L.ko ? n.ko : n.en
     }
     static var filterOriginal: String { L.t("원본", "Original") }

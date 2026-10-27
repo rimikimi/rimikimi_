@@ -8,12 +8,13 @@ import { AppHeader } from "@/ui/AppHeader";
 import { Text } from "@/ui/Text";
 import { presetByKey } from "@/filters";
 import { isKo } from "@/lib/locale";
-import { FILTER_GROUPS } from "@/lib/filterGroups";
+import { FILTER_GROUPS , useFilterCatalogVersion } from "@/lib/filterGroups";
 import { FlipCard } from "@/app/(tabs)/edit";
 import { color, space } from "@/theme/tokens";
 
 // 필터 앨범 안 — 그 묶음 필터를 3열 뒤집기 카드로(iOS FilterGroupGrid).
 export default function FilterGroupScreen() {
+  useFilterCatalogVersion();
   const { key } = useLocalSearchParams<{ key: string }>();
   const g = FILTER_GROUPS.find((x) => x.key === key) ?? FILTER_GROUPS[0];
   const { width } = useWindowDimensions();

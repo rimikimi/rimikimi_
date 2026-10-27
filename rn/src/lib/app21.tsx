@@ -21,6 +21,7 @@ import {
   fetchStudioCatalog, fetchWeddingCatalog, type DressFilter, type StudioCatalog, type WeddingDress,
 } from "./studio";
 import { c21, loadLabels, labelsVersionSubscribe, t } from "./copy21";
+import { loadFilterCatalog } from "./filterGroups";
 
 // ============================================================================
 // 2.1 앱 상태 — iOS `ios2/rimikimi/App/AppState.swift` 의 2.1 몫을 옮긴 것.
@@ -184,6 +185,7 @@ export function App21Provider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const off = labelsVersionSubscribe(() => setLabelsVersion((n) => n + 1));
     void loadLabels();
+    void loadFilterCatalog();
     void loadCoachSeen().then(() => setCoachReady(true));
     void AsyncStorage.getItem(AI_CONSENT_KEY).then((v) => { consentGiven.current = v === "1"; }).catch(() => undefined);
     return off;

@@ -16,7 +16,7 @@ import { getEnv } from "@/lib/env";
 import { pickPhotos } from "@/lib/photo";
 import { openEditorWithShots } from "@/lib/openEditor";
 import { isPaidFilter, startFilterTrialIfNeeded } from "@/lib/iap";
-import { FEATURED, FILTER_GROUPS, NEW_KEYS, type FilterGroupDef } from "@/lib/filterGroups";
+import { FEATURED, FILTER_GROUPS, NEW_KEYS, type FilterGroupDef , useFilterCatalogVersion } from "@/lib/filterGroups";
 import { color, radius, space, themedStyles } from "@/theme/tokens";
 
 // 필터 탭 — iOS `FilterTabView` 이식(2026-10-26 5탭): 즐겨찾는 필터 · 추천 · 신규 가로 줄 + 필터 앨범(폰카·빈티지·감성·효과).
@@ -94,6 +94,7 @@ export function FlipCard({ k, width, fav, onFav, caption = true }: { k: string; 
 }
 
 export default function FilterTab() {
+  useFilterCatalogVersion();
   const { width } = useWindowDimensions();
   const { favs, toggle } = useFavs();
   const cardW = Math.round((width - space.screen) * 0.42);

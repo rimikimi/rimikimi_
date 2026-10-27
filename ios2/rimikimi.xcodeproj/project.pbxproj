@@ -62,6 +62,7 @@
 		6F2399D44AB229460D3A7931 /* Motion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22011AE81D18E4DA58D0FC81 /* Motion.swift */; };
 		73C2818D37BDF699BF2DD3E1 /* GuestFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54A37DC618C2AFB38E5F3FDB /* GuestFlowView.swift */; };
 		75ABB8FC02E395FFDCE9EC5E /* GenerationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 602EA387617A8E42DFAD3C9D /* GenerationCoordinator.swift */; };
+		7841E0878F67F68B969A8BE5 /* FilterCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 512EBEB2EC32AAE1B568C302 /* FilterCatalog.swift */; };
 		78962CE8BACB19DEBB10C1D0 /* e2e_sample_person.jpg in Resources */ = {isa = PBXBuildFile; fileRef = E9E942DA3CA4C0AF9A0113D7 /* e2e_sample_person.jpg */; };
 		798DBE706A3F519A59694993 /* BurstCamera.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9526E68CEA29D4F803D6681 /* BurstCamera.swift */; };
 		7B3FB9E2EEA88904B7FAD8E7 /* ConceptStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B5F41573F759B338E33F44C /* ConceptStore.swift */; };
@@ -159,6 +160,7 @@
 		4AEA3894ED8BC11545AF447F /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		4B53E11DE3E80A74A2E3C770 /* PushManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushManager.swift; sourceTree = "<group>"; };
 		4D8E6DAE2CC2F97BE9DDB763 /* rimikimi.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = rimikimi.entitlements; sourceTree = "<group>"; };
+		512EBEB2EC32AAE1B568C302 /* FilterCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterCatalog.swift; sourceTree = "<group>"; };
 		52B197639FFDFC4EF9426F27 /* crown3.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = crown3.png; sourceTree = "<group>"; };
 		54A37DC618C2AFB38E5F3FDB /* GuestFlowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuestFlowView.swift; sourceTree = "<group>"; };
 		5857D4A423BFF51BC53D5FC5 /* FilterTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterTabView.swift; sourceTree = "<group>"; };
@@ -469,6 +471,7 @@
 				1D0C7847AA2242A68E84ED84 /* Config.swift */,
 				E7BB3DB23ED6EDD1769936B5 /* FaceProfileStore.swift */,
 				9FD97965DB921BD965EBF742 /* FavoritesStore.swift */,
+				512EBEB2EC32AAE1B568C302 /* FilterCatalog.swift */,
 				FB56DB282B398E4582D41267 /* FilterPassKeychain.swift */,
 				602EA387617A8E42DFAD3C9D /* GenerationCoordinator.swift */,
 				B9E4D6B65FD51D64BE105C2C /* GuestDevice.swift */,
@@ -713,6 +716,7 @@
 				DDB8093140CCE88A274E4AB1 /* FaceScanView.swift in Sources */,
 				87C1D9D1AE7692F2D85BCB7B /* FavoritesStore.swift in Sources */,
 				3F80252D1AC27E24F99EC75B /* Feedback.swift in Sources */,
+				7841E0878F67F68B969A8BE5 /* FilterCatalog.swift in Sources */,
 				2D056ECAFFB12AFB2ADC5DB4 /* FilterFlipCard.swift in Sources */,
 				1A7ADD2DE5735E3EA8656064 /* FilterPassKeychain.swift in Sources */,
 				0AB7C5480D5D3905F853F44C /* FilterPassSheet.swift in Sources */,
@@ -855,7 +859,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = rimikimi/rimikimi.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 81;
+				CURRENT_PROJECT_VERSION = 87;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = rimikimi/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -940,7 +944,7 @@
 				CODE_SIGN_ENTITLEMENTS = rimikimi/rimikimi.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 81;
+				CURRENT_PROJECT_VERSION = 87;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = rimikimi/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (

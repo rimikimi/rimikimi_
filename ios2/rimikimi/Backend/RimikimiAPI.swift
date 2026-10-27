@@ -151,6 +151,15 @@ final class RimikimiAPI {
         return try JSONDecoder().decode([Season].self, from: data)
     }
 
+    /// 필터 카탈로그(`/filters.json`) — `FilterCatalog` 참고. 원본 바이트를 그대로 넘긴다.
+    func fetchFilters() async throws -> Data {
+        var req = URLRequest(url: Config.apiBase.appendingPathComponent("filters.json"))
+        req.cachePolicy = .reloadIgnoringLocalCacheData
+        let (data, resp) = try await session.data(for: req)
+        try Self.check(resp, data)
+        return data
+    }
+
     /// 이름표(`/labels.json`) — `LabelStore` 참고.
     func fetchLabels() async throws -> [String: [String: String]] {
         var req = URLRequest(url: Config.apiBase.appendingPathComponent("labels.json"))

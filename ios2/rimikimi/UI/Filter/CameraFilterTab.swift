@@ -18,7 +18,7 @@ struct CameraFilterTab: View {
     @State private var fxAmount: Double = 0.7   // 카메라 필터 강도 기본 70%(오너)
     struct FocusMark: Equatable { let id = UUID(); let point: CGPoint; var locked = false; var touched = Date(); var adjusting = false; var dim = false }
 
-    private var phone: [String] { ["ph16pro", "ph15pro", "ph14pro", "phxs", "ph7", "ph6s", "ph4s", "ph3gs"] }
+    private var phone: [String] { FilterTabView.groups.first { $0.key == "phone" }?.presets.map(\.key) ?? [] }
     private var analog: [String] { FilterTabView.groups.filter { $0.key != "phone" }.flatMap { $0.presets.map(\.key) } }
     private var vintage: [String] { FilterTabView.groups.first { $0.key == "vintage" }?.presets.map(\.key) ?? [] }
     private var mood: [String] { FilterTabView.groups.first { $0.key == "mood" }?.presets.map(\.key) ?? [] }

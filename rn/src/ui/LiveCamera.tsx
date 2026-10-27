@@ -66,6 +66,8 @@ export async function detectFaces(uri: string): Promise<number[][]> {
 }
 
 const lookCache = new Map<string, LookProps>();
+/** 서버 필터 카탈로그가 값을 바꾸면 비운다(같은 키라도 새 값으로). */
+export function clearLookCache() { lookCache.clear(); }
 /** 프리셋 키 → 셰이더 값. "none"·모르는 키 = 원본 그대로. */
 export function lookFor(key: string): LookProps {
   const hit = lookCache.get(key);

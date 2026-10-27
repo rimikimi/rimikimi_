@@ -15,7 +15,14 @@ struct FilterTabView: View {
     struct Group: Identifiable { let key: String; let title: String; let emoji: String; let presets: [Preset]; var id: String { key } }
 
     // 그룹 제목이 번역 문구라 `static let` 이면 처음 읽은 언어로 굳는다(앱 안 언어 전환) — 볼 때마다 만든다.
-    static var groups: [Group] { [
+    /// 서버 카탈로그(/filters.json)가 있으면 그 묶음, 없으면 아래 기본값.
+    static var groups: [Group] {
+        let remote = FilterCatalog.shared.groups
+        guard !remote.isEmpty else { return builtinGroups }
+        let emoji = ["phone": "📱", "vintage": "📸", "mood": "🎞️", "fx": "✨"]
+        return remote.map { .init(key: $0.key, title: L.ko ? $0.ko : $0.en, emoji: emoji[$0.key] ?? "✨", presets: $0.keys.map { Preset(key: $0) }) }
+    }
+    static var builtinGroups: [Group] { [
         // 폰카 — 연도별 아이폰 색감. 이름은 모델 번호만(오너 지시 2026-09-23, "iPhone" 은 안 붙인다).
         // 이름(ko/en)은 `Copy.filterNames` — 여기는 key 만.
         .init(key: "phone", title: Copy.filterGroupPhone, emoji: "📱", presets: [
@@ -45,9 +52,9 @@ struct FilterTabView: View {
     ] }
 
     /// 추천 필터 — 사용 기록이 쌓이기 전까지는 직접 고른 목록(시안, 2026-10-26).
-    static let featuredKeys = ["ph7", "golden", "vintC", "peach", "ph4s", "bloom", "cine", "vintS"]
+    static var featuredKeys: [String] { let r = FilterCatalog.shared.featured; return r.isEmpty ? ["ph7", "golden", "vintC", "peach", "ph4s", "bloom", "cine", "vintS"] : r }
     /// 신규 필터 — 월 3개 드롭 자리. 지금은 가장 최근에 추가된 빈티지 3종(시안).
-    static let newKeys = ["folder", "y2k", "haduri", "flashsoft"]
+    static var newKeys: [String] { let r = FilterCatalog.shared.newKeys; return r.isEmpty ? ["folder", "y2k", "haduri", "flashsoft"] : r }
 
     /// 오늘의 필터 — 날짜로 고르므로 하루 동안 고정이고 매일 바뀐다.
     private var todays: (group: Group, preset: Preset) {

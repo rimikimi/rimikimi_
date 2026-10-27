@@ -22,7 +22,7 @@ import { saveFileToAlbum } from "@/lib/nativeMedia";
 import { openEditorWithShots } from "@/lib/openEditor";
 import { isPaidFilter, startFilterTrialIfNeeded, useFilterAccess } from "@/lib/iap";
 import { presetByKey } from "@/filters";
-import { FX, MOOD, PHONE, VINTAGE } from "@/lib/filterGroups";
+import { FX, MOOD, PHONE, VINTAGE, useFilterCatalogVersion } from "@/lib/filterGroups";
 import { chrome, space } from "@/theme/tokens";
 
 // ============================================================================
@@ -56,7 +56,7 @@ async function deleteTemp(uri: string) {
 }
 const MIRROR_KEY = "camera.frontMirror";
 // 폰카 / 빈티지 / 감성 + 효과 — 묶음은 `@/lib/filterGroups`(필터 탭과 같이 쓴다).
-const ANALOG = [...MOOD, ...FX];
+const analog = () => [...MOOD, ...FX];   // 서버 카탈로그로 바뀔 수 있어 그때그때 만든다
 const filterName = (k: string) => { const p = presetByKey(k); return isKo ? p.ko : p.en; };
 
 function zoomText(z: number, active: boolean): string {
@@ -72,6 +72,7 @@ interface Shot { uri: string; width: number; height: number; presetKey: string; 
 const PREVIEW_TOP = 56;
 
 export default function CameraFilterTab() {
+  useFilterCatalogVersion();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const focused = useIsFocused();
@@ -396,7 +397,7 @@ export default function CameraFilterTab() {
             <View style={styles.groupMark}><IconFilm size={16} color="rgba(255,255,255,0.7)" /></View>
             {VINTAGE.map((k) => <Chip key={k} k={k} label={filterName(k)} on={selected === k} onPress={setSelected} onLong={toggleFav} locked={lockPaid} />)}
             <View style={styles.groupMark}><IconHeartCircle size={16} color="rgba(255,255,255,0.7)" /></View>
-            {ANALOG.map((k) => <Chip key={k} k={k} label={filterName(k)} on={selected === k} onPress={setSelected} onLong={toggleFav} locked={lockPaid} />)}
+            {analog().map((k) => <Chip key={k} k={k} label={filterName(k)} on={selected === k} onPress={setSelected} onLong={toggleFav} locked={lockPaid} />)}
           </ScrollView>
         </CoachAnchor>
         <View style={styles.controls}>

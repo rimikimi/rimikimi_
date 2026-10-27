@@ -94,7 +94,9 @@ enum LiveFilter {
     }
 
     // filters.js FILM_PRESETS — genpresets.mjs 로 생성 (원본 none 은 없음 = 처리 안 함)
-    static let presets: [String: Preset] = [
+    /// 앱에 들어 있는 기본값 — 서버 카탈로그(FilterCatalog, /filters.json)가 있으면 그 값이 우선이다.
+    static func preset(_ key: String) -> Preset? { FilterCatalog.shared.preset(key) ?? builtinPresets[key] }
+    static let builtinPresets: [String: Preset] = [
         "golden": .init(temp: 20, ex: 0.04, con: 0.18, fade: 10, whitePull: 8, sat: 0.12, vib: 0.15, sh: [6, 3, -8], hi: [12, 9, -12], hsl: [.init(c: 110, w: 60, h: -18, s: -0.12, l: 0), .init(c: 30, w: 25, h: 0, s: 0.08, l: 0.02)]),
         "peach": .init(temp: 12, tint: 6, ex: 0.07, con: 0.08, fade: 14, whitePull: 14, sat: -0.08, vib: 0.25, sh: [4, 2, 0], hi: [10, 5, -2], hsl: [.init(c: 30, w: 28, h: 0, s: -0.06, l: 0.04), .init(c: 110, w: 60, h: -10, s: -0.15, l: 0)]),
         "slide": .init(temp: -6, tint: -2, con: 0.26, fade: 4, sat: 0.2, vib: 0.1, sh: [-3, 0, 8], hi: [0, 0, 0], hsl: [.init(c: 225, w: 55, h: 0, s: 0.25, l: -0.05), .init(c: 120, w: 50, h: 0, s: 0.1, l: 0)]),
@@ -674,7 +676,7 @@ final class LiveFilterEngine {
             if t <= 0.001 { return img }
             return beauty(img, amount: t, faces: faces ?? LiveFilter.detectFaces(img))
         }
-        guard let p = LiveFilter.presets[key] else { return img }
+        guard let p = LiveFilter.preset(key) else { return img }
         let t = min(1, max(0, intensity))
         if t >= 0.999 { return apply(img, key: key) }
         if t <= 0.001 { return img }
@@ -689,7 +691,7 @@ final class LiveFilterEngine {
     }
 
     func apply(_ input: CIImage, key: String, effects: Bool = true) -> CIImage {
-        guard let p = LiveFilter.presets[key] else { return input }
+        guard let p = LiveFilter.preset(key) else { return input }
         let ext = input.extent
         let W = ext.width, H = ext.height
         let minWH = min(W, H)
@@ -902,14 +904,16 @@ final class LiveFilterEngine {
     }
 
     private func lutImage(_ key: String, _ p: LiveFilter.Preset) -> CIImage {
-        if let c = lutCache[key] { return c }
+        // 서버 카탈로그로 같은 키의 값이 바뀔 수 있어 LUT 를 만드는 값까지 키에 넣는다.
+        let ck = "\(key)|\(p.temp)|\(p.tint)|\(p.ex)|\(p.con)|\(p.fade)|\(p.whitePull)"
+        if let c = lutCache[ck] { return c }
         let luts = LiveFilter.buildLuts(p)
         var bytes = [UInt8](repeating: 255, count: 256 * 4)
         for v in 0..<256 { bytes[v * 4] = luts[0][v]; bytes[v * 4 + 1] = luts[1][v]; bytes[v * 4 + 2] = luts[2][v] }
         // 색공간을 작업 공간(sRGB)과 같게 줘서 변환 없이 바이트 그대로 읽히게 한다
         let img = CIImage(bitmapData: Data(bytes), bytesPerRow: 256 * 4, size: CGSize(width: 256, height: 1),
                           format: .RGBA8, colorSpace: CGColorSpace(name: CGColorSpace.sRGB)).samplingNearest()
-        lutCache[key] = img
+        lutCache[ck] = img
         return img
     }
 
