@@ -44,7 +44,7 @@ struct PromoAdCard: View {
                 .padding(10)
             }
             .aspectRatio(9.0 / 16.0, contentMode: .fit)
-            .frame(maxWidth: 300)
+            .frame(maxWidth: 262)
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             .frame(maxWidth: .infinity)
 
@@ -58,7 +58,14 @@ struct PromoAdCard: View {
             .buttonStyle(PressScaleButtonStyle(scale: 0.98))
         }
         .padding(.top, Spacing.s3)
-        .onAppear { model.start(PromoAdStore.shared.playlist(magicBooth: magicBooth)) }
+        .padding(.horizontal, Spacing.page)
+        .padding(.bottom, Spacing.s5)
+        .onAppear {
+            model.start(PromoAdStore.shared.playlist(magicBooth: magicBooth))
+            // 캡처·검증용: `-dev.promoTapAt 20` = 20초 뒤 영상 탭과 같은 동작.
+            let at = UserDefaults.standard.double(forKey: "dev.promoTapAt")
+            if at > 0 { DispatchQueue.main.asyncAfter(deadline: .now() + at) { model.openCurrent() } }
+        }
         .onDisappear { model.stop() }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in model.pause() }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in model.resume() }
@@ -79,6 +86,9 @@ final class PromoAdPlayer {
         guard !ads.isEmpty, !active else { return }
         active = true
         list = ads; index = 0
+        if let first = UserDefaults.standard.string(forKey: "dev.promoFirst"), let i = list.firstIndex(where: { $0.id == first }) {
+            list.insert(list.remove(at: i), at: 0)
+        }
         // 다른 앱 음악을 끊지 않고(무음 스위치도 따른다) 섞어서 재생.
         try? AVAudioSession.sharedInstance().setCategory(.ambient, options: [.mixWithOthers])
         player.isMuted = muted

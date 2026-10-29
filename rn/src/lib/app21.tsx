@@ -1,3 +1,4 @@
+import { loadPromoAds } from "./promoAds";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { ToastAndroid } from "react-native";
 import { router } from "expo-router";
@@ -185,6 +186,7 @@ export function App21Provider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const off = labelsVersionSubscribe(() => setLabelsVersion((n) => n + 1));
     void loadLabels();
+    void loadPromoAds();
     void loadFilterCatalog();
     void loadCoachSeen().then(() => setCoachReady(true));
     void AsyncStorage.getItem(AI_CONSENT_KEY).then((v) => { consentGiven.current = v === "1"; }).catch(() => undefined);

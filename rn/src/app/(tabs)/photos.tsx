@@ -8,6 +8,9 @@ import { Text } from "@/ui/Text";
 import { Button } from "@/ui/Button";
 import { Spinner } from "@/ui/Spinner";
 import { ProgressCards } from "@/ui/ProgressCard";
+import { PromoAdCard } from "@/ui/PromoAdCard";
+import { onPromoChange, promoActive } from "@/lib/promoAds";
+import { isArtConcept } from "@/lib/concepts";
 import { useAuth } from "@/lib/auth";
 import { useGeneration } from "@/lib/generation";
 import { deleteGalleryItem, fetchGallery, type GalleryItem } from "@/lib/api";
@@ -25,10 +28,13 @@ import { devFakeGallery } from "@/lib/myAlbums";
 export default function PhotosTab() {
   const { session, requireLogin } = useAuth();
   // ⚠️ DEV 전용 캡처 경로 — `/(tabs)/photos?fake=1` 이면 로그인 없이 가짜 앨범(iOS dev/myphotos?fake=1).
-  const { fake } = useLocalSearchParams<{ fake?: string }>();
+  const { fake, promo } = useLocalSearchParams<{ fake?: string; promo?: string }>();
   const devFake = __DEV__ && fake === "1";
   const token = session?.access_token;
   const { jobs } = useGeneration();
+  const running = jobs.filter((j) => j.status === "running" || j.status === "waiting");
+  const [promoOn, setPromoOn] = useState(promoActive());
+  useEffect(() => onPromoChange(() => setPromoOn(promoActive())), []);
   const { byId } = useStore();
   const [items, setItems] = useState<GalleryItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -77,6 +83,8 @@ export default function PhotosTab() {
     >
       {/* 로그인한 사람의 카드만. 로그아웃 상태에서 앞사람 카드가 보이던 것(2026-09-23 스윕) */}
       {session ? <ProgressCards /> : null}
+      {/* 생성 중 케이스 광고 — 진행 중인 작업이 있을 때만(완성되면 사라짐). 매직 부스면 커스텀부터. */}
+      {promoOn && ((session && running.length) || promo === "1") ? <PromoAdCard magicBooth={promo === "1" ? false : running.some((j) => isArtConcept(j.concept))} /> : null}
       {!session && !devFake ? (
         <View style={styles.empty}>
           <Text tone="muted" center>{c21.mineLoginPrompt}</Text>
