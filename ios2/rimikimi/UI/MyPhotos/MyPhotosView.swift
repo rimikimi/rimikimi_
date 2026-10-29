@@ -10,6 +10,21 @@ struct MyPhotosView: View {
     private let columns = [GridItem(.flexible(), spacing: 6), GridItem(.flexible(), spacing: 6), GridItem(.flexible(), spacing: 6)]
     private let albumColumns = Array(repeating: GridItem(.flexible(), spacing: Spacing.s2), count: 3)
 
+    /// 생성 중 케이스 광고 — 진행 중인 작업이 있을 때만(완성되면 사라진다). 캡처용 `-dev.promoAd 1`.
+    private var showPromo: Bool {
+        guard PromoAdStore.shared.isActive else { return false }
+        if UserDefaults.standard.bool(forKey: "dev.promoAd") { return true }
+        return app.generation.entries.contains { if case .running = $0.phase { return true }; return false }
+    }
+    /// 매직 부스 생성이면 커스텀 케이스 광고부터.
+    private var promoMagicBooth: Bool {
+        if UserDefaults.standard.bool(forKey: "dev.promoMagic") { return true }
+        return app.generation.entries.contains { e in
+            guard case .running = e.phase else { return false }
+            return app.concepts.concept(id: e.job.conceptId)?.categories.contains { $0.contains("매직 부스") } ?? false
+        }
+    }
+
     private var devFake: Bool {
         #if DEBUG
         app.devFakeGallery != nil
@@ -46,6 +61,9 @@ struct MyPhotosView: View {
         ScrollView {
             LazyVStack(spacing: Spacing.s4) {
                 ProgressCard()
+                if showPromo {
+                    PromoAdCard(magicBooth: promoMagicBooth)
+                }
                 if !app.auth.isSignedIn && !devFake {
                     EmptyState(message: Copy.mineLoginPrompt, actionTitle: Copy.signIn) {
                         app.loginMessage = nil

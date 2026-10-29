@@ -1,0 +1,192 @@
+{
+ "comment": "생성 중 화면 케이스 광고(2026-10-29 오너). enabled 끄면 빌드 없이 내려간다. 영상은 public/promo/cases. 각 광고 30초 = 앞 15초·뒤 15초 시리즈, 누르면 그 순간 시리즈 상품(iOS=아이폰, 안드=갤럭시). locales: 이 언어 사용자에게만. magicBoothFirst: 매직 부스 생성이면 이 광고부터.",
+ "enabled": true,
+ "locales": [
+  "ko"
+ ],
+ "headline": {
+  "ko": "이미지가 생성되는 동안\n케이스를 구경해보세요",
+  "en": "Browse our phone cases\nwhile your image is being created"
+ },
+ "button": {
+  "ko": "케이스 보러가기",
+  "en": "Shop cases"
+ },
+ "magicBoothFirst": "custom",
+ "ads": [
+  {
+   "id": "xmas_leopard",
+   "video": {
+    "ios": "promo/cases/xmas_leopard_iphone.mp4",
+    "android": "promo/cases/xmas_leopard_galaxy.mp4"
+   },
+   "poster": {
+    "ios": "promo/cases/xmas_leopard_iphone.jpg",
+    "android": "promo/cases/xmas_leopard_galaxy.jpg"
+   },
+   "segments": [
+    {
+     "until": 15,
+     "series": "xmas",
+     "link": {
+      "ios": "https://smartstore.naver.com/frolicpaper/products/13834294545",
+      "android": "https://smartstore.naver.com/frolicpaper/products/13834294881"
+     }
+    },
+    {
+     "until": 30,
+     "series": "leopard",
+     "link": {
+      "ios": "https://smartstore.naver.com/frolicpaper/products/13825494691",
+      "android": "https://smartstore.naver.com/frolicpaper/products/13825497504"
+     }
+    }
+   ]
+  },
+  {
+   "id": "birthday",
+   "video": {
+    "ios": "promo/cases/birthday_iphone.mp4",
+    "android": "promo/cases/birthday_galaxy.mp4"
+   },
+   "poster": {
+    "ios": "promo/cases/birthday_iphone.jpg",
+    "android": "promo/cases/birthday_galaxy.jpg"
+   },
+   "segments": [
+    {
+     "until": 15,
+     "series": "flower",
+     "link": {
+      "ios": "https://smartstore.naver.com/frolicpaper/products/13823991394",
+      "android": "https://smartstore.naver.com/frolicpaper/products/13823991657"
+     }
+    },
+    {
+     "until": 30,
+     "series": "stone",
+     "link": {
+      "ios": "https://smartstore.naver.com/frolicpaper/products/13824019186",
+      "android": "https://smartstore.naver.com/frolicpaper/products/13824019485"
+     }
+    }
+   ]
+  },
+  {
+   "id": "chrome_argyle",
+   "video": {
+    "ios": "promo/cases/chrome_argyle_iphone.mp4",
+    "android": "promo/cases/chrome_argyle_galaxy.mp4"
+   },
+   "poster": {
+    "ios": "promo/cases/chrome_argyle_iphone.jpg",
+    "android": "promo/cases/chrome_argyle_galaxy.jpg"
+   },
+   "segments": [
+    {
+     "until": 15,
+     "series": "chrome",
+     "link": {
+      "ios": "https://smartstore.naver.com/frolicpaper/products/13825537674",
+      "android": "https://smartstore.naver.com/frolicpaper/products/13825539455"
+     }
+    },
+    {
+     "until": 30,
+     "series": "argyle",
+     "link": {
+      "ios": "https://smartstore.naver.com/frolicpaper/products/13824564682",
+      "android": "https://smartstore.naver.com/frolicpaper/products/13824564916"
+     }
+    }
+   ]
+  },
+  {
+   "id": "travel",
+   "video": {
+    "ios": "promo/cases/travel_iphone.mp4",
+    "android": "promo/cases/travel_galaxy.mp4"
+   },
+   "poster": {
+    "ios": "promo/cases/travel_iphone.jpg",
+    "android": "promo/cases/travel_galaxy.jpg"
+   },
+   "segments": [
+    {
+     "until": 15,
+     "series": "sights",
+     "link": {
+      "ios": "https://smartstore.naver.com/frolicpaper/products/13824021267",
+      "android": "https://smartstore.naver.com/frolicpaper/products/13824021778"
+     }
+    },
+    {
+     "until": 30,
+     "series": "parks",
+     "link": {
+      "ios": "https://smartstore.naver.com/frolicpaper/products/13824020509",
+      "android": "https://smartstore.naver.com/frolicpaper/products/13824020916"
+     }
+    }
+   ]
+  },
+  {
+   "id": "city_mbti",
+   "video": {
+    "ios": "promo/cases/city_mbti_iphone.mp4",
+    "android": "promo/cases/city_mbti_galaxy.mp4"
+   },
+   "poster": {
+    "ios": "promo/cases/city_mbti_iphone.jpg",
+    "android": "promo/cases/city_mbti_galaxy.jpg"
+   },
+   "segments": [
+    {
+     "until": 15,
+     "series": "city",
+     "link": {
+      "ios": "https://smartstore.naver.com/frolicpaper/products/13824043740",
+      "android": "https://smartstore.naver.com/frolicpaper/products/13824044175"
+     }
+    },
+    {
+     "until": 30,
+     "series": "mbti",
+     "link": {
+      "ios": "https://smartstore.naver.com/frolicpaper/products/13823955696",
+      "android": "https://smartstore.naver.com/frolicpaper/products/13824024513"
+     }
+    }
+   ]
+  },
+  {
+   "id": "custom",
+   "video": {
+    "ios": "promo/cases/custom_iphone.mp4",
+    "android": "promo/cases/custom_galaxy.mp4"
+   },
+   "poster": {
+    "ios": "promo/cases/custom_iphone.jpg",
+    "android": "promo/cases/custom_galaxy.jpg"
+   },
+   "segments": [
+    {
+     "until": 15,
+     "series": "custom",
+     "link": {
+      "ios": "https://smartstore.naver.com/frolicpaper/products/13816298557",
+      "android": "https://smartstore.naver.com/frolicpaper/products/13816298557"
+     }
+    },
+    {
+     "until": 30,
+     "series": "custom",
+     "link": {
+      "ios": "https://smartstore.naver.com/frolicpaper/products/13816298557",
+      "android": "https://smartstore.naver.com/frolicpaper/products/13816298557"
+     }
+    }
+   ]
+  }
+ ]
+}

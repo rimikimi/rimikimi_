@@ -181,6 +181,7 @@ final class ConceptStore {
         if let ids = try? await RimikimiAPI.shared.fetchPopular() { popularIDs = ids }
         if let t = try? await RimikimiAPI.shared.fetchLabels() { LabelStore.shared.update(t) }
         if let f = try? await RimikimiAPI.shared.fetchFilters() { FilterCatalog.shared.update(f) }
+        await PromoAdStore.shared.refresh()
         if let list = try? await RimikimiAPI.shared.fetchSeasons(), !list.isEmpty {
             seasons = list
         } else if seasons.isEmpty {
