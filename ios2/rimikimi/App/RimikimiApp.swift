@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import FacebookCore
 
 @main
 struct RimikimiApp: App {
@@ -74,6 +75,14 @@ struct RimikimiApp: App {
 
 /// APNs 토큰 → Firebase Messaging 브리지(스위즐링 끔). 이 셋이 없으면 iOS 에서 FCM 토큰이 안 나온다.
 final class AppDelegate: NSObject, UIApplicationDelegate {
+    /// 메타 SDK — 설치·앱 실행(activate) 이벤트를 메타에 보낸다(앱 설치 캠페인 최적화용, 2026-11-01).
+    /// 광고 식별자는 ATT 허용한 사용자만 SDK 가 스스로 쓴다(ATT 묻는 시점은 TrackingPrompt 그대로).
+    func application(_ application: UIApplication,
+                     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        ApplicationDelegate.shared.application(application, didFinishLaunchingWithOptions: launchOptions)
+        return true
+    }
+
     func application(_ application: UIApplication,
                      didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
         MainActor.assumeIsolated { PushManager.shared.didRegister(deviceToken: deviceToken) }

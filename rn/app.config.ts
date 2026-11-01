@@ -99,6 +99,21 @@ const config: ExpoConfig = {
     "expo-secure-store",
     "@react-native-firebase/app",
     "@react-native-firebase/messaging",
+    // 메타(인스타) 앱 설치 캠페인 — 설치·앱 실행 이벤트만 보낸다(로그인 안 씀). 오너 2026-11-01.
+    // 클라이언트 토큰은 앱에 들어가는 공개 값(시크릿 아님). 앱 = rimikimi-ads 1669186291239677.
+    [
+      "react-native-fbsdk-next",
+      {
+        appID: "1669186291239677",
+        clientToken: "22868227f8fd6a4785104e683843f561",
+        displayName: "rimikimi",
+        scheme: "fb1669186291239677",
+        advertiserIDCollectionEnabled: true,
+        autoLogAppEventsEnabled: true,
+        isAutoInitEnabled: true,
+        iosUserTrackingPermission: false,
+      },
+    ],
     // Android 8+ 상태바 알림 아이콘: 흰색·투명 배경 단색 96×96 PNG(로고 하트 실루엣) — 3주차 교체.
     ["expo-notifications", { icon: "./assets/images/notification-icon.png", color: "#E6403C", defaultChannel: "default" }],
     [

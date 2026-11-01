@@ -19,6 +19,10 @@ packages:
   GoogleMobileAds:
     url: https://github.com/googleads/swift-package-manager-google-mobile-ads.git
     from: 12.0.0
+  # 메타(인스타) 앱 설치 캠페인 — 설치·앱 실행 이벤트만(FacebookCore, 로그인 없음). 오너 2026-11-01 "설치 캠페인으로 변경".
+  Facebook:
+    url: https://github.com/facebook/facebook-ios-sdk.git
+    from: 18.0.0
 
 settings:
   base:
@@ -69,6 +73,8 @@ targets:
         product: FirebaseAnalytics
       - package: GoogleMobileAds
         product: GoogleMobileAds
+      - package: Facebook
+        product: FacebookCore
     info:
       path: rimikimi/Info.plist
       properties:
@@ -100,6 +106,12 @@ targets:
         # AdMob 앱 ID(전면광고). ⚠️ 광고 **단위** ID 가 아니라 앱 ID(`~` 구분자) — 여기에
         # 단위 ID 를 넣으면 SDK 가 실행 즉시 크래시한다. 값은 1.x `ios/App/App/Info.plist` 그대로.
         GADApplicationIdentifier: ca-app-pub-9458625554324585~5856129775
+        # 메타 SDK(앱 rimikimi-ads). 클라이언트 토큰은 앱에 들어가는 공개 값(시크릿 아님).
+        FacebookAppID: "1669186291239677"
+        FacebookClientToken: "22868227f8fd6a4785104e683843f561"
+        FacebookDisplayName: rimikimi
+        FacebookAutoLogAppEventsEnabled: true
+        FacebookAdvertiserIDCollectionEnabled: true
         # SKAdNetwork — iOS 광고 기여(attribution) 허용 네트워크 목록. 이게 없으면 ATT 를 거부한
         # 사용자에 대한 전환 측정이 통째로 빠져 eCPM 이 떨어진다. 1.x Info.plist 의 42개를 그대로 옮겼다.
         SKAdNetworkItems:

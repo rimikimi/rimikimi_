@@ -106,3 +106,7 @@
 - 증명·프로필 표지 409 증명사진 + 목적 카드 표지 서버 교체(labels.json purpose.<목적>.cover) — iOS 91+·안드 122+ 부터.
 
 - 생성 중 케이스 광고(오너 10/29) — 내 사진 진행 카드 아래 30초 영상 6종 무작위 반복, 누르면 그 순간 시리즈 스마트스토어 상품(iOS 아이폰·안드 갤럭시), 우측 상단 음소거. 코드 반영됨(12148bd·1b203fd), iOS 다음 빌드·안드 122+ 부터. 안드는 expo-video 새로 들어감(네이티브). 끄기·영상·링크 교체 = public/promo-ads.json(빌드 없이).
+
+- 메타 SDK(설치 캠페인, 오너 11/01) — iOS FacebookCore(SPM)·Info.plist FacebookAppID/ClientToken, 안드 react-native-fbsdk-next(app.config.ts 플러그인, prebuild 반영). 설치·앱 실행 이벤트만, 로그인 없음.
+  ⚠️ 올리기 전: App Store 앱 개인정보(App Privacy)에 "기기 ID·사용 데이터 — 제3자 광고, 추적에 사용" 추가 필요(메타 SDK). Play 데이터 보안은 AdMob 광고 ID 항목으로 이미 신고됨 — 확인만.
+  메타 캠페인 "[설치] KR/US 18-34 · 인스타 · 일 1만원" 은 PAUSED 로 만들어 둠(광고 20개). 새 빌드가 스토어에 나간 뒤 켜고, 그때 옛 트래픽 캠페인은 끈다.
