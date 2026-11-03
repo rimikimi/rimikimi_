@@ -338,6 +338,20 @@ const PHOTOREALISM =
   "Camera: full-frame DSLR with an 85mm lens at around f/2.8 — natural, believable depth of field, " +
   "true-to-life color, natural micro-contrast and a faint, fine sensor grain like a real photograph. ";
 
+// 대두 금지 최종 규칙 — 모든 생성 지시문 맨 끝에 붙인다(아래 instruction 조립부 주석).
+const BODY_FINAL =
+  "\n\nBODY PROPORTIONS (final rule — overrides any framing, pose or style wording above): realistic adult " +
+  "proportions exactly like a real photo of this person. The head is small relative to the body — about one-eighth of " +
+  "total height on a full-length shot, and on a half-body shot the head is clearly narrower than the shoulders (shoulder " +
+  "width about 2.5–3 head widths). Never enlarge the head or face to show the face better; no big-head, bobblehead or " +
+  "chibi look. Neck, shoulders, arms and hands are in natural scale to the head.";
+const BODY_FINAL_ART =
+  "\n\nBODY PROPORTIONS (final rule): keep the person's real-life head-to-body proportions in this style — an adult " +
+  "head about one-seventh to one-eighth of total height, head clearly narrower than the shoulders. Do NOT enlarge the " +
+  "head, face or eyes to make it cute; no big-head, bobblehead, chibi or super-deformed look.";
+// 일부러 머리를 크게 그리는 컨셉 — 1.5등신 피규어.
+const BIG_HEAD_OK_IDS = new Set(["1127"]);
+
 // 사실적 의상 렌더링 공통 문구 (플라스틱/붙인 듯한 느낌 방지) — 의상이 관여하는 모드에만 적용.
 const REALISTIC_GARMENT =
   "The clothing must look like REAL, photographed garments with a bespoke, made-to-measure " +
@@ -1618,13 +1632,23 @@ async function handleGenerate(req, res, hold) {
     } catch (_) { return null; }
   }
   // 브루클린 지시문은 사진 사실감·얼굴 참조 절까지 자체로 완결돼 있다 — 리미키미 포장을 씌우지 않는다.
-  const instruction = isStudio
+  const instructionBase = isStudio
     ? st.instruction
     : isWedding
     ? weddingInstruction + faceClause
     : isSprite
     ? prompt + "\n\nSUBJECT DESCRIPTION: " + spriteDesc
     : (skipFacePrecheck ? conceptInstruction : PHOTOREALISM + conceptInstruction + SKIN_FINAL) + headTiltClause + faceClause;
+
+  // 대두 금지 — 맨 끝에 한 번 더(오너 2026-11-03 "모든 ai컨셉에서 대두 만들지 말랬잖아", "비율 똑바로 맞추라고").
+  //   PHOTOREALISM 안의 BODY PROPORTIONS 는 맨 앞이라 뒤쪽 컨셉 문장에 밀렸고, 그림체(skipFacePrecheck)·스튜디오·웨딩
+  //   경로엔 아예 없었다. SKIN_FINAL 처럼 마지막에 두면 이긴다. 1.5등신 피규어(1127)·픽셀 캐릭터만 일부러 머리가 커서 뺀다.
+  const bodyFinal = isSprite || BIG_HEAD_OK_IDS.has(String(conceptId))
+    ? ""
+    : skipFacePrecheck || magicBoothConcept
+    ? BODY_FINAL_ART
+    : BODY_FINAL;
+  const instruction = instructionBase + bodyFinal;
 
   // 드레스룸 일상컷: 장면 토큰을 "이 샷의 배경"으로 치환한다. 배치에서 shotIdx 가
   // 달라지면 같은 그룹 안의 다른 배경이 들어간다(오너: "그룹 안에서는 랜덤이어야").
