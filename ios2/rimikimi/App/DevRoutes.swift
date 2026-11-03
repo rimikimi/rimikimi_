@@ -165,6 +165,10 @@ enum DevRoutes {
             app.generation.devFlip(); app.tab = .myPhotos
             // 결과 화면이 열린 뒤 뒤로 가기(사용자가 결과 보고 돌아온 상황)
             DispatchQueue.main.asyncAfter(deadline: .now() + 16) { app.myPhotosPath = [] }
+        case "/fakeresult3":
+            // 여러 장 결과 스와이프 확인(오너 2026-11-03 "여기서 사진 스와이프 안 됨")
+            app.tab = .gallery
+            app.galleryPath = [.result(ResultPayload(items: ["1123", "1124", "1125"].map { .init(id: "r\($0)", image: nil, url: Config.largeURL($0), expiresAt: nil) }, conceptId: "1123", conceptTitle: "빈티지 소품샵"))]
         case "/fakeresult":
             // 3:4 가 아닌 결과가 잘리지 않고 전체로 보이는지(가로 1200×630)
             app.tab = .gallery

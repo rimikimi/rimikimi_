@@ -157,7 +157,8 @@ struct ResultPhoto: View {
     var override: UIImage? = nil
     /// 매직 부스 원본(기기에만 보관, `OriginalStore`) — 있으면 길게 누르는 동안 원본을 보여 준다.
     @State private var original: UIImage?
-    @GestureState private var showingOriginal = false
+    @State private var showingOriginal = false
+    @State private var pressTask: Task<Void, Never>?
 
     var body: some View {
         let result = override ?? item.image ?? loaded[item.id]
@@ -187,13 +188,17 @@ struct ResultPhoto: View {
         .clipShape(RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
         .contentShape(Rectangle())
         // 길게 누르는 동안만 원본(손 떼면 결과). 짧은 스와이프는 그대로 페이지 넘김.
-        .simultaneousGesture(
-            LongPressGesture(minimumDuration: 0.2)
-                .sequenced(before: DragGesture(minimumDistance: 0))
-                .updating($showingOriginal) { value, state, _ in
-                    if case .second(true, _) = value, original != nil { state = true }
-                }
-        )
+        // ⚠️ 예전엔 LongPress→DragGesture(최소 거리 0) 를 붙였는데, 그 드래그가 페이지 TabView 의 가로 스와이프를
+        //    먹어서 여러 장 결과가 안 넘어갔다(오너 2026-11-03 "여기서 사진 스와이프 안 됨"). 드래그 없는 길게 누르기로
+        //    바꿨다(손가락이 10pt 넘게 움직이면 바로 포기 → 스와이프로 넘어감). 원본이 없으면 누르기만 하고 아무것도 안 한다.
+        .onLongPressGesture(minimumDuration: 60, maximumDistance: 10, perform: {}, onPressingChanged: { pressing in
+            pressTask?.cancel()
+            guard pressing, original != nil else { showingOriginal = false; return }
+            pressTask = Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(200))
+                if !Task.isCancelled { showingOriginal = true }
+            }
+        })
         .sensoryFeedback(.selection, trigger: showingOriginal)
         .task(id: item.id) {
             // 완성 직후엔 원본을 결과 id 로 옮겨 적는 중일 수 있다 — 2초까지 다시 본다.
