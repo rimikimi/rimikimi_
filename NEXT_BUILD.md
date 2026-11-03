@@ -111,3 +111,4 @@
 - 메타 SDK(설치 캠페인, 오너 11/01) — iOS FacebookCore(SPM)·Info.plist FacebookAppID/ClientToken, 안드 react-native-fbsdk-next(app.config.ts 플러그인, prebuild 반영). 설치·앱 실행 이벤트만, 로그인 없음.
   ⚠️ 올리기 전: App Store 앱 개인정보(App Privacy)에 "기기 ID·사용 데이터 — 제3자 광고, 추적에 사용" 추가 필요(메타 SDK). Play 데이터 보안은 AdMob 광고 ID 항목으로 이미 신고됨 — 확인만.
   메타 캠페인 "[설치] KR/US 18-34 · 인스타 · 일 1만원" 은 PAUSED 로 만들어 둠(광고 20개). 새 빌드가 스토어에 나간 뒤 켜고, 그때 옛 트래픽 캠페인은 끈다.
+- iOS 카메라 피사체 글로우 깜빡임(오너 11/03 "오락가락") — 미리보기 마스크 시퀀스 핸들러·앞 프레임과 섞기·놓친 프레임 유지 … 다음 iOS 빌드(92+)부터.

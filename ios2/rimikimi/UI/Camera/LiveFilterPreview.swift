@@ -120,7 +120,7 @@ final class LiveFilterRenderer: NSObject, AVCaptureVideoDataOutputSampleBufferDe
             guard let self, self.commandQueue == nil, let device, let cq = device.makeCommandQueue() else { return }
             self.commandQueue = cq
             self.context = CIContext(mtlCommandQueue: cq, options: LiveFilter.contextOptions)
-            do { self.engine = try LiveFilterEngine() } catch {
+            do { self.engine = try LiveFilterEngine(); self.engine?.live = true } catch {
                 AppLog.ui.error("live filter kernels: \(error.localizedDescription, privacy: .public)")
             }
         }

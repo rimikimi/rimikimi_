@@ -1,6 +1,7 @@
 import Foundation
 import CoreImage
 import Vision
+import QuartzCore
 
 /// 카메라 탭 **실시간 필터** 엔진 — 웹 편집기의 `src/filters.js`(applyLook)를 Core Image 커널로
 /// 그대로 옮긴 것(오너 지시 2026-10-09 "필터는 실시간으로 볼 수 있어야 하는데??").
@@ -851,6 +852,49 @@ final class LiveFilterEngine {
         return out.cropped(to: ext)
     }
 
+    /// 실시간 미리보기용이면 true — 피사체 글로우 마스크를 프레임끼리 이어 붙인다(아래 glowMask).
+    var live = false
+    private let glowSeq = VNSequenceRequestHandler()
+    private let glowReq: VNGeneratePersonSegmentationRequest = {
+        let r = VNGeneratePersonSegmentationRequest(); r.qualityLevel = .balanced
+        r.outputPixelFormat = kCVPixelFormatType_OneComponent8; return r
+    }()
+    private var glowPrev: CVPixelBuffer?
+    private var glowPrevAt: CFTimeInterval = 0
+
+    /// 피사체 글로우 인물 마스크. 카메라에서 글로우가 깜빡이며 오락가락했다(오너 2026-11-03) —
+    /// 프레임마다 따로 분할해 경계가 매 프레임 흔들렸고, 한 프레임이라도 분할을 놓치면 글로우가 통째로 꺼졌다.
+    /// 미리보기(live)는 ① 시퀀스 핸들러(Vision 이 앞 프레임을 참고해 안정화) ② 앞 마스크와 섞기(새 것 60%)
+    /// ③ 놓친 프레임은 0.5초까지 앞 마스크 유지. 섞은 결과는 매번 새 버퍼에 쓴다 — 아직 그리는 중인 앞 프레임이 읽는 버퍼를 덮지 않게.
+    private func glowMask(_ img: CIImage) -> CVPixelBuffer? {
+        if live { try? glowSeq.perform([glowReq], on: img) } else { try? VNImageRequestHandler(ciImage: img).perform([glowReq]) }
+        let cur = glowReq.results?.first?.pixelBuffer
+        guard live else { return cur }
+        let now = CACurrentMediaTime()
+        let fresh = glowPrev != nil && now - glowPrevAt < 0.5
+        guard let cur else { return fresh ? glowPrev : nil }
+        defer { glowPrevAt = now }
+        let w = CVPixelBufferGetWidth(cur), h = CVPixelBufferGetHeight(cur)
+        var out: CVPixelBuffer?
+        CVPixelBufferCreate(nil, w, h, kCVPixelFormatType_OneComponent8, nil, &out)
+        guard let out else { glowPrev = nil; return cur }
+        let prev = fresh && glowPrev.map { CVPixelBufferGetWidth($0) == w && CVPixelBufferGetHeight($0) == h } == true ? glowPrev : nil
+        CVPixelBufferLockBaseAddress(cur, .readOnly); CVPixelBufferLockBaseAddress(out, [])
+        if let prev { CVPixelBufferLockBaseAddress(prev, .readOnly) }
+        let cb = CVPixelBufferGetBaseAddress(cur)!.assumingMemoryBound(to: UInt8.self), cr = CVPixelBufferGetBytesPerRow(cur)
+        let ob = CVPixelBufferGetBaseAddress(out)!.assumingMemoryBound(to: UInt8.self), or = CVPixelBufferGetBytesPerRow(out)
+        if let prev {
+            let pb = CVPixelBufferGetBaseAddress(prev)!.assumingMemoryBound(to: UInt8.self), pr = CVPixelBufferGetBytesPerRow(prev)
+            for y in 0..<h { for x in 0..<w { ob[y * or + x] = UInt8((UInt16(cb[y * cr + x]) * 6 + UInt16(pb[y * pr + x]) * 4 + 5) / 10) } }
+            CVPixelBufferUnlockBaseAddress(prev, .readOnly)
+        } else {
+            for y in 0..<h { memcpy(ob + y * or, cb + y * cr, w) }
+        }
+        CVPixelBufferUnlockBaseAddress(out, []); CVPixelBufferUnlockBaseAddress(cur, .readOnly)
+        glowPrev = out
+        return out
+    }
+
     /// 피사체 글로우 — 배경 채도↓·×0.62, 인물 윤곽 바깥에만 하얀 글로우(넓게 0.55 + 가까이 0.85). 사람이 없으면 배경만 살짝 어둡게.
     func subjectGlow(_ img: CIImage) -> CIImage {
         let ext = img.extent, W = ext.width, H = ext.height
@@ -859,7 +903,7 @@ final class LiveFilterEngine {
                                                          "inputBVector": CIVector(x: 0, y: 0, z: k, w: 0), "inputBiasVector": CIVector(x: bias, y: bias, z: bias, w: 0)])
                 .applyingFilter("CIColorClamp")
         }
-        guard (try? VNImageRequestHandler(ciImage: img).perform([segReq])) != nil, let pb = segReq.results?.first?.pixelBuffer else {
+        guard let pb = glowMask(img) else {
             return mul(img, 0.8).cropped(to: ext)
         }
         // 마스크는 색이 아니라 데이터 — 색공간 없이 읽어야 감마로 값이 줄지 않는다(실측: 머리 쪽 글로우가 빠졌다).
