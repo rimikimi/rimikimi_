@@ -160,6 +160,25 @@ final class GenerationCoordinator {
         }
     }
 
+    #if DEBUG
+    /// 검증용 — 진행 중 둘을 넣고 8초 뒤 하나만 완성으로 바꾼다(위 카드 높이가 바뀌어도 케이스 광고가 계속 나오는지).
+    func devFlip() {
+        let keep = Job(conceptId: "1", conceptTitle: "계속 생성 중", startedAt: Date(), count: 1)
+        let flip = Job(conceptId: "2", conceptTitle: "곧 완성", startedAt: Date(), count: 1)
+        entries.insert(Entry(job: keep, phase: .running(waiting: false)), at: 0)
+        entries.insert(Entry(job: flip, phase: .running(waiting: false)), at: 0)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 8) {
+            let items = [ResultItem(id: "devflip", image: nil, url: Config.largeURL("1"), expiresAt: nil)]
+            self.setPhase(flip.id, .done(items))
+            // 실제 완성과 똑같이 — 결과 화면 자동 열기 + 전면광고 신호
+            self.pendingPresentation = items
+            self.pendingPresentationJob = flip
+            self.lastDoneWasLive = true
+            self.doneTick &+= 1
+        }
+    }
+    #endif
+
     private func setPhase(_ id: String, _ phase: Phase) {
         guard let i = entries.firstIndex(where: { $0.id == id }) else { return }
         entries[i].phase = phase

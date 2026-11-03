@@ -21,6 +21,12 @@ struct PromoAdCard: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             ZStack(alignment: .top) {
+                // 영상이 첫 장면을 그리기 전(받는 중·다음 광고로 넘어가는 순간)에 까만 상자 대신 표지를 보인다.
+                Color(white: 0.13)
+                if let poster = model.posterURL {
+                    AsyncImage(url: poster) { $0.resizable().scaledToFill() } placeholder: { Color.clear }
+                        .allowsHitTesting(false)
+                }
                 PromoVideoLayer(player: model.player)
                     .contentShape(Rectangle())
                     .onTapGesture { model.openCurrent() }
@@ -61,30 +67,50 @@ struct PromoAdCard: View {
         .padding(.horizontal, Spacing.page)
         .padding(.bottom, Spacing.s5)
         .onAppear {
-            model.start(PromoAdStore.shared.playlist(magicBooth: magicBooth))
+            model.appeared(PromoAdStore.shared.playlist(magicBooth: magicBooth))
             // 캡처·검증용: `-dev.promoTapAt 20` = 20초 뒤 영상 탭과 같은 동작.
             let at = UserDefaults.standard.double(forKey: "dev.promoTapAt")
             if at > 0 { DispatchQueue.main.asyncAfter(deadline: .now() + at) { model.openCurrent() } }
         }
-        .onDisappear { model.stop() }
+        .onDisappear { model.disappeared() }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in model.pause() }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in model.resume() }
     }
 }
 
 /// 광고 재생기 — 목록을 하나씩 재생하고 끝나면 다음 것, 목록 끝이면 처음으로(반복).
+/// ⚠️ 화면에서 빠질 때 영상을 비우지(stop) 말 것. LazyVStack 은 위 진행 카드 높이가 바뀌면(한 장 완성 등)
+///    onAppear 를 onDisappear **보다 먼저** 부르기도 해서, 예전엔 새로 시작한 직후 비워져 까만 상자로 남았다
+///    (2026-11-03 오너 "광고가 왜 뜨다 안뜨다 함?"). 보이는 횟수를 세서 멈춤/재생만 하고, 정리는 카드가 사라질 때(deinit).
 @Observable
 final class PromoAdPlayer {
     let player = AVPlayer()
     private(set) var muted: Bool = UserDefaults.standard.bool(forKey: "promoAds.muted")
     private var list: [PromoAdStore.Ad] = []
     private var index = 0
-    private var endObserver: NSObjectProtocol?
-    private var active = false
+    @ObservationIgnored private var endObserver: NSObjectProtocol?
+    @ObservationIgnored private var visible = 0
 
-    func start(_ ads: [PromoAdStore.Ad]) {
-        guard !ads.isEmpty, !active else { return }
-        active = true
+    /// 지금 광고의 표지 — 영상 아래에 깔린다.
+    var posterURL: URL? { list.indices.contains(index) ? PromoAdStore.url(list[index].poster?.ios) : nil }
+
+    func appeared(_ ads: [PromoAdStore.Ad]) {
+        visible += 1
+        if list.isEmpty { start(ads) } else if player.currentItem == nil { load() } else { player.play() }
+    }
+
+    func disappeared() {
+        visible -= 1
+        // 같은 순간에 다시 나타나는 경우(순서 뒤바뀜)를 기다렸다가 정말 안 보일 때만 멈춘다.
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.visible <= 0 else { return }
+            self.visible = 0
+            self.player.pause()
+        }
+    }
+
+    private func start(_ ads: [PromoAdStore.Ad]) {
+        guard !ads.isEmpty else { return }
         list = ads; index = 0
         if let first = UserDefaults.standard.string(forKey: "dev.promoFirst"), let i = list.firstIndex(where: { $0.id == first }) {
             list.insert(list.remove(at: i), at: 0)
@@ -107,16 +133,13 @@ final class PromoAdPlayer {
         player.play()
     }
 
-    func stop() {
-        active = false
+    deinit {
         player.pause()
-        player.replaceCurrentItem(with: nil)
         if let o = endObserver { NotificationCenter.default.removeObserver(o) }
-        endObserver = nil
     }
 
     func pause() { player.pause() }
-    func resume() { if active { player.play() } }
+    func resume() { if visible > 0 { player.play() } }
 
     func toggleMute() {
         muted.toggle()
@@ -138,7 +161,7 @@ struct PromoVideoLayer: UIViewRepresentable {
     let player: AVPlayer
     func makeUIView(context: Context) -> PlayerView {
         let v = PlayerView(); v.playerLayer.player = player; v.playerLayer.videoGravity = .resizeAspectFill
-        v.backgroundColor = UIColor(white: 0.13, alpha: 1); return v
+        v.backgroundColor = .clear; return v
     }
     func updateUIView(_ uiView: PlayerView, context: Context) { uiView.playerLayer.player = player }
     final class PlayerView: UIView {

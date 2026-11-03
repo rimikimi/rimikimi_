@@ -161,6 +161,10 @@ enum DevRoutes {
                 if let d = try? JSONSerialization.data(withJSONObject: arr) { app.devFakeGallery = try? JSONDecoder().decode([GalleryItem].self, from: d) }
                 app.tab = .myPhotos
             }
+        case "/promoflip":
+            app.generation.devFlip(); app.tab = .myPhotos
+            // 결과 화면이 열린 뒤 뒤로 가기(사용자가 결과 보고 돌아온 상황)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 16) { app.myPhotosPath = [] }
         case "/fakeresult":
             // 3:4 가 아닌 결과가 잘리지 않고 전체로 보이는지(가로 1200×630)
             app.tab = .gallery
