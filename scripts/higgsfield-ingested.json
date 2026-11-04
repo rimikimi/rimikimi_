@@ -1,173 +1,243 @@
 {
- "a0c87a3a-8399-4bd8-b091-1a7d8bbd2929": {
-  "status": "staged",
-  "id": "1014",
-  "title": "천사와 악마",
-  "note": "편집형(세 번째 레퍼런스) 프롬프트를 단독 커플 프롬프트로 바꿈 — 2장 얼굴 테스트 통과"
- },
- "887f84ce-c3ba-4adc-8efd-4861d3ce51cd": {
-  "status": "staged",
-  "id": "995",
-  "title": "고딕 블랙 웨딩"
- },
- "9924b289-4d3e-4d4c-adc9-7e430f2e1202": {
-  "status": "staged",
-  "id": "996",
-  "title": "좀비 프롬 데이트"
- },
- "ed34a622-0804-4a2b-93ee-e106536e42e0": {
-  "status": "staged",
-  "id": "997",
-  "title": "밤의 백작"
- },
- "6d100cb0-372f-44c9-99e1-9f4f90217e86": {
-  "status": "staged",
-  "id": "998",
-  "title": "해골 분장 중"
- },
- "ed8addcc-1799-4489-bb77-508c3307803e": {
-  "status": "staged",
-  "id": "999",
-  "title": "빨간 망토 셀카"
- },
- "f8d9e65c-a163-4f93-a2a0-fb11f0da5780": {
-  "status": "staged",
-  "id": "1000",
-  "title": "블랙캣 데일리룩"
- },
- "d24ccaf8-2306-4058-9af0-f57665e14808": {
-  "status": "staged",
-  "id": "1001",
-  "title": "까마귀 쿠튀르"
- },
- "2911821a-c001-4c47-b6f1-a6f1827f8596": {
-  "status": "staged",
-  "id": "1002",
-  "title": "유령 신부의 서약"
- },
- "b838865d-a6b8-4947-8e9d-2cd093c9a2b2": {
-  "status": "staged",
-  "id": "1003",
-  "title": "마녀 홈파티"
- },
- "c7c36e26-2ca5-4e06-b023-b833c4802d87": {
-  "status": "staged",
-  "id": "1004",
-  "title": "펌킨 퀸"
- },
- "6c8dd72a-7403-47fd-9542-c0a4a876f0fd": {
-  "status": "staged",
-  "id": "1005",
-  "title": "호박밭 마녀"
- },
- "c2f6b844-2fc8-4551-99d1-e35abe439730": {
-  "status": "staged",
-  "id": "1006",
-  "title": "스켈레톤 파티 나잇"
- },
- "959bc632-66ad-4375-bbc7-c558c36b6cda": {
-  "status": "staged",
-  "id": "1007",
-  "title": "레드 데빌 라운지"
- },
- "1a5413f5-092f-4b45-b9f2-f5b0fe0dffbe": {
-  "status": "staged",
-  "id": "1008",
-  "title": "창가의 검은 고양이"
- },
- "77d1dc49-6ef1-4a07-8d33-40af6b0e7990": {
-  "status": "staged",
-  "id": "1009",
-  "title": "러블리 미라"
- },
- "4f97bb44-2c06-42fe-8e18-9e9e30c5da73": {
-  "status": "staged",
-  "id": "1010",
-  "title": "달빛 구미호"
- },
- "1f391623-f8ba-4cc9-9b19-7c9295bd1030": {
-  "status": "staged",
-  "id": "1011",
-  "title": "뱀파이어 백작부인"
- },
- "e234a06b-41bf-489d-9cca-e344ef5c6787": {
-  "status": "staged",
-  "id": "1012",
-  "title": "까마귀 여왕"
- },
- "d428b831-0114-49c1-8af8-acf0ee04a785": {
-  "status": "staged",
-  "id": "1013",
-  "title": "안개 골목 저승사자"
- },
- "848636a2-6e99-4584-95a5-c17a9506672c": {
-  "status": "staged",
-  "id": "1016",
-  "title": "동아리방 미라"
- },
- "067c1a3e-e27b-43fd-b9a8-f817013a6ea9": {
-  "status": "staged",
-  "id": "1017",
-  "title": "도자기 인형 신부"
- },
- "fce53f19-5c01-4dbf-8c02-2588a6d54875": {
-  "status": "staged",
-  "id": "1018",
-  "title": "쿠튀르 메두사"
- },
- "8a2da248-d914-4a80-8060-fde6945bc49c": {
-  "status": "staged",
-  "id": "1019",
-  "title": "서촌 탐정 룩"
- },
- "aec1ca7b-2392-4df3-b342-b89981d099ba": {
-  "status": "staged",
-  "id": "1020",
-  "title": "회전목마 링마스터"
- },
- "4fd990d8-59af-4d1e-9f23-a2ea6c24d35b": {
-  "status": "staged",
-  "id": "1021",
-  "title": "펌킨 니트 거울셀카"
- },
- "c5fdff88-05c5-4457-8d48-e4a87d020fec": {
-  "status": "staged",
-  "id": "1022",
-  "title": "호떡 사는 저승사자"
- },
- "2565e44e-81d3-4535-ad0f-c87223190fd8": {
-  "status": "staged",
-  "id": "1023",
-  "title": "몰락한 왕"
- },
- "4f2eda7e-f42f-4421-acde-051bc1909129": {
-  "status": "staged",
-  "id": "1024",
-  "title": "제주 목장 카우보이"
- },
- "77e863df-369f-492b-a314-cc7d39bc22b8": {
-  "status": "staged",
-  "id": "1025",
-  "title": "계란프라이와 토스트"
- },
- "35bb2b3f-294c-47ca-9b7a-a17e3a3469d2": {
-  "status": "staged",
-  "id": "1026",
-  "title": "달과 태양"
- },
- "ee04d5de-5598-4471-af28-0eaded54d01c": {
-  "status": "staged",
-  "id": "1027",
-  "title": "우주인과 외계인"
- },
- "f03e9da9-ed64-49b1-9a49-1598cefa87a2": {
-  "status": "staged",
-  "id": "1028",
-  "title": "가면무도회 웨딩"
- },
- "4bb4d34c-df8a-4664-ae29-8650888c3c7a": {
-  "status": "staged",
-  "id": "1029",
-  "title": "꿀벌과 양봉가 셀카"
- }
+  "a0c87a3a-8399-4bd8-b091-1a7d8bbd2929": {
+    "status": "staged",
+    "id": "1014",
+    "title": "천사와 악마",
+    "note": "편집형(세 번째 레퍼런스) 프롬프트를 단독 커플 프롬프트로 바꿈 — 2장 얼굴 테스트 통과"
+  },
+  "887f84ce-c3ba-4adc-8efd-4861d3ce51cd": {
+    "status": "staged",
+    "id": "995",
+    "title": "고딕 블랙 웨딩"
+  },
+  "9924b289-4d3e-4d4c-adc9-7e430f2e1202": {
+    "status": "staged",
+    "id": "996",
+    "title": "좀비 프롬 데이트"
+  },
+  "ed34a622-0804-4a2b-93ee-e106536e42e0": {
+    "status": "staged",
+    "id": "997",
+    "title": "밤의 백작"
+  },
+  "6d100cb0-372f-44c9-99e1-9f4f90217e86": {
+    "status": "staged",
+    "id": "998",
+    "title": "해골 분장 중"
+  },
+  "ed8addcc-1799-4489-bb77-508c3307803e": {
+    "status": "staged",
+    "id": "999",
+    "title": "빨간 망토 셀카"
+  },
+  "f8d9e65c-a163-4f93-a2a0-fb11f0da5780": {
+    "status": "staged",
+    "id": "1000",
+    "title": "블랙캣 데일리룩"
+  },
+  "d24ccaf8-2306-4058-9af0-f57665e14808": {
+    "status": "staged",
+    "id": "1001",
+    "title": "까마귀 쿠튀르"
+  },
+  "2911821a-c001-4c47-b6f1-a6f1827f8596": {
+    "status": "staged",
+    "id": "1002",
+    "title": "유령 신부의 서약"
+  },
+  "b838865d-a6b8-4947-8e9d-2cd093c9a2b2": {
+    "status": "staged",
+    "id": "1003",
+    "title": "마녀 홈파티"
+  },
+  "c7c36e26-2ca5-4e06-b023-b833c4802d87": {
+    "status": "staged",
+    "id": "1004",
+    "title": "펌킨 퀸"
+  },
+  "6c8dd72a-7403-47fd-9542-c0a4a876f0fd": {
+    "status": "staged",
+    "id": "1005",
+    "title": "호박밭 마녀"
+  },
+  "c2f6b844-2fc8-4551-99d1-e35abe439730": {
+    "status": "staged",
+    "id": "1006",
+    "title": "스켈레톤 파티 나잇"
+  },
+  "959bc632-66ad-4375-bbc7-c558c36b6cda": {
+    "status": "staged",
+    "id": "1007",
+    "title": "레드 데빌 라운지"
+  },
+  "1a5413f5-092f-4b45-b9f2-f5b0fe0dffbe": {
+    "status": "staged",
+    "id": "1008",
+    "title": "창가의 검은 고양이"
+  },
+  "77d1dc49-6ef1-4a07-8d33-40af6b0e7990": {
+    "status": "staged",
+    "id": "1009",
+    "title": "러블리 미라"
+  },
+  "4f97bb44-2c06-42fe-8e18-9e9e30c5da73": {
+    "status": "staged",
+    "id": "1010",
+    "title": "달빛 구미호"
+  },
+  "1f391623-f8ba-4cc9-9b19-7c9295bd1030": {
+    "status": "staged",
+    "id": "1011",
+    "title": "뱀파이어 백작부인"
+  },
+  "e234a06b-41bf-489d-9cca-e344ef5c6787": {
+    "status": "staged",
+    "id": "1012",
+    "title": "까마귀 여왕"
+  },
+  "d428b831-0114-49c1-8af8-acf0ee04a785": {
+    "status": "staged",
+    "id": "1013",
+    "title": "안개 골목 저승사자"
+  },
+  "848636a2-6e99-4584-95a5-c17a9506672c": {
+    "status": "staged",
+    "id": "1016",
+    "title": "동아리방 미라"
+  },
+  "067c1a3e-e27b-43fd-b9a8-f817013a6ea9": {
+    "status": "staged",
+    "id": "1017",
+    "title": "도자기 인형 신부"
+  },
+  "fce53f19-5c01-4dbf-8c02-2588a6d54875": {
+    "status": "staged",
+    "id": "1018",
+    "title": "쿠튀르 메두사"
+  },
+  "8a2da248-d914-4a80-8060-fde6945bc49c": {
+    "status": "staged",
+    "id": "1019",
+    "title": "서촌 탐정 룩"
+  },
+  "aec1ca7b-2392-4df3-b342-b89981d099ba": {
+    "status": "staged",
+    "id": "1020",
+    "title": "회전목마 링마스터"
+  },
+  "4fd990d8-59af-4d1e-9f23-a2ea6c24d35b": {
+    "status": "staged",
+    "id": "1021",
+    "title": "펌킨 니트 거울셀카"
+  },
+  "c5fdff88-05c5-4457-8d48-e4a87d020fec": {
+    "status": "staged",
+    "id": "1022",
+    "title": "호떡 사는 저승사자"
+  },
+  "2565e44e-81d3-4535-ad0f-c87223190fd8": {
+    "status": "staged",
+    "id": "1023",
+    "title": "몰락한 왕"
+  },
+  "4f2eda7e-f42f-4421-acde-051bc1909129": {
+    "status": "staged",
+    "id": "1024",
+    "title": "제주 목장 카우보이"
+  },
+  "77e863df-369f-492b-a314-cc7d39bc22b8": {
+    "status": "staged",
+    "id": "1025",
+    "title": "계란프라이와 토스트"
+  },
+  "35bb2b3f-294c-47ca-9b7a-a17e3a3469d2": {
+    "status": "staged",
+    "id": "1026",
+    "title": "달과 태양"
+  },
+  "ee04d5de-5598-4471-af28-0eaded54d01c": {
+    "status": "staged",
+    "id": "1027",
+    "title": "우주인과 외계인"
+  },
+  "f03e9da9-ed64-49b1-9a49-1598cefa87a2": {
+    "status": "staged",
+    "id": "1028",
+    "title": "가면무도회 웨딩"
+  },
+  "4bb4d34c-df8a-4664-ae29-8650888c3c7a": {
+    "status": "staged",
+    "id": "1029",
+    "title": "꿀벌과 양봉가 셀카"
+  },
+  "6b6c6897-8809-49b4-9fa7-dacc1f37b17e": {
+    "status": "staged",
+    "id": "1130",
+    "title": "가와구치코 단풍 셀카"
+  },
+  "2434eae8-e69f-4948-8655-001bcbb05746": {
+    "status": "staged",
+    "id": "1131",
+    "title": "한옥 감나무 웨딩"
+  },
+  "e7126a71-d8b8-459b-ad6f-abab649b9082": {
+    "status": "staged",
+    "id": "1132",
+    "title": "토스카나 사이프러스 길"
+  },
+  "de0f84f8-8979-44af-8f49-db43c0f41c29": {
+    "status": "staged",
+    "id": "1133",
+    "title": "망원시장 군고구마"
+  },
+  "4fb14d00-4fc5-433f-9f63-76a8e1877dcc": {
+    "status": "staged",
+    "id": "1134",
+    "title": "제주 귤 따기"
+  },
+  "c51d9f60-1e8e-4d84-9b2b-0ef804e8ca0e": {
+    "status": "staged",
+    "id": "1135",
+    "title": "센트럴파크 숲길 산책"
+  },
+  "5a2f227b-fcfe-4287-bf71-101d69f1a9db": {
+    "status": "staged",
+    "id": "1136",
+    "title": "센트럴파크 은행나무길"
+  },
+  "ff4a75a7-f476-4a00-8eb1-04b75a86b3e6": {
+    "status": "staged",
+    "id": "1137",
+    "title": "서촌 감나무 골목"
+  },
+  "049ad265-c643-48c6-b833-afade1354269": {
+    "status": "staged",
+    "id": "1138",
+    "title": "한강 자전거 셀카"
+  },
+  "cefa330d-d639-4e9c-83a7-5a24151e6eb1": {
+    "status": "staged",
+    "id": "1139",
+    "title": "성수 사이버샷 OOTD"
+  },
+  "e04b3072-13d5-4e7f-8012-517f7df1afa0": {
+    "status": "staged",
+    "id": "1140",
+    "title": "하늘공원 억새길"
+  },
+  "f50b3a4e-e805-49de-b3e6-dc7ef49d9961": {
+    "status": "staged",
+    "id": "1141",
+    "title": "연남동 빵집 아침"
+  },
+  "e6750eea-e23f-4ec5-afde-e8e6926b81de": {
+    "status": "staged",
+    "id": "1142",
+    "title": "뤽상부르 정원 코트"
+  },
+  "1e070938-7d28-4c2d-911b-8cc4b8790f56": {
+    "status": "staged",
+    "id": "1143",
+    "title": "교토 단풍 브라이덜"
+  }
 }
