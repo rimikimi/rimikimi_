@@ -62,7 +62,7 @@ struct MyPhotosView: View {
             LazyVStack(spacing: Spacing.s4) {
                 ProgressCard()
                 if showPromo {
-                    PromoAdCard(magicBooth: promoMagicBooth)
+                    PromoAdCard(magicBooth: promoMagicBooth, active: app.tab == .myPhotos && app.myPhotosPath.isEmpty)
                 }
                 if !app.auth.isSignedIn && !devFake {
                     EmptyState(message: Copy.mineLoginPrompt, actionTitle: Copy.signIn) {

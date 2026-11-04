@@ -9,6 +9,8 @@ import UIKit
 /// 사진이 완성되면(진행 중인 작업이 없어지면) 카드째 사라진다. 서버 `/promo-ads.json` enabled 로 끈다.
 struct PromoAdCard: View {
     let magicBooth: Bool
+    /// 내 사진 탭이 앞에 있고 결과 화면 등이 위에 안 덮였을 때만 true — 재생/멈춤은 이것만 보고 정한다.
+    let active: Bool
     @State private var model = PromoAdPlayer()
     private var store: PromoAdStore { PromoAdStore.shared }
 
@@ -67,21 +69,22 @@ struct PromoAdCard: View {
         .padding(.horizontal, Spacing.page)
         .padding(.bottom, Spacing.s5)
         .onAppear {
-            model.appeared(PromoAdStore.shared.playlist(magicBooth: magicBooth))
+            model.appeared(PromoAdStore.shared.playlist(magicBooth: magicBooth), active: active)
             // 캡처·검증용: `-dev.promoTapAt 20` = 20초 뒤 영상 탭과 같은 동작.
             let at = UserDefaults.standard.double(forKey: "dev.promoTapAt")
             if at > 0 { DispatchQueue.main.asyncAfter(deadline: .now() + at) { model.openCurrent() } }
         }
-        .onDisappear { model.disappeared() }
+        .onChange(of: active) { _, on in model.setActive(on) }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in model.pause() }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in model.resume() }
     }
 }
 
 /// 광고 재생기 — 목록을 하나씩 재생하고 끝나면 다음 것, 목록 끝이면 처음으로(반복).
-/// ⚠️ 화면에서 빠질 때 영상을 비우지(stop) 말 것. LazyVStack 은 위 진행 카드 높이가 바뀌면(한 장 완성 등)
-///    onAppear 를 onDisappear **보다 먼저** 부르기도 해서, 예전엔 새로 시작한 직후 비워져 까만 상자로 남았다
-///    (2026-11-03 오너 "광고가 왜 뜨다 안뜨다 함?"). 보이는 횟수를 세서 멈춤/재생만 하고, 정리는 카드가 사라질 때(deinit).
+/// ⚠️ onDisappear 로 멈추지 말 것. LazyVStack 은 위 진행 카드가 바뀔 때 카드가 화면에 그대로 있는데도
+///    onAppear→onDisappear 를 부르고 다시 onAppear 를 안 부르기도 한다(2026-11-04 로그로 확인). 그래서 예전엔
+///    영상이 멈춘 채(빌드 91 은 비워져 회색 상자로) 남았다(11/03·11/04 오너 "광고 왜 안 뜸?").
+///    재생/멈춤은 `active`(내 사진 탭이 앞 + 위에 덮인 화면 없음)와 앱 백그라운드만 보고, 정리는 카드가 사라질 때(deinit).
 @Observable
 final class PromoAdPlayer {
     let player = AVPlayer()
@@ -89,24 +92,20 @@ final class PromoAdPlayer {
     private var list: [PromoAdStore.Ad] = []
     private var index = 0
     @ObservationIgnored private var endObserver: NSObjectProtocol?
-    @ObservationIgnored private var visible = 0
+    @ObservationIgnored private var active = true
 
     /// 지금 광고의 표지 — 영상 아래에 깔린다.
     var posterURL: URL? { list.indices.contains(index) ? PromoAdStore.url(list[index].poster?.ios) : nil }
 
-    func appeared(_ ads: [PromoAdStore.Ad]) {
-        visible += 1
-        if list.isEmpty { start(ads) } else if player.currentItem == nil { load() } else { player.play() }
+    func appeared(_ ads: [PromoAdStore.Ad], active: Bool) {
+        self.active = active
+        if list.isEmpty { start(ads) } else if player.currentItem == nil { load() }
+        setActive(active)
     }
 
-    func disappeared() {
-        visible -= 1
-        // 같은 순간에 다시 나타나는 경우(순서 뒤바뀜)를 기다렸다가 정말 안 보일 때만 멈춘다.
-        DispatchQueue.main.async { [weak self] in
-            guard let self, self.visible <= 0 else { return }
-            self.visible = 0
-            self.player.pause()
-        }
+    func setActive(_ on: Bool) {
+        active = on
+        if on { player.play() } else { player.pause() }
     }
 
     private func start(_ ads: [PromoAdStore.Ad]) {
@@ -130,7 +129,7 @@ final class PromoAdPlayer {
     private func load() {
         guard list.indices.contains(index), let url = PromoAdStore.url(list[index].video.ios) else { return }
         player.replaceCurrentItem(with: AVPlayerItem(url: url))
-        player.play()
+        if active { player.play() }
     }
 
     deinit {
@@ -139,7 +138,7 @@ final class PromoAdPlayer {
     }
 
     func pause() { player.pause() }
-    func resume() { if visible > 0 { player.play() } }
+    func resume() { if active { player.play() } }
 
     func toggleMute() {
         muted.toggle()
