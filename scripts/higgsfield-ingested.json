@@ -311,9 +311,9 @@
     "title": "양재 꽃시장 리스"
   },
   "73d6df7a-75c1-4cc9-92ff-12427c735c6d": {
-    "status": "staged",
+    "status": "replaced",
     "id": "1158",
-    "title": "창덕궁 설경 한복 화보"
+    "title": "창덕궁 설경 한복 화보 (구버전, 11/04 오너 교체)"
   },
   "a155d161-4294-474d-931c-e6388d2df3ef": {
     "status": "staged",
@@ -454,5 +454,10 @@
     "status": "staged",
     "id": "1186",
     "title": "산타 선물 배달"
+  },
+  "59ef9b7e-7fcd-4add-ac79-d42e5fb3b6e8": {
+    "status": "staged",
+    "id": "1158",
+    "title": "창덕궁 설경 한복 화보"
   }
 }
