@@ -185,6 +185,73 @@ async function applyWatermark(base64, mime) {
   }
 }
 
+// 결과 마무리 = (무료면) 워터마크 + 화면용 축소를 **한 번만 디코드**해서 처리(오너 2026-11-05 Vercel CPU 한도 초과로 서버 정지).
+// 예전엔 applyWatermark(디코드 2번 + PNG 인코드) → shrinkOutput(워터마크 PNG 를 또 디코드) 순이라 2K PNG 한 장에 디코드 3번.
+// 픽셀 결과는 예전과 완전히 같다(1792×2400 실측: 원본·축소본 모두 픽셀 차 0, CPU 360→250ms). 워드마크 그림은 크기·색별로 캐시.
+// 실패하면 예전 함수로 그대로 처리한다 — 마무리 실패가 생성을 깨뜨리면 안 된다.
+const MARK_CACHE = new Map();
+async function finishOutput(base64, mime, watermark) {
+  try {
+    const sharp = (await import("sharp")).default;
+    if (watermark && WORDMARK_SVG === null) {
+      const { readFileSync } = await import("node:fs");
+      const { fileURLToPath } = await import("node:url");
+      WORDMARK_SVG = readFileSync(fileURLToPath(new URL("./_lib/wordmark.svg", import.meta.url)), "utf8");
+    }
+    const { data, info } = await sharp(Buffer.from(base64, "base64")).rotate().raw().toBuffer({ resolveWithObject: true });
+    const W = info.width, H = info.height;
+    if (!W || !H) throw new Error("no size");
+    let pixels = data;
+    let pinfo = { raw: { width: W, height: H, channels: info.channels } };
+    let raw = { base64, mime };
+    if (watermark) {
+      // ↓ applyWatermark 와 같은 자리·크기·색 규칙
+      const markW = Math.max(90, Math.round(W * 0.18));
+      const markH = Math.round(markW * (400 / 1200));
+      const pad = Math.round(W * 0.035);
+      const left = W - markW - pad, top = H - markH - pad;
+      let bright = false;
+      try {
+        const stat = await sharp(data, pinfo).extract({ left, top, width: markW, height: markH }).greyscale().stats();
+        bright = (stat.channels?.[0]?.mean ?? 0) > 140;
+      } catch (_) { /* 못 재면 흰색(기본) */ }
+      const key = `${markW}x${markH}:${bright}`;
+      let m = MARK_CACHE.get(key);
+      if (!m) {
+        const svg = bright ? WORDMARK_SVG.replace(/#ffffff/g, "#231f20") : WORDMARK_SVG;
+        const mark = await sharp(Buffer.from(svg))
+          .resize(markW, markH, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer();
+        const halo = await sharp(mark).blur(7).negate({ alpha: false }).png().toBuffer();
+        m = { mark, halo };
+        if (MARK_CACHE.size > 50) MARK_CACHE.clear();
+        MARK_CACHE.set(key, m);
+      }
+      let pipe = sharp(data, pinfo).composite([
+        { input: m.halo, left, top, blend: "over", opacity: 0.35 },
+        { input: m.mark, left, top, blend: "over", opacity: 0.9 },
+      ]);
+      // 합성하면 알파 채널이 붙는다(전부 불투명) — 원본에 알파가 없었으면 떼서 인코딩을 가볍게.
+      if (info.channels === 3) pipe = pipe.removeAlpha();
+      const c = await pipe.raw().toBuffer({ resolveWithObject: true });
+      pixels = c.data;
+      pinfo = { raw: { width: c.info.width, height: c.info.height, channels: c.info.channels } };
+      const isJpeg = /jpe?g/i.test(mime || "");
+      const enc = isJpeg ? await sharp(pixels, pinfo).jpeg().toBuffer() : await sharp(pixels, pinfo).png().toBuffer();
+      raw = { base64: enc.toString("base64"), mime: isJpeg ? "image/jpeg" : "image/png" };
+    }
+    const s = await sharp(pixels, pinfo)
+      .resize(1024, 1365, { fit: "inside", withoutEnlargement: true })
+      .jpeg({ quality: 82 })
+      .toBuffer();
+    return { raw, small: { base64: s.toString("base64"), mime: "image/jpeg" } };
+  } catch (e) {
+    console.error("[finishOutput failed, falling back]", e?.message || e);
+    let raw = { base64, mime };
+    if (watermark) raw = await applyWatermark(base64, mime);
+    return { raw, small: await shrinkOutput(raw.base64, raw.mime) };
+  }
+}
+
 // 페이스 프로필 앵커 전용 축소.
 // 일반 결과물(1024/q82)보다 크고 곱게 남긴다 — 앵커는 사용자가 화질을 직접 확인하고,
 // 이후 모든 생성에 얼굴 참조로 다시 올라가는 원본이기 때문이다.
@@ -2005,11 +2072,9 @@ async function handleGenerate(req, res, hold) {
       let rawOut = o.data;
       if (postFx === "mspaint") { const px = await paintPixelate(rawOut, rawMime); rawOut = px.base64; rawMime = px.mime; }
       // 결제로 만든 것만 깨끗하다 — 원본에 찍어야 갤러리 다운로드로 우회되지 않는다
-      if (!useCredit) {
-        const wm = await applyWatermark(rawOut, rawMime);
-        rawOut = wm.base64; rawMime = wm.mime;
-      }
-      const small = await shrinkOutput(rawOut, rawMime);
+      const fin = await finishOutput(rawOut, rawMime, !useCredit);
+      rawOut = fin.raw.base64; rawMime = fin.raw.mime;
+      const small = fin.small;
       let gId = null, gExp = null;
       // 게스트는 계정 갤러리가 없다 — 사진은 응답으로만 가고, 앱이 "받기"(로그인) 뒤 앨범에 저장한다.
       if (!isGuest) try {
@@ -2240,14 +2305,11 @@ async function handleGenerate(req, res, hold) {
 
   // 6.4) 워터마크 — 결제(크레딧)로 만든 것만 깨끗하다.
   //      축소 전 원본에 찍어야 아래 갤러리 저장분에도 함께 들어간다.
-  if (!useCredit) {
-    const wm = await applyWatermark(rawData, rawMime);
-    rawData = wm.base64; rawMime = wm.mime;
-  }
-
   // 6.5) 응답 전 이미지 축소 (Vercel 4.5MB 한도 초과로 본문 잘리는 "오류 200" 방지 + 전송 속도↑)
-  //      응답(화면 표시)만 축소. 갤러리/다운로드는 아래에서 원본 그대로 저장.
-  const small = await shrinkOutput(rawData, rawMime);
+  //      응답(화면 표시)만 축소. 갤러리/다운로드는 아래에서 원본 그대로 저장. 워터마크와 한 번에(finishOutput).
+  const fin = await finishOutput(rawData, rawMime, !useCredit);
+  rawData = fin.raw.base64; rawMime = fin.raw.mime;
+  const small = fin.small;
   const outMime = small.mime;
   const outData = small.base64;
 
