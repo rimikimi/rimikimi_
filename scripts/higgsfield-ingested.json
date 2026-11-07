@@ -612,5 +612,134 @@
   "e9071933-9611-496b-8aaa-f09c54f1fa53": {
     "status": "superseded",
     "note": "같은 장면 재생성본 34d9ffb6 를 씀(이건 실내 입김/유명 앨범 커버)"
+  },
+  "4f26bbde-3551-4a20-adf4-f1f08472255b": {
+    "status": "staged",
+    "id": "1216",
+    "title": "파리 정원 계단 신부"
+  },
+  "27806229-045d-4fd4-8b05-214d5045de5a": {
+    "status": "staged",
+    "id": "1217",
+    "title": "런던 호텔 윙체어 케이프"
+  },
+  "d745c057-5fe4-4773-bb7a-08d36b634db8": {
+    "status": "staged",
+    "id": "1218",
+    "title": "프라하 카를교 새벽"
+  },
+  "e356bae3-5118-4ebc-944d-0d73f19e038f": {
+    "status": "staged",
+    "id": "1219",
+    "title": "경주 고분 돌담 간식"
+  },
+  "2a59834f-126b-43f8-a1a5-ca24ef5eba97": {
+    "status": "staged",
+    "id": "1220",
+    "title": "제주 억새 오름 신부"
+  },
+  "82a64a81-0baf-4da9-bdee-aeb27b42f0cc": {
+    "status": "staged",
+    "id": "1221",
+    "title": "강릉 안목해변 커피"
+  },
+  "d0def50d-4aa3-45f1-a4db-48f2d3b11a07": {
+    "status": "staged",
+    "id": "1222",
+    "title": "속초 호텔 거울 셀카"
+  },
+  "f53d89e2-214f-4ef5-882a-f9554dc9bcc0": {
+    "status": "staged",
+    "id": "1223",
+    "title": "파리 호텔 침대 셀카"
+  },
+  "e365d291-555f-47c0-9641-cfdf7dc6583f": {
+    "status": "staged",
+    "id": "1224",
+    "title": "전주 한옥마을 사이버샷 OOTD"
+  },
+  "6bb3d0fa-34b9-4f0c-ae34-6dbc2da5ac9e": {
+    "status": "staged",
+    "id": "1225",
+    "title": "암스테르담 캐리어 지도"
+  },
+  "937aa5b2-f2d2-4f23-80b5-f92ae813b5c5": {
+    "status": "staged",
+    "id": "1226",
+    "title": "뉴욕 소호 벽돌벽"
+  },
+  "88c24fa7-592d-4dc5-b083-381cc3a3446c": {
+    "status": "staged",
+    "id": "1227",
+    "title": "두물머리 새벽 보온컵"
+  },
+  "7059e404-ac97-4000-a3c3-23ac6da0ce9e": {
+    "status": "staged",
+    "id": "1228",
+    "title": "경주 한옥호텔 마루"
+  },
+  "440d2f6e-110b-4aa8-b89d-816d88cbabdf": {
+    "status": "staged",
+    "id": "1229",
+    "title": "에든버러 칼튼 힐"
+  },
+  "8b25138c-8f5f-4123-9ca5-c8ddb5d7d6e2": {
+    "status": "staged",
+    "id": "1230",
+    "title": "밀라노 팔라초 피아노"
+  },
+  "c484f26b-576f-4ef0-b571-e2c7a93f298b": {
+    "status": "staged",
+    "id": "1231",
+    "title": "감천문화마을 계단"
+  },
+  "1f097ca6-1bbb-4235-92c8-efa5e0a38371": {
+    "status": "staged",
+    "id": "1232",
+    "title": "통영 항구 운동화 끈"
+  },
+  "6548db9a-34af-42c1-a8bf-773d9f3593c2": {
+    "status": "staged",
+    "id": "1233",
+    "title": "파리 루프탑 블루아워"
+  },
+  "0f65bc3c-2671-4085-b6e8-367d1321fd94": {
+    "status": "staged",
+    "id": "1234",
+    "title": "코모 호수 빌라 웨딩"
+  },
+  "a8820f34-e84b-4336-ac9c-f2d5f50c0bd0": {
+    "status": "staged",
+    "id": "1235",
+    "title": "강릉 해변 캠핑 불멍"
+  },
+  "3b536b3f-c473-4a10-9eb0-b39e05bfd3e0": {
+    "status": "staged",
+    "id": "1236",
+    "title": "동궁과 월지 야경"
+  },
+  "d298bacf-b78b-45c0-a6ce-f76bcdb57fe6": {
+    "status": "staged",
+    "id": "1237",
+    "title": "제주 현무암 돌담 웨딩"
+  },
+  "0f28356f-0028-457a-bd3f-7ade033b7b97": {
+    "status": "staged",
+    "id": "1238",
+    "title": "빈 크리스마스 마켓"
+  },
+  "9946b68d-83cd-4a4d-9a67-b5d1ceee5ac3": {
+    "status": "staged",
+    "id": "1239",
+    "title": "암스테르담 운하 보트"
+  },
+  "ac226601-43ab-4c6a-8b2e-14e42dc2312c": {
+    "status": "staged",
+    "id": "1240",
+    "title": "순천만 갈대 데크"
+  },
+  "f8a4697b-8b53-4aa5-8d93-13807c9b9279": {
+    "status": "superseded",
+    "note": "같은 장면(암스테르담 운하 보트) 재생성본 9946b68d 를 씀"
   }
 }
