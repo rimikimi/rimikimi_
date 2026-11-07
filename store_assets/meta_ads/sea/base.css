@@ -1,0 +1,8 @@
+*{box-sizing:border-box;margin:0}body{width:1080px;height:1350px;position:relative;font-family:-apple-system,"SF Pro Display","Helvetica Neue",Arial,sans-serif;color:#1A1A1A;overflow:hidden}
+.bg{position:absolute;inset:0;width:1080px;height:1350px}
+.head{position:absolute;left:0;top:0;width:1080px;height:420px;background:#FBF8F3;padding:72px 64px 0}
+.top{display:flex;justify-content:space-between;align-items:center}.logo{display:flex;align-items:center;gap:6px}.logo i{width:14px;height:14px;border-radius:50%;display:inline-block}.logo b{font-size:30px;margin-left:8px;letter-spacing:-.5px}
+.pill{background:#1A1A1A;color:#fff;font-weight:700;font-size:26px;padding:14px 26px;border-radius:40px}
+h1{font-size:76px;line-height:1.08;letter-spacing:-2.5px;font-weight:800;margin-top:44px}h1 em{font-style:normal;color:#E6403C}
+p.sub{font-size:31px;color:#6B6460;margin-top:24px;font-weight:600}
+.tag{position:absolute;font-weight:800;font-size:25px;padding:9px 18px;border-radius:30px;color:#fff;background:rgb(70,66,63)}
