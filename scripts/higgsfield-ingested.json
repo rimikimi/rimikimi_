@@ -903,9 +903,8 @@
     "title": "연말 조명 거리"
   },
   "98f9744b-d443-4681-9740-5359426e4a5f": {
-    "status": "staged",
-    "id": "1278",
-    "title": "북촌 한옥 설경"
+    "status": "replaced",
+    "note": "1278 의상 교체본 cc8f4bb3 로 바꿈(오너 11/08)"
   },
   "90ea5971-8652-4c46-987c-87e60af6a82b": {
     "status": "staged",
@@ -966,5 +965,10 @@
     "status": "staged",
     "id": "1292",
     "title": "신년 프로필"
+  },
+  "cc8f4bb3-3455-4d8a-876e-ec3575a51319": {
+    "status": "staged",
+    "id": "1278",
+    "title": "북촌 한옥 설경"
   }
 }
