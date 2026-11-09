@@ -22,6 +22,8 @@ import { copy } from "@/lib/copy";
 import { conceptThumb, isRestoreConcept, isRetouch } from "@/lib/concepts";
 import { PURPOSES, albumName, albumTiles, purposeCover, purposeTitle, type AlbumTile } from "@/lib/home21";
 import { chrome, color, radius, space, themedStyles } from "@/theme/tokens";
+import { WeatherCanvas, WeatherDim, WeatherLedge, WetCover, useSunShadow, useWeatherDriver, type LedgeSpec } from "@/ui/Weather";
+import { refreshAmbient } from "@/lib/ambient";
 
 // ============================================================================
 // 만들기 탭(홈) — iOS 2.1 `HomeView.swift` 와 같은 구성(오너 지시 2026-10-09, docs/ux-v3 C안).
@@ -75,6 +77,23 @@ export default function HomeTab() {
   useEffect(() => { if (concepts.length) startHomeCoach(); }, [concepts.length, startHomeCoach]);
 
   const tileW = Math.floor((width - space.screen * 2 - space.s2 * 2) / 3);
+
+  // 날씨 '창문'(iOS HomeView WeatherBackdrop·WeatherDim) — 앨범 카드 자리를 격자 계산으로 알려 준다(스크롤 반영).
+  const albumsY = useRef(0);
+  const tilesRef = useRef(tiles);
+  tilesRef.current = tiles;
+  const getLedges = useCallback((): LedgeSpec[] => {
+    const h = photoHeight(tileW);
+    const out: LedgeSpec[] = [];
+    tilesRef.current.forEach((t, i) => {
+      const y = albumsY.current - scrollY.current + Math.floor(i / 3) * (h + space.s4);
+      if (y + h < -40 || y > height + 40) return; // 화면에 보이는 카드만
+      out.push({ id: t.name, frame: { x: space.screen + (i % 3) * (tileW + space.s2), y, w: tileW, h } });
+    });
+    return out;
+  }, [tileW, height]);
+  const weather = useWeatherDriver(getLedges);
+  useFocusEffect(useCallback(() => { void refreshAmbient(); }, []));
   // 추천·새로 나왔어요 가로 슬라이드(iOS HomeView 2026-10-10) — 카드 폭·간격은 iOS CardMetrics(160/390, 10).
   const railW = Math.round((width * 160) / 390);
   // 사진 복원·말로 고치기는 위 카드에 있으니 추천에서 뺀다(오너 2026-10-10, iOS 와 같다)
@@ -82,7 +101,9 @@ export default function HomeTab() {
   const newest = home?.newest ?? [];
 
   return (
-    <View style={styles.root}>
+    <View style={styles.root} onLayout={weather.onLayout}>
+      <WeatherDim />
+      <WeatherCanvas pic={weather.back} level={weather.level} />
       <ScrollView
         ref={scrollRef}
         onScroll={(e) => { scrollY.current = e.nativeEvent.contentOffset.y; }}
@@ -105,7 +126,7 @@ export default function HomeTab() {
               <ConceptRail title={copy.home.newest} items={newest} cardWidth={railW} gap={10} isNew />
             </View>
             <Text size="headline" style={styles.sectionTitle} accessibilityRole="header">{c21.purposeConcept}</Text>
-            <View style={styles.albums}>
+            <View style={styles.albums} onLayout={(e) => { albumsY.current = e.nativeEvent.layout.y; }}>
               {tiles.map((t, i) => {
                 const tile = <AlbumGridTile key={t.name} tile={t} width={tileW} fav={isFavoriteCategory(t.name)} />;
                 return i === 0 ? <CoachAnchor key={t.name} id="albums">{tile}</CoachAnchor> : tile;
@@ -114,6 +135,7 @@ export default function HomeTab() {
           </>
         )}
       </ScrollView>
+      <WeatherCanvas pic={weather.front} level={weather.level} />
       <CartBar compactOnHome hasTabBar />
       <CoachHost hasTabBar keys={["cards", "purposes", "albums", "cameraTab", "cartBadge"]} />
     </View>
@@ -203,6 +225,7 @@ function PurposeGrid() {
 function AlbumGridTile({ tile, width, fav }: { tile: AlbumTile; width: number; fav: boolean }) {
   const [failed, setFailed] = useState(false);
   const uri = failed ? tile.coverFallback : tile.cover;
+  const sun = useSunShadow();
   return (
     <Pressable
       accessibilityRole="button"
@@ -210,7 +233,7 @@ function AlbumGridTile({ tile, width, fav }: { tile: AlbumTile; width: number; f
       onPress={() => router.push({ pathname: "/category/[name]", params: { name: tile.name } })}
       style={({ pressed }) => [{ width, gap: space.s1, transform: [{ scale: pressed ? 0.97 : 1 }] }]}
     >
-      <View style={{ width, height: photoHeight(width), borderRadius: radius.card, overflow: "hidden", backgroundColor: color.mat }}>
+      <View style={[{ width, height: photoHeight(width), borderRadius: radius.card, overflow: "hidden", backgroundColor: color.mat }, sun]}>
         {uri ? (
           <Image
             source={{ uri }}
@@ -221,9 +244,11 @@ function AlbumGridTile({ tile, width, fav }: { tile: AlbumTile; width: number; f
             onError={() => setFailed(true)}
           />
         ) : null}
+        <WetCover id={tile.name} uri={uri} width={width} height={photoHeight(width)} />
         <PhotoCaption title={albumName(tile.name)} subtitle={c21.albumCount(tile.count)} size={15} />
         {fav ? <View style={styles.favBadge}><FavoriteBadge size={20} /></View> : null}
       </View>
+      <WeatherLedge id={tile.name} width={width} radius={radius.card} />
     </Pressable>
   );
 }

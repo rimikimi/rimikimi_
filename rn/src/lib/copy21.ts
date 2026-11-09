@@ -180,6 +180,7 @@ export const c21 = {
   get guestPick() { return t("마음에 드는 1장을 골라요", "Pick the one you like"); },
   get guestReceive() { return t("이 사진 받기 · 무료", "Get this photo · free"); },
   get guestAgain() { return t("다른 스타일로 다시", "Try another style"); },
+  get weatherEffects() { return t("날씨 효과", "Weather effects"); },
   get guestIdentity() { return t("내 얼굴과 같은 사람인지 확인했어요", "Checked it's the same person"); },
   get guestLogin() { return t("사진을 받으려면 로그인해 주세요", "Sign in to get your photo"); },
   get errNetwork() { return t("네트워크 요청에 실패했어요. 잠시 후 다시 시도해 주세요.", "Network request failed. Please try again shortly."); },

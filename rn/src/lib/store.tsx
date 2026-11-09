@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { buildHome, loadConcepts, loadPopular, resolveFourcutStyles, type Concept, type FourcutStyle, type HomeData } from "./concepts";
 import { loadRegisteredPhoto, type PhotoRef } from "./photo";
+import { current as currentWeather, moodScore, useAmbient } from "./ambient";
 import {
   EMPTY_FAVORITES, FAVORITES_ALBUM, hasGenerated, loadFavorites, saveCategories, saveConcepts,
   saveMarks, withGenerated, withSaved, type FavoritesState,
@@ -125,8 +126,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
    *  · 즐겨찾기한 카테고리가 그다음 — "실제로 배열도 바꿔주고".
    *  · **추천·새로 나왔어요 줄은 그대로 둔다**(순서를 건드리지 않는다).
    */
+  // 날씨·시간 무드가 바뀌면 추천 맨 앞 2개가 바뀐다(한 시간마다 다시 — 같은 점수끼리 돌아가게).
+  const ambient = useAmbient();
+  const wxNow = currentWeather(ambient);
+  const [hourTick, setHourTick] = useState(() => new Date().getHours());
+  useEffect(() => { const t = setInterval(() => setHourTick(new Date().getHours()), 5 * 60_000); return () => clearInterval(t); }, []);
   const home = useMemo(() => {
-    const base = concepts.length ? buildHome(concepts, popular) : null;
+    const base = concepts.length ? buildHome(concepts, popular, (c) => moodScore(c.mood)) : null;
     if (!base) return null;
     const order = orderCategories(base.chips.map((c) => c.name), {
       seasons,
@@ -146,7 +152,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       chips.unshift({ name: FAVORITES_ALBUM, count: picked.length });
     }
     return { ...base, rows, chips };
-  }, [concepts, popular, seasons, fav.categories, fav.concepts]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [concepts, popular, seasons, fav.categories, fav.concepts, wxNow, hourTick, ambient.sunrise]);
   const fourcutStyles = useMemo(
     () => resolveFourcutStyles(concepts.find((c) => c.mode === "fourcut")?.fourcutStyles),
     [concepts]

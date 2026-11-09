@@ -29,6 +29,8 @@ export interface Concept {
   fourcutStyle?: string;
   fourcutStyles?: FourcutStyle[];
   pinFeatured?: number;
+  /** 시간대·날씨 무드(서버 api/_lib/mood.js 가 붙인다) — 홈 추천을 지금 날씨에 맞춰 올린다. */
+  mood?: { tod?: string; wx?: string };
   /** 홈 목적 칸(profile / snap / wedding)에 들어가는지 — 서버 데이터가 정한다(iOS `Concept.purposes`). */
   purposes?: string[];
   // ── 2.1 이식: 리미키미 컨셉이 아닌 담기 항목(브루클린 룩 · 조세핀 드레스)을 같은 격자·담기 줄에 태우려고
@@ -240,13 +242,27 @@ export interface HomeData {
 }
 
 /** 웹 HomeLayout 의 homeData 계산을 그대로 옮긴 것. */
-export function buildHome(pool: Concept[], popular: Array<number | string>): HomeData {
+export function buildHome(pool: Concept[], popular: Array<number | string>, mood?: (c: Concept) => number): HomeData {
   const byId = new Map(pool.map((p) => [String(p.id), p]));
   let featured = popular.map((id) => byId.get(String(id))).filter((p): p is Concept => !!p).slice(0, 5);
   if (featured.length < 5) {
     const have = new Set(featured.map((p) => String(p.id)));
     const fill = [...pool].sort(byNewest).filter((p) => !have.has(String(p.id)));
     featured = [...featured, ...fill].slice(0, 5);
+  }
+  // 지금 날씨·시간 무드에 맞는 컨셉 2개를 맨 앞에(iOS ConceptStore.featured, 오너 2026-10-22).
+  // 점수가 같으면 한 시간마다 돌아가게(매번 같은 것만 뜨지 않게).
+  if (mood) {
+    const hour = new Date().getHours();
+    const spin = (c: Concept) => { let h = 2166136261; for (const ch of String(c.id)) h = Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0; return (h + hour) % 997; };
+    const picks = pool.filter((c) => !isFeatureConcept(c))
+      .map((c) => [c, mood(c)] as const).filter(([, sc]) => sc >= 3)
+      .sort((a, b) => (a[1] !== b[1] ? b[1] - a[1] : spin(a[0]) - spin(b[0])))
+      .slice(0, 2).map(([c]) => c);
+    if (picks.length) {
+      const ids = new Set(picks.map((c) => String(c.id)));
+      featured = [...picks, ...featured.filter((c) => !ids.has(String(c.id)))].slice(0, 5);
+    }
   }
   const pinned = pool.filter((p) => Number(p.pinFeatured) > 0).sort((a, b) => Number(a.pinFeatured) - Number(b.pinFeatured));
   for (const p of pinned) {

@@ -12,6 +12,7 @@ import { copy } from "@/lib/copy";
 import { GenerationProvider } from "@/lib/generation";
 import { CreditGateProvider } from "@/lib/creditGate";
 import { installPushHandlers, setupNotifications } from "@/lib/push";
+import { bootAmbient } from "@/lib/ambient";
 import { initAds, preloadRewarded } from "@/lib/ads";
 import { usePushResultRouting } from "@/lib/pushRouting";
 import { LoginSheet } from "@/ui/LoginSheet";
@@ -71,6 +72,7 @@ export default function RootLayout() {
     if (problem) return;
     const off = installPushHandlers();
     void setupNotifications(false);
+    bootAmbient();
     return off;
   }, [problem]);
 

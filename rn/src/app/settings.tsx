@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
+import { setEffectsOn, useAmbient } from "@/lib/ambient";
 import { Alert, Linking, Pressable, Share, StyleSheet, Switch, TextInput, View } from "react-native";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { Image } from "expo-image";
@@ -130,6 +131,17 @@ function StartTabRow() {
 }
 
 /** 화면 모드 — 시스템 설정 / 라이트 / 다크(iOS 설정의 같은 행). 고르면 재시작 없이 바로 바뀐다. */
+/** 날씨 효과 켜기/끄기 — 홈 배경의 비·눈·번개, 앨범 윗면 물·눈, 햇빛 그림자(iOS WeatherEffectsRow, 오너 2026-10-22). */
+function WeatherEffectsRow() {
+  const a = useAmbient();
+  return (
+    <Row
+      label={c21.weatherEffects}
+      trailing={<Switch value={a.effectsOn} onValueChange={setEffectsOn} trackColor={{ true: color.accent, false: color.fillPress }} thumbColor={color.card} />}
+    />
+  );
+}
+
 function AppearanceRow() {
   const v = useAppearancePref();
   const label: Record<AppearancePref, string> = { system: c21.appearanceSystem, light: c21.appearanceLight, dark: c21.appearanceDark };
@@ -291,6 +303,8 @@ export default function SettingsScreen() {
         <StartTabRow />
         <Sep />
         <AppearanceRow />
+        <Sep />
+        <WeatherEffectsRow />
       </Card>
 
       {/* 알림 */}
