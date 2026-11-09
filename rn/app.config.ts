@@ -86,6 +86,9 @@ const config: ExpoConfig = {
       //    우리는 `setBrightnessAsync`(이 액티비티 창 밝기, 권한 불필요)만 쓰고 시스템 밝기를
       //    바꾸는 `setSystemBrightnessAsync` 는 안 쓴다. 안 쓰는 특수 권한을 달고 심사에 넣지 않는다.
       "android.permission.WRITE_SETTINGS",
+      // ⚠️ expo-sensors 라이브러리 매니페스트가 만보계용으로 넣는다. 우리는 가속도계(홈 날씨 기울기, 권한 불필요)만
+      //    쓴다 — 안 쓰는 '신체 활동' 위험 권한을 달고 심사에 넣지 않는다(2026-11-09 정책 점검).
+      "android.permission.ACTIVITY_RECOGNITION",
     ],
   },
 
