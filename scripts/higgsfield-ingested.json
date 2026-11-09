@@ -1117,9 +1117,10 @@
     "title": "엘프 신부"
   },
   "33ed8f05-60e9-4ab4-abdf-b283d4e6ec04": {
-    "status": "staged",
+    "status": "replaced",
     "id": "1322",
-    "title": "용의 등 위에서"
+    "title": "용의 등 위에서",
+    "replacedBy": "870f6104-05ba-44b5-9574-a3799e4fd1fe"
   },
   "0e7917ba-79a6-4efc-b60f-f9bf3e887f78": {
     "status": "staged",
@@ -1161,6 +1162,12 @@
     "status": "staged",
     "id": "1329",
     "title": "진주빛 용 비행",
+    "note": "재생성(용 얼굴 보이게, 오너 11/09)"
+  },
+  "870f6104-05ba-44b5-9574-a3799e4fd1fe": {
+    "status": "staged",
+    "id": "1322",
+    "title": "용의 등 위에서",
     "note": "재생성(용 얼굴 보이게, 오너 11/09)"
   }
 }
