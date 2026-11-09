@@ -241,7 +241,7 @@ const copyKo = {
     toggle: "새 컨셉 알림 켜기",
     desc: "매일 저녁 8시 새 컨셉 · 생성 완료를 알려드려요",
     denied: "알림이 꺼져 있어요. 시스템 설정에서 켜 주세요.",
-    dropTitle: "새로운 컨셉이 도착했어요 ✨",
+    dropTitle: "새 컨셉 도착 · 오늘 무료 1장 만들어 보세요 ✨",
     dropBody: (n: number, titles: string) => (titles ? `오늘의 새 컨셉 ${n}종 · ${titles}` : `오늘의 새 컨셉 ${n}종이 올라왔어요`),
   },
   fit: {
@@ -616,7 +616,7 @@ const copyEn: Copy = {
     toggle: "New concept alerts",
     desc: "New-concept alerts at 8 PM your time · we'll tell you when your photos are ready",
     denied: "Notifications are off. Turn them on in system settings.",
-    dropTitle: "New concepts are here ✨",
+    dropTitle: "New concepts · your free photo today ✨",
     // 서버 드롭 목록의 제목은 한국어뿐이라 영어에서는 제목을 붙이지 않는다.
     dropBody: (n: number, _titles: string) => `${n} new ${n === 1 ? "concept" : "concepts"} just dropped`,
   },

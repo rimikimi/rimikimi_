@@ -11,7 +11,8 @@ import { useStore } from "./store";
 import { useGeneration, type JobInput } from "./generation";
 import { useCreditGate } from "./creditGate";
 import { askAdFree } from "./adFreePrompt";
-import { useSaveAdGate } from "./saveAdGate";
+import { NOTIFY_ASKED_KEY, getFlag, setFlag } from "./prefs";
+import { setupNotifications } from "./push";
 import { ApiError, generateImage } from "./api";
 import { encodeForUpload, pickPhotos, registerPhoto, type PhotoRef } from "./photo";
 import { loadProfileRefs } from "./faceProfile";
@@ -149,6 +150,16 @@ export function useApp21(): App21Value {
   return v;
 }
 
+/** 첫 생성(또는 첫 1장 받기) 때 한 번만 알림 권한을 묻는다 — iOS askOnFirstGenerate 와 같다.
+ *  2026-11-09: 안드로이드는 설정 토글에서만 물어서 대부분 사용자가 매일 20시 드롭 알림을 못 받았다. */
+async function askNotifyOnce(): Promise<void> {
+  try {
+    if (await getFlag(NOTIFY_ASKED_KEY)) return;
+    await setFlag(NOTIFY_ASKED_KEY, true);
+    await setupNotifications(true);
+  } catch { /* 알림은 부가 기능 */ }
+}
+
 /** 셀카 한 장으로 되는 컨셉·룩·드레스만, 옵션(세부 조정·옷·신랑) 없이 — 서버도 같은 기준(403 needLogin). */
 function guestEligible(i: JobInput): boolean {
   return isBatchable(i.concept)
@@ -160,7 +171,6 @@ export function App21Provider({ children }: { children: React.ReactNode }) {
   const { photo, setPhoto } = useStore();
   const { start, willShowAds } = useGeneration();
   const gate = useCreditGate();
-  const adGate = useSaveAdGate();
   const signedIn = !!session?.user?.id;
 
   const [cart, setCart] = useState<Concept[]>([]);
@@ -318,23 +328,13 @@ export function App21Provider({ children }: { children: React.ReactNode }) {
   /** 로그인·크레딧 확인 뒤 한 건 시작(iOS perform(.generate)). */
   const performOne = useCallback((input: JobInput, opts?: GenOpts) => {
     withConsent(() => {
-      gate.request(opts?.cost ?? 1, afterAdFreeAsk(() => { start({ ...input, autoPresent: true }); goMyPhotos(); }), { creditsOnly: !!opts?.creditsOnly });
+      gate.request(opts?.cost ?? 1, afterAdFreeAsk(() => { void askNotifyOnce(); start({ ...input, autoPresent: true }); goMyPhotos(); }), { creditsOnly: !!opts?.creditsOnly });
     });
   }, [gate, start, goMyPhotos, withConsent, afterAdFreeAsk]);
 
-  const startGuest = useCallback((input: JobInput, rewarded?: boolean) => {
+  const startGuest = useCallback((input: JobInput) => {
     if (!consentGiven.current) { withConsent(() => startGuest(input)); return; }
-    // 로그인 전 첫 1장도 "광고 보고 만들기"(충전 버튼 없이) — 끝까지 보면 만든다, 만든 뒤 전면광고는 없다(오너 2026-10-12).
-    if (!rewarded) {
-      void askAdFree("guest").then(async (choice) => {
-        if (choice !== "watch") return;
-        await new Promise((r) => setTimeout(r, 300));
-        const ok = await showRewardedForCreate();
-        if (ok) startGuest(input, true);
-        else toast(c21.rewardedIncomplete);
-      });
-      return;
-    }
+    // 로그인 전 첫 1장은 광고 없이 바로 만든다(오너 2026-11-09 — 설치 대비 첫 생성이 20% 남짓, 이 광고 수입은 하루 ₩300 안팎).
     const title = conceptTitle(input.concept);
     setGuestFlow({ title, images: [] });
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
@@ -359,7 +359,6 @@ export function App21Provider({ children }: { children: React.ReactNode }) {
         const images = r.batch ? r.batch.map((b) => b.imageDataUrl) : [r.imageDataUrl];
         setGuestFlow((g) => (g ? { ...g, images } : g));
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
-        // 생성 뒤 전면광고 없음 — 만들기 전에 보상형을 봤다(2026-10-12).
       } catch (err) {
         const e = err as ApiError;
         if (e?.status === 403) {
@@ -385,16 +384,17 @@ export function App21Provider({ children }: { children: React.ReactNode }) {
   }, [signedIn, performOne, startGuest, requireLogin]);
 
   const guestReceive = useCallback((uri: string) => {
+    // 첫 1장 받기는 광고 없이 저장(오너 2026-11-09). 로그인은 그대로 받는다.
     const doSave = async () => {
-      if (!(await adGate())) return; // 보상형을 끝까지 안 봤으면 저장 안 하고 받기 화면에 남는다
       const r = await saveDataUrlToAlbum(uri, "rimikimi");
       toast("ok" in r ? c21.savedToAlbum : c21.noAlbumPermission);
       setGuestFlow(null);
       setCart([]); setCartExpanded(false);
+      void askNotifyOnce();
     };
     if (signedIn) void doSave();
     else requireLogin("make", () => { void doSave(); }, undefined, c21.guestLogin);
-  }, [signedIn, adGate, toast, requireLogin]);
+  }, [signedIn, toast, requireLogin]);
 
   /** "N장 만들기" — 등록 사진으로 담은 컨셉을 한꺼번에(iOS generateCart). */
   const generateCart = useCallback((optionsDone = false) => {

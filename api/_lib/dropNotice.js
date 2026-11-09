@@ -96,13 +96,13 @@ export async function notifyConceptDrop(req, res) {
   const results = [];
   for (const topic of topics) {
     const r = await sendToTopic(topic, {
-      title: "새로운 컨셉이 도착했어요 ✨",
+      title: "새 컨셉 도착 · 오늘 무료 1장 만들어 보세요 ✨", // 다음 날 다시 오게(오너 2026-11-09 "알림만")
       body,
       data: { kind: "drop", count: fresh.length, firstId: fresh[0]?.id ?? "" },
     });
     results.push({ topic, ok: r.ok, error: r.error });
     const rEn = await sendToTopic(`${topic}_en`, {
-      title: "New concepts are here ✨",
+      title: "New concepts · your free photo today ✨",
       body: bodyEn,
       data: { kind: "drop", count: fresh.length, firstId: fresh[0]?.id ?? "" },
     });

@@ -9,6 +9,8 @@ export const INVITE_CARD_DONE_KEY = "rimikimi_invite_card_done";
 export const FIRST_GEN_DONE_KEY = "rimikimi_first_gen_done";
 /** 알림 토글(사용자 의사). OS 권한과 별개 — 둘 다 켜져야 등록한다. */
 export const NOTIFY_ON_KEY = "rimikimi_notify_on";
+/** 첫 생성 때 알림 권한을 이미 물었는지(한 번만 묻는다, 2026-11-09). */
+export const NOTIFY_ASKED_KEY = "rimikimi_notify_asked";
 
 export async function getFlag(key: string): Promise<boolean> {
   try { return (await AsyncStorage.getItem(key)) === "1"; } catch { return false; }

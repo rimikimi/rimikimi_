@@ -366,18 +366,9 @@ final class AppState {
         r.concept.isBatchable && r.studioOverrides.isEmpty && r.outfit == nil && r.groomPhoto == nil
     }
 
-    func startGuest(_ req: GenerateRequest, rewarded: Bool = false) {
+    func startGuest(_ req: GenerateRequest) {
         guard Self.aiConsentGiven else { pendingGuestAfterConsent = req; aiConsentSheet = true; return }
-        // 로그인 전 첫 1장도 "광고 보고 만들기"(충전 버튼 없이) — 끝까지 보면 만든다, 만든 뒤 전면광고 없음(오너 2026-10-12).
-        if !rewarded {
-            adFreePromptGuest = true
-            Task {
-                let ok = await withCheckedContinuation { c in adFreeContinuation = c; adFreePrompt = true }
-                adFreePromptGuest = false
-                if ok { startGuest(req, rewarded: true) }
-            }
-            return
-        }
+        // 로그인 전 첫 1장은 광고 없이 바로 만든다(오너 2026-11-09 — 설치 대비 첫 생성이 20% 남짓, 이 광고 수입은 하루 ₩300 안팎).
         var r = req
         r.count = 1
         if r.faceRef == nil, !r.concept.isArtTransform { r.faceRef = userPhoto.image }
@@ -391,7 +382,6 @@ final class AppState {
                 GuestDevice.used = true
                 guestFlow?.images = res.items.map(\.image)
                 HapticPlayer.success()
-                // 생성 뒤 전면광고 없음 — 만들기 전에 보상형을 봤다(2026-10-12).
             } catch let e as APIError {
                 AppLog.api.error("guest.failed status=\(e.status) msg=\(e.message, privacy: .public)")
                 if e.status == 403 {
@@ -496,12 +486,12 @@ final class AppState {
             tab = .myPhotos
         case .guestReceive(let image):
             await refreshQuota()
-            // 로그인 전 첫 1장 — 충전할 수 없으니 "광고 보고 저장"만(닫으면 저장 안 하고 받기 화면에 남는다).
-            guard await adGateBeforeSave(guest: true) else { return }
+            // 로그인 전 첫 1장 받기는 광고 없이 저장(오너 2026-11-09). 알림 권한은 여기서 한 번 묻는다.
             let ok = await CameraAlbum.save(image)
             showToast(ok ? Copy.savedToAlbum : Copy.noAlbumPermission)
             guestFlow = nil
             clearCart()
+            await push.askOnFirstGenerate()
         case .filterPick(let presetKey):
             // 사진을 **먼저** 고른다 — 웹의 "사진 선택" 빈 화면을 없애기 위해(오너 지적 2026-09-17).
             photoPickPreset = presetKey ?? "none"
