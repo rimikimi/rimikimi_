@@ -31,11 +31,13 @@ interface State {
   previewWind: number | null;
   effectsOn: boolean;
   reduced: boolean;
+  /** 액자 유리 빗물(셰이더) — 서버 public/flags.json wetGlass 로 켠다(기본 끔, 실기기 성능 확인 전). */
+  wetGlass: boolean;
 }
 
 let state: State = {
   weather: "clear", sunrise: null, sunset: null, wind: 0, windDir: 0,
-  preview: null, previewWind: null, effectsOn: true, reduced: false,
+  preview: null, previewWind: null, effectsOn: true, reduced: false, wetGlass: false,
 };
 const listeners = new Set<() => void>();
 function set(p: Partial<State>) {
@@ -67,6 +69,11 @@ export function bootAmbient() {
       set({ effectsOn: e == null ? true : e === "1", preview: WEATHERS.includes(p as Weather) ? (p as Weather) : null });
     } catch { /* 기본값 */ }
   })();
+  // 서버 스위치 — 빌드 없이 켜고 끈다(public/flags.json).
+  fetch(`${getEnv().apiBase}/flags.json`, { cache: "no-cache" })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((j: { wetGlass?: boolean } | null) => { if (j && typeof j.wetGlass === "boolean") set({ wetGlass: j.wetGlass }); })
+    .catch(() => undefined);
   AccessibilityInfo.isReduceMotionEnabled().then((r) => set({ reduced: r }), () => undefined);
   AccessibilityInfo.addEventListener("reduceMotionChanged", (r) => set({ reduced: r }));
   AppState.addEventListener("change", (s) => {

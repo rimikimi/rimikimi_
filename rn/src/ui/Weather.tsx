@@ -496,11 +496,10 @@ half4 main(float2 pos) {
 `);
 
 /**
- * 액자 유리 빗물 스위치. 2026-11-09 에뮬레이터(-gpu host) 측정: 비 + 유리 빗물 = 프레임 중간 29ms·90% 61ms·CPU 138%
- * (유리 빗물 없이 비만 = 16ms·30%). 에뮬레이터는 실기기 GPU 를 대표하지 못해 **실기기(갤럭시)에서 재고 판단**한다.
- * 버벅이면 false — 나머지(비·눈·번개·윗면 물·그림자)는 그대로 돈다.
+ * 액자 유리 빗물 — 서버 스위치(public/flags.json wetGlass, 기본 끔). 2026-11-09 에뮬레이터(-gpu host) 측정:
+ * 비 + 유리 빗물 = 프레임 중간 29ms·90% 61ms·CPU 138% (유리 빗물 없이 비만 = 16ms·30%). 에뮬레이터는 실기기 GPU 를
+ * 대표하지 못해 **실기기(갤럭시)에서 재고 켠다**. 꺼도 나머지(비·눈·번개·윗면 물·그림자)는 그대로 돈다.
  */
-export const WET_GLASS = true;
 
 /** 물 묻는 액자 — 4개 중 1개꼴, 이름으로 고정(스크롤해도 같은 액자가 젖어 있다). iOS FaceWaterModifier.isWet 과 같은 FNV. */
 export function isWetTile(id: string): boolean {
@@ -523,7 +522,7 @@ export function setShaderDown() {
 export function WetCover({ id, uri, width, height }: { id: string; uri?: string; width: number; height: number }) {
   const a = useAmbient();
   const w = visual(a);
-  const rainy = WET_GLASS && (w === "rain" || w === "storm") && isWetTile(id) && !a.reduced;
+  const rainy = a.wetGlass && (w === "rain" || w === "storm") && isWetTile(id) && !a.reduced;
   const img = useImage(rainy && uri ? uri : null);
   const lvl = useSharedValue(0);
   useEffect(() => { lvl.value = withTiming(rainy ? 1 : 0, { duration: 2000, easing: Easing.inOut(Easing.ease) }); }, [rainy, lvl]);
