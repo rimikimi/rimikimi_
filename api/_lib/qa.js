@@ -189,7 +189,14 @@ An apparent age difference of about 10 years or more counts AGAINST being the sa
 If image 1 shows no clearly visible human face (food, objects, scenery, a person seen only from behind), there is nothing to compare: return identity_score 100 and "no_face": true.
 Give identity_score from 0 to 100: 90-100 = certainly the same person, 70-89 = probably the same, 40-69 = unsure / could be a lookalike, 0-39 = a different person.
 Reply with JSON only: {"identity_score": 0-100, "no_face": true|false, "ethnicity_changed": true|false, "age_gap_years": number, "reason": "short"}`;
-async function strictFaceMatch(ref, out, apiKey, timeoutMs) {
+// 커플(두 사람) 결과용 — 결과에 두 명이 있으니 '그중 이 사람에 해당하는 쪽'을 찾아 같은 기준으로 채점한다.
+// 2026-11-11 신고 gallery:2389(730 비 오는 날 카페 "남자얼굴이 전혀 다른 사람"): 커플은 예전 느슨한 검사
+// (Flash 2표, 둘 다 '다름'일 때만 탈락)만 거쳐 다른 남자가 통과했다. 이제 두 사람을 각각 엄격 채점한다.
+const FACE_MATCH_PAIR_PROMPT = FACE_MATCH_PROMPT.replace(
+  "Image 2 is an AI-generated portrait that must show the SAME individual.",
+  "Image 2 is an AI-generated photo of TWO people; one of them must be the SAME individual as image 1. " +
+  "First pick the person in image 2 who is meant to be the person in image 1 (same gender presentation; if both are the same gender, the closer resemblance), then judge ONLY that person against image 1.");
+async function strictFaceMatch(ref, out, apiKey, timeoutMs, prompt = FACE_MATCH_PROMPT) {
   for (let attempt = 0; attempt < 2; attempt++) {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), timeoutMs);
@@ -201,7 +208,7 @@ async function strictFaceMatch(ref, out, apiKey, timeoutMs) {
           contents: [{ role: "user", parts: [
             { inline_data: { mime_type: ref.mime, data: ref.data } },
             { inline_data: { mime_type: out.mime, data: out.data } },
-            { text: FACE_MATCH_PROMPT },
+            { text: prompt },
           ] }],
           generationConfig: { responseMimeType: "application/json", temperature: 0, thinkingConfig: { thinkingLevel: "low" } },
         }),
@@ -232,6 +239,18 @@ export async function checkIdentity({ refBase64, refMime, base64, mimeType, apiK
   if (!art && !pair && panels <= 1) {
     const strict = await strictFaceMatch(ref, out, apiKey, Math.max(timeoutMs, 25000));
     if (strict) return strict;
+  }
+  // 커플: 두 사람을 각각 엄격 채점 — 한 명이라도 70 미만이면 탈락. 하나라도 채점 실패면 아래 예전 방식으로.
+  if (!art && pair && panels <= 1) {
+    const tm = Math.max(timeoutMs, 25000);
+    const [a, b] = await Promise.all([
+      strictFaceMatch(ref, out, apiKey, tm, FACE_MATCH_PAIR_PROMPT),
+      strictFaceMatch(ref2, out, apiKey, tm, FACE_MATCH_PAIR_PROMPT),
+    ]);
+    if (a && b) {
+      const bad = !a.ok ? a : !b.ok ? b : null;
+      return { ok: !bad, score: Math.min(a.score, b.score), issue: bad ? `${bad === a ? "1번" : "2번"} 사람: ${bad.issue}` : "" };
+    }
   }
   const once = async () => {
     const ctrl = new AbortController();
