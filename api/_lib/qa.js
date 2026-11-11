@@ -180,7 +180,7 @@ function identityPrompt({ art = false, panels = 1, pair = false } = {}) {
   );
 }
 const FACE_MATCH_MODEL = "gemini-3.1-pro-preview";
-const FACE_MATCH_MIN = 70;
+const FACE_MATCH_MIN = 80; // 오너 11/12 "80점 이상"(mimo 세션 경유)
 const FACE_MATCH_PROMPT = `Image 1 is the customer's own photo. Image 2 is an AI-generated portrait that must show the SAME individual.
 You are a strict face-identity examiner. Look past styling and judge the underlying face structure, like comparing two passport photos.
 Compare, one by one: (1) eye shape, eyelid type and eye spacing, (2) nose bridge, nose width and tip shape, (3) lip shape and philtrum, (4) face outline: jaw width, chin shape and length, cheekbones, (5) brow shape and position, (6) overall proportions (eye-nose-mouth distances), (7) apparent age.
