@@ -1849,7 +1849,16 @@ async function handleGenerate(req, res, hold) {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   // 카테고리 라우팅 — 매직 부스 등은 2.1 이 1순위(AI Studio 로만 부른다. Vertex 엔 이 모델이 없을 수 있다).
-  const useNb21 = conceptId != null && NB21_IDS.has(String(conceptId));
+  // 2.1 vs Pro 실사용자 랜덤 A/B(오너 2026-11-12 "2.1로 바꾸자… 실제 사용자들한테 랜덤으로").
+  //   일반 1인 컨셉 한 장 생성만 반반으로 나눈다. 따로 다듬은 경로(스튜디오·웨딩·드레스룸·복원·증명·네컷·
+  //   커플·그림체·픽셀)와 묶음 생성은 Pro 그대로. 비율은 Vercel 환경변수 AB_NB21_SHARE(0~1, 기본 0.5).
+  //   결과는 gen_ab 테이블(갤러리 id·컨셉·배정·첫 검사·재생성 여부) — 신고·재생성률을 두 쪽으로 비교한다.
+  const abEligible = conceptId != null && !NB21_IDS.has(String(conceptId)) && !isStudio && !isWedding &&
+    !isDressroom && !isRestore && !isIdPhoto && !isFourcut && !hasSecond && !skipFacePrecheck && !isSprite;
+  const abShare = Math.min(1, Math.max(0, Number(process.env.AB_NB21_SHARE ?? 0.5) || 0));
+  const abArm = abEligible ? (Math.random() < abShare ? "nb21" : "pro") : null;
+  let abFirstModel = null, abFirstQa = null, abRegen = false;
+  const useNb21 = (conceptId != null && NB21_IDS.has(String(conceptId))) || abArm === "nb21";
   const PRO_MODEL = "gemini-3-pro-image";
   const BASE_MODEL = "gemini-3.1-flash-image";
   // 최후 폴백 — 검증된 구세대 모델.
@@ -2128,10 +2137,11 @@ async function handleGenerate(req, res, hold) {
     });
   }
 
+  let nb21Failed = false;
   if (useProEngine && useNb21) {
     result = await callGemini(NB21_MODEL, true, budget(70000));
     if (!isBusyFailure(result)) console.log(`[generate] 2.1 성공 concept=${conceptId}`);
-    else console.error("[generate] 2.1 실패 → Pro 로:", result.networkError?.message || `HTTP ${result.upstream?.status}`);
+    else { nb21Failed = true; console.error("[generate] 2.1 실패 → Pro 로:", result.networkError?.message || `HTTP ${result.upstream?.status}`); }
   }
   if (useProEngine && (!useNb21 || isBusyFailure(result))) {
     // 1) Vertex 로 나노바나나 프로 (1순위).
@@ -2163,6 +2173,8 @@ async function handleGenerate(req, res, hold) {
   } else if (!useProEngine) {
     result = await baseThenLegacy(24000);
   }
+  // A/B: 실제로 첫 장을 만든 모델(2.1 이 실패해 Pro 로 넘어간 경우를 구분하려고)
+  abFirstModel = busyFallback || !useProEngine ? "base" : useNb21 && !nb21Failed ? "nb21" : "pro";
 
   // 생성 불량 검사 → 불량이면 같은 경로로 **한 번만** 다시 뽑는다(묶음 경로의 oneShot 과 같은 규칙).
   // 판단 불가·타임아웃·시간 부족이면 그대로 내보낸다 — 검사가 생성을 막으면 안 된다.
@@ -2185,6 +2197,7 @@ async function handleGenerate(req, res, hold) {
       : scn.ok === false ? { ok: false, issue: `장면: ${scn.issue}` } : qa0;
     console.log(`[qa] ${qa0.ok === false ? "불량" : qa0.ok ? "통과" : "판단불가"} concept=${conceptId}${qa0.issue ? ` "${qa0.issue}"` : ""}` +
       ` identity=${idt.ok === false ? "다른사람" : idt.ok ? "같음" : "-"} scene=${scn.ok === false ? "불량" : scn.ok ? "통과" : "-"}`);
+    abFirstQa = qa.ok === false ? String(qa.issue || "불량").slice(0, 200) : qa0.ok ? "ok" : "unknown";
     if (qa.ok === false) {
       console.log(`[generate] 불량 → 재생성 concept=${conceptId} qa="${qa.issue}"`);
       let again = null;
@@ -2197,7 +2210,7 @@ async function handleGenerate(req, res, hold) {
       } else {
         again = await baseThenLegacy(Math.max(6000, left() - 3000));
       }
-      if (again && !isBusyFailure(again) && again.upstream?.ok) result = again;
+      if (again && !isBusyFailure(again) && again.upstream?.ok) { result = again; abRegen = true; }
     }
   }
 
@@ -2332,6 +2345,14 @@ async function handleGenerate(req, res, hold) {
     }
   } catch (e) {
     console.error("[gallery save throw]", e?.message || e);
+  }
+  // A/B 기록 — 실패해도 응답에는 영향 없음
+  if (abArm) {
+    console.log(`[ab] arm=${abArm} first=${abFirstModel} qa=${abFirstQa ?? "-"} regen=${abRegen} concept=${conceptId} gallery=${galleryId}`);
+    admin.from("gen_ab").insert({
+      gallery_id: galleryId, user_id: user.id, concept_id: Number(conceptId) || null, arm: abArm,
+      first_model: abFirstModel, first_qa: abFirstQa, regenerated: abRegen,
+    }).then(({ error }) => { if (error) console.error("[gen_ab]", error.message); }, () => {});
   }
 
   // 무료 유저가 아직 무료 Pro 체험을 쓸 수 있는지 (결과화면 CTA 노출용).
