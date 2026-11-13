@@ -139,7 +139,7 @@ enum LiveFilter {
         "glitch": .init(special: .glitch),
         "vhs": .init(fx: .init(grain: 0.35), special: .vhs),
         // 폴더폰 · Y2K · 하두리(옛 웹캠) — 오너 2026-10-26. filters.js 와 같은 값.
-        "folder": .init(temp: -10, tint: 6, ex: 0.18, con: 0.22, fade: 24, sat: -0.35, vib: -0.05, sh: [-6, 4, 10], hi: [-2, 2, 8], fx: .init(grain: 0.55, vignette: 0.55)),
+        "folder": .init(temp: -26, tint: -8, ex: 0.24, con: 0.32, fade: 18, sat: -0.28, sh: [-6, 4, 10], hi: [-6, 2, 8], fx: .init(grain: 0.55, vignette: 0.5)),
         "y2k": .init(temp: -14, tint: 2, ex: 0.2, con: 0.45, sat: 0.3, vib: 0.1, sh: [-10, 0, 20], hi: [8, 0, 8], hsl: [.init(c: 225, w: 60, h: 0, s: 0.3, l: 0), .init(c: 180, w: 40, h: 0, s: 0.2, l: 0)], fx: .init(grain: 0.3, vignette: 1.0, glow: 0.8)),
         "haduri": .init(temp: 12, tint: 8, ex: 0.18, con: -0.1, fade: 26, whitePull: 20, sat: -0.2, sh: [6, 6, -4], hi: [8, 6, -10], fx: .init(grain: 0.45, glow: 0.6)),
         // 효과 5종(오너 2026-10-27 "효과 10개") — filters.js 와 같은 값.

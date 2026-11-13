@@ -145,8 +145,9 @@ export const FILM_PRESETS: Preset[] = [
     // 흐림·픽셀 효과 없음(웹 filters.js 2026-10-09)
     fx: { grain: 0.55, vignette: 0.45 } },
   { key: "folder",  ko: "폴더폰",  en: "Flip Phone", group: "phone", // 웹 filters.js 와 같은 색 값(저해상도·블록은 편집기 웹에서)
-    temp: -10, tint: 6, ex: 0.18, con: 0.22, fade: 24, whitePull: 0,  sat: -0.35, vib: -0.05, sh: [-6, 4, 10], hi: [-2, 2, 8],
-    fx: { grain: 0.55, vignette: 0.55 } },
+    // 11/13 오너 "피처폰 감성" — 청록·초록 캐스트로 다시(이전 tint:+6 은 오히려 마젠타였다, 실측). 저화질은 안 함(오너).
+    temp: -26, tint: -8, ex: 0.24, con: 0.32, fade: 18, whitePull: 0, sat: -0.28, vib: 0, sh: [-6, 4, 10], hi: [-6, 2, 8],
+    fx: { grain: 0.55, vignette: 0.5 } },
 
   /* ── 재미 (SNOW류 — 특수 렌더 모드, special 필드가 전용 코드 경로를 탄다) ── */
   // 인플 — 얼굴 피부 보정(뷰티). 색 LUT 대신 beautyRGBA(웹 filters.js)를 탄다. 강도 = 색감 슬라이더(0 = 원본).

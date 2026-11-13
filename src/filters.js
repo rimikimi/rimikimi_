@@ -130,9 +130,10 @@ export const FILM_PRESETS = [
     fx: { grain: 0.55, vignette: 0.45 } },
 
   { key: "folder",  ko: "폴더폰",  en: "Flip Phone", group: "phone", // 2004 — 30만 화소 폴더폰: 뭉개짐·블록·뿌연 저채도·청록 캐스트·노이즈·하이라이트 날림(오너 2026-10-26)
-    temp: -10, tint: 6, ex: 0.18, con: 0.22, fade: 24, whitePull: 0,  sat: -0.35, vib: -0.05, sh: [-6, 4, 10], hi: [-2, 2, 8],
+    // 11/13 오너 "피처폰 감성" — 청록·초록 캐스트로 다시(이전 tint:+6 은 오히려 마젠타였다, 실측). 저화질은 안 함(오너).
+    temp: -26, tint: -8, ex: 0.24, con: 0.32, fade: 18, whitePull: 0, sat: -0.28, vib: 0, sh: [-6, 4, 10], hi: [-6, 2, 8],
     // 해상도는 건드리지 않는다(오너 10/27 "해상도까지 조져버리지는 말아라") — 3GS 와 같은 원칙: 색감·노이즈·비네팅만.
-    fx: { grain: 0.55, vignette: 0.55 } },
+    fx: { grain: 0.55, vignette: 0.5 } },
 
   /* ── 재미 (SNOW류 — 특수 렌더 모드, special 필드가 전용 코드 경로를 탄다) ── */
   // 인플 — 얼굴 피부 보정(뷰티). 색 LUT 대신 beautyRGBA 를 탄다. 강도 = 색감 슬라이더(0 = 원본).
