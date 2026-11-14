@@ -5196,15 +5196,12 @@
   "id": 958,
   "title": "크리스마스 마켓",
   "title_en": "Christmas Market",
-  "category": "일상(겨울)",
+  "category": "🎄 크리스마스",
   "categories": [
-   "일상(겨울)"
+   "🎄 크리스마스"
   ],
   "sensitive": false,
   "text": "Implement 100% ultra photorealism.\nEnsure to keep and maintain the same facial structure, natural dark brown (#463021) hair, soft makeup from the reference photo.\nThe photos must be in 8k resolution(9:16)with ultra high definition, her face must have 100% fidelity to the provided reference photo.\n상반신 medium shot.\n사진 배경은 저녁 10시. 매우 어두운 야외.\n눈이 내리는 날씨에 배경은 아이스링크와 크리스마스마켓. 흐릿하게 화려안 크리스마스 장식이 보인다.\n의상은 하얀 롱패딩을 입고 있고 하얀색 털이 복실복실고 빨간 리본으로 장식된 cloche hat을 착용하고 있다.\n볼에 약간의 홍조와 환하게 웃고 있는 표정.",
-  "purposes": [
-   "snap"
-  ],
   "publishAt": "2026-10-15T08:00:00Z"
  },
  {
