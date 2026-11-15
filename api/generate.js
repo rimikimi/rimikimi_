@@ -419,6 +419,16 @@ const BODY_FINAL_ART =
 // 일부러 머리를 크게 그리는 컨셉 — 1.5등신 피규어.
 const BIG_HEAD_OK_IDS = new Set(["1127"]);
 
+// 자세·표정은 컨셉 글이 정한다 — 사진은 "누구인지"만(2026-11-15 오너: 샘플은 다 다른데 실제 생성은 비슷).
+const POSE_FROM_CONCEPT =
+  "POSE AND EXPRESSION COME ONLY FROM THE CONCEPT TEXT, never from the photo: the provided photo(s) are used " +
+  "ONLY to know who the person is. Ignore the head angle, gaze, facial expression, smile, mouth, hand position, " +
+  "body angle, framing and background of the photo, and render exactly the pose, head turn, gaze direction, " +
+  "expression and framing the concept describes — for example, if the concept says laughing with teeth showing, " +
+  "looking back over the shoulder, eyes lowered or chin toward one shoulder, do exactly that even if the photo is " +
+  "a neutral front-facing face. Wherever the concept says to keep the face exactly as in the reference photo, that " +
+  "means the identity only (facial features, face shape, skin, hair colour), never the expression, head angle or pose. ";
+
 // 사실적 의상 렌더링 공통 문구 (플라스틱/붙인 듯한 느낌 방지) — 의상이 관여하는 모드에만 적용.
 const REALISTIC_GARMENT =
   "The clothing must look like REAL, photographed garments with a bespoke, made-to-measure " +
@@ -1568,7 +1578,7 @@ async function handleGenerate(req, res, hold) {
       "containing BOTH of them together. The FIRST reference image is the first person and the " +
       "SECOND reference image is the second person — keep each person's own face, identity and " +
       "facial features clearly recognizable, and never merge, swap or blend the two faces. " +
-      "Exactly two people in frame. Apply the following concept:\n" + prompt
+      "Exactly two people in frame. " + POSE_FROM_CONCEPT + "Apply the following concept:\n" + prompt
     : "Using the person in the provided photo, generate a new portrait. " +
       "Keep the same face, identity, and facial features clearly recognizable. " +
       // 2026-10-18 신고 #1848(339 바람결 셀피 "남녀가 바뀜"): 컨셉 글 상당수가 "a young woman"
@@ -1580,6 +1590,10 @@ async function handleGenerate(req, res, hold) {
       "gendered details — clothing, hairstyle and hair length, makeup, jewellery, pronouns — into " +
       "the natural equivalent for this person, while keeping the scene, pose, framing, mood, " +
       "colours and lighting of the concept. Never change the person's sex. " +
+      // 2026-11-15 오너 "업로드된 샘플은 자세·표정이 다 다른데 실제로 만들면 비슷하게 나옴": 모델이 사용자 사진
+      // (대개 정면·무표정 셀카, 얼굴 등록이면 정면 무표정 앵커)의 고개 각도·표정·구도를 그대로 따라갔다.
+      // 컨셉 글의 "Keep the face exactly as in the reference photo" 도 표정까지 고정하라는 뜻으로 읽혔다.
+      POSE_FROM_CONCEPT +
       "Apply the following concept:\n" + prompt;
 
   // ── 페이스 프로필: 얼굴 참조 절 (face-profile-v1.md §3) ──
@@ -1612,10 +1626,10 @@ async function handleGenerate(req, res, hold) {
           ? `\n\nThe final ${faceRefList.length} reference images are ` +
             `the SAME person's face from multiple angles — reproduce this person's facial identity exactly. ` +
             `They are provided only to fix the face; they never change the composition, framing, pose, ` +
-            `clothing or background decided above.`
+            `expression, head angle, clothing or background decided above.`
           : `\n\nThe final reference image shows this person's face — reproduce this person's ` +
             `facial identity exactly. It is provided only to fix the face; it never changes the ` +
-            `composition, framing, pose, clothing or background decided above.`)
+            `composition, framing, pose, expression, head angle, clothing or background decided above.`)
       : "";
 
   // 비보관 증명용 로그 (face-profile-v1.md §2-3: "서버 코드로 비보관을 보장하고 로그로 증명").
@@ -1645,7 +1659,10 @@ async function handleGenerate(req, res, hold) {
             `\n\nHEAD ANGLE: the head is turned about ${deg} degrees to the ${dir} — a subtle, ` +
             `natural turn. The face must NOT be perfectly frontal and NOT perfectly symmetrical: ` +
             `the nose sits slightly off the vertical center line and one ear is a touch more ` +
-            `visible than the other. Keep the gaze toward the camera; only the head angle changes.`
+            `visible than the other. Keep the gaze toward the camera; only the head angle changes. ` +
+            // 2026-11-15: 컨셉이 고개·시선을 정해 둔 경우(뒤돌아보기·시선 아래·턱을 어깨 쪽) 이 규칙이 그걸 덮어 다 정면이 됐다.
+            `If the concept above already describes a head turn, tilt, looking back, looking down or away, ` +
+            `follow the concept instead of this rule.`
           );
         })()
       : "";
