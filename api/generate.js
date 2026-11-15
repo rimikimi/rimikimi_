@@ -459,6 +459,15 @@ const TEMPLATE_INSTRUCTION =
   "and a turtleneck that fits a man's shoulders and chest, no makeup). Keep their real age — do not make them younger or " +
   "older. Natural skin texture, realistic adult proportions, no extra people, no text.";
 
+// 템플릿 컨셉 피부·원단 결(2026-11-15 오너 "피부결이랑 원단결이 AI 같은 게 더 문제"): 2K 같은 조건 비교에서
+// 이 문구가 있어야 모공·잔털·니트 코가 살았다(없으면 매끈한 도자기 피부). 맨 끝에 둔다.
+const TEMPLATE_TEXTURE =
+  "\n\nSKIN TEXTURE (final rule): the face must have real photographic skin at full 2K detail — visible fine pores on the " +
+  "nose, cheeks and forehead, faint natural micro-texture and tiny unevenness in tone, fine vellus hairs along the cheek and " +
+  "jaw catching the light, natural lip lines; only temporary blemishes (acne, spots) are removed. The skin must NOT look " +
+  "smoothed, airbrushed, porcelain, waxy, glossy-plastic or painted, and the template's smooth skin must not be copied — " +
+  "render this person's real skin. The knit must show individual stitches and slight fuzz.";
+
 // 자세·표정은 컨셉 글이 정한다 — 사진은 "누구인지"만(2026-11-15 오너: 샘플은 다 다른데 실제 생성은 비슷).
 const POSE_FROM_CONCEPT =
   "POSE AND EXPRESSION COME ONLY FROM THE CONCEPT TEXT, never from the photo: the provided photo(s) are used " +
@@ -1768,7 +1777,7 @@ async function handleGenerate(req, res, hold) {
   // 브루클린 지시문은 사진 사실감·얼굴 참조 절까지 자체로 완결돼 있다 — 리미키미 포장을 씌우지 않는다.
   const instructionBase = templateImg
     // 사실감 블록(PHOTOREALISM·REALISTIC_GARMENT·SKIN_FINAL)을 함께 — 빠져 있어 피부·니트가 AI 같았다(오너 11/15).
-    ? PHOTOREALISM + "\n\n" + TEMPLATE_INSTRUCTION + "\n\n" + REALISTIC_GARMENT + SKIN_FINAL + faceClause
+    ? PHOTOREALISM + "\n\n" + TEMPLATE_INSTRUCTION + "\n\n" + REALISTIC_GARMENT + SKIN_FINAL + TEMPLATE_TEXTURE + faceClause
     : isStudio
     ? st.instruction
     : isWedding
