@@ -436,7 +436,7 @@ enum Copy {
     static var notEnoughCredits: String { L.t("크레딧이 부족해요", "Not enough credits") }
     static var continueAfterTopUp: String { L.t("충전하면 하던 작업이 바로 이어져요.", "Top up and we'll pick up right where you left off.") }
     static var oneCreditOneImage: String { L.t("크레딧 1장으로 이미지 한 장을 만들 수 있어요.", "1 credit = 1 image.") }
-    static var inviteForFree: String { L.t("친구 초대로 무료 3장", "Invite friends · 3 free credits") }
+    static var inviteForFree: String { L.t("친구 초대로 무료 5장", "Invite friends · 5 free credits") }
     static var packIntro: String { L.t("인트로", "Intro") }
     static var packSingle: String { L.t("1장", "Single") }
     static var packMini: String { L.t("미니", "Mini") }
@@ -513,9 +513,9 @@ enum Copy {
 
     // MARK: 친구 초대
 
-    static var inviteHeadline: String { L.t("🎟 친구 초대하면 크레딧 3개", "🎟 Invite & earn 3 credits") }
-    static func inviteDesc(_ invited: Int) -> String { L.ko ? "친구 1명 초대할 때마다 크레딧 3개! (현재 \(invited)명 초대)" : "Get 3 credits for every friend you invite! (\(invited) invited so far)" }
-    static var inviteDescShort: String { L.t("친구 1명 초대할 때마다 크레딧 3개!", "3 credits per friend invited!") }
+    static var inviteHeadline: String { L.t("🎟 친구 초대하면 크레딧 5개", "🎟 Invite & earn 5 credits") }
+    static func inviteDesc(_ invited: Int) -> String { L.ko ? "친구 1명 초대할 때마다 크레딧 5개! (현재 \(invited)명 초대)" : "Get 5 credits for every friend you invite! (\(invited) invited so far)" }
+    static var inviteDescShort: String { L.t("친구 1명 초대할 때마다 크레딧 5개!", "5 credits per friend invited!") }
     static var inviteMyCode: String { L.t("내 초대 코드", "Your invite code") }
     static var inviteCodeCopied: String { L.t("초대 코드를 복사했어요", "Invite code copied") }
     static var inviteTapToCopy: String { L.t("탭해서 복사", "Tap to copy") }
@@ -524,13 +524,13 @@ enum Copy {
     static var inviteCodePlaceholder: String { L.t("6자 코드", "6-character code") }
     static var inviteApply: String { L.t("등록", "Apply") }
     static var inviteCodeHelp: String { L.t("설치 경로에서 링크가 끊겼을 때 친구의 코드를 직접 넣어요.", "If the invite link didn't carry over when you installed, enter your friend's code here.") }
-    static var inviteOk: String { L.t("초대가 등록됐어요! 친구에게 크레딧 3개가 쌓였어요 🎉", "Invite registered — your friend got 3 credits 🎉") }
+    static var inviteOk: String { L.t("초대가 등록됐어요! 친구에게 크레딧 5개가 쌓였어요 🎉", "Invite registered — your friend got 5 credits 🎉") }
     static var inviteErrInvalid: String { L.t("코드를 다시 확인해 주세요", "Please check the code") }
     static var inviteErrNotFound: String { L.t("없는 코드예요", "That code doesn't exist") }
     static var inviteErrSelf: String { L.t("내 코드는 등록할 수 없어요", "You can't use your own code") }
     static var inviteErrAlready: String { L.t("이미 초대 코드를 등록했어요", "You've already used an invite code") }
     static var inviteAskTitle: String { L.t("친구 초대로 오셨나요?", "Invited by a friend?") }
-    static var inviteAskDesc: String { L.t("친구의 초대 코드를 넣으면 친구에게 크레딧 3장이 선물돼요.", "Enter your friend's invite code and they'll get 3 credits.") }
+    static var inviteAskDesc: String { L.t("친구의 초대 코드를 넣으면 친구에게 크레딧 5장이 선물돼요.", "Enter your friend's invite code and they'll get 5 credits.") }
     static var invitePaste: String { L.t("붙여넣기", "Paste") }
     static var inviteNoCode: String { L.t("코드 없어요", "No code") }
     static var inviteErrRetry: String { L.t("잠시 후 다시 시도해 주세요", "Please try again in a moment") }

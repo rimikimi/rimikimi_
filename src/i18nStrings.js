@@ -182,12 +182,12 @@ export const STR = {
 
     // === 친구 초대 ===
     "invite.adminTitle": "🎁 친구에게 공유하기",
-    "invite.testerTitle": "🎟 친구 초대하면 크레딧 3개",
+    "invite.testerTitle": "🎟 친구 초대하면 크레딧 5개",
     "invite.adminDesc": "친구에게 rimikimi를 공유해 보세요!",
     "invite.testerDesc":
-      "친구 1명 초대할 때마다 크레딧 3개! (현재 {now}명 초대)",
+      "친구 1명 초대할 때마다 크레딧 5개! (현재 {now}명 초대)",
     "invite.testerDescWithCredits":
-      "보유 크레딧 {credits}개 · 친구 1명 초대할 때마다 크레딧 3개! (현재 {now}명 초대)",
+      "보유 크레딧 {credits}개 · 친구 1명 초대할 때마다 크레딧 5개! (현재 {now}명 초대)",
     "invite.btn": "공유하기",
     "invite.shareTitle": "rimikimi",
     "invite.shareText": "내 얼굴로 인생 프로필 만들기 ✨ rimikimi 같이 해요! 이 링크로 시작하면 저도 크레딧을 받아요 🙌",
@@ -199,7 +199,7 @@ export const STR = {
     "invite.codeCopied": "초대 코드를 복사했어요",
     "invite.enterCode": "친구 초대 코드 입력",
     "invite.codeApply": "등록",
-    "invite.codeOk": "초대가 등록됐어요! 친구에게 크레딧 3개가 쌓였어요 🎉",
+    "invite.codeOk": "초대가 등록됐어요! 친구에게 크레딧 5개가 쌓였어요 🎉",
     "invite.codeFail.invalid_code": "코드를 다시 확인해 주세요",
     "invite.codeFail.code_not_found": "없는 코드예요",
     "invite.codeFail.invalid_ref": "코드를 다시 확인해 주세요",
@@ -615,12 +615,12 @@ export const STR = {
     "profile.provider.email": "Email",
 
     "invite.adminTitle": "🎁 Share with friends",
-    "invite.testerTitle": "🎟 Invite a friend, get 3 credits",
+    "invite.testerTitle": "🎟 Invite a friend, get 5 credits",
     "invite.adminDesc": "Share rimikimi with your friends!",
     "invite.testerDesc":
-      "Get 3 credits for every friend you invite! ({now} invited so far)",
+      "Get 5 credits for every friend you invite! ({now} invited so far)",
     "invite.testerDescWithCredits":
-      "{credits} credits in hand · Get 3 credits for every friend you invite! ({now} invited so far)",
+      "{credits} credits in hand · Get 5 credits for every friend you invite! ({now} invited so far)",
     "invite.btn": "Share",
     "invite.shareTitle": "rimikimi",
     "invite.shareText": "Turn your face into a dream portrait ✨ Try rimikimi with me!",
@@ -631,7 +631,7 @@ export const STR = {
     "invite.codeCopied": "Invite code copied",
     "invite.enterCode": "Enter a friend's code",
     "invite.codeApply": "Apply",
-    "invite.codeOk": "Invite registered — your friend got 3 credits 🎉",
+    "invite.codeOk": "Invite registered — your friend got 5 credits 🎉",
     "invite.codeFail.invalid_code": "Please check the code",
     "invite.codeFail.code_not_found": "That code doesn't exist",
     "invite.codeFail.invalid_ref": "Please check the code",
