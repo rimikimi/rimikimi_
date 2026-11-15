@@ -117,6 +117,28 @@ async function paintPixelate(base64, mime) {
   }
 }
 
+// 빛번짐 — 컨셉 postFx:"dreamy"(2026-11-15 오너 "빛번짐은 한 번씩 자동으로 당연히 들어가는 거"). 앱 필터 '빛번짐'과 같은
+// 코드(src/filters.js dreamyRGBA)를 세기 0.2 로 한 번 입힌다. 템플릿은 빛번짐 없는 원본(public/templates)이라 두 번 겹치지 않는다.
+// 실패하면 원본 그대로.
+async function applyDreamy(base64, mime, strength = 0.2) {
+  try {
+    const sharp = (await import("sharp")).default;
+    const { applyLookWithStrength, presetByKey, findFacesSkin } = await import("../src/filters.js");
+    const { data, info } = await sharp(Buffer.from(base64, "base64")).rotate().removeAlpha().ensureAlpha().raw()
+      .toBuffer({ resolveWithObject: true });
+    const px = new Uint8ClampedArray(data.buffer, data.byteOffset, data.length);
+    let faces = [];
+    try { faces = findFacesSkin(px, info.width, info.height); } catch { faces = []; }
+    applyLookWithStrength(px, info.width, info.height, presetByKey("bloom"), { faces, seed: 1 }, strength);
+    const out = await sharp(Buffer.from(px.buffer, px.byteOffset, px.length), { raw: { width: info.width, height: info.height, channels: 4 } })
+      .png().toBuffer();
+    return { base64: out.toString("base64"), mime: "image/png" };
+  } catch (e) {
+    console.error("[applyDreamy failed, using original]", e?.message || e);
+    return { base64, mime };
+  }
+}
+
 // ── 워터마크 ────────────────────────────────────────────────────────────────
 // 결제(크레딧)로 만든 이미지에만 워터마크가 없다. 무료 하루 1장도, 무제한 계정도
 // 크레딧을 쓰지 않으므로 붙는다.
@@ -2128,6 +2150,7 @@ async function handleGenerate(req, res, hold) {
       let rawMime = o.mime;
       let rawOut = o.data;
       if (postFx === "mspaint") { const px = await paintPixelate(rawOut, rawMime); rawOut = px.base64; rawMime = px.mime; }
+      if (postFx === "dreamy") { const dr = await applyDreamy(rawOut, rawMime); rawOut = dr.base64; rawMime = dr.mime; }
       // 결제로 만든 것만 깨끗하다 — 원본에 찍어야 갤러리 다운로드로 우회되지 않는다
       const fin = await finishOutput(rawOut, rawMime, !useCredit);
       rawOut = fin.raw.base64; rawMime = fin.raw.mime;
@@ -2363,6 +2386,7 @@ async function handleGenerate(req, res, hold) {
   }
 
   if (postFx === "mspaint") { const px = await paintPixelate(rawData, rawMime); rawData = px.base64; rawMime = px.mime; }
+  if (postFx === "dreamy") { const dr = await applyDreamy(rawData, rawMime); rawData = dr.base64; rawMime = dr.mime; }
 
   // 6.4) 워터마크 — 결제(크레딧)로 만든 것만 깨끗하다.
   //      축소 전 원본에 찍어야 아래 갤러리 저장분에도 함께 들어간다.
