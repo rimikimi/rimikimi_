@@ -37,6 +37,8 @@ export interface Concept {
   //    컨셉 모양을 빌린다(iOS `Concept(syntheticID:)`). 서버엔 conceptId 대신 studio / wedding 으로 보낸다.
   /** 합성 항목의 썸네일(절대 URL). 있으면 /thumbs/{id}.webp 대신 이걸 쓴다. */
   thumb?: string;
+  /** 샘플 이미지 버전(서버 imgV) — 주소 뒤 ?v= 로 붙여 디스크 캐시를 우회한다(2026-11-15). */
+  imgV?: string;
   studioPurpose?: string;
   studioPreset?: string;
   dressCode?: string;
@@ -151,9 +153,9 @@ export function isBatchable(c: Concept): boolean {
   return !isCoupleConcept(c) && !isDressroom(c) && !isFourcut(c) && !isArtOnly(c) && !isRetouch(c);
 }
 /** 화면용 썸네일 — 합성 항목은 카탈로그 썸네일, 나머지는 /thumbs/{id}.webp. */
-export function conceptThumb(c: Concept): string { return c.thumb || thumbUrl(c.id); }
+export function conceptThumb(c: Concept): string { return c.thumb || thumbUrl(c.id) + (c.imgV ? `?v=${encodeURIComponent(c.imgV)}` : ""); }
 /** 크게 보이는 자리(1200px). 없으면 RemoteImage 쪽에서 썸네일로 물러선다. */
-export function conceptLarge(c: Concept): string { return c.thumb || `${getEnv().apiBase}/large/${c.id}.webp`; }
+export function conceptLarge(c: Concept): string { return c.thumb || `${getEnv().apiBase}/large/${c.id}.webp` + (c.imgV ? `?v=${encodeURIComponent(c.imgV)}` : ""); }
 /** 증명사진은 목록에서 뺀다(iOS `ConceptStore.pool`, 웹과 동일). */
 // 홈 위 카드·칸으로 바로 여는 기능(말로 고치기·옛날 사진 복원·드레스룸)은 앨범·목록에서 뺀다(iOS isHomeShortcut, 오너 2026-10-11)
 export function isHomeShortcut(c: Concept): boolean { return isRetouch(c) || isRestoreConcept(c) || isDressroom(c); }

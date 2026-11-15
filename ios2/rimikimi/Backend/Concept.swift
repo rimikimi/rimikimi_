@@ -21,6 +21,9 @@ struct Concept: Identifiable, Hashable, Decodable {
     /// 홈 추천을 지금 날씨·시간에 맞춰 올리는 데 쓴다(2026-10-22).
     struct Mood: Decodable, Hashable { let tod: String; let wx: String }
     let mood: Mood?
+    /// 샘플 이미지 버전(서버 concepts.json imgV, 2026-11-15) — 바뀌면 주소 뒤 ?v= 가 달라져 앱 디스크 캐시를 우회한다.
+    /// (ImageLoader 는 returnCacheDataElseLoad 라 같은 주소면 서버를 다시 묻지 않는다.)
+    var imgV: String? = nil
     /// 2026-10-09 이식: 리미키미 컨셉이 아닌 담기 항목(브루클린 룩 · 조세핀 드레스)을 같은 격자·담기 줄에 태우려고
     /// 컨셉 모양을 빌린다. 서버엔 conceptId 대신 studio / wedding 으로 보낸다(RimikimiAPI.generate).
     var customThumb: URL? = nil
@@ -30,7 +33,7 @@ struct Concept: Identifiable, Hashable, Decodable {
     var isSynthetic: Bool { studioPreset != nil || dressCode != nil }
 
     enum CodingKeys: String, CodingKey {
-        case id, title, title_en, category, categories, text, mode, fourcutStyle, fourcutStyles, pinFeatured, publishAt, sensitive, purposes, mood
+        case id, title, title_en, category, categories, text, mode, fourcutStyle, fourcutStyles, pinFeatured, publishAt, sensitive, purposes, mood, imgV
     }
 
     init(from decoder: Decoder) throws {
@@ -58,6 +61,7 @@ struct Concept: Identifiable, Hashable, Decodable {
         sensitive = (try? c.decode(Bool.self, forKey: .sensitive)) ?? false
         purposes = (try? c.decode([String].self, forKey: .purposes)) ?? []
         mood = try? c.decode(Mood.self, forKey: .mood)
+        imgV = try? c.decode(String.self, forKey: .imgV)
     }
 
     /// 브루클린 룩 · 조세핀 드레스용 — 서버 카탈로그에서 만든다.
@@ -101,9 +105,14 @@ struct Concept: Identifiable, Hashable, Decodable {
         return title
     }
 
-    var thumbURL: URL { customThumb ?? Config.thumbURL(id) }
+    var thumbURL: URL { customThumb ?? Concept.versioned(Config.thumbURL(id), imgV) }
     /// 크게 깔리는 자리용 1200px 원본(없으면 `RemoteImage(fallback:)` 이 썸네일로 되돌아간다).
-    var largeURL: URL { customThumb ?? Config.largeURL(id) }
+    var largeURL: URL { customThumb ?? Concept.versioned(Config.largeURL(id), imgV) }
+    static func versioned(_ u: URL, _ v: String?) -> URL {
+        guard let v, !v.isEmpty, var c = URLComponents(url: u, resolvingAgainstBaseURL: false) else { return u }
+        c.queryItems = [URLQueryItem(name: "v", value: v)]
+        return c.url ?? u
+    }
     var sortKey: Double { publishAt?.timeIntervalSince1970 ?? (Double(id) ?? 0) }
 
     static func == (a: Concept, b: Concept) -> Bool { a.id == b.id }
