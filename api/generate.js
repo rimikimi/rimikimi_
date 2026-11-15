@@ -1925,7 +1925,8 @@ async function handleGenerate(req, res, hold) {
   //   결과는 gen_ab 테이블(갤러리 id·컨셉·배정·첫 검사·재생성 여부) — 신고·재생성률을 두 쪽으로 비교한다.
   const abEligible = conceptId != null && !NB21_IDS.has(String(conceptId)) && !isStudio && !isWedding &&
     !isDressroom && !isRestore && !isIdPhoto && !isFourcut && !hasSecond && !skipFacePrecheck && !isSprite && !templateImg;
-  const abShare = Math.min(1, Math.max(0, Number(process.env.AB_NB21_SHARE ?? 0.5) || 0));
+  // 2026-11-15 오너 "매직부스 말고는 다 프로 쓰자" — 2.1 반반 A/B 종료(환경변수와 무관하게 0).
+  const abShare = 0;
   const abArm = abEligible ? (Math.random() < abShare ? "nb21" : "pro") : null;
   let abFirstModel = null, abFirstQa = null, abRegen = false;
   const useNb21 = (conceptId != null && NB21_IDS.has(String(conceptId))) || abArm === "nb21" || !!templateImg;
