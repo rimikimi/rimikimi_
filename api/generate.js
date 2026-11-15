@@ -212,7 +212,7 @@ async function applyWatermark(base64, mime) {
 // 픽셀 결과는 예전과 완전히 같다(1792×2400 실측: 원본·축소본 모두 픽셀 차 0, CPU 360→250ms). 워드마크 그림은 크기·색별로 캐시.
 // 실패하면 예전 함수로 그대로 처리한다 — 마무리 실패가 생성을 깨뜨리면 안 된다.
 const MARK_CACHE = new Map();
-async function finishOutput(base64, mime, watermark) {
+async function finishOutput(base64, mime, watermark, fullRes = false) {
   try {
     const sharp = (await import("sharp")).default;
     if (watermark && WORDMARK_SVG === null) {
@@ -261,16 +261,20 @@ async function finishOutput(base64, mime, watermark) {
       const enc = isJpeg ? await sharp(pixels, pinfo).jpeg().toBuffer() : await sharp(pixels, pinfo).png().toBuffer();
       raw = { base64: enc.toString("base64"), mime: isJpeg ? "image/jpeg" : "image/png" };
     }
-    const s = await sharp(pixels, pinfo)
-      .resize(1024, 1365, { fit: "inside", withoutEnlargement: true })
-      .jpeg({ quality: 82 })
-      .toBuffer();
+    // 2026-11-15 오너 "1792×2400 을 만들어야지": 앱 결과 화면·앨범 저장이 이 응답본을 쓰는데 1024 로 줄여 1019×1365 였다.
+    //   fullRes 면 원본 해상도 그대로 JPEG q90(2K 한 장 ≈ 0.4~0.7MB, base64 ≈ 0.6~0.95MB — 4.5MB 응답 한도 안).
+    const s = fullRes
+      ? await sharp(pixels, pinfo).jpeg({ quality: 90, mozjpeg: true }).toBuffer()
+      : await sharp(pixels, pinfo)
+          .resize(1024, 1365, { fit: "inside", withoutEnlargement: true })
+          .jpeg({ quality: 82 })
+          .toBuffer();
     return { raw, small: { base64: s.toString("base64"), mime: "image/jpeg" } };
   } catch (e) {
     console.error("[finishOutput failed, falling back]", e?.message || e);
     let raw = { base64, mime };
     if (watermark) raw = await applyWatermark(base64, mime);
-    return { raw, small: await shrinkOutput(raw.base64, raw.mime) };
+    return { raw, small: fullRes ? raw : await shrinkOutput(raw.base64, raw.mime) };
   }
 }
 
@@ -2165,7 +2169,8 @@ async function handleGenerate(req, res, hold) {
       if (postFx === "mspaint") { const px = await paintPixelate(rawOut, rawMime); rawOut = px.base64; rawMime = px.mime; }
       if (postFx === "dreamy") { const dr = await applyDreamy(rawOut, rawMime); rawOut = dr.base64; rawMime = dr.mime; }
       // 결제로 만든 것만 깨끗하다 — 원본에 찍어야 갤러리 다운로드로 우회되지 않는다
-      const fin = await finishOutput(rawOut, rawMime, !useCredit);
+      // 3장까지는 원본 해상도(4.5MB 응답 한도: 2K JPEG base64 ≈ 1MB 안팎 × 3). 6·12장 묶음은 화면용 축소본.
+      const fin = await finishOutput(rawOut, rawMime, !useCredit, outs.length <= 3);
       rawOut = fin.raw.base64; rawMime = fin.raw.mime;
       const small = fin.small;
       let gId = null, gExp = null;
@@ -2409,7 +2414,7 @@ async function handleGenerate(req, res, hold) {
   //      축소 전 원본에 찍어야 아래 갤러리 저장분에도 함께 들어간다.
   // 6.5) 응답 전 이미지 축소 (Vercel 4.5MB 한도 초과로 본문 잘리는 "오류 200" 방지 + 전송 속도↑)
   //      응답(화면 표시)만 축소. 갤러리/다운로드는 아래에서 원본 그대로 저장. 워터마크와 한 번에(finishOutput).
-  const fin = await finishOutput(rawData, rawMime, !useCredit);
+  const fin = await finishOutput(rawData, rawMime, !useCredit, true);
   rawData = fin.raw.base64; rawMime = fin.raw.mime;
   const small = fin.small;
   const outMime = small.mime;
