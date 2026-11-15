@@ -15,16 +15,22 @@
 const CREDITS_PER_REFERRAL = 5;
 const OLD_CREDITS_PER_REFERRAL = 3;
 const REFERRAL_5_SINCE = "2026-11-15T07:00:00Z";
+// 2026-11-15 오너 "초대로 가입하면 3개를 줘": 초대 코드를 등록한 사람(초대받은 쪽)에게 3장. 이 시각 이후 등록분만.
+//   referred_id 는 unique 라 한 계정이 최대 한 번만 받는다.
+const CREDITS_FOR_INVITEE = 3;
+const INVITEE_BONUS_SINCE = "2026-11-15T12:30:00Z";
 
 /** 초대 적립 — 전체 초대 수와 그중 REFERRAL_5_SINCE 이전 초대 수로 계산(이전 3장, 이후 5장). */
 async function referralEarned(admin, userId) {
-  const [all, old] = await Promise.all([
+  const [all, old, invited] = await Promise.all([
     admin.from("referrals").select("*", { count: "exact", head: true }).eq("referrer_id", userId),
     admin.from("referrals").select("*", { count: "exact", head: true }).eq("referrer_id", userId).lt("created_at", REFERRAL_5_SINCE),
+    admin.from("referrals").select("*", { count: "exact", head: true }).eq("referred_id", userId).gte("created_at", INVITEE_BONUS_SINCE),
   ]);
-  if (all.error || old.error) return { error: (all.error || old.error).message };
+  if (all.error || old.error || invited.error) return { error: (all.error || old.error || invited.error).message };
   const count = all.count || 0, oldCount = Math.min(count, old.count || 0);
-  return { count, earned: oldCount * OLD_CREDITS_PER_REFERRAL + (count - oldCount) * CREDITS_PER_REFERRAL };
+  const inviteeBonus = Math.min(1, invited.count || 0) * CREDITS_FOR_INVITEE;
+  return { count, earned: oldCount * OLD_CREDITS_PER_REFERRAL + (count - oldCount) * CREDITS_PER_REFERRAL + inviteeBonus };
 }
 
 // ── 만료되는 이벤트 크레딧 (2026-09-16 추석 이벤트) ──────────────────────────

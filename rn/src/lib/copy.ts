@@ -202,9 +202,9 @@ const copyKo = {
   },
   invite: {
     title: "친구 초대하면 크레딧 5개",
-    desc: "친구가 내 코드로 가입하면 나에게 크레딧 5개가 쌓여요.",
+    desc: "친구가 내 코드로 가입하면 나에게 크레딧 5개, 친구에게 3개가 쌓여요.",
     askTitle: "친구 초대로 오셨나요?",
-    askDesc: "친구의 초대 코드를 넣으면 친구에게 크레딧 5장이 선물돼요.",
+    askDesc: "친구의 초대 코드를 넣으면 나에게 크레딧 3장, 친구에게 5장이 쌓여요.",
     paste: "붙여넣기",
     noCode: "코드 없어요",
     myCode: "내 초대 코드",
@@ -212,7 +212,7 @@ const copyKo = {
     codeCopied: "초대 코드를 복사했어요",
     enterCode: "친구 초대 코드 입력",
     codeApply: "등록",
-    codeOk: "초대가 등록됐어요! 친구에게 크레딧 5개가 쌓였어요 🎉",
+    codeOk: "초대가 등록됐어요! 나에게 크레딧 3개, 친구에게 5개가 쌓였어요 🎉",
     share: "공유하기",
     shareText: (code: string, url: string) => `내 얼굴로 인생 프로필 만들기 ✨ rimikimi 같이 해요! 초대 코드: ${code}\n${url}`,
     fail: {
@@ -581,9 +581,9 @@ const copyEn: Copy = {
   },
   invite: {
     title: "Invite a friend, get 5 credits",
-    desc: "When a friend signs up with your code, you get 5 credits.",
+    desc: "When a friend signs up with your code, you get 5 credits and they get 3.",
     askTitle: "Invited by a friend?",
-    askDesc: "Enter your friend's invite code and they'll get 5 credits.",
+    askDesc: "Enter your friend's invite code — you get 3 credits and your friend gets 5.",
     paste: "Paste",
     noCode: "No code",
     myCode: "Your invite code",
@@ -591,7 +591,7 @@ const copyEn: Copy = {
     codeCopied: "Invite code copied",
     enterCode: "Enter a friend's code",
     codeApply: "Apply",
-    codeOk: "Invite registered — your friend got 5 credits 🎉",
+    codeOk: "Invite registered — you got 3 credits and your friend got 5 🎉",
     share: "Share",
     shareText: (code: string, url: string) => `Turn your face into a dream portrait ✨ Try rimikimi with me! Invite code: ${code}\n${url}`,
     fail: {

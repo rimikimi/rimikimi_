@@ -92,6 +92,7 @@ struct InviteView: View {
                     HapticPlayer.success()
                     app.showToast(Copy.inviteOk)
                     friendCode = ""
+                    await app.refreshQuota()
                 } else {
                     app.showToast(Self.failMessage(r.reason))
                 }
@@ -206,6 +207,7 @@ struct InviteCodeSheet: View {
                 if r.ok {
                     HapticPlayer.success()
                     app.showToast(Copy.inviteOk)
+                    await app.refreshQuota() // 초대받은 쪽 3장이 바로 칩에 보이게
                     dismiss()
                 } else {
                     app.showToast(InviteView.failMessage(r.reason))
