@@ -142,3 +142,78 @@ struct InviteCard: View {
         .transition(.opacity.combined(with: .move(edge: .top)))
     }
 }
+
+/// 가입 직후 1회 — "친구 초대로 오셨나요?" 코드 입력 시트(2026-11-15).
+/// 초대 페이지(public/invite.html)가 클립보드에 "rimikimi-invite:CODE" 를 넣어 두므로, 시스템 붙여넣기 버튼
+/// (PasteButton — 권한 팝업 없음) 한 번으로 코드가 들어온다. 보상은 초대한 사람에게 3장.
+struct InviteCodeSheet: View {
+    @Environment(AppState.self) private var app
+    @Environment(\.dismiss) private var dismiss
+    @State private var code = ""
+    @State private var claiming = false
+
+    /// "rimikimi-invite:A3F9K2", 초대 링크(…/i/A3F9K2), 코드만 — 어느 쪽이든 6자 코드를 뽑는다.
+    static func extract(_ raw: String) -> String? {
+        let s = raw.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        let start = s.range(of: "RIMIKIMI-INVITE:")?.upperBound ?? s.range(of: "/I/")?.upperBound ?? s.startIndex
+        guard let r = s.range(of: "[2-9A-HJKMNP-Z]{6}", options: .regularExpression, range: start..<s.endIndex)
+        else { return nil }
+        return String(s[r])
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.s4) {
+            VStack(alignment: .leading, spacing: Spacing.s2) {
+                Text(Copy.inviteAskTitle).font(AppFont.title2)
+                Text(Copy.inviteAskDesc).font(AppFont.footnote).foregroundStyle(Color.ink2)
+            }
+            HStack(spacing: Spacing.s2) {
+                TextField(Copy.inviteCodePlaceholder, text: $code)
+                    .textInputAutocapitalization(.characters)
+                    .autocorrectionDisabled()
+                    .font(.system(size: 20, weight: .bold, design: .rounded)).tracking(2)
+                    .padding(.horizontal, Spacing.s3)
+                    .frame(height: ControlHeight.button)
+                    .background(Color.fill, in: RoundedRectangle(cornerRadius: Radius.button, style: .continuous))
+                PasteButton(payloadType: String.self) { strings in
+                    if let c = strings.lazy.compactMap(Self.extract).first { code = c }
+                }
+                .labelStyle(.titleAndIcon)
+                .buttonBorderShape(.capsule)
+            }
+            Button(claiming ? "…" : Copy.inviteApply) { claim() }
+                .buttonStyle(PrimaryButtonStyle())
+                .disabled(claiming || code.trimmingCharacters(in: .whitespaces).count < 6)
+            Button(Copy.inviteNoCode) { dismiss() }
+                .buttonStyle(SecondaryButtonStyle())
+        }
+        .padding(.horizontal, Spacing.page)
+        .padding(.top, Spacing.s5)
+        .padding(.bottom, Spacing.s4)
+        .frame(maxHeight: .infinity, alignment: .top)
+        .background(Color.bg)
+    }
+
+    private func claim() {
+        let c = Self.extract(code) ?? code.trimmingCharacters(in: .whitespaces).uppercased()
+        guard !claiming else { return }
+        claiming = true
+        Task {
+            defer { claiming = false }
+            guard let token = await app.auth.validAccessToken() else { app.handleNoToken(); return }
+            do {
+                let r = try await RimikimiAPI.shared.referralClaim(code: c, token: token)
+                if r.ok {
+                    HapticPlayer.success()
+                    app.showToast(Copy.inviteOk)
+                    dismiss()
+                } else {
+                    app.showToast(InviteView.failMessage(r.reason))
+                    if r.reason == "already_referred" || r.reason == "self_referral" { dismiss() }
+                }
+            } catch {
+                app.showToast(error.localizedDescription)
+            }
+        }
+    }
+}

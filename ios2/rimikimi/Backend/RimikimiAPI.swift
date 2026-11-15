@@ -25,6 +25,8 @@ struct QuotaInfo: Decodable {
     var untilNext: Int?
     /// 한 번도 결제한 적 없는 계정 — 크레딧팩 첫 구매 30% 할인 대상(서버 판정, 없으면 false).
     var firstPurchase: Bool?
+    /// 가입 7일 이내 + 아직 친구 초대 코드를 등록 안 한 계정 — 첫 로그인 뒤 "초대 코드 있어요?" 시트(2026-11-15).
+    var inviteEligible: Bool?
 
     var creditsAvailable: Int { credits ?? 0 }
     var freeLeft: Int { max(0, (limit ?? 1) - (used ?? 0)) }

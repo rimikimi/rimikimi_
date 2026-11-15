@@ -7,6 +7,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import * as SplashScreen from "expo-splash-screen";
 import { AuthProvider } from "@/lib/auth";
 import { QuotaProvider } from "@/lib/quota";
+import { InviteCodePrompt } from "@/ui/InviteCodePrompt";
 import { StoreProvider } from "@/lib/store";
 import { copy } from "@/lib/copy";
 import { GenerationProvider } from "@/lib/generation";
@@ -142,6 +143,8 @@ export default function RootLayout() {
                 <CreditSheet />
                 {/* 무료 사용자 만들기 직전 "광고 없이 쓰고 싶다면" 안내 */}
                 <AdFreePrompt />
+                {/* 가입 직후 1회 — 친구 초대 코드(설치 경로에서 코드가 끊기므로) */}
+                <InviteCodePrompt />
               </App21Provider>
               </GenerationProvider>
               </CreditGateProvider>

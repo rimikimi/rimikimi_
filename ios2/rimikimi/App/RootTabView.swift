@@ -120,6 +120,13 @@ struct RootTabView: View {
                 .presentationCornerRadius(Radius.sheet)
                 .interactiveDismissDisabled()
         }
+        // 친구 초대 코드 — 가입 직후 1회(AppState.offerInviteCodeIfNeeded).
+        .sheet(isPresented: $app.inviteCodeSheet) {
+            InviteCodeSheet()
+                .presentationDetents([.height(380)])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(Radius.sheet)
+        }
         // 연속 촬영 — 여러 장 찍고 한 번에 필터.
         .fullScreenCover(isPresented: $app.showBurstCamera) { BurstCameraView() }
         // 얼굴 스캔 — Face ID 등록처럼 영상으로 3장(정면·옆·옆)을 모은다.

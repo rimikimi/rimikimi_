@@ -410,7 +410,12 @@ final class AppState {
     func resumePending() {
         loginSheet = false
         // ⚠️ 크레딧 갱신은 pending 유무와 무관하다 — 예전엔 guard 뒤에 있어 그냥 로그인만 하면 칩이 "–" 로 남았다.
-        Task { await refreshQuota() }
+        let hadPending = pending != nil
+        Task {
+            await refreshQuota()
+            // 친구 초대 코드 입력 제안 — 이어서 할 작업(생성 등)이 없을 때만, 계정당 한 번.
+            if !hadPending { offerInviteCodeIfNeeded() }
+        }
         if let uid = auth.session?.userID { Task { await store.logIn(userID: uid) } }
         guard let action = pending else { return }
         pending = nil
@@ -735,6 +740,18 @@ final class AppState {
     func resetOutpaintPhase() { outpaintPhase = .idle }
 
     // MARK: 크레딧
+
+    /// 친구 초대 코드 시트(2026-11-15 오너 "친구 소개하면 3장"). 초대 링크를 타고 설치해도 앱이 코드를 못 받으므로
+    /// (8/27 이후 초대 0건) 가입 직후 한 번 묻는다. 서버 `inviteEligible`(가입 7일 이내·미등록) + 계정당 1회.
+    var inviteCodeSheet = false
+    func offerInviteCodeIfNeeded() {
+        guard quota?.inviteEligible == true, let uid = auth.session?.userID else { return }
+        let key = "invitePrompted.\(uid)"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        UserDefaults.standard.set(true, forKey: key)
+        guard !loginSheet, !creditsSheet, !aiConsentSheet, guestFlow == nil else { return }
+        inviteCodeSheet = true
+    }
 
     func refreshQuota() async {
         guard let token = await auth.validAccessToken() else { quota = nil; return }

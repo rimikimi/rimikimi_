@@ -529,6 +529,10 @@ enum Copy {
     static var inviteErrNotFound: String { L.t("없는 코드예요", "That code doesn't exist") }
     static var inviteErrSelf: String { L.t("내 코드는 등록할 수 없어요", "You can't use your own code") }
     static var inviteErrAlready: String { L.t("이미 초대 코드를 등록했어요", "You've already used an invite code") }
+    static var inviteAskTitle: String { L.t("친구 초대로 오셨나요?", "Invited by a friend?") }
+    static var inviteAskDesc: String { L.t("친구의 초대 코드를 넣으면 친구에게 크레딧 3장이 선물돼요.", "Enter your friend's invite code and they'll get 3 credits.") }
+    static var invitePaste: String { L.t("붙여넣기", "Paste") }
+    static var inviteNoCode: String { L.t("코드 없어요", "No code") }
     static var inviteErrRetry: String { L.t("잠시 후 다시 시도해 주세요", "Please try again in a moment") }
 
     // MARK: 카메라 · 편집기

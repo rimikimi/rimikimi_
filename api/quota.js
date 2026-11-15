@@ -80,14 +80,26 @@ export default async function handler(req, res) {
   const { count: paidCount } = await admin
     .from("iap_events").select("*", { count: "exact", head: true }).eq("user_id", user.id);
   const firstPurchase = (paidCount || 0) === 0;
+  // 친구 초대 코드 입력 제안(2026-11-15 오너 "친구 소개하면 3장"): 가입 7일 이내 + 아직 초대 등록 안 한 계정.
+  // 앱이 첫 로그인 직후 "초대 코드 있어요?" 시트를 띄울지 판단한다. 보상은 초대한 사람에게 3장(credits.js).
+  let inviteEligible = false;
+  try {
+    const created = Date.parse(user.created_at || "");
+    if (Number.isFinite(created) && Date.now() - created < 7 * 86400_000) {
+      const { count: refd } = await admin
+        .from("referrals").select("*", { count: "exact", head: true }).eq("referred_id", user.id);
+      inviteEligible = (refd || 0) === 0;
+    }
+  } catch { inviteEligible = false; }
   const creditFields = credit.error
-    ? { credits: 0, referralCount: 0, untilNext: 1, referralCode, firstPurchase }
+    ? { credits: 0, referralCount: 0, untilNext: 1, referralCode, firstPurchase, inviteEligible }
     : {
         credits: credit.creditsAvailable,
         referralCount: credit.referralCount,
         untilNext: credit.untilNext,
         referralCode,
         firstPurchase,
+        inviteEligible,
       };
 
   // 어드민/무제한

@@ -36,6 +36,8 @@ export interface Quota {
   untilNext?: number;
   /** 결제 기록이 없는 계정 — 첫 구매 30% 할인 팩을 보여 준다(서버 /api/quota). */
   firstPurchase?: boolean;
+  /** 가입 7일 이내 + 친구 초대 코드 미등록 — 첫 로그인 뒤 "초대 코드 있어요?" 시트(ui/InviteCodePrompt). */
+  inviteEligible?: boolean;
 }
 
 export async function fetchQuota(token: string): Promise<Quota> {
@@ -52,6 +54,7 @@ export async function fetchQuota(token: string): Promise<Quota> {
     referralCode: j.referralCode,
     untilNext: j.untilNext,
     firstPurchase: j.firstPurchase === true,
+    inviteEligible: j.inviteEligible === true,
   };
 }
 
