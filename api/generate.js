@@ -419,6 +419,23 @@ const BODY_FINAL_ART =
 // 일부러 머리를 크게 그리는 컨셉 — 1.5등신 피규어.
 const BIG_HEAD_OK_IDS = new Set(["1127"]);
 
+// 템플릿 컨셉(2026-11-15 오너 "템플릿을 픽스하고 사람만 갈아끼우면 되는 거 아님?", "샘플이랑 다르면 사기급"):
+// concepts.json 의 template(예: "large/1415.webp") 이미지를 그대로 두고 사람만 바꾼다. 남녀·나이 무관.
+// 실측: Pro 는 템플릿 속 사람을 그대로 돌려주는 경우가 많아(4장 중 3장) 2.1 로 고정한다.
+const TEMPLATE_INSTRUCTION =
+  "The FIRST image is a finished studio photograph used as a fixed template. Reproduce it exactly — the same background " +
+  "and set, every decoration (each bauble, ribbon and light in the same place, size and colour), the same garment type and " +
+  "colour, pose, body angle, head tilt, gaze direction, expression, framing, crop, lighting and colour grade. Replace ONLY " +
+  "the person: the person in the template must be completely replaced by the person in the SECOND image — do not keep " +
+  "the template person's face. Take from the second image only who the person is: their face, facial features, face " +
+  "shape, skin tone, age, sex, body build and hair colour, reproduced exactly so they are clearly recognisable. Ignore " +
+  "the pose, expression, clothing, accessories (tiaras, veils, hats, glasses that are not part of their face) and " +
+  "background of the second image. The person can be any sex and any age: if they are a man, an older person or a " +
+  "child, keep the template's pose, garment type, colours and set, and translate only the hairstyle, makeup, jewellery " +
+  "and the garment's cut and fit into what naturally suits this person (for example a man gets a man's short hairstyle " +
+  "and a turtleneck that fits a man's shoulders and chest, no makeup). Keep their real age — do not make them younger or " +
+  "older. Natural skin texture, realistic adult proportions, no extra people, no text.";
+
 // 자세·표정은 컨셉 글이 정한다 — 사진은 "누구인지"만(2026-11-15 오너: 샘플은 다 다른데 실제 생성은 비슷).
 const POSE_FROM_CONCEPT =
   "POSE AND EXPRESSION COME ONLY FROM THE CONCEPT TEXT, never from the photo: the provided photo(s) are used " +
@@ -1715,8 +1732,20 @@ async function handleGenerate(req, res, hold) {
       return inl ? { data: inl.data, mime: inl.mimeType || inl.mime_type || "image/png" } : null;
     } catch (_) { return null; }
   }
+  // 템플릿 컨셉: 샘플 사진을 첫 이미지로 넣고 사람만 바꾼다(TEMPLATE_INSTRUCTION 주석).
+  let templateImg = null;
+  if (conceptRow?.template && !hasSecond && !isStudio && !isWedding && !isDressroom && !isFourcut && !isRestore && !isIdPhoto && !skipFacePrecheck) {
+    try {
+      const host = req.headers?.host ? `https://${req.headers.host}` : "https://rimikimi-app.vercel.app";
+      const tr = await fetch(`${host}/${String(conceptRow.template).replace(/^\/+/, "")}`);
+      if (tr.ok) templateImg = { mimeType: tr.headers.get("content-type") || "image/webp", base64: Buffer.from(await tr.arrayBuffer()).toString("base64") };
+    } catch { templateImg = null; }
+    console.log(`[generate] template concept=${conceptId} loaded=${!!templateImg}`);
+  }
   // 브루클린 지시문은 사진 사실감·얼굴 참조 절까지 자체로 완결돼 있다 — 리미키미 포장을 씌우지 않는다.
-  const instructionBase = isStudio
+  const instructionBase = templateImg
+    ? TEMPLATE_INSTRUCTION + faceClause
+    : isStudio
     ? st.instruction
     : isWedding
     ? weddingInstruction + faceClause
@@ -1785,6 +1814,8 @@ async function handleGenerate(req, res, hold) {
         parts: [
           { text: instructionAt(shotIdx) },
           // 픽셀 캐릭터는 사진을 넣지 않는다(설명만) — 넣으면 편집 모드로 원본이 섞인다.
+          // 템플릿 컨셉: 샘플 사진이 첫 이미지("FIRST image"), 사용자 사진이 두 번째.
+          ...(templateImg ? [{ inline_data: { mime_type: templateImg.mimeType, data: templateImg.base64 } }] : []),
           ...(isSprite ? [] : [{ inline_data: { mime_type: mimeType, data: base64 } }]),
           // 커플: 두 번째 참조 사진 (순서가 곧 "first/second reference image")
           ...(hasSecond
@@ -1871,11 +1902,11 @@ async function handleGenerate(req, res, hold) {
   //   커플·그림체·픽셀)와 묶음 생성은 Pro 그대로. 비율은 Vercel 환경변수 AB_NB21_SHARE(0~1, 기본 0.5).
   //   결과는 gen_ab 테이블(갤러리 id·컨셉·배정·첫 검사·재생성 여부) — 신고·재생성률을 두 쪽으로 비교한다.
   const abEligible = conceptId != null && !NB21_IDS.has(String(conceptId)) && !isStudio && !isWedding &&
-    !isDressroom && !isRestore && !isIdPhoto && !isFourcut && !hasSecond && !skipFacePrecheck && !isSprite;
+    !isDressroom && !isRestore && !isIdPhoto && !isFourcut && !hasSecond && !skipFacePrecheck && !isSprite && !templateImg;
   const abShare = Math.min(1, Math.max(0, Number(process.env.AB_NB21_SHARE ?? 0.5) || 0));
   const abArm = abEligible ? (Math.random() < abShare ? "nb21" : "pro") : null;
   let abFirstModel = null, abFirstQa = null, abRegen = false;
-  const useNb21 = (conceptId != null && NB21_IDS.has(String(conceptId))) || abArm === "nb21";
+  const useNb21 = (conceptId != null && NB21_IDS.has(String(conceptId))) || abArm === "nb21" || !!templateImg;
   const PRO_MODEL = "gemini-3-pro-image";
   const BASE_MODEL = "gemini-3.1-flash-image";
   // 최후 폴백 — 검증된 구세대 모델.
