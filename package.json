@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "prebuild": "bash scripts/clean-icloud-dupes.sh && node scripts/build-fallback.mjs",
+    "prebuild": "bash scripts/clean-icloud-dupes.sh && node scripts/build-img-versions.mjs && node scripts/build-fallback.mjs",
     "build": "vite build",
     "preview": "vite preview",
     "clean:icloud": "bash scripts/clean-icloud-dupes.sh",

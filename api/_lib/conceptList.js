@@ -57,6 +57,7 @@ const IOS_HIDE_CONTACT_COUPLES = true;
 // 2026-10-26 오너: 스킨십(접촉) 템플릿만 iOS 에서 빼고(iosHidden 77종) 접촉 없는 2인 컨셉은 살린다(10/24 "커플 전부" 숨김 해제).
 export function iosHiddenConcept(c) { return !!(c && c.iosHidden); }
 import { moodOf } from "./mood.js";
+import IMG_V from "../_data/img-versions.json" with { type: "json" };
 export function publishedConcepts(ALL, now, caps = new Set(), { ios = false } = {}) {
   const list = ALL.filter((c) => isPublished(c, now) && supportsConcept(c, caps) && !(IOS_HIDE_CONTACT_COUPLES && ios && iosHiddenConcept(c)));
 
@@ -65,6 +66,8 @@ export function publishedConcepts(ALL, now, caps = new Set(), { ios = false } = 
     if (at) c.pinFeatured = at;
     // 무드 꼬리표(시간대·날씨) — 프롬프트를 안 보내므로 여기서 붙인다
     if (!c.mood) c.mood = moodOf(c);
+    // 샘플 이미지 지문(scripts/build-img-versions.mjs) — 앱이 주소 뒤 ?v= 로 붙여 바뀐 샘플을 바로 받는다.
+    if (IMG_V[String(c.id)]) c.imgV = IMG_V[String(c.id)];
   }
 
   const rank = (c) => (c.publishAt ? Date.parse(c.publishAt) : 0);
