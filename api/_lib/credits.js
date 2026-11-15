@@ -11,8 +11,21 @@
 // ⚠️ 적립은 referrals 행 수에서 **매번 계산**하므로, 이 상수를 바꾸면 기존 초대분에도
 //    소급 적용된다(10명 초대한 사용자: 5개 → 30개). 의도된 동작이다 — 적립을 스냅샷으로
 //    저장하지 않는 설계라 과거분만 옛 비율로 두려면 스키마 변경이 필요하다.
-// 2026-11-15 오너 "친구 초대하면 5장 주자" — 3 → 5 (기존 초대분에도 소급: 행 수 × 상수로 매번 계산).
+// 2026-11-15 오너 "친구 초대하면 5장 주자" → "예전 건 그대로 둬": 이 시각 이전 초대는 3장, 이후는 5장.
 const CREDITS_PER_REFERRAL = 5;
+const OLD_CREDITS_PER_REFERRAL = 3;
+const REFERRAL_5_SINCE = "2026-11-15T07:00:00Z";
+
+/** 초대 적립 — 전체 초대 수와 그중 REFERRAL_5_SINCE 이전 초대 수로 계산(이전 3장, 이후 5장). */
+async function referralEarned(admin, userId) {
+  const [all, old] = await Promise.all([
+    admin.from("referrals").select("*", { count: "exact", head: true }).eq("referrer_id", userId),
+    admin.from("referrals").select("*", { count: "exact", head: true }).eq("referrer_id", userId).lt("created_at", REFERRAL_5_SINCE),
+  ]);
+  if (all.error || old.error) return { error: (all.error || old.error).message };
+  const count = all.count || 0, oldCount = Math.min(count, old.count || 0);
+  return { count, earned: oldCount * OLD_CREDITS_PER_REFERRAL + (count - oldCount) * CREDITS_PER_REFERRAL };
+}
 
 // ── 만료되는 이벤트 크레딧 (2026-09-16 추석 이벤트) ──────────────────────────
 // 기존 버킷(구매·초대·공유)과 **완전히 분리**한다. 사용량도 따로 센다.
@@ -28,9 +41,9 @@ function promoAvailable(row) {
 }
 
 /** 구매·초대·공유 버킷의 잔액(프로모 제외). */
-function normalAvailable(row, referralCount) {
+function normalAvailable(row, referralEarnedCredits) {
   const earned =
-    (referralCount || 0) * CREDITS_PER_REFERRAL +
+    (referralEarnedCredits || 0) +
     (row?.credits_purchased || 0) +
     (row?.credits_shared || 0);
   return Math.max(0, earned - (row?.credits_used || 0));
@@ -41,13 +54,10 @@ export const SHARE_DAILY_CAP = 3;
 
 export async function getCreditInfo(admin, userId) {
   // 1) 내가 초대한 사람 수
-  const { count, error: cErr } = await admin
-    .from("referrals")
-    .select("*", { count: "exact", head: true })
-    .eq("referrer_id", userId);
-  if (cErr) return { error: cErr.message };
-  const referralCount = count || 0;
-  const creditsEarned = referralCount * CREDITS_PER_REFERRAL;
+  const ref = await referralEarned(admin, userId);
+  if (ref.error) return { error: ref.error };
+  const referralCount = ref.count;
+  const creditsEarned = ref.earned;
 
   // 2) 사용한 크레딧 + 결제로 적립한 크레딧 + 공유 리워드로 적립한 크레딧
   const { data, error: uErr } = await admin
@@ -121,17 +131,17 @@ export async function consumeCredits(admin, userId, n) {
     .upsert({ user_id: userId }, { onConflict: "user_id", ignoreDuplicates: true });
 
   for (let attempt = 0; attempt < 3; attempt++) {
-    const [{ count: referralCount, error: rErr }, { data: row, error: uErr }] =
+    const [ref, { data: row, error: uErr }] =
       await Promise.all([
-        admin.from("referrals").select("*", { count: "exact", head: true }).eq("referrer_id", userId),
+        referralEarned(admin, userId),
         admin.from("user_credits")
           .select(`credits_used, credits_purchased, credits_shared, ${PROMO_COLS}`)
           .eq("user_id", userId).maybeSingle(),
       ]);
-    if (rErr || uErr || !row) return false;
+    if (ref.error || uErr || !row) return false;
 
     const promoAvail = promoAvailable(row);
-    const normalAvail = normalAvailable(row, referralCount);
+    const normalAvail = normalAvailable(row, ref.earned);
     if (promoAvail + normalAvail < need) return false; // 잔액 부족 — 부분 차감 없이 거절
 
     // 만료되는 것부터 쓴다(사용자에게 유리).
