@@ -19,6 +19,8 @@ import { readFileSync, writeFileSync } from "node:fs";
 const SRC = new URL("../api/_data/concepts.json", import.meta.url);
 const arg = (k, d) => { const a = process.argv.find((x) => x.startsWith(`--${k}=`)); return a ? a.slice(k.length + 3) : d; };
 const CAT = arg("cat", "세계여행");
+// --ids=1367,1369 — 카테고리 대신 컨셉 번호로 고른다(2026-11-15 크리스마스 스튜디오: 여성 확실한 것만 빼고 남녀 공용)
+const IDS = arg("ids", "") ? new Set(arg("ids", "").split(",").map((x) => x.trim())) : null;
 const DRY = process.argv.includes("--dry");
 const SHOW = Number(arg("show", "0"));
 
@@ -113,7 +115,8 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   let changed = 0, shown = 0;
   for (const c of all) {
     const cats = c.categories || (c.category ? [c.category] : []);
-    if (!cats.includes(CAT) || !c.text) continue;
+    if (IDS ? !IDS.has(String(c.id)) : !cats.includes(CAT)) continue;
+    if (!c.text) continue;
     if (c.text.startsWith("CASTING —")) continue; // 이미 적용됨(idempotent)
     const next = CASTING + neutralize(c.text);
     if (next === c.text) continue;
@@ -126,7 +129,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     }
     if (!DRY) c.text = next;
   }
-  console.log(`\n${CAT} · 프롬프트 ${changed}종 중성화${DRY ? " (dry)" : ""}`);
+  console.log(`\n${IDS ? "ids" : CAT} · 프롬프트 ${changed}종 중성화${DRY ? " (dry)" : ""}`);
   if (!DRY && changed) {
     writeFileSync(SRC, JSON.stringify(all, null, indent) + (raw.endsWith("\n") ? "\n" : ""));
     console.log("concepts.json 기록 — scripts/build-fallback.mjs 를 이어서 돌릴 것");
