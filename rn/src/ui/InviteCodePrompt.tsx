@@ -1,4 +1,4 @@
-// 가입 직후 1회 — "친구 초대로 오셨나요?" (2026-11-15 오너 "친구 소개하면 3장").
+// 가입 직후 1회 — "친구 초대로 오셨나요?" (2026-11-15). 보상: 초대한 사람 5장, 초대 코드로 가입한 사람 3장(api/_lib/credits.js).
 // 8/27 이후 초대 기록이 0건이었다: 초대 링크(public/invite.html)를 타고 설치해도 앱이 코드를 못 받아서,
 // 친구가 설정에서 코드를 직접 쳐야만 인정됐기 때문. 그래서
 //   ① 초대 페이지가 Play 스토어 링크에 실어 둔 install referrer(utm_content=CODE)를 읽어 칸을 미리 채우고,
@@ -47,14 +47,26 @@ export function InviteCodePrompt() {
       await AsyncStorage.setItem(key, "1").catch(() => undefined);
       let pre: string | null = null;
       if (Platform.OS === "android") {
-        pre = extractInviteCode(await Application.getInstallReferrerAsync().catch(() => null));
+        // 엄격하게 — 초대 페이지가 실은 utm_content=CODE 만 인정한다. 일반 설치의 referrer("utm_source=google-play&utm_medium=organic")
+        //   안의 아무 6글자를 코드로 오인해 자동 등록하면 안 된다.
+        const ref = decodeURIComponent(String(await Application.getInstallReferrerAsync().catch(() => "") || ""));
+        const m = ref.match(/(?:^|&)utm_content=([2-9A-HJKMNP-Za-hjkmnp-z]{6})(?:&|$)/);
+        pre = m ? m[1].toUpperCase() : null;
       }
       if (cancelled) return;
+      // 초대 링크로 설치(Play install referrer 에 코드) → 창 없이 바로 등록(오너 11/15 "링크로 들어와서 가입하면 코드 안 넣어도 되게").
+      //   실패(없는 코드·내 코드 등)하면 아래 창을 코드가 채워진 채로 연다. 이미 등록했으면 조용히 끝.
+      if (pre && token) {
+        const r = await referralClaim(token, pre).catch(() => ({ ok: false, reason: "db_error" }));
+        if (cancelled) return;
+        if (r.ok) { if (Platform.OS === "android") ToastAndroid.show(copy.invite.autoOk, ToastAndroid.LONG); refresh(); return; }
+        if (r.reason === "already_referred") return;
+      }
       if (pre) setInput(pre);
       setOpen(true);
     })();
     return () => { cancelled = true; };
-  }, [uid, quota?.inviteEligible]);
+  }, [uid, quota?.inviteEligible, token, refresh]);
 
   const paste = async () => {
     const c = extractInviteCode(await Clipboard.getStringAsync().catch(() => ""));
