@@ -1351,7 +1351,7 @@
     "title": "핑크 털모자 곁눈질"
   },
   "52cc2bcd-713c-4abb-a807-3cf576862f56": {
-    "status": "staged",
+    "status": "replaced",
     "id": "1366",
     "title": "아이보리 털모자 볼 터치"
   },
@@ -1386,7 +1386,7 @@
     "title": "촛불과 포인세티아"
   },
   "46a4f531-19a1-4273-ab03-51ca30e494d5": {
-    "status": "staged",
+    "status": "removed",
     "id": "1373",
     "title": "오너먼트 레드 터틀넥"
   },
@@ -1604,5 +1604,40 @@
     "status": "staged",
     "id": "1381",
     "title": "블루 오너먼트 앙고라 니트"
+  },
+  "1405c153-0cad-4235-a68a-fdc133cd194c": {
+    "status": "staged",
+    "id": "1415",
+    "title": "블루 터틀넥 실버 오너먼트"
+  },
+  "39b1c27b-ea97-438c-848b-7047ecb580c5": {
+    "status": "staged",
+    "id": "1416",
+    "title": "실버 터틀넥 실버 오너먼트"
+  },
+  "50d4dddf-2b61-4337-a429-387addb3a4b2": {
+    "status": "staged",
+    "id": "1417",
+    "title": "샴페인 골드 터틀넥"
+  },
+  "53211838-378a-46a7-8b23-102878d2a9e4": {
+    "status": "staged",
+    "id": "1418",
+    "title": "에메랄드 터틀넥 골드 오너먼트"
+  },
+  "0d13ab3d-575c-4896-a6d7-95b6e7613413": {
+    "status": "staged",
+    "id": "1419",
+    "title": "아이보리 터틀넥 버건디 배경"
+  },
+  "4203262e-d938-486e-8889-c2cdcbef8d12": {
+    "status": "staged",
+    "id": "1420",
+    "title": "핑크 터틀넥 로즈골드 오너먼트"
+  },
+  "42ada647-b6f7-4e30-9015-a64f614fbb08": {
+    "status": "staged",
+    "id": "1366",
+    "title": "아이보리 털모자 볼 터치"
   }
 }
