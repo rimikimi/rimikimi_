@@ -1626,7 +1626,7 @@
     "title": "에메랄드 터틀넥 골드 오너먼트"
   },
   "0d13ab3d-575c-4896-a6d7-95b6e7613413": {
-    "status": "staged",
+    "status": "replaced",
     "id": "1419",
     "title": "아이보리 터틀넥 버건디 배경"
   },
@@ -1641,7 +1641,7 @@
     "title": "아이보리 털모자 볼 터치"
   },
   "401410f7-f531-439a-8edc-6c6f8cf213b0": {
-    "status": "staged",
+    "status": "replaced",
     "id": "1415",
     "title": "블루 터틀넥 실버 오너먼트"
   },
@@ -1651,28 +1651,63 @@
     "title": "실버 터틀넥 실버 오너먼트"
   },
   "fdb36ddd-71b8-4323-a7d9-edb811321283": {
-    "status": "staged",
+    "status": "replaced",
     "id": "1417",
     "title": "샴페인 골드 터틀넥"
   },
   "b3d20e55-2cd4-4229-9031-fff233cecefe": {
-    "status": "staged",
+    "status": "replaced",
     "id": "1418",
     "title": "에메랄드 터틀넥 골드 오너먼트"
   },
   "037546da-1b06-4043-aaf5-fdb1a525b7cd": {
-    "status": "staged",
+    "status": "replaced",
     "id": "1420",
     "title": "핑크 터틀넥 로즈골드 오너먼트"
   },
   "c62c1b96-7b6e-47c3-8583-d63a15034e34": {
-    "status": "staged",
+    "status": "replaced",
     "id": "1373",
     "title": "레드 터틀넥 스노우볼 오너먼트"
   },
   "a095d34f-6d99-489f-bd5c-ebd82425e12b": {
-    "status": "staged",
+    "status": "replaced",
     "id": "1416",
     "title": "실버 터틀넥 스노우볼 오너먼트"
+  },
+  "7c7d1084-fc2d-4020-99c6-2ab39581bfcc": {
+    "status": "staged",
+    "id": "1373",
+    "title": "레드 터틀넥 스노우볼 오너먼트"
+  },
+  "e87dfc61-643f-40d2-a40a-e4e64b594d6d": {
+    "status": "staged",
+    "id": "1416",
+    "title": "라벤더 터틀넥 컬러 오너먼트"
+  },
+  "bca798b4-aed1-4930-980c-8a3ff4e9d68a": {
+    "status": "staged",
+    "id": "1420",
+    "title": "핑크 터틀넥 로즈골드 오너먼트"
+  },
+  "a0b777ce-a4a1-43b3-9f10-08a7c793ddf1": {
+    "status": "staged",
+    "id": "1419",
+    "title": "아이보리 터틀넥 버건디 배경"
+  },
+  "676aa677-de23-47ca-b9c0-0856a6402bfc": {
+    "status": "staged",
+    "id": "1418",
+    "title": "에메랄드 터틀넥 골드 오너먼트"
+  },
+  "dcb3487e-bd08-4694-9e40-0e520a6c1932": {
+    "status": "staged",
+    "id": "1417",
+    "title": "샴페인 골드 터틀넥"
+  },
+  "1e1a44fd-8e7f-4355-8af6-d51b1351d7c2": {
+    "status": "staged",
+    "id": "1415",
+    "title": "블루 터틀넥 실버 오너먼트"
   }
 }
