@@ -1606,22 +1606,22 @@
     "title": "블루 오너먼트 앙고라 니트"
   },
   "1405c153-0cad-4235-a68a-fdc133cd194c": {
-    "status": "staged",
+    "status": "replaced",
     "id": "1415",
     "title": "블루 터틀넥 실버 오너먼트"
   },
   "39b1c27b-ea97-438c-848b-7047ecb580c5": {
-    "status": "staged",
+    "status": "replaced",
     "id": "1416",
     "title": "실버 터틀넥 실버 오너먼트"
   },
   "50d4dddf-2b61-4337-a429-387addb3a4b2": {
-    "status": "staged",
+    "status": "replaced",
     "id": "1417",
     "title": "샴페인 골드 터틀넥"
   },
   "53211838-378a-46a7-8b23-102878d2a9e4": {
-    "status": "staged",
+    "status": "replaced",
     "id": "1418",
     "title": "에메랄드 터틀넥 골드 오너먼트"
   },
@@ -1631,7 +1631,7 @@
     "title": "아이보리 터틀넥 버건디 배경"
   },
   "4203262e-d938-486e-8889-c2cdcbef8d12": {
-    "status": "staged",
+    "status": "replaced",
     "id": "1420",
     "title": "핑크 터틀넥 로즈골드 오너먼트"
   },
@@ -1639,5 +1639,40 @@
     "status": "staged",
     "id": "1366",
     "title": "아이보리 털모자 볼 터치"
+  },
+  "401410f7-f531-439a-8edc-6c6f8cf213b0": {
+    "status": "staged",
+    "id": "1415",
+    "title": "블루 터틀넥 실버 오너먼트"
+  },
+  "445c0675-889d-4064-8e25-18b79df6bffd": {
+    "status": "staged",
+    "id": "1416",
+    "title": "실버 터틀넥 실버 오너먼트"
+  },
+  "fdb36ddd-71b8-4323-a7d9-edb811321283": {
+    "status": "staged",
+    "id": "1417",
+    "title": "샴페인 골드 터틀넥"
+  },
+  "b3d20e55-2cd4-4229-9031-fff233cecefe": {
+    "status": "staged",
+    "id": "1418",
+    "title": "에메랄드 터틀넥 골드 오너먼트"
+  },
+  "037546da-1b06-4043-aaf5-fdb1a525b7cd": {
+    "status": "staged",
+    "id": "1420",
+    "title": "핑크 터틀넥 로즈골드 오너먼트"
+  },
+  "c62c1b96-7b6e-47c3-8583-d63a15034e34": {
+    "status": "staged",
+    "id": "1373",
+    "title": "레드 터틀넥 스노우볼 오너먼트"
+  },
+  "a095d34f-6d99-489f-bd5c-ebd82425e12b": {
+    "status": "staged",
+    "id": "1421",
+    "title": "실버 터틀넥 스노우볼 오너먼트"
   }
 }
