@@ -1767,7 +1767,8 @@ async function handleGenerate(req, res, hold) {
   }
   // 브루클린 지시문은 사진 사실감·얼굴 참조 절까지 자체로 완결돼 있다 — 리미키미 포장을 씌우지 않는다.
   const instructionBase = templateImg
-    ? TEMPLATE_INSTRUCTION + faceClause
+    // 사실감 블록(PHOTOREALISM·REALISTIC_GARMENT·SKIN_FINAL)을 함께 — 빠져 있어 피부·니트가 AI 같았다(오너 11/15).
+    ? PHOTOREALISM + "\n\n" + TEMPLATE_INSTRUCTION + "\n\n" + REALISTIC_GARMENT + SKIN_FINAL + faceClause
     : isStudio
     ? st.instruction
     : isWedding
@@ -2072,12 +2073,13 @@ async function handleGenerate(req, res, hold) {
         if (!isBusyFailure(r0)) { console.log(`[generate] 2.1 성공 shot=${shotIdx} concept=${conceptId}`); return r0; }
         console.error("[generate] 2.1 실패 → Pro 로:", r0.networkError?.message || `HTTP ${r0.upstream?.status}`);
       }
+      // 2026-11-15: AI Studio 먼저 — Vertex 는 imageSize 2K 를 무시하고 1K(896×1200)로 돌려줬다(갤러리 실측 4장).
+      const r1 = await callGemini(PRO_MODEL, true, budget(90000), shotIdx);
+      if (!isBusyFailure(r1)) return r1;
       if (vertexSA()) {
         const r = await callVertexBackoff(PRO_MODEL, true, budget(90000), shotIdx);
         if (!isBusyFailure(r)) return r;
       }
-      const r2 = await callGemini(PRO_MODEL, true, budget(40000), shotIdx);
-      if (!isBusyFailure(r2)) return r2;
       return await callGemini(BASE_MODEL, false, budget(30000), shotIdx);
     }
 
@@ -2217,19 +2219,22 @@ async function handleGenerate(req, res, hold) {
     else { nb21Failed = true; console.error("[generate] 2.1 실패 → Pro 로:", result.networkError?.message || `HTTP ${result.upstream?.status}`); }
   }
   if (useProEngine && (!useNb21 || isBusyFailure(result))) {
-    // 1) Vertex 로 나노바나나 프로 (1순위).
-    //    실측 ~29s 로 느리므로 넉넉히 주되, 실패 시 AI Studio 몫을 남겨둔다.
-    if (vertexSA()) {
-      result = await callVertexBackoff(PRO_MODEL, true, budget(90000));
-      if (!isBusyFailure(result)) {
-        console.log("[generate] Vertex 3-pro 성공");
-      } else {
-        console.error("[generate] Vertex 3-pro 실패:",
-          result.networkError?.message || `HTTP ${result.upstream?.status}`);
+    // 1) AI Studio 로 나노바나나 프로 (1순위, 2026-11-15 순서 바꿈).
+    //    Vertex 는 같은 요청(imageSize "2K")에 1K(896×1200)를 돌려줘 피부·옷이 뭉개져 보였다(오너 "AI 티").
+    //    AI Studio 는 1792×2400. Vertex 는 혼잡 대비 2순위로 남긴다(2026-08-06 AI Studio 종일 503 전례).
+    result = await callGemini(PRO_MODEL, true, budget(90000));
+    if (!isBusyFailure(result)) {
+      console.log("[generate] AI Studio 3-pro 성공");
+    } else {
+      console.error("[generate] AI Studio 3-pro 실패:", result.networkError?.message || `HTTP ${result.upstream?.status}`);
+      if (vertexSA()) {
+        result = await callVertexBackoff(PRO_MODEL, true, budget(90000));
+        if (!isBusyFailure(result)) console.log("[generate] Vertex 3-pro 성공(1K)");
+        else console.error("[generate] Vertex 3-pro 실패:", result.networkError?.message || `HTTP ${result.upstream?.status}`);
       }
     }
 
-    // 2) Vertex 가 없거나 실패하면 AI Studio 로 같은 모델 재시도.
+    // 2) 둘 다 실패하면 AI Studio 로 짧게 재시도.
     if (!result || isBusyFailure(result)) {
       const r2 = await proWithRetries(10000);
       if (r2) result = r2;
@@ -2278,7 +2283,8 @@ async function handleGenerate(req, res, hold) {
         again = await callGemini(NB21_MODEL, true, budget(70000));
         if (isBusyFailure(again)) again = await proWithRetries(10000);
       } else if (useProEngine && !busyFallback) {
-        if (vertexSA()) again = await callVertexBackoff(PRO_MODEL, true, budget(90000));
+        again = await callGemini(PRO_MODEL, true, budget(90000));
+        if (isBusyFailure(again) && vertexSA()) again = await callVertexBackoff(PRO_MODEL, true, budget(90000));
         if (!again || isBusyFailure(again)) again = await proWithRetries(10000);
       } else {
         again = await baseThenLegacy(Math.max(6000, left() - 3000));
