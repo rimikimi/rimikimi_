@@ -274,7 +274,15 @@ async function finishOutput(base64, mime, watermark, fullRes = false) {
     console.error("[finishOutput failed, falling back]", e?.message || e);
     let raw = { base64, mime };
     if (watermark) raw = await applyWatermark(base64, mime);
-    return { raw, small: fullRes ? raw : await shrinkOutput(raw.base64, raw.mime) };
+    // ⚠️ fullRes 라도 원본 PNG 를 그대로 보내면 2K 한 장이 base64 ~12MB 라 4.5MB 응답 한도를 넘는다 → JPEG 로.
+    if (fullRes) {
+      try {
+        const sharp = (await import("sharp")).default;
+        const j = await sharp(Buffer.from(raw.base64, "base64")).jpeg({ quality: 90, mozjpeg: true }).toBuffer();
+        return { raw, small: { base64: j.toString("base64"), mime: "image/jpeg" } };
+      } catch (_) { /* 아래 축소본으로 */ }
+    }
+    return { raw, small: await shrinkOutput(raw.base64, raw.mime) };
   }
 }
 
