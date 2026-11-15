@@ -443,7 +443,8 @@ const BIG_HEAD_OK_IDS = new Set(["1127"]);
 
 // 템플릿 컨셉(2026-11-15 오너 "템플릿을 픽스하고 사람만 갈아끼우면 되는 거 아님?", "샘플이랑 다르면 사기급"):
 // concepts.json 의 template(예: "large/1415.webp") 이미지를 그대로 두고 사람만 바꾼다. 남녀·나이 무관.
-// 실측: Pro 는 템플릿 속 사람을 그대로 돌려주는 경우가 많아(4장 중 3장) 2.1 로 고정한다.
+// 모델: 처음엔 Pro 가 템플릿 속 사람을 그대로 돌려줘(옛 지시문, 4장 중 3장) 2.1 로 고정했으나, 지금 지시문으로 Pro 재실측
+// (60대·남성·다른 여성) 얼굴 교체 확인 → 오너 "매직부스 말고는 다 프로" 에 따라 Pro.
 const TEMPLATE_INSTRUCTION =
   "The FIRST image is a finished studio photograph used as a fixed template. Reproduce it exactly — the same background " +
   "and set, every decoration (each bauble, ribbon and light in the same place, size and colour), the same garment type and " +
@@ -1929,7 +1930,7 @@ async function handleGenerate(req, res, hold) {
   const abShare = 0;
   const abArm = abEligible ? (Math.random() < abShare ? "nb21" : "pro") : null;
   let abFirstModel = null, abFirstQa = null, abRegen = false;
-  const useNb21 = (conceptId != null && NB21_IDS.has(String(conceptId))) || abArm === "nb21" || !!templateImg;
+  const useNb21 = (conceptId != null && NB21_IDS.has(String(conceptId))) || abArm === "nb21";
   const PRO_MODEL = "gemini-3-pro-image";
   const BASE_MODEL = "gemini-3.1-flash-image";
   // 최후 폴백 — 검증된 구세대 모델.
