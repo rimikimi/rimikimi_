@@ -143,9 +143,9 @@ struct InviteCard: View {
     }
 }
 
-/// 가입 직후 1회 — "친구 초대로 오셨나요?" 코드 입력 시트(2026-11-15).
+/// 가입 직후 1회 — "친구 초대로 오셨나요?" 코드 입력 시트(2026-11-15). 보상은 초대한 사람에게 5장.
 /// 초대 페이지(public/invite.html)가 클립보드에 "rimikimi-invite:CODE" 를 넣어 두므로, 시스템 붙여넣기 버튼
-/// (PasteButton — 권한 팝업 없음) 한 번으로 코드가 들어온다. 보상은 초대한 사람에게 3장.
+/// (PasteButton — 권한 팝업 없음) 한 번으로 코드가 들어온다.
 struct InviteCodeSheet: View {
     @Environment(AppState.self) private var app
     @Environment(\.dismiss) private var dismiss

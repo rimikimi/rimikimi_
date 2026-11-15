@@ -3,7 +3,7 @@
 // 친구가 설정에서 코드를 직접 쳐야만 인정됐기 때문. 그래서
 //   ① 초대 페이지가 Play 스토어 링크에 실어 둔 install referrer(utm_content=CODE)를 읽어 칸을 미리 채우고,
 //   ② 클립보드("rimikimi-invite:CODE")에서 붙여넣기 버튼으로도 채운다.
-// 대상은 서버 quota.inviteEligible(가입 7일 이내·초대 미등록), 계정당 한 번(AsyncStorage). 보상은 초대한 사람에게 3장.
+// 대상은 서버 quota.inviteEligible(가입 7일 이내·초대 미등록), 계정당 한 번(AsyncStorage). 보상은 초대한 사람에게 5장(11/15 3→5).
 import { useEffect, useState } from "react";
 import { Platform, StyleSheet, TextInput, ToastAndroid, View } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
