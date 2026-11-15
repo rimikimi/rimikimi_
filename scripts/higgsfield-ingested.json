@@ -1361,7 +1361,7 @@
     "title": "루돌프 어글리 스웨터"
   },
   "6e66d491-f184-4e6d-8be0-750c94cb7443": {
-    "status": "to-regen",
+    "status": "replaced",
     "id": "1368",
     "title": "핑크 털모자 귀덮개 잡기"
   },
@@ -1426,7 +1426,7 @@
     "title": "트리 옆 레드 니트 미소"
   },
   "f2cb1198-f284-45fa-9179-0d145f10ee3c": {
-    "status": "to-regen",
+    "status": "replaced",
     "id": "1381",
     "title": "트리 불빛 앙고라 니트"
   },
@@ -1594,5 +1594,15 @@
     "status": "staged",
     "id": "1414",
     "title": "버건디 배경 로우번"
+  },
+  "4da1d214-e9f5-49b4-b903-2dc95823dbd3": {
+    "status": "staged",
+    "id": "1368",
+    "title": "연보라 털모자 귀덮개 잡기"
+  },
+  "d56f87a7-25f6-4289-83cd-98ca636548c4": {
+    "status": "staged",
+    "id": "1381",
+    "title": "블루 오너먼트 앙고라 니트"
   }
 }
