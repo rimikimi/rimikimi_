@@ -42,7 +42,9 @@ final class LabelStore {
 
     /// 서버 표에 값이 있으면 그것, 없으면 기본 문구.
     static func t(_ key: String, _ ko: String, _ en: String) -> String {
-        if let v = shared.table[key]?[L.ko ? "ko" : "en"], !v.isEmpty { return v }
+        if let v = shared.table[key]?[L.lang], !v.isEmpty { return v }
+        if !L.ko, let v = shared.table[key]?["en"], !v.isEmpty { return L.tr(v) }
+        if L.ko, let v = shared.table[key]?["ko"], !v.isEmpty { return v }
         return L.t(ko, en)
     }
 }

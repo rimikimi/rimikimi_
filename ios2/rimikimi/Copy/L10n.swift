@@ -3,7 +3,8 @@ import Observation
 
 /// 프로필 "언어" 행의 선택지. 기본은 `.system`(기기 언어를 따른다).
 enum AppLanguage: String, CaseIterable, Identifiable {
-    case system, ko, en
+    // 2026-11-16 오너: 일본어·대만(번체)·인도네시아어·태국어·말레이어 추가. 원값 = 번역 사전 언어 코드.
+    case system, ko, en, ja, zhHant = "zh-Hant", indonesian = "id", th, ms
     var id: String { rawValue }
 }
 
@@ -21,9 +22,13 @@ enum L {
     final class Current {
         fileprivate(set) var preference: AppLanguage
         fileprivate(set) var ko: Bool
+        /// 실제로 쓰는 언어 코드 — ko · en · ja · zh-Hant · id · th · ms.
+        fileprivate(set) var lang: String
         init(preference: AppLanguage) {
             self.preference = preference
-            ko = L.resolve(preference)
+            let l = L.resolveLang(preference)
+            lang = l
+            ko = l == "ko"
         }
     }
 
@@ -31,27 +36,33 @@ enum L {
     static let current = Current(preference: AppLanguage(rawValue: UserDefaults.standard.string(forKey: key) ?? "") ?? .system)
 
     /// 기기 언어 — 실행 때 한 번 본다(기기 언어를 바꾸면 iOS 가 앱을 새로 띄운다).
-    static let systemKo: Bool = {
+    static let systemKo: Bool = { systemLang == "ko" }()
+    /// 기기 첫 선호 언어 → 지원 언어 코드(없으면 en). 중국어는 번체(대만·홍콩·마카오)만 — 간체는 영어.
+    static let systemLang: String = {
         let first = Locale.preferredLanguages.first?.lowercased() ?? ""
-        return first.hasPrefix("ko")
+        if first.hasPrefix("ko") { return "ko" }
+        if first.hasPrefix("ja") { return "ja" }
+        if first.hasPrefix("zh-hant") || first.hasPrefix("zh-tw") || first.hasPrefix("zh-hk") || first.hasPrefix("zh-mo") { return "zh-Hant" }
+        if first.hasPrefix("id") || first.hasPrefix("in-") || first == "in" { return "id" }
+        if first.hasPrefix("th") { return "th" }
+        if first.hasPrefix("ms") { return "ms" }
+        return "en"
     }()
 
     static var preference: AppLanguage { current.preference }
     static var ko: Bool { current.ko }
+    static var lang: String { current.lang }
 
     /// 프로필 "언어" 행 → 저장하고 바로 적용.
     static func set(_ p: AppLanguage) {
         UserDefaults.standard.set(p.rawValue, forKey: key)
         current.preference = p
-        current.ko = resolve(p)
+        current.lang = resolveLang(p)
+        current.ko = current.lang == "ko"
     }
 
-    fileprivate static func resolve(_ p: AppLanguage) -> Bool {
-        switch p {
-        case .system: return systemKo
-        case .ko: return true
-        case .en: return false
-        }
+    fileprivate static func resolveLang(_ p: AppLanguage) -> String {
+        p == .system ? systemLang : p.rawValue
     }
 
     /// 웹뷰 도구·서버에 넘길 언어 코드.
@@ -59,5 +70,15 @@ enum L {
 
     /// 한국어면 `ko`, 아니면 `en`.
     @inline(__always)
-    static func t(_ ko: String, _ en: String) -> String { L.ko ? ko : en }
+    static func t(_ ko: String, _ en: String) -> String {
+        let l = current.lang
+        if l == "ko" { return ko }
+        if l == "en" { return en }
+        return I18N.tr(en, l)
+    }
+    /// 영어 문구(서버 이름표 등)를 지금 언어로 — 사전에 없으면 영어 그대로.
+    static func tr(_ en: String) -> String {
+        let l = current.lang
+        return (l == "ko" || l == "en") ? en : I18N.tr(en, l)
+    }
 }

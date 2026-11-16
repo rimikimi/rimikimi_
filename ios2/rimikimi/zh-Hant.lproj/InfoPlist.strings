@@ -1,0 +1,5 @@
+/* Permission prompts (zh-Hant, 2026-11-16). */
+"NSCameraUsageDescription" = "rimikimi 使用相機讓你拍攝照片，製作成概念寫真。";
+"NSPhotoLibraryAddUsageDescription" = "rimikimi 會將你製作與編輯的照片儲存到照片圖庫。";
+"NSMicrophoneUsageDescription" = "開啟濾鏡相機時 iOS 會檢查此權限，rimikimi 不會錄音。";
+"NSUserTrackingUsageDescription" = "用於為你顯示個人化廣告。";

@@ -24,6 +24,8 @@ struct Concept: Identifiable, Hashable, Decodable {
     /// 샘플 이미지 버전(서버 concepts.json imgV, 2026-11-15) — 바뀌면 주소 뒤 ?v= 가 달라져 앱 디스크 캐시를 우회한다.
     /// (ImageLoader 는 returnCacheDataElseLoad 라 같은 주소면 서버를 다시 묻지 않는다.)
     var imgV: String? = nil
+    /// 컨셉 이름 번역(서버 titleI18n — ja·zh-Hant·id·th·ms, 2026-11-16).
+    var titleI18n: [String: String]? = nil
     /// 2026-10-09 이식: 리미키미 컨셉이 아닌 담기 항목(브루클린 룩 · 조세핀 드레스)을 같은 격자·담기 줄에 태우려고
     /// 컨셉 모양을 빌린다. 서버엔 conceptId 대신 studio / wedding 으로 보낸다(RimikimiAPI.generate).
     var customThumb: URL? = nil
@@ -33,7 +35,7 @@ struct Concept: Identifiable, Hashable, Decodable {
     var isSynthetic: Bool { studioPreset != nil || dressCode != nil }
 
     enum CodingKeys: String, CodingKey {
-        case id, title, title_en, category, categories, text, mode, fourcutStyle, fourcutStyles, pinFeatured, publishAt, sensitive, purposes, mood, imgV
+        case id, title, title_en, category, categories, text, mode, fourcutStyle, fourcutStyles, pinFeatured, publishAt, sensitive, purposes, mood, imgV, titleI18n
     }
 
     init(from decoder: Decoder) throws {
@@ -62,6 +64,7 @@ struct Concept: Identifiable, Hashable, Decodable {
         purposes = (try? c.decode([String].self, forKey: .purposes)) ?? []
         mood = try? c.decode(Mood.self, forKey: .mood)
         imgV = try? c.decode(String.self, forKey: .imgV)
+        titleI18n = try? c.decode([String: String].self, forKey: .titleI18n)
     }
 
     /// 브루클린 룩 · 조세핀 드레스용 — 서버 카탈로그에서 만든다.
@@ -101,6 +104,7 @@ struct Concept: Identifiable, Hashable, Decodable {
 
     /// 화면에 보일 이름 — 영어 UI 면 `title_en`(비어 있으면 한국어 제목). 판정·서버 전송은 계속 `title`.
     var displayTitle: String {
+        if let t = titleI18n?[L.lang], !t.isEmpty { return t }
         if !L.ko, let en = titleEn?.trimmingCharacters(in: .whitespacesAndNewlines), !en.isEmpty { return en }
         return title
     }

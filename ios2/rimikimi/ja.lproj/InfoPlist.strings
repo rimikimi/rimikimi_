@@ -1,0 +1,5 @@
+/* Permission prompts (ja, 2026-11-16). */
+"NSCameraUsageDescription" = "コンセプト写真にする写真を撮るためにカメラを使用します。";
+"NSPhotoLibraryAddUsageDescription" = "作成・編集した写真を写真ライブラリに保存します。";
+"NSMicrophoneUsageDescription" = "フィルターカメラを開くときにiOSが確認します。rimikimiは音声を録音しません。";
+"NSUserTrackingUsageDescription" = "あなたに合わせた広告を表示するために使用します。";

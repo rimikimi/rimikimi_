@@ -20,7 +20,7 @@ struct FilterTabView: View {
         let remote = FilterCatalog.shared.groups
         guard !remote.isEmpty else { return builtinGroups }
         let emoji = ["phone": "📱", "vintage": "📸", "mood": "🎞️", "fx": "✨"]
-        return remote.map { .init(key: $0.key, title: L.ko ? $0.ko : $0.en, emoji: emoji[$0.key] ?? "✨", presets: $0.keys.map { Preset(key: $0) }) }
+        return remote.map { .init(key: $0.key, title: L.ko ? $0.ko : L.tr($0.en), emoji: emoji[$0.key] ?? "✨", presets: $0.keys.map { Preset(key: $0) }) }
     }
     static var builtinGroups: [Group] { [
         // 폰카 — 연도별 아이폰 색감. 이름은 모델 번호만(오너 지시 2026-09-23, "iPhone" 은 안 붙인다).

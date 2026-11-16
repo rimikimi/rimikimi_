@@ -1,0 +1,5 @@
+/* Permission prompts (ms, 2026-11-16). */
+"NSCameraUsageDescription" = "rimikimi menggunakan kamera supaya anda boleh mengambil foto untuk dijadikan foto konsep.";
+"NSPhotoLibraryAddUsageDescription" = "rimikimi menyimpan foto yang anda cipta dan sunting ke pustaka foto.";
+"NSMicrophoneUsageDescription" = "iOS menyemak ini apabila kamera penapis dibuka. rimikimi tidak pernah merakam bunyi.";
+"NSUserTrackingUsageDescription" = "Digunakan untuk memaparkan iklan yang diperibadikan.";

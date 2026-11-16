@@ -30,11 +30,11 @@ enum Copy {
     static var refund: String { L.t("환불정책", "Refund Policy") }
 
     /// "3장" / "3 photos"
-    static func photos(_ n: Int) -> String { L.ko ? "\(n)장" : plural(n, "photo", "photos") }
+    static func photos(_ n: Int) -> String { L.ko ? "\(n)장" : L.tr(plural(n, "photo", "photos")) }
     /// "3 크레딧" / "3 credits"
-    static func credits(_ n: Int) -> String { L.ko ? "\(n) 크레딧" : plural(n, "credit", "credits") }
+    static func credits(_ n: Int) -> String { L.ko ? "\(n) 크레딧" : L.tr(plural(n, "credit", "credits")) }
     /// 원화 금액 폴백(스토어 가격을 못 받았을 때만) — "3,900원" / "₩3,900"
-    static func krw(_ v: Int) -> String { L.ko ? "\(v.formatted())원" : v.formatted(.currency(code: "KRW").precision(.fractionLength(0))) }
+    static func krw(_ v: Int) -> String { L.ko ? "\(v.formatted())원" : L.tr(v.formatted(.currency(code: "KRW").precision(.fractionLength(0)))) }
 
     // MARK: 탭
 
@@ -87,14 +87,14 @@ enum Copy {
     static var noResults: String { L.t("검색 결과가 없어요", "No results") }
     static var makeWithThisConcept: String { L.t("이 컨셉으로 만들기", "Create with this concept") }
     /// 앨범 타일 장수 — "12장" / "12" (웹 `home.albumCount`)
-    static func albumCount(_ n: Int) -> String { L.ko ? "\(n)장" : "\(n)" }
+    static func albumCount(_ n: Int) -> String { L.ko ? "\(n)장" : L.tr("\(n)") }
     static var brooklynTitle: String { L.t("증명사진이 필요하다면, Brooklyn", "Need an ID photo? Try Brooklyn") }
     static var brooklynDesc: String { L.t("여권·이력서·배우 프로필까지\n셀카 한 장이면 스튜디오급으로", "Passport, resume, actor headshots\nStudio quality from one selfie") }
     static var brooklynGet: String { L.t("받기", "Get") }
 
     /// 헤더 크레딧 칩 — `Quota.chipLabel`
     static var chipUnlimited: String { L.t("∞ 무제한", "∞ Unlimited") }
-    static func chipFree(_ n: Int) -> String { L.ko ? "무료 \(n)장" : "\(n) free" }
+    static func chipFree(_ n: Int) -> String { L.ko ? "무료 \(n)장" : L.tr("\(n) free") }
 
     // MARK: 카테고리 이름 (데이터는 한국어 그대로 — 화면에 보일 때만 바꾼다)
 
@@ -176,7 +176,7 @@ enum Copy {
         return L.ko ? n.ko : n.en
     }
     static var filterOriginal: String { L.t("원본", "Original") }
-    static func todaysFilter(_ group: String) -> String { L.ko ? "오늘의 필터 · \(group)" : "Today's filter · \(group)" }
+    static func todaysFilter(_ group: String) -> String { L.ko ? "오늘의 필터 · \(group)" : L.tr("Today's filter · \(group)") }
     static var filterTapToStart: String { L.t("탭하면 이 필터로 바로 시작", "Tap to start with this filter") }
     static var filterUpTo10: String { L.t("한 번에 10장까지", "Up to 10 at once") }
     static var filterAllFree: String { L.t("전부 무료", "All free") }
@@ -202,12 +202,12 @@ enum Copy {
     static var dressModel: String { L.t("일상컷", "Everyday cut") }
     static var cutsTitle: String { L.t("컷 수", "Cuts") }
     /// "4컷" / "4 cuts"
-    static func cuts(_ n: Int) -> String { L.ko ? "\(n)컷" : plural(n, "cut", "cuts") }
+    static func cuts(_ n: Int) -> String { L.ko ? "\(n)컷" : L.tr(plural(n, "cut", "cuts")) }
     static var styleTitle: String { L.t("스타일", "Style") }
     static var batchTitle: String { L.t("한 번에 만들기", "Make several at once") }
-    static func creditsHeld(_ n: Int) -> String { L.ko ? "크레딧 \(n)개 보유" : "You have \(plural(n, "credit", "credits"))" }
+    static func creditsHeld(_ n: Int) -> String { L.ko ? "크레딧 \(n)개 보유" : L.tr("You have \(plural(n, "credit", "credits"))") }
     /// 묶음 할인 배지 — "17% 할인" / "Save 17%"
-    static func percentOff(_ pct: Int) -> String { L.ko ? "\(pct)% 할인" : "Save \(pct)%" }
+    static func percentOff(_ pct: Int) -> String { L.ko ? "\(pct)% 할인" : L.tr("Save \(pct)%") }
     static var footArt: String { L.t("업로드하신 사진을 선택한 컨셉으로 변환해 드려요.", "We'll transform your photo into the selected concept.") }
     // 커스텀 보정(매직 부스) — 2026-09-30
     static var retouchPhotoTitle: String { L.t("고칠 사진", "Photo to fix") }
@@ -219,10 +219,10 @@ enum Copy {
     static var keyboardDone: String { L.t("완료", "Done") }
     static var footRetouch: String { L.t("AI 가 요청을 이해하고 그 부분만 고쳐요. 얼굴과 나머지는 원본 그대로예요.", "AI reads your request and fixes only that part. Faces and everything else stay as in your photo.") }
     static var footFace: String { L.t("선택한 컨셉으로 내 얼굴 특징을 살린 이미지를 만들어 드려요.", "We'll create this concept keeping your facial features.") }
-    static func makeCost(_ n: Int) -> String { L.ko ? "만들기 · \(n) 크레딧" : "Create · \(plural(n, "credit", "credits"))" }
+    static func makeCost(_ n: Int) -> String { L.ko ? "만들기 · \(n) 크레딧" : L.tr("Create · \(plural(n, "credit", "credits"))") }
     static var loginToSave: String { L.t("생성된 이미지 저장을 위해 로그인이 필요합니다", "Sign in to save your generated image") }
     static var garmentsTitle: String { L.t("입어볼 의상 (한 번에 5장까지 선택)", "Items to try on (pick up to 5 at once)") }
-    static func garmentRemove(_ i: Int) -> String { L.ko ? "의상 \(i) 삭제" : "Remove item \(i)" }
+    static func garmentRemove(_ i: Int) -> String { L.ko ? "의상 \(i) 삭제" : L.tr("Remove item \(i)") }
     static var garmentAddFirst: String { L.t("의상 올리기", "Add item") }
     static var garmentAddMore: String { L.t("더 추가", "Add more") }
     static var garmentAutoNote: String { L.t("빠진 의상은 AI가 판단해서 생성해줘요.", "Anything missing, AI fills in to match.") }
@@ -230,7 +230,7 @@ enum Copy {
     // MARK: 결과
 
     static func resultCount(_ n: Int, page: Int) -> String {
-        L.ko ? "\(n)장 만들었어요 · \(page) / \(n)" : "\(plural(n, "photo", "photos")) made · \(page) / \(n)"
+        L.ko ? "\(n)장 만들었어요 · \(page) / \(n)" : L.tr("\(plural(n, "photo", "photos")) made · \(page) / \(n)")
     }
     static var resultHoldOriginal: String { L.t("길게 눌러 원본 보기", "Hold to see the original") }
     static var resultOriginalBadge: String { L.t("원본", "Original") }
@@ -254,7 +254,7 @@ enum Copy {
 
     static var fitTitle: String { L.t("정방향 맞춤", "Fit to 3:4") }
     static var fitDesc: String { L.t("이 사진은 3:4 가 아니에요. 얼굴 기준으로 잘라 맞추거나, 바깥을 채워 맞출 수 있어요.", "This photo isn't 3:4. You can crop it around the face, or fill in the edges to fit.") }
-    static func fitOriginal(_ w: Int, _ h: Int) -> String { L.ko ? "원본 \(w)×\(h)" : "Original \(w)×\(h)" }
+    static func fitOriginal(_ w: Int, _ h: Int) -> String { L.ko ? "원본 \(w)×\(h)" : L.tr("Original \(w)×\(h)") }
     static var fitCropPreview: String { L.t("잘라 맞춤 미리보기", "Crop preview") }
     static var fitCropFree: String { L.t("잘라 맞춤 · 무료", "Crop · free") }
     static var fitFilledToast: String { L.t("채워 맞춤으로 3:4 를 만들었어요", "Filled in to 3:4") }
@@ -357,7 +357,7 @@ enum Copy {
     static var mineLoadFailed: String { L.t("갤러리를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.", "Couldn't load your gallery. Please try again in a moment.") }
     static var genRunning: String { L.t("이미지를 만들고 있어요", "Creating your image") }
     static var genWaiting: String { L.t("연결이 잠시 끊겼지만 서버는 계속 만들고 있어요.\n결과를 기다리는 중이에요...", "The connection dropped, but the server is still working.\nWaiting for your result...") }
-    static func genBatchHint(_ n: Int) -> String { L.ko ? "\(n)장을 만드는 중이라 몇 분까지 걸릴 수 있어요" : "Making \(n) photos — this can take a few minutes" }
+    static func genBatchHint(_ n: Int) -> String { L.ko ? "\(n)장을 만드는 중이라 몇 분까지 걸릴 수 있어요" : L.tr("Making \(n) photos — this can take a few minutes") }
     static var genHint: String { L.t("최대 몇 분까지 걸릴 수 있어요", "This can take a few minutes") }
     static var genDone: String { L.t("완성!", "Done!") }
     static var genView: String { L.t("보기", "View") }
@@ -372,7 +372,7 @@ enum Copy {
     static var inviteFriends: String { L.t("친구 초대", "Invite friends") }
     static var faceRescan: String { L.t("얼굴 다시 스캔하기", "Rescan face") }
     static var faceScan: String { L.t("얼굴 스캔하기", "Scan face") }
-    static func faceSavedCount(_ n: Int) -> String { L.ko ? "\(n)장 등록됨" : "\(n) saved" }
+    static func faceSavedCount(_ n: Int) -> String { L.ko ? "\(n)장 등록됨" : L.tr("\(n) saved") }
     static var account: String { L.t("계정", "Account") }
     static var signOut: String { L.t("로그아웃", "Sign out") }
     static var deleting: String { L.t("삭제 중…", "Deleting…") }
@@ -401,6 +401,11 @@ enum Copy {
         case .system: return L.t("시스템 따라가기", "Follow system")
         case .ko: return "한국어"
         case .en: return "English"
+        case .ja: return "日本語"
+        case .zhHant: return "繁體中文"
+        case .indonesian: return "Bahasa Indonesia"
+        case .th: return "ไทย"
+        case .ms: return "Bahasa Melayu"
         }
     }
 
@@ -408,7 +413,7 @@ enum Copy {
 
     static var storeBalance: String { L.t("현재 보유", "Balance") }
     /// 하루 무료 장수는 계정마다 다르다(9/30: 그 전 가입 2장 · 그 뒤 가입 1장) — 서버 quota 의 limit 을 받는다.
-    static func storeIntro(_ n: Int) -> String { L.ko ? "하루 무료 \(n)장을 모두 사용했어요. 크레딧 1장으로 이미지 한 장을 만들 수 있어요." : "You've used today's \(n) free \(n == 1 ? "image" : "images"). 1 credit = 1 image." }
+    static func storeIntro(_ n: Int) -> String { L.ko ? "하루 무료 \(n)장을 모두 사용했어요. 크레딧 1장으로 이미지 한 장을 만들 수 있어요." : L.tr("You've used today's \(n) free \(n == 1 ? "image" : "images"). 1 credit = 1 image.") }
     static var storePacks: String { L.t("크레딧 팩", "Credit packs") }
     static var storeSubs: String { L.t("rimikimi+ 구독", "rimikimi+ subscription") }
     static var storeSubsDesc: String { L.t("광고·워터마크 제거 + 크레딧 자동 충전", "No ads or watermark + automatic credit refills") }
@@ -417,9 +422,9 @@ enum Copy {
     static var restoreDone: String { L.t("구매 내역을 확인했어요.", "Checked your purchases.") }
     static var storeLegalCredits: String { L.t("구매는 App Store 계정으로 안전하게 결제돼요.", "Purchases are billed securely through your App Store account.") }
     static var storeLegal: String { L.t("구매는 App Store 계정으로 안전하게 결제돼요. 구독은 기간 종료 24시간 전까지 해지하지 않으면 자동 갱신돼요.", "Purchases are billed securely through your App Store account. Subscriptions renew automatically unless canceled at least 24 hours before the end of the current period.") }
-    static func purchaseDone(_ n: Int) -> String { L.ko ? "🎉 +\(n) 크레딧 충전 완료!" : "🎉 +\(plural(n, "credit", "credits")) added!" }
+    static func purchaseDone(_ n: Int) -> String { L.ko ? "🎉 +\(n) 크레딧 충전 완료!" : L.tr("🎉 +\(plural(n, "credit", "credits")) added!") }
     static var purchaseTestNoCredit: String { L.t("테스트 결제라 크레딧은 적립되지 않았어요.", "This was a test purchase, so no credits were added.") }
-    static func purchaseFailed(_ msg: String) -> String { L.ko ? "결제 처리 실패: \(msg)" : "Payment failed: \(msg)" }
+    static func purchaseFailed(_ msg: String) -> String { L.ko ? "결제 처리 실패: \(msg)" : L.tr("Payment failed: \(msg)") }
     static func subLine(period: String?, credits n: Int) -> String {
         if L.ko { return "매\(period ?? "") \(n) 크레딧" }
         let every: String
@@ -431,7 +436,7 @@ enum Copy {
         }
         return "\(plural(n, "credit", "credits")) every \(every)"
     }
-    static func perImage(krw v: Int) -> String { L.ko ? "장당 \(v.formatted())원" : "\(Copy.krw(v)) each" }
+    static func perImage(krw v: Int) -> String { L.ko ? "장당 \(v.formatted())원" : L.tr("\(Copy.krw(v)) each") }
     static var processing: String { L.t("처리 중…", "Processing…") }
     static var notEnoughCredits: String { L.t("크레딧이 부족해요", "Not enough credits") }
     static var continueAfterTopUp: String { L.t("충전하면 하던 작업이 바로 이어져요.", "Top up and we'll pick up right where you left off.") }
@@ -470,7 +475,7 @@ enum Copy {
     static var filterPassTitle: String { L.t("카메라 이용권", "Camera Pass") }
     static var filterPassSubtitle: String { L.t("폰카·빈티지·감성 필터를 전부 저장하고 공유해요.", "Save and share every filter — phone, vintage and mood.") }
     static var filterPassFreeLine: String { L.t("원본은 언제나 무료예요. 처음 3일은 모든 필터를 무료로 써 보세요.", "Original is always free. Try every filter free for your first 3 days.") }
-    static func filterPassDaysLeft(_ n: Int) -> String { L.ko ? "무료 이용 \(n)일 남음" : (n == 1 ? "1 free day left" : "\(n) free days left") }
+    static func filterPassDaysLeft(_ n: Int) -> String { L.ko ? "무료 이용 \(n)일 남음" : L.tr((n == 1 ? "1 free day left" : "\(n) free days left")) }
     static var filterPassEnded: String { L.t("처음 3일이 끝났어요. 이용권으로 계속 쓸 수 있어요.", "Your first 3 days are over. Keep going with a pass.") }
     static var filterPassActive: String { L.t("카메라 이용권을 쓰고 있어요. 모든 필터가 열려 있어요.", "Your Camera Pass is active. Every filter is unlocked.") }
     static var filterPassPlus: String { L.t("rimikimi+ 구독 중이라 모든 필터가 무료예요.", "You're on rimikimi+, so every filter is free.") }
@@ -514,7 +519,7 @@ enum Copy {
     // MARK: 친구 초대
 
     static var inviteHeadline: String { L.t("🎟 친구 초대하면 크레딧 5개", "🎟 Invite & earn 5 credits") }
-    static func inviteDesc(_ invited: Int) -> String { L.ko ? "친구 1명 초대할 때마다 크레딧 5개! (현재 \(invited)명 초대)" : "Get 5 credits for every friend you invite! (\(invited) invited so far)" }
+    static func inviteDesc(_ invited: Int) -> String { L.ko ? "친구 1명 초대할 때마다 크레딧 5개! (현재 \(invited)명 초대)" : L.tr("Get 5 credits for every friend you invite! (\(invited) invited so far)") }
     static var inviteDescShort: String { L.t("친구 1명 초대할 때마다 크레딧 5개!", "5 credits per friend invited!") }
     static var inviteMyCode: String { L.t("내 초대 코드", "Your invite code") }
     static var inviteCodeCopied: String { L.t("초대 코드를 복사했어요", "Invite code copied") }
@@ -539,27 +544,27 @@ enum Copy {
 
     static var burstAllTaken: String { L.t("10장을 다 찍었어요 · 완료를 눌러 주세요", "You've taken all 10 · tap Done") }
     static var burstHint: String { L.t("여러 장 찍고 한 번에 필터를 입혀요 · 최대 10장", "Shoot several, then filter them all at once · up to 10") }
-    static func burstDone(_ n: Int) -> String { L.ko ? "완료 \(n)" : "Done \(n)" }
+    static func burstDone(_ n: Int) -> String { L.ko ? "완료 \(n)" : L.tr("Done \(n)") }
     static var cameraPermissionTitle: String { L.t("카메라 권한이 필요해요", "Camera access needed") }
     static var cameraPermissionDesc: String { L.t("설정에서 카메라를 켜면 여러 장을 찍어 한 번에 필터를 입힐 수 있어요.", "Turn on camera access in Settings to shoot several photos and filter them all at once.") }
     static var openSettings: String { L.t("설정 열기", "Open Settings") }
     static var shutter: String { L.t("촬영", "Shutter") }
     static var decorate: String { L.t("꾸미기", "Decorate") }
-    static func savedNToAlbum(_ n: Int) -> String { L.ko ? "\(n)장을 앨범에 저장했어요" : "Saved \(plural(n, "photo", "photos")) to your album" }
+    static func savedNToAlbum(_ n: Int) -> String { L.ko ? "\(n)장을 앨범에 저장했어요" : L.tr("Saved \(plural(n, "photo", "photos")) to your album") }
     static var noAlbumPermission: String { L.t("앨범 저장 권한이 없어요", "No permission to save to your album") }
     static var savedToAlbum: String { L.t("앨범에 저장했어요", "Saved to your album") }
 
     // MARK: 서버 통신 오류(앱이 만드는 문구만 — 서버가 보낸 `error` 문구는 그대로 보여 준다)
 
     static var errNetwork: String { L.t("네트워크 요청에 실패했어요. 잠시 후 다시 시도해 주세요.", "Network request failed. Please try again shortly.") }
-    static func errUnreadable(_ status: Int) -> String { L.ko ? "서버 응답을 읽을 수 없어요 (오류 \(status))" : "Couldn't read the server response (error \(status))" }
-    static func errGenerate(_ status: Int) -> String { L.ko ? "이미지 생성 실패 (오류 \(status))" : "Image generation failed (error \(status))" }
+    static func errUnreadable(_ status: Int) -> String { L.ko ? "서버 응답을 읽을 수 없어요 (오류 \(status))" : L.tr("Couldn't read the server response (error \(status))") }
+    static func errGenerate(_ status: Int) -> String { L.ko ? "이미지 생성 실패 (오류 \(status))" : L.tr("Image generation failed (error \(status))") }
     static var errDetailPrefix: String { L.t("\n\n[원문] ", "\n\n[Details] ") }
     static var errNoImage: String { L.t("이미지 응답을 받지 못했어요. 다른 컨셉으로 시도해 주세요.", "No image came back. Please try another concept.") }
     static var errOutpaintRetry: String { L.t("채워 맞춤을 하지 못했어요. 잠시 후 다시 시도해 주세요 🙂", "Couldn't fill in the photo. Please try again in a moment 🙂") }
     static var errOutpaintNoCharge: String { L.t("채워 맞춤을 하지 못했어요. 크레딧은 차감되지 않았어요 🙂", "Couldn't fill in the photo. No credit was used 🙂") }
     static var errOutpaintNoResult: String { L.t("채워 맞춤 결과를 받지 못했어요. 잠시 후 다시 시도해 주세요 🙂", "Didn't get the filled-in photo back. Please try again in a moment 🙂") }
-    static func errPayment(_ status: Int) -> String { L.ko ? "결제 처리 실패 (오류 \(status))" : "Payment processing failed (error \(status))" }
+    static func errPayment(_ status: Int) -> String { L.ko ? "결제 처리 실패 (오류 \(status))" : L.tr("Payment processing failed (error \(status))") }
     static var errPurchasePending: String { L.t("구매 확인 중이에요. 잠시 후 크레딧을 확인해 주세요.", "Confirming your purchase. Check your credits again in a moment.") }
-    static func errRequest(_ status: Int) -> String { L.ko ? "요청에 실패했어요 (오류 \(status))" : "Request failed (error \(status))" }
+    static func errRequest(_ status: Int) -> String { L.ko ? "요청에 실패했어요 (오류 \(status))" : L.tr("Request failed (error \(status))") }
 }
