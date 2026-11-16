@@ -1,3 +1,4 @@
+import { uiLang } from "./i18n";
 import { getEnv } from "./env";
 import { FAVORITES_ALBUM } from "./favorites";
 import { copy } from "./copy";
@@ -39,6 +40,8 @@ export interface Concept {
   thumb?: string;
   /** 샘플 이미지 버전(서버 imgV) — 주소 뒤 ?v= 로 붙여 디스크 캐시를 우회한다(2026-11-15). */
   imgV?: string;
+  /** 컨셉 이름 번역(서버 titleI18n — ja·zh-Hant·id·th·ms). */
+  titleI18n?: Record<string, string>;
   studioPurpose?: string;
   studioPreset?: string;
   dressCode?: string;
@@ -82,8 +85,10 @@ export const COUPLE_CATEGORY = "커플";
 
 /** 화면에 보일 컨셉 제목 — 영어 UI 이고 title_en 이 있으면 그것, 아니면 title.
  *  (판정·서버 전송에는 원래 title 을 쓴다 — 이 함수는 표시 전용.) */
-export function conceptTitle(c?: Pick<Concept, "title" | "title_en"> | null): string {
+export function conceptTitle(c?: Pick<Concept, "title" | "title_en"> & { titleI18n?: Record<string, string> } | null): string {
   if (!c) return "";
+  const tl = c.titleI18n?.[uiLang];
+  if (tl) return tl;
   return pick(c.title || "", c.title_en);
 }
 /** 인생네컷 스타일·증명사진 정장 같은 옵션 라벨 — 영어 UI 면 label_en. */

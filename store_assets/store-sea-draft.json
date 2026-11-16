@@ -1,5 +1,5 @@
 {
- "_note": "동남아·인도 스토어 문구 초안 — 2026-11-07, 오너 컨펌 전. Play 는 play-listing.json listings 에 th/id/vi/zh-TW 로 합치면 빌드 없이 반영. iOS 는 다음 버전 제출 때 로컬라이제이션 추가. 인도는 영어(en-US) 페이지 그대로 사용.",
+ "_note": "동남아·인도 스토어 문구 초안 — 2026-11-07, 오너 컨펌 전. Play 는 play-listing.json listings 에 th/id/vi/zh-TW 로 합치면 빌드 없이 반영. iOS 는 다음 버전 제출 때 로컬라이제이션 추가. 인도는 영어(en-US) 페이지 그대로 사용. / 2026-11-16 ja·ms 추가, Play zh-HK 는 zh-TW 와 같은 문구.",
  "th": {
   "play": {
    "title": "rimikimi: AI โฟโต้ชูตทุกวัน",
@@ -46,6 +46,30 @@
    "subtitle": "AI 寫真 · 大頭貼",
    "keywords": "寫真,大頭貼,自拍,情侶照,韓系,韓國,底片,相機,修圖,老照片,穿搭,拍貼",
    "promotionalText": "每天傍晚新增 4 種韓系寫真風格"
+  }
+ },
+ "ja": {
+  "play": {
+   "title": "rimikimi: AI写真・プロフィール作成",
+   "shortDescription": "自撮り1枚でAI写真。プロフィール、カップル、試着室など500以上のコンセプト。",
+   "fullDescription": "rimikimi — 自撮り1枚でAIフォト\n\n自撮り1枚をアップロードするだけで、rimikimiが本人らしさを保ったまま、あなたが必要な写真に変身させます。新しいホーム画面では、その日の気分や目的に合わせてぴったりのコンセプトを提案。毎日最初の1枚は無料で作成できます。\n\n■ 新しいホーム\n· プロフィール、SNS、カップル、試着室 — 必要な写真のタイプから選べます\n· 注目のコンセプトや新作をスワイプでチェック。アルバム形式で探しやすくなりました\n· 旅行、スタジオ、季節、フィルムなど500以上のコンセプト。毎晩4つの新作が追加されます\n\n■ まとめて作成\n· お気に入りのコンセプトを選んで、最大8枚まで一気に作成可能\n· 完成した写真は「マイフォト」に保存され、すぐにダウンロードできます\n\n■ スタジオ品質のプロフィール写真\n· ビジネス、プロフェッショナル、俳優風のルックを自撮り1枚で実現\n\n■ 試着室 — 似合うかどうか事前にチェック\n· トップス、ボトムス、アウター、靴、バッグ（最大5点）をアップロードして、自分に似合うかプレビュー\n· ショップのスクリーンショット、クローゼットの写真、鏡越しの自撮り、モデル写真のどれでもOK\n\n■ ムードカメラ\n· 38種類のフィルム、レトロ携帯、カメラ風ルックをリアルタイムで適用\n· 撮影後すぐに補正して保存できます\n\n■ 言葉で修正 ・ 古い写真の復元\n· 「後ろの人を消して」など、一言入力するだけでその部分だけを修正\n· 色あせたり傷ついたりした古い写真を、鮮明で綺麗な状態に復元\n\n■ カップル写真 ・ フォトブース\n· 2人の写真を1枚ずつ使って、カップルコンセプトの写真を生成\n· 好きなコンセプトを選んで、2–8コマのフォトブース風ストリップ画像を作成\n\n■ プライバシー第一\n· アップロードされた写真はサーバーに保存されません\n· 生成された画像は24時間後に自動的に削除されます\n· あなたの個人データは厳重に保護されます\n\n今すぐrimikimiで、あなたにぴったりの1枚を作りましょう！\n\n— 購入について —\nAI写真の作成にはクレジットを使用します。クレジットパックはGoogle Playアカウントに請求される1回限りの購入で、自動更新はありません。\n利用規約: https://rimikimi-app.vercel.app/terms\nプライバシーポリシー: https://rimikimi-app.vercel.app/privacy"
+  },
+  "ios": {
+   "subtitle": "AIフォト・プロフィール作成",
+   "keywords": "AI写真,プロフィール,自撮り,カップル,韓国,フィルム,カメラ,加工,修復,試着,フォトブース,ポートレート,証明写真",
+   "promotionalText": "毎晩4つの新しい韓国風コンセプトが登場。自撮り1枚で、スタジオ品質のプロフィール写真やカップル写真、バーチャル試着を体験しましょう。"
+  }
+ },
+ "ms": {
+  "play": {
+   "title": "rimikimi: Sesi Foto AI Harian",
+   "shortDescription": "Satu swafoto: profil, pasangan, bilik persalinan, 500+ konsep, kamera mood.",
+   "fullDescription": "rimikimi — sesi foto AI daripada satu swafoto\n\nMuat naik satu swafoto dan rimikimi mengubahnya menjadi foto yang anda perlukan, mengekalkan wajah anda dengan jelas. Di Laman Utama baharu, pilih apa yang anda perlukan hari ini dan konsep yang sepadan akan dikumpulkan segera. Foto pertama anda setiap hari adalah percuma.\n\n■ Laman Utama baharu\n· Profil, sosial, pasangan, bilik persalinan — bermula daripada foto yang anda perlukan\n· Leret melalui konsep pilihan dan baharu; album konsep bersambung di bawah\n· 500+ konsep — pelancongan, studio, musim, mood filem — dan 4 yang baharu setiap petang\n\n■ Beberapa foto sekaligus\n· Pilih konsep yang anda suka dan buat sehingga 8 foto sekali gus\n· Cari setiap satu dalam Foto Saya setelah selesai dan simpan di sana\n\n■ Foto profil yang kelihatan seperti buatan studio\n· Gaya perniagaan, profesional dan pelakon daripada satu swafoto\n\n■ Bilik Persalinan — adakah ini sesuai untuk saya?\n· Muat naik foto baju, seluar, pakaian luar, kasut atau beg (sehingga 5) dan pratonton keseluruhan pakaian pada anda\n· Tangkapan skrin kedai dan foto almari kedua-duanya berfungsi · swafoto cermin atau foto model\n\n■ Kamera mood\n· 38 gaya filem, telefon retro dan kamera, secara langsung semasa anda merakam\n· Kemas kini dan simpan segera\n\n■ Baiki dengan kata-kata · pemulihan foto lama\n· “Alih keluar orang di belakang saya” — satu baris dan hanya bahagian itu berubah\n· Kembalikan foto lama yang pudar atau rosak, tajam dan bersih\n\n■ Sesi foto pasangan · jalur foto booth\n· Dua orang, dua foto, satu foto konsep pasangan\n· Pilih konsep dan dapatkan jalur 2–8 bingkai sebagai satu imej\n\n■ Privasi diutamakan\n· Foto yang anda muat naik tidak pernah disimpan di pelayan kami\n· Imej yang dihasilkan dipadamkan secara automatik selepas 24 jam\n· Data peribadi anda kekal dilindungi\n\nHasilkan foto yang anda perlukan hari ini dengan rimikimi!\n\n— Pembelian —\nFoto AI menggunakan kredit. Pek kredit adalah pembelian sekali sahaja yang dibilkan ke akaun Google Play anda; tiada pembaharuan automatik.\nTerma Penggunaan: https://rimikimi-app.vercel.app/terms\nDasar Privasi: https://rimikimi-app.vercel.app/privacy"
+  },
+  "ios": {
+   "subtitle": "Sesi Foto AI · Foto Profil",
+   "keywords": "sesi foto,profil,swafoto,foto pasangan,gaya korea,filem,kamera,AI,edit foto,foto lama,cuba baju,booth foto",
+   "promotionalText": "4 konsep gaya Korea baharu setiap petang."
   }
  }
 }

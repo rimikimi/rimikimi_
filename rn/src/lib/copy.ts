@@ -6,6 +6,7 @@
 // 호출부는 그대로 `copy.xxx` 를 쓴다.
 
 import { isKo } from "./locale";
+import { translateDeep } from "./i18n";
 
 const copyKo = {
   tabs: {
@@ -745,4 +746,5 @@ const copyEn: Copy = {
   },
 };
 
-export const copy: Copy = isKo ? copyKo : copyEn;
+// 일본어·번체·인도네시아어·태국어·말레이어는 영어 표를 사전으로 바꿔 쓴다(src/lib/i18n.ts, 2026-11-16).
+export const copy: Copy = isKo ? copyKo : translateDeep(copyEn);

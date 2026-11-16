@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getEnv } from "./env";
 import { isKo } from "./locale";
+import { tr, uiLang } from "./i18n";
 
 // ============================================================================
 // 2.1 개편 문구 — iOS `ios2/rimikimi/Copy/Copy.swift`(+ CoachMarks·PurposeView·CameraFilterTab 안의
@@ -11,7 +12,7 @@ import { isKo } from "./locale";
 // 다음 실행 첫 화면부터 쓴다(받기 전 한순간 옛 이름이 보이지 않게).
 // ============================================================================
 
-export const t = (ko: string, en: string): string => (isKo ? ko : en);
+export const t = (ko: string, en: string): string => (isKo ? ko : tr(en));
 
 type LabelTable = Record<string, { ko?: string; en?: string }>;
 const LABELS_CACHE_KEY = "labels.cache";
@@ -47,8 +48,11 @@ export async function loadLabels(): Promise<void> {
 
 /** 서버 표에 값이 있으면 그것, 없으면 기본 문구(iOS `LabelStore.t`). */
 export function label(key: string, ko: string, en: string): string {
-  const v = labelTable[key]?.[isKo ? "ko" : "en"];
-  return v ? v : t(ko, en);
+  const row = labelTable[key];
+  const local = isKo ? undefined : (row as Record<string, string | undefined> | undefined)?.[uiLang];
+  if (local) return local;
+  const v = row?.[isKo ? "ko" : "en"];
+  return v ? (isKo ? v : tr(v)) : t(ko, en);
 }
 
 /**

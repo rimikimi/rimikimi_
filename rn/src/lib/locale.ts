@@ -1,4 +1,5 @@
 import { I18nManager } from "react-native";
+import { tr } from "./i18n";
 
 // ============================================================================
 // UI 언어 — 기기 첫 번째 선호 언어가 한국어면 한국어, 아니면 영어. 앱 시작 때 한 번만 정한다.
@@ -67,10 +68,10 @@ export const CATEGORY_EN: Record<string, string> = {
 /** 카테고리 표시 이름 — 키(한국어)는 그대로 두고 화면에 보일 때만 바꾼다. */
 export function categoryLabel(name: string): string {
   if (isKo) return name;
-  return CATEGORY_EN[name] ?? name;
+  return tr(CATEGORY_EN[name] ?? name);
 }
 
 /** 한국어/영어 중 하나를 고른다(데이터에 _en 필드가 있는 경우용). 영어가 비어 있으면 한국어. */
 export function pick(ko: string, en?: string | null): string {
-  return !isKo && en ? en : ko;
+  return !isKo && en ? tr(en) : ko;
 }
