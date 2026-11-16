@@ -58,6 +58,7 @@ const IOS_HIDE_CONTACT_COUPLES = true;
 export function iosHiddenConcept(c) { return !!(c && c.iosHidden); }
 import { moodOf } from "./mood.js";
 import IMG_V from "../_data/img-versions.json" with { type: "json" };
+import TITLE_I18N from "../_data/concept-titles-i18n.json" with { type: "json" };
 export function publishedConcepts(ALL, now, caps = new Set(), { ios = false } = {}) {
   const list = ALL.filter((c) => isPublished(c, now) && supportsConcept(c, caps) && !(IOS_HIDE_CONTACT_COUPLES && ios && iosHiddenConcept(c)));
 
@@ -68,6 +69,8 @@ export function publishedConcepts(ALL, now, caps = new Set(), { ios = false } = 
     if (!c.mood) c.mood = moodOf(c);
     // 샘플 이미지 지문(scripts/build-img-versions.mjs) — 앱이 주소 뒤 ?v= 로 붙여 바뀐 샘플을 바로 받는다.
     if (IMG_V[String(c.id)]) c.imgV = IMG_V[String(c.id)];
+    // 컨셉 이름 번역(ja·zh-Hant·id·th·ms, 2026-11-16) — 앱이 화면 언어에 맞는 것만 골라 쓴다.
+    if (TITLE_I18N[String(c.id)]) c.titleI18n = TITLE_I18N[String(c.id)];
   }
 
   const rank = (c) => (c.publishAt ? Date.parse(c.publishAt) : 0);

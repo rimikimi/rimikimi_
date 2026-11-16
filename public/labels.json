@@ -1,87 +1,182 @@
 {
- "feature.retouch": {
-  "ko": "말로 고치기",
-  "en": "Fix with words"
- },
- "feature.restore": {
-  "ko": "옛날 사진 복원",
-  "en": "Restore old photo"
- },
- "purpose.profile": {
-  "ko": "증명·프로필",
-  "en": "ID · Profile"
- },
- "purpose.snap": {
-  "ko": "프사·소개팅",
-  "en": "Profile pic · Dating"
- },
- "purpose.wedding": {
-  "ko": "웨딩·커플",
-  "en": "Wedding · Couple"
- },
- "purpose.concept": {
-  "ko": "컨셉화보",
-  "en": "Concept shoots"
- },
- "segment.today": {
-  "ko": "오늘의 새 컨셉",
-  "en": "New today"
- },
- "studioTab.resume": {
-  "ko": "이력서·취업",
-  "en": "Résumé"
- },
- "studioTab.linkedin": {
-  "ko": "전문 프로필",
-  "en": "Professional"
- },
- "studioTab.audition": {
-  "ko": "배우·모델",
-  "en": "Actor · model"
- },
- "weddingTab.concepts": {
-  "ko": "웨딩 컨셉",
-  "en": "Wedding"
- },
- "weddingTab.main": {
-  "ko": "본식 드레스",
-  "en": "Ceremony gowns"
- },
- "weddingTab.after": {
-  "ko": "2부 드레스",
-  "en": "Reception gowns"
- },
- "_comment": {
-  "ko": "앱 이름표 — 키별 ko/en. 앨범 이름은 category.<앨범명> 키로 바꿀 수 있다(예: category.스튜디오 프로필). 앱 2.1.0 build 32+ 가 읽는다.",
-  "en": ""
- },
- "purpose.dressroom": {
-  "ko": "드레스룸",
-  "en": "Dressing room"
- },
- "filterPass": {
-  "enabled": "false",
-  "iosMinBuild": "53",
-  "androidMinVersionCode": "109"
- },
- "category.일상(봄)": {
-  "ko": "일상(봄)",
-  "en": "Everyday · Spring"
- },
- "category.일상(여름)": {
-  "ko": "일상(여름)",
-  "en": "Everyday · Summer"
- },
- "category.일상(가을)": {
-  "ko": "일상(가을)",
-  "en": "Everyday · Autumn"
- },
- "category.일상(겨울)": {
-  "ko": "일상(겨울)",
-  "en": "Everyday · Winter"
- },
- "tab.make": {
-  "ko": "AI 컨셉",
-  "en": "AI Concepts"
- }
+  "feature.retouch": {
+    "ko": "말로 고치기",
+    "en": "Fix with words",
+    "ja": "言葉で修正",
+    "zh-Hant": "文字修圖",
+    "id": "Edit kata",
+    "th": "แก้ด้วยคำ",
+    "ms": "Baiki kata"
+  },
+  "feature.restore": {
+    "ko": "옛날 사진 복원",
+    "en": "Restore old photo",
+    "ja": "古い写真復元",
+    "zh-Hant": "舊照修復",
+    "id": "Restorasi foto",
+    "th": "กู้รูปเก่า",
+    "ms": "Pulih foto"
+  },
+  "purpose.profile": {
+    "ko": "증명·프로필",
+    "en": "ID · Profile",
+    "ja": "証明・プロフ",
+    "zh-Hant": "證件・個人照",
+    "id": "ID · Profil",
+    "th": "ไอดี · โปรไฟล์",
+    "ms": "ID · Profil"
+  },
+  "purpose.snap": {
+    "ko": "프사·소개팅",
+    "en": "Profile pic · Dating",
+    "ja": "スナップ・恋活",
+    "zh-Hant": "生活照・交友",
+    "id": "Foto · Kencan",
+    "th": "รูป · เดท",
+    "ms": "Foto · Janji temu"
+  },
+  "purpose.wedding": {
+    "ko": "웨딩·커플",
+    "en": "Wedding · Couple",
+    "ja": "ウェディング",
+    "zh-Hant": "婚紗・情侶",
+    "id": "Pernikahan",
+    "th": "แต่งงาน · คู่รัก",
+    "ms": "Kahwin · Pasangan"
+  },
+  "purpose.concept": {
+    "ko": "컨셉화보",
+    "en": "Concept shoots",
+    "ja": "コンセプト",
+    "zh-Hant": "風格寫真",
+    "id": "Foto Konsep",
+    "th": "คอนเซปต์",
+    "ms": "Foto Konsep"
+  },
+  "segment.today": {
+    "ko": "오늘의 새 컨셉",
+    "en": "New today",
+    "ja": "今日の新作",
+    "zh-Hant": "今日新作",
+    "id": "Baru hari ini",
+    "th": "มาใหม่วันนี้",
+    "ms": "Baru hari ini"
+  },
+  "studioTab.resume": {
+    "ko": "이력서·취업",
+    "en": "Résumé",
+    "ja": "履歴書",
+    "zh-Hant": "履歷",
+    "id": "Resume",
+    "th": "เรซูเม่",
+    "ms": "Resume"
+  },
+  "studioTab.linkedin": {
+    "ko": "전문 프로필",
+    "en": "Professional",
+    "ja": "ビジネス",
+    "zh-Hant": "商務",
+    "id": "Profesional",
+    "th": "มืออาชีพ",
+    "ms": "Profesional"
+  },
+  "studioTab.audition": {
+    "ko": "배우·모델",
+    "en": "Actor · model",
+    "ja": "俳優・モデル",
+    "zh-Hant": "演員・模特",
+    "id": "Aktor · Model",
+    "th": "นักแสดง · นางแบบ",
+    "ms": "Pelakon · Model"
+  },
+  "weddingTab.concepts": {
+    "ko": "웨딩 컨셉",
+    "en": "Wedding",
+    "ja": "ウェディング",
+    "zh-Hant": "婚紗寫真",
+    "id": "Pernikahan",
+    "th": "งานแต่ง",
+    "ms": "Perkahwinan"
+  },
+  "weddingTab.main": {
+    "ko": "본식 드레스",
+    "en": "Ceremony gowns",
+    "ja": "本式ドレス",
+    "zh-Hant": "正式禮服",
+    "id": "Gaun Utama",
+    "th": "ชุดพิธีการ",
+    "ms": "Gaun Utama"
+  },
+  "weddingTab.after": {
+    "ko": "2부 드레스",
+    "en": "Reception gowns",
+    "ja": "二次会ドレス",
+    "zh-Hant": "宴客禮服",
+    "id": "Gaun Resepsi",
+    "th": "ชุดงานเลี้ยง",
+    "ms": "Gaun Resepsi"
+  },
+  "_comment": {
+    "ko": "앱 이름표 — 키별 ko/en. 앨범 이름은 category.<앨범명> 키로 바꿀 수 있다(예: category.스튜디오 프로필). 앱 2.1.0 build 32+ 가 읽는다.",
+    "en": ""
+  },
+  "purpose.dressroom": {
+    "ko": "드레스룸",
+    "en": "Dressing room",
+    "ja": "ドレスルーム",
+    "zh-Hant": "試衣間",
+    "id": "Ruang Ganti",
+    "th": "ห้องแต่งตัว",
+    "ms": "Bilik Persalinan"
+  },
+  "filterPass": {
+    "enabled": "false",
+    "iosMinBuild": "53",
+    "androidMinVersionCode": "109"
+  },
+  "category.일상(봄)": {
+    "ko": "일상(봄)",
+    "en": "Everyday · Spring",
+    "ja": "日常・春",
+    "zh-Hant": "日常・春",
+    "id": "Harian · Semi",
+    "th": "ทั่วไป · ผลิ",
+    "ms": "Harian · Bunga"
+  },
+  "category.일상(여름)": {
+    "ko": "일상(여름)",
+    "en": "Everyday · Summer",
+    "ja": "日常・夏",
+    "zh-Hant": "日常・夏",
+    "id": "Harian · Panas",
+    "th": "ทั่วไป · ร้อน",
+    "ms": "Harian · Panas"
+  },
+  "category.일상(가을)": {
+    "ko": "일상(가을)",
+    "en": "Everyday · Autumn",
+    "ja": "日常・秋",
+    "zh-Hant": "日常・秋",
+    "id": "Harian · Gugur",
+    "th": "ทั่วไป · ร่วง",
+    "ms": "Harian · Luruh"
+  },
+  "category.일상(겨울)": {
+    "ko": "일상(겨울)",
+    "en": "Everyday · Winter",
+    "ja": "日常・冬",
+    "zh-Hant": "日常・冬",
+    "id": "Harian · Dingin",
+    "th": "ทั่วไป · หนาว",
+    "ms": "Harian · Sejuk"
+  },
+  "tab.make": {
+    "ko": "AI 컨셉",
+    "en": "AI Concepts",
+    "ja": "AIコンセプト",
+    "zh-Hant": "AI 概念照",
+    "id": "Buat AI",
+    "th": "สร้าง AI",
+    "ms": "Cipta AI"
+  }
 }
