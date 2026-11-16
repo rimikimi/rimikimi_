@@ -1,0 +1,32 @@
+{
+ "ja": {
+  "name": "rimikimi - AI写真・証明写真・エモいカメラ",
+  "sub": "プロフィール写真・自撮り加工・プリクラ",
+  "kw": "写真加工,アプリ,編集,作成,着せ替え,試着,韓国風,フィルム,レトロ,古い写真,復元,高画質化,顔写真,盛れる,マッチング,婚活,ウェディング,カップル,人生4カット,フィルター,画像生成,無料"
+ },
+ "zh-Hant": {
+  "name": "rimikimi - AI寫真・證件照・底片相機",
+  "sub": "大頭貼・韓系修圖・老照片修復",
+  "kw": "AI照片,證件相,菲林相機,濾鏡,美顏,自拍,頭像,形象照,婚紗照,情侶,穿搭,換裝,試穿,人生四格,拍貼,復古,舊相,相機,生成,編輯,P圖,免費,美圖,AI相機,寫真集,大頭照,學生相"
+ },
+ "id": {
+  "name": "rimikimi: Foto AI & Photoshoot",
+  "sub": "Edit Foto Aesthetic & Pas Foto",
+  "kw": "editor,kamera,film,filter,vintage,retro,photobooth,prewedding,lama,ganti,baju,profil,korea,selfie"
+ },
+ "th": {
+  "name": "rimikimi แต่งรูป AI กล้องฟิล์ม",
+  "sub": "รูปติดบัตร โฟโต้บูธ ฟิลเตอร์",
+  "kw": "แอพแต่งรูป,ถ่ายรูปสวย,รูปโปรไฟล์,เกาหลี,วินเทจ,เซลฟี่,ไอจี,รูปเก่า,ซ่อมรูป,คู่รัก,แต่งงาน,ลองชุด"
+ },
+ "ms": {
+  "name": "rimikimi: AI Photoshoot Studio",
+  "sub": "Edit Gambar AI & Foto Pasport",
+  "kw": "photobooth,editor,generator,passport,photo,retro,kamera,filem,filter,korean,selfie,profil,kahwin"
+ },
+ "en-GB": {
+  "name": "rimikimi: AI Photoshoot Studio",
+  "sub": "Photo Booth, Retro & ID Photos",
+  "kw": "editor,generator,passport,maker,camera,film,filter,vintage,selfie,korean,profile,headshot,restore"
+ }
+}
