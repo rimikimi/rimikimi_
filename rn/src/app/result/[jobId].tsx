@@ -15,6 +15,9 @@ import { setEditorPayload } from "@/lib/editorPayload";
 import { useSaveAdGate } from "@/lib/saveAdGate";
 import { useGeneration, type ResultImage } from "@/lib/generation";
 import { useStore } from "@/lib/store";
+import { useAuth } from "@/lib/auth";
+import { logPhotoSave } from "@/lib/api";
+import Constants from "expo-constants";
 import { conceptTitle, similarConcepts } from "@/lib/concepts";
 import { copy } from "@/lib/copy";
 import { color, radius, space, themedStyles } from "@/theme/tokens";
@@ -47,6 +50,7 @@ export default function Result() {
   const { jobId, url, conceptId, title } = useLocalSearchParams<{ jobId: string; url?: string; conceptId?: string; title?: string }>();
   const { job: findJob } = useGeneration();
   const { byId, concepts } = useStore();
+  const { session } = useAuth();
   const { width } = useWindowDimensions();
   const [saving, setSaving] = useState(false);
   const [idx, setIdx] = useState(0);
@@ -79,6 +83,11 @@ export default function Result() {
       if (!perm.granted) throw new Error("no permission");
       const f = await toLocalFile(img, `rimikimi_${String(concept?.id ?? "photo")}_${idx}.png`);
       await MediaLibrary.saveToLibraryAsync(f.uri);
+      // 저장율 지표(오너 11/20) — 갤러리 id 는 새 결과면 img.galleryId, 내 사진에서 왔으면 jobId 의 gallery:{id}.
+      const gid = img.galleryId ?? (jobId?.startsWith("gallery:") ? jobId.slice(8) : undefined);
+      const token = session?.access_token;
+      if (token) void logPhotoSave(token, gid, concept?.id != null ? String(concept.id) : undefined, "result",
+        `${Constants.expoConfig?.version ?? "?"}(${Constants.expoConfig?.android?.versionCode ?? "?"})`);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
       Alert.alert(copy.result.saved);
     } catch {

@@ -26,6 +26,22 @@ export default async function handler(req, res) {
   // 인생네컷처럼 클라에서 합성한 "최종 1장"을 갤러리에 보관.
   // replaceIds = 합성 재료였던 개별 컷들 → 스트립 저장이 성공했을 때만 정리한다
   // (실패 시 컷을 지워버리면 사용자가 아무것도 못 건진다).
+  // 사진첩 저장 기록 — 앱(iOS·안드)이 결과를 기기 사진첩에 저장했을 때 한 줄 남긴다(오너 11/20, 저장율 지표).
+  // 분모는 user_gallery(서버가 생성 성공한 장마다 자동으로 넣는다), 분자는 이 이벤트의 고유 gallery_id 수.
+  // ⚠️ 새 함수 파일을 만들지 않는다 — Vercel Hobby 함수 상한 12개가 꽉 차 있다(generate.js faceCheck 주석).
+  if (req.method === "POST" && req.body?.event === "photo_save") {
+    const b = req.body;
+    const props = {
+      gallery_id: b.galleryId != null ? String(b.galleryId).slice(0, 40) : null,
+      concept: b.conceptId != null ? String(b.conceptId).slice(0, 20) : null,
+      src: String(b.src || "result").slice(0, 20),
+      plat: String(b.plat || "").slice(0, 10),
+      v: String(b.v || "").slice(0, 20),
+    };
+    await admin.from("events").insert({ user_id: user.id, anon_id: null, event: "photo_save", props }).then(() => {}, () => {});
+    return res.status(200).json({ ok: true });
+  }
+
   if (req.method === "POST") {
     const { base64, mimeType, conceptId, conceptTitle, replaceIds } = req.body || {};
     if (!base64) return res.status(400).json({ error: "base64 required" });

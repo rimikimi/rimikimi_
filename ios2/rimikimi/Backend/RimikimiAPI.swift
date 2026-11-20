@@ -211,6 +211,18 @@ final class RimikimiAPI {
         return try JSONDecoder().decode(R.self, from: data).items ?? []
     }
 
+    /// 사진첩 저장 기록(저장율 지표, 오너 11/20) — 실패해도 무시한다. 저장 동작을 막지 않는다.
+    func logPhotoSave(galleryId: String?, conceptId: String?, src: String, token: String) async {
+        var req = authed("api/gallery", token: token)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let v = "\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] ?? "?")(\(Bundle.main.infoDictionary?["CFBundleVersion"] ?? "?"))"
+        let body: [String: Any] = ["event": "photo_save", "galleryId": galleryId ?? NSNull(), "conceptId": conceptId ?? NSNull(),
+                                   "src": src, "plat": "ios", "v": v]
+        req.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        _ = try? await session.data(for: req)
+    }
+
     func deleteGalleryItem(id: String, token: String) async throws {
         var req = authed("api/gallery", token: token)
         req.url = URL(string: req.url!.absoluteString + "?id=" + id)

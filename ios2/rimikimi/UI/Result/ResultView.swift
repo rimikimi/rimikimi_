@@ -139,6 +139,13 @@ struct ResultView: View {
                 try await PHPhotoLibrary.shared().performChanges { PHAssetChangeRequest.creationRequestForAsset(from: img) }
                 // 앨범에 저장한 컨셉만 "만든 컨셉" 표시가 영구로 남는다(오너 지시 2026-09-22).
                 app.favorites.markSaved(payload.conceptId)
+                // 저장율 지표(오너 11/20) — item.id 가 서버 갤러리 id(user_gallery.id)다. 기록 실패는 무시.
+                let gid = current?.id, cid = payload.conceptId
+                Task {
+                    if let token = await app.auth.validAccessToken() {
+                        await RimikimiAPI.shared.logPhotoSave(galleryId: gid, conceptId: cid, src: "result", token: token)
+                    }
+                }
                 HapticPlayer.success()
                 app.showToast(Copy.savedToPhotos)
             } catch {

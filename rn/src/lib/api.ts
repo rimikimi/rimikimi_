@@ -80,6 +80,17 @@ export async function fetchGallery(token: string): Promise<GalleryItem[]> {
   return j.items;
 }
 
+/** 사진첩 저장 기록(저장율 지표, 오너 11/20) — 실패해도 무시. 저장 동작을 막지 않는다. */
+export async function logPhotoSave(token: string, galleryId: string | undefined, conceptId: string | undefined, src: string, v: string): Promise<void> {
+  try {
+    await fetch(`${getEnv().apiBase}/api/gallery`, {
+      method: "POST",
+      headers: { ...auth(token), "Content-Type": "application/json" },
+      body: JSON.stringify({ event: "photo_save", galleryId: galleryId ?? null, conceptId: conceptId ?? null, src, plat: "android", v }),
+    });
+  } catch { /* 무시 */ }
+}
+
 export async function deleteGalleryItem(token: string, id: string): Promise<void> {
   await fetch(`${getEnv().apiBase}/api/gallery?id=${encodeURIComponent(id)}`, { method: "DELETE", headers: auth(token) });
 }
