@@ -1,5 +1,17 @@
 [
  {
+  "id": "1422",
+  "title": "오늘의 타로",
+  "title_en": "Today's Tarot",
+  "category": "🪄 매직 부스",
+  "categories": [
+   "🪄 매직 부스"
+  ],
+  "sensitive": false,
+  "freeLayout": true,
+  "text": "Today's tarot reading with a handmade clay figure. Vertical 3:4, one single full-frame image, full-bleed edge to edge. The whole image is one elegant editorial page richly decorated in gold filigree style: fine gold scrollwork borders, ornate corner flourishes and thin gold rules on warm ivory (#F6EFE2) paper, with small deep-navy (#1F2A44) accents. One horizontal gold filigree divider splits the page into two parts.\nTOP PART (about 60% of the height): the subject of the reference photo as a handmade 3D clay figure — matte modelling clay, soft rounded forms, visible fingerprints and tool marks, subtle seams where clay pieces join — shown from the waist up, smiling warmly, holding ONE tarot card up in one hand beside the face and showing it to the camera. The card is \"{{TAROT_EN}}\", painted in the style of the 15th-century Visconti-Sforza tarot: hand-painted figures and symbols on a tooled gold-leaf background in lapis blue, vermilion and green. The card face is flat, upright and fully visible, not covered by fingers. The subject wears a refined Renaissance-inspired outfit that matches the card's mood, also sculpted from clay, against a softly lit backdrop in matching colours. The same person must stay instantly recognisable: keep the face shape, eye shape, eyebrows, skin tone, hairstyle, hair colour and length, and glasses or earrings if any. Natural adult proportions.\nBOTTOM PART (about 40% of the height): a calm reading panel with centred text in elegant Korean typography in deep navy, printed EXACTLY as written below and nothing else:\nline 1, small: \"오늘의 타로\"\nline 2, large and bold: \"{{TAROT_KO}}\"\nline 3, small, in gold: \"{{TAROT_KW}}\"\nline 4: \"{{TAROT_L1}}\"\nline 5: \"{{TAROT_L2}}\"\nEvery Korean character crisp, correctly spelled and evenly spaced, with generous line spacing.\nIf the photo has several people, sculpt each of them as a clay figure side by side, one of them holding the card. If the subject is a pet, make a clay pet figure with the same fur colour and markings, the card propped against its paws.\nSoft warm studio lighting with gentle shadows. Do not: add any other text, English words, watermark, logo or signature; split the page left and right; show a second card; use photorealistic skin; add a white margin or before/after."
+ },
+ {
   "id": "1420",
   "title": "핑크 터틀넥 로즈골드 오너먼트",
   "title_en": "Pink Turtleneck & Rose Gold Baubles",

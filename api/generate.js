@@ -54,8 +54,101 @@ const PROMPT_BY_ID = new Map(
 /** conceptId 로 서버 프롬프트를 찾는다. 없으면 앱이 보낸 것(구버전 호환). */
 function resolvePrompt(conceptId, clientPrompt) {
   const mine = conceptId != null ? PROMPT_BY_ID.get(String(conceptId)) : null;
-  return (mine || clientPrompt || "").replace(/\{\{LUCKY6\}\}/g, lucky6).replace(/\{\{NOW_KST\}\}/g, nowKst);
+  let out = (mine || clientPrompt || "").replace(/\{\{LUCKY6\}\}/g, lucky6).replace(/\{\{NOW_KST\}\}/g, nowKst);
+  if (/\{\{TAROT_/.test(out)) {
+    // 한 요청 안에서는 같은 카드 하나 — 그림의 카드와 아래 해설이 어긋나면 안 된다.
+    const t = TAROT[Math.floor(Math.random() * TAROT.length)];
+    out = out.replace(/\{\{TAROT_EN\}\}/g, t[0]).replace(/\{\{TAROT_KO\}\}/g, t[1])
+      .replace(/\{\{TAROT_KW\}\}/g, t[2]).replace(/\{\{TAROT_L1\}\}/g, t[3]).replace(/\{\{TAROT_L2\}\}/g, t[4]);
+  }
+  return out;
 }
+
+// 오늘의 타로(매직 부스) — {{TAROT_*}} 에 생성마다 78장(메이저 22 + 마이너 56) 중 한 장을 넣는다.
+// 모델에게 "아무 카드나" 맡기면 매번 같은 몇 장만 나오고, 한글 해설도 지어내다 글자가 깨진다 →
+// 카드도 해설도 서버가 정해서 "그대로 인쇄"만 시킨다(행운 영수증 {{LUCKY6}} 와 같은 방식, 오너 11/20).
+// [영문 카드명(그림용), 한글 카드명, 키워드, 해설 1, 해설 2]
+const TAROT = [
+  ["0 · The Fool", "0 · 바보", "새 출발 · 자유 · 모험", "가볍게 첫발을 떼기 좋은 날이에요.", "계산보다 설렘을 믿어 보세요."],
+  ["I · The Magician", "I · 마법사", "시작 · 재능 · 실행", "필요한 건 이미 손에 다 있어요.", "생각만 하던 일을 오늘 시작해요."],
+  ["II · The High Priestess", "II · 여사제", "직감 · 지혜 · 고요", "답은 이미 마음속에 있어요.", "조용히 귀 기울이면 들려요."],
+  ["III · The Empress", "III · 여황제", "풍요 · 사랑 · 아름다움", "넉넉하고 따뜻한 기운이 와요.", "나를 아끼는 하루를 보내세요."],
+  ["IV · The Emperor", "IV · 황제", "안정 · 책임 · 리더십", "중심을 단단히 잡는 날이에요.", "내 결정이 길을 만들어요."],
+  ["V · The Hierophant", "V · 교황", "배움 · 조언 · 믿음", "좋은 조언이 찾아오는 날이에요.", "기본에 충실하면 잘 풀려요."],
+  ["VI · The Lovers", "VI · 연인", "사랑 · 선택 · 조화", "마음이 통하는 사람이 곁에 있어요.", "마음이 가는 쪽을 고르세요."],
+  ["VII · The Chariot", "VII · 전차", "전진 · 의지 · 승리", "밀어붙이면 이기는 날이에요.", "목표만 보고 달려가세요."],
+  ["VIII · Strength", "VIII · 힘", "용기 · 인내 · 다정함", "부드러운 마음이 가장 강해요.", "조급해하지 않아도 괜찮아요."],
+  ["IX · The Hermit", "IX · 은둔자", "성찰 · 휴식 · 깨달음", "혼자만의 시간이 답을 줘요.", "잠깐 멈춰서 숨을 골라요."],
+  ["X · Wheel of Fortune", "X · 운명의 수레바퀴", "행운 · 변화 · 타이밍", "흐름이 내 편으로 돌아요.", "찾아온 기회를 꼭 잡으세요."],
+  ["XI · Justice", "XI · 정의", "균형 · 공정 · 판단", "뿌린 만큼 거두는 날이에요.", "솔직하게 말하면 잘 풀려요."],
+  ["XII · The Hanged Man", "XII · 매달린 사람", "기다림 · 새 시각 · 내려놓기", "거꾸로 보면 새 길이 보여요.", "서두르지 않아도 돼요."],
+  ["XIII · Death", "XIII · 죽음", "끝과 시작 · 변화 · 정리", "묵은 것을 보내고 새로 시작해요.", "끝은 곧 새로운 시작이에요."],
+  ["XIV · Temperance", "XIV · 절제", "균형 · 치유 · 조화", "적당함이 행운을 불러요.", "몸과 마음을 천천히 돌봐요."],
+  ["XV · The Devil", "XV · 악마", "유혹 · 욕망 · 해방", "끌리는 마음을 솔직히 봐요.", "나를 묶던 걸 풀 수 있어요."],
+  ["XVI · The Tower", "XVI · 탑", "깨달음 · 전환 · 해방", "예상 밖 일이 길을 열어 줘요.", "흔들려도 금방 다시 서요."],
+  ["XVII · The Star", "XVII · 별", "희망 · 영감 · 치유", "바라던 일에 빛이 들어요.", "소원을 하나 빌어 보세요."],
+  ["XVIII · The Moon", "XVIII · 달", "직감 · 꿈 · 상상", "꿈과 직감이 힌트를 줘요.", "애매할 땐 천천히 가세요."],
+  ["XIX · The Sun", "XIX · 태양", "기쁨 · 성공 · 활력", "모든 게 환하게 풀리는 날이에요.", "웃는 얼굴이 행운을 불러요."],
+  ["XX · Judgement", "XX · 심판", "부활 · 결실 · 새 소식", "기다리던 소식이 들려와요.", "다시 도전하기 좋은 날이에요."],
+  ["XXI · The World", "XXI · 세계", "완성 · 성취 · 축하", "노력이 결실을 맺는 날이에요.", "오늘은 마음껏 즐기세요."],
+  // 마이너 아르카나 56장(비스콘티-스포르차 덱은 펜타클이 동전 Coins)
+  ["Ace of Wands", "완드 에이스", "열정 · 시작 · 영감", "마음에 불꽃이 켜져요.", "떠오른 아이디어를 곧장 실행해요."],
+  ["Two of Wands", "완드 2", "계획 · 결정 · 전망", "더 넓은 세상이 눈에 들어와요.", "오늘은 큰 그림을 그려요."],
+  ["Three of Wands", "완드 3", "확장 · 기대 · 진전", "기다리던 일이 움직이기 시작해요.", "멀리 보고 한 걸음 더 가요."],
+  ["Four of Wands", "완드 4", "축하 · 안정 · 기쁨", "축하할 일이 생기는 날이에요.", "고마운 사람과 기쁨을 나눠요."],
+  ["Five of Wands", "완드 5", "경쟁 · 도전 · 활기", "가벼운 경쟁 속에 실력이 늘어요.", "내 의견을 당당히 말해 봐요."],
+  ["Six of Wands", "완드 6", "승리 · 인정 · 자신감", "칭찬받을 일이 생겨요.", "오늘은 어깨를 쭉 펴세요."],
+  ["Seven of Wands", "완드 7", "용기 · 방어 · 소신", "내 자리를 지킬 힘이 있어요.", "흔들리지 말고 소신대로 가요."],
+  ["Eight of Wands", "완드 8", "속도 · 소식 · 움직임", "일이 빠르게 풀려 나가요.", "반가운 연락이 올 수 있어요."],
+  ["Nine of Wands", "완드 9", "끈기 · 경계 · 회복", "조금만 더 버티면 돼요.", "지친 나를 살짝 쉬게 해 줘요."],
+  ["Ten of Wands", "완드 10", "책임 · 노력 · 마무리", "짐을 나누면 훨씬 가벼워요.", "이제 끝이 눈앞에 보여요."],
+  ["Page of Wands", "완드 시종", "호기심 · 소식 · 열정", "새로운 일 앞에서 설레요.", "궁금한 건 바로 물어보세요."],
+  ["Knight of Wands", "완드 기사", "모험 · 추진력 · 열정", "망설이지 말고 출발해요.", "오늘은 에너지가 넘쳐요."],
+  ["Queen of Wands", "완드 여왕", "매력 · 자신감 · 활력", "당신의 매력이 빛나는 날이에요.", "좋아하는 일에 힘을 쏟아요."],
+  ["King of Wands", "완드 왕", "리더십 · 비전 · 결단", "앞장서면 모두가 따라와요.", "큰 결정을 내리기 좋아요."],
+  ["Ace of Cups", "컵 에이스", "사랑 · 감동 · 새 감정", "마음이 따뜻하게 차올라요.", "좋아한다고 표현해 봐요."],
+  ["Two of Cups", "컵 2", "인연 · 교감 · 약속", "마음이 통하는 만남이 있어요.", "먼저 다정하게 손 내밀어요."],
+  ["Three of Cups", "컵 3", "우정 · 축하 · 즐거움", "친구들과 웃을 일이 생겨요.", "작은 모임에서 행운이 와요."],
+  ["Four of Cups", "컵 4", "성찰 · 휴식 · 새 제안", "놓치고 있던 기회를 살펴봐요.", "잠깐 쉬어 가도 괜찮아요."],
+  ["Five of Cups", "컵 5", "위로 · 회복 · 남은 것", "아직 남은 좋은 것이 많아요.", "지난 일은 살며시 놓아줘요."],
+  ["Six of Cups", "컵 6", "추억 · 순수 · 다정함", "반가운 추억이 떠올라요.", "오랜 친구에게 연락해 봐요."],
+  ["Seven of Cups", "컵 7", "상상 · 선택 · 꿈", "꿈꾸던 일이 하나씩 보여요.", "진짜 원하는 걸 골라 보세요."],
+  ["Eight of Cups", "컵 8", "떠남 · 성장 · 새 길", "더 나은 곳을 향해 떠나요.", "아쉬움보다 설렘을 챙겨요."],
+  ["Nine of Cups", "컵 9", "소원 · 만족 · 행복", "바라던 일이 이뤄지는 날이에요.", "오늘은 마음껏 누리세요."],
+  ["Ten of Cups", "컵 10", "행복 · 가족 · 평화", "소중한 사람들과 웃게 돼요.", "하루가 꽉 차게 행복해요."],
+  ["Page of Cups", "컵 시종", "설렘 · 감성 · 좋은 소식", "귀여운 소식이 찾아와요.", "감성이 한껏 풍부해져요."],
+  ["Knight of Cups", "컵 기사", "로맨스 · 제안 · 낭만", "낭만적인 제안이 올 수 있어요.", "마음 가는 대로 움직여요."],
+  ["Queen of Cups", "컵 여왕", "공감 · 배려 · 직감", "따뜻한 말 한마디가 힘이 돼요.", "나 자신도 다정히 돌봐요."],
+  ["King of Cups", "컵 왕", "너그러움 · 안정 · 지혜", "여유롭게 임하면 일이 잘돼요.", "감정을 차분히 다스려요."],
+  ["Ace of Swords", "소드 에이스", "명쾌함 · 진실 · 결단", "머릿속이 맑아지는 날이에요.", "생각을 분명하게 말해요."],
+  ["Two of Swords", "소드 2", "고민 · 균형 · 선택", "잠시 눈을 감고 생각해 봐요.", "답은 생각보다 가까이 있어요."],
+  ["Three of Swords", "소드 3", "치유 · 정리 · 털어놓기", "털어놓으면 마음이 가벼워져요.", "아픈 만큼 단단해져요."],
+  ["Four of Swords", "소드 4", "휴식 · 재충전 · 회복", "푹 쉬는 것도 할 일이에요.", "오늘은 충전에 집중해요."],
+  ["Five of Swords", "소드 5", "갈등 · 교훈 · 내려놓기", "이기는 것보다 웃는 게 중요해요.", "굳이 다투지 않아도 돼요."],
+  ["Six of Swords", "소드 6", "이동 · 변화 · 평온", "잔잔한 물살이 길을 열어요.", "더 편한 곳으로 나아가요."],
+  ["Seven of Swords", "소드 7", "전략 · 재치 · 유연함", "기발한 아이디어가 통해요.", "돌아가는 길이 더 빠를 수 있어요."],
+  ["Eight of Swords", "소드 8", "해방 · 용기 · 새 시각", "나는 이미 자유로워요.", "눈을 뜨면 길이 보여요."],
+  ["Nine of Swords", "소드 9", "불안 해소 · 위로 · 안정", "걱정은 알고 보면 작아요.", "오늘 밤은 편히 잠들어요."],
+  ["Ten of Swords", "소드 10", "끝 · 새 시작 · 회복", "힘든 시간은 이제 끝나요.", "내일은 한결 밝아요."],
+  ["Page of Swords", "소드 시종", "호기심 · 관찰 · 배움", "눈과 귀를 활짝 열어 둬요.", "새로 배운 게 쏙쏙 들어와요."],
+  ["Knight of Swords", "소드 기사", "추진력 · 속도 · 결단", "생각했으면 지체 없이 움직여요.", "빠른 판단이 빛을 발해요."],
+  ["Queen of Swords", "소드 여왕", "통찰 · 솔직함 · 독립", "솔직한 한마디가 통해요.", "내 기준을 믿어 보세요."],
+  ["King of Swords", "소드 왕", "판단력 · 논리 · 권위", "냉정하게 판단하면 답이 보여요.", "원칙을 지키면 탈이 없어요."],
+  ["Ace of Coins", "펜타클 에이스", "기회 · 풍요 · 시작", "좋은 기회가 손에 들어와요.", "작은 씨앗을 심어 보세요."],
+  ["Two of Coins", "펜타클 2", "균형 · 유연함 · 즐거움", "여러 일을 척척 해내요.", "리듬을 타듯 가볍게 가요."],
+  ["Three of Coins", "펜타클 3", "협력 · 실력 · 인정", "함께하면 더 멋지게 완성돼요.", "실력을 인정받는 날이에요."],
+  ["Four of Coins", "펜타클 4", "안정 · 절약 · 지킴", "가진 것을 소중히 지켜요.", "알뜰하면 복이 들어와요."],
+  ["Five of Coins", "펜타클 5", "도움 · 회복 · 연대", "도움의 손길이 가까이 있어요.", "혼자 끙끙대지 말아요."],
+  ["Six of Coins", "펜타클 6", "나눔 · 선물 · 너그러움", "베풀면 좋은 일로 돌아와요.", "선물 하나로 기쁨을 전해요."],
+  ["Seven of Coins", "펜타클 7", "인내 · 성장 · 기다림", "노력의 열매가 익어 가요.", "조금만 더 기다려 봐요."],
+  ["Eight of Coins", "펜타클 8", "성실 · 집중 · 숙련", "꾸준함이 실력으로 쌓여요.", "한 가지에 집중해 봐요."],
+  ["Nine of Coins", "펜타클 9", "여유 · 자립 · 풍요", "스스로 일군 결실을 누려요.", "나에게 작은 사치를 선물해요."],
+  ["Ten of Coins", "펜타클 10", "번영 · 가족 · 안정", "든든한 기반이 생기는 날이에요.", "가족과 따뜻한 시간을 보내요."],
+  ["Page of Coins", "펜타클 시종", "배움 · 계획 · 새 기회", "배움이 돈이 되는 날이에요.", "차근차근 계획을 세워요."],
+  ["Knight of Coins", "펜타클 기사", "성실 · 꾸준함 · 책임", "느려도 확실하게 가요.", "맡은 일을 끝까지 해내요."],
+  ["Queen of Coins", "펜타클 여왕", "풍요 · 돌봄 · 실속", "일상이 한결 넉넉해져요.", "나를 잘 챙겨 주세요."],
+  ["King of Coins", "펜타클 왕", "성공 · 재물 · 안정", "재물운이 따르는 날이에요.", "돈 문제는 신중히 결정해요."],
+];
 
 // 프롬프트의 {{NOW_KST}} → 지금 한국 시각 "2026.10.15 14:32" (모델은 오늘 날짜를 몰라 아무 날짜나 찍는다).
 function nowKst() {
@@ -452,6 +545,11 @@ const BODY_FINAL_ART =
   "head, face or eyes to make it cute; no big-head, bobblehead, chibi or super-deformed look.";
 // 일부러 머리를 크게 그리는 컨셉 — 1.5등신 피규어.
 const BIG_HEAD_OK_IDS = new Set(["1127"]);
+// 화면을 새로 짜는 매직 부스 컨셉(concepts.json freeLayout:true — 오늘의 타로처럼 인물+해설 패널).
+// 사진 구도·비율을 그대로 따르라는 매직 부스 공통 규칙을 빼고, 결과는 항상 세로 3:4.
+const FREE_LAYOUT_IDS = new Set(
+  (Array.isArray(ALL_CONCEPTS) ? ALL_CONCEPTS : []).filter((c) => c && c.freeLayout).map((c) => String(c.id))
+);
 
 // 템플릿 컨셉(2026-11-15 오너 "템플릿을 픽스하고 사람만 갈아끼우면 되는 거 아님?", "샘플이랑 다르면 사기급"):
 // concepts.json 의 template(예: "large/1415.webp") 이미지를 그대로 두고 사람만 바꾼다. 남녀·나이 무관.
@@ -1612,6 +1710,10 @@ async function handleGenerate(req, res, hold) {
       "their own identity.\n\n" +
       "Result: a high-resolution, photorealistic portrait indistinguishable from one shot today on a " +
       "full-frame mirrorless camera with an 85mm f/1.4 lens — same person, same moment, modern photo."
+    : FREE_LAYOUT_IDS.has(String(conceptId))
+    ? "Use the provided image only as the reference for who the subject is (a person, several people or a pet) — " +
+      "keep them clearly recognisable. Build a completely new composition exactly as described below; do not " +
+      "copy the photo's framing, background or aspect ratio.\n" + prompt
     : skipFacePrecheck
     ? "Re-render the provided image in a new artistic style. " +
       "The subject can be a person, landscape, animal, object, or anything else. " +
@@ -1847,7 +1949,7 @@ async function handleGenerate(req, res, hold) {
   //   (같은 입력 → 1792×2400, 실측 9/23).
   //   예외: 네컷(칸 수별 비율) · 사진 복원(원본 구도 유지) · 아트 변환(사용자 사진을 그대로
   //   다시 그리는 것이라 원본 비율 유지).
-  const keepSourceRatio = isRestore || !!skipFacePrecheck;
+  const keepSourceRatio = isRestore || (!!skipFacePrecheck && !FREE_LAYOUT_IDS.has(String(conceptId)));
   const ratioFor = () =>
     isStrip ? (fourcutStyle === "bluemood" ? BLUE_RATIO[stripN] : STRIP_RATIO[stripN]) : isDressroom || isSprite ? "3:4" : keepSourceRatio ? null : "3:4";
   const bodyFor = (isPro, shotIdx = 0) => ({
