@@ -173,6 +173,12 @@ async function handleWebhook(req, res) {
   }
   // 카메라 이용권(필터) 상품은 크레딧을 주지 않는다(Play 는 "id:basePlan" 형태라 접두어로 판별).
   if (isFilterProduct(ev.product_id)) {
+    // 판매 집계용 기록만 남긴다(오너 11/20 — 예전엔 아무 데도 안 남아 판매량을 알 수 없었다). 실패는 무시.
+    const uid = /^[0-9a-f-]{36}$/i.test(String(ev.app_user_id || "")) ? ev.app_user_id : null;
+    await makeAdmin().from("events").insert({ user_id: uid, anon_id: null, event: "filter_pass_purchase", props: {
+      product: String(ev.product_id).slice(0, 60), type, store: ev.store || null, env: ev.environment || null,
+      price: ev.price ?? null, currency: ev.currency || null, tx: ev.transaction_id || null, rc_user: uid ? null : String(ev.app_user_id || "").slice(0, 60),
+    } }).then(() => {}, () => {});
     return res.status(200).json({ ok: true, ignored: "filter_pass" });
   }
 
