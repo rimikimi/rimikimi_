@@ -131,7 +131,7 @@
   },
   "filterPass": {
     "enabled": "false",
-    "iosMinBuild": "53",
+    "iosMinBuild": "97",
     "androidMinVersionCode": "109"
   },
   "category.일상(봄)": {
