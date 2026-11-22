@@ -1,5 +1,19 @@
 [
  {
+  "id": "1427",
+  "title": "대리석 흉상",
+  "category": "🪄 매직 부스",
+  "text": "Turn the person in the provided photo into a classical white marble bust sculpture. The carved face must be an exact likeness of THIS person — keep their real face shape, eye shape and eyelids, eyebrows, nose, lips, cheeks and jawline exactly as in the photo; do not replace them with a generic Greek or Western statue face. Keep the person's sex and age: a man stays clearly male (masculine jaw and brow, short hair, toga-style drapery over one shoulder); a woman stays female. Render the person's own hairstyle (including bangs if they have them) carved in marble — only if their hair is long may it be gathered into a soft low bun. Serene expression, calm gaze, slight head tilt, shoulders angled subtly. Thick, heavy, opaque classical drapery covering the chest completely, deep fabric folds, no anatomical detail visible through the cloth. Elegant architectural stone alcove, neutral cream (#EDE4D3) palette, museum atmosphere, soft directional natural light from the left, chiaroscuro, cinematic shadows, warm ambient glow, 85mm lens, shallow depth of field, crisp focus on the carved face, photorealistic white (#F2EFE9) marble texture with subtle grey veining, ultra-high definition. The whole subject is carved stone — no real skin, no colour in eyes or lips. No text, no watermark.",
+  "sensitive": false,
+  "categories": [
+   "🪄 매직 부스",
+   "예술 / 클래식"
+  ],
+  "title_en": "Marble Bust",
+  "freeLayout": true,
+  "imgV": "20261122"
+ },
+ {
   "id": "1424",
   "title": "2세 미리보기 · 아들",
   "title_en": "Future Baby · Boy",
