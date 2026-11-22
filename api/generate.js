@@ -568,7 +568,10 @@ const BABY_INSTRUCTION = (sex) =>
   `generate a realistic photograph of that child: a ${sex === "boy" ? "little boy (their son)" : "little girl (their daughter)"}, ` +
   "about 4 years old. The child must look like a believable natural mix of BOTH parents — inherit some features from " +
   "each (eye shape and colour, eyebrows, nose, lips, face shape, hair colour and texture), with a skin tone and " +
-  "ethnicity that is a natural combination of the two. Do not simply make a younger copy of one parent. The child is a " +
+  "ethnicity that is a natural combination of the two. ETHNICITY AND COLOURING COME ONLY FROM THE PARENTS: if both " +
+  "parents are East Asian, the child is clearly East Asian with dark hair and dark eyes; if both are of the same " +
+  "ethnicity, the child shares it; if they differ, the child is a natural mix. Never default to a different ethnicity, " +
+  "hair colour or eye colour than the parents could give. Do not simply make a younger copy of one parent. The child is a " +
   "real child with natural child proportions and soft child features — not a mini adult, no makeup. Exactly one " +
   "person in frame: the child only, never either parent or any adult. Ignore the parents' clothing, pose, expression " +
   "and backgrounds; the outfit, pose, set, framing and mood come only from the concept below.\n";
