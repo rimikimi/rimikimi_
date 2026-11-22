@@ -545,11 +545,33 @@ const BODY_FINAL_ART =
   "head, face or eyes to make it cute; no big-head, bobblehead, chibi or super-deformed look.";
 // 일부러 머리를 크게 그리는 컨셉 — 1.5등신 피규어.
 const BIG_HEAD_OK_IDS = new Set(["1127"]);
+// 아이로 만드는 컨셉(concepts.json child:true — 2세 미리보기·어린 시절의 나): 어른 비율 규칙 대신 아이 비율.
+const CHILD_IDS = new Set(
+  (Array.isArray(ALL_CONCEPTS) ? ALL_CONCEPTS : []).filter((c) => c && c.child).map((c) => String(c.id))
+);
+const BODY_FINAL_CHILD =
+  "\n\nBODY PROPORTIONS (final rule): a real young child of the stated age with natural, true-to-life child " +
+  "proportions — head about one-fifth to one-sixth of total height, as in a real photo of a child that age. Not a mini " +
+  "adult, but also no exaggerated doll, chibi or bobblehead look. It must look like a REAL PHOTOGRAPH, not an AI " +
+  "image, render or illustration: real child skin with soft natural texture, real hair strands, no makeup.";
 // 화면을 새로 짜는 매직 부스 컨셉(concepts.json freeLayout:true — 오늘의 타로처럼 인물+해설 패널).
 // 사진 구도·비율을 그대로 따르라는 매직 부스 공통 규칙을 빼고, 결과는 항상 세로 3:4.
 const FREE_LAYOUT_IDS = new Set(
   (Array.isArray(ALL_CONCEPTS) ? ALL_CONCEPTS : []).filter((c) => c && c.freeLayout).map((c) => String(c.id))
 );
+
+// 2세 미리보기(매직 부스, 2026-11-22 오너 "남녀 사진 넣으면 가상 2세사진, 아들 딸 선택"): concepts.json baby:"girl"|"boy".
+// 앱은 커플 컨셉처럼 사진 2장(부모)을 보낸다(mode "couple" — 상대 사진 칸). 결과는 아이 1명이라 사람 수 검사는 1명,
+// 동일인 검사는 끈다(부모 누구와도 같은 사람이 아니어야 정상). freeLayout:true 로 결과 비율은 3:4.
+const BABY_INSTRUCTION = (sex) =>
+  "The FIRST and SECOND provided photos show two people who are the parents. Imagine their biological child and " +
+  `generate a realistic photograph of that child: a ${sex === "boy" ? "little boy (their son)" : "little girl (their daughter)"}, ` +
+  "about 4 years old. The child must look like a believable natural mix of BOTH parents — inherit some features from " +
+  "each (eye shape and colour, eyebrows, nose, lips, face shape, hair colour and texture), with a skin tone and " +
+  "ethnicity that is a natural combination of the two. Do not simply make a younger copy of one parent. The child is a " +
+  "real child with natural child proportions and soft child features — not a mini adult, no makeup. Exactly one " +
+  "person in frame: the child only, never either parent or any adult. Ignore the parents' clothing, pose, expression " +
+  "and backgrounds; the outfit, pose, set, framing and mood come only from the concept below.\n";
 
 // 템플릿 컨셉(2026-11-15 오너 "템플릿을 픽스하고 사람만 갈아끼우면 되는 거 아님?", "샘플이랑 다르면 사기급"):
 // concepts.json 의 template(예: "large/1415.webp") 이미지를 그대로 두고 사람만 바꾼다. 남녀·나이 무관.
@@ -1495,6 +1517,10 @@ async function handleGenerate(req, res, hold) {
   //      얼굴 없으면 본 모델 호출 안 함 → 차감 X
   //      단, skipFacePrecheck (아트 변환 등) 면 검사 우회
   const hasSecond = !!(base64_2 && mimeType2);
+  const isBaby = !!conceptRow?.baby;
+  if (isBaby && !hasSecond) {
+    return res.status(400).json({ error: "엄마·아빠 사진 두 장이 다 필요해요 🙂" });
+  }
   if (!skipFacePrecheck) {
     // 커플이면 두 장 다 검사한다 — 한 장만 통과시키면 상대 얼굴이 없는 채로
     // 본 모델을 호출해 크레딧만 나간다.
@@ -1710,6 +1736,8 @@ async function handleGenerate(req, res, hold) {
       "their own identity.\n\n" +
       "Result: a high-resolution, photorealistic portrait indistinguishable from one shot today on a " +
       "full-frame mirrorless camera with an 85mm f/1.4 lens — same person, same moment, modern photo."
+    : isBaby
+    ? BABY_INSTRUCTION(conceptRow.baby) + prompt
     : FREE_LAYOUT_IDS.has(String(conceptId))
     ? "Use the provided image only as the reference for who the subject is (a person, several people or a pet) — " +
       "keep them clearly recognisable. Build a completely new composition exactly as described below; do not " +
@@ -1855,9 +1883,9 @@ async function handleGenerate(req, res, hold) {
   //   빠뜨리면 캐리커처를 "다른 사람·장면 다름"으로 매번 불합격시켜 두 번씩 만들었다(2026-10-14 실측).
   const magicBoothConcept = conceptId != null && NB21_IDS.has(String(conceptId));
   const postFx = conceptId != null ? ALL_CONCEPTS.find((c) => String(c.id) === String(conceptId))?.postFx || null : null;
-  const wantIdentity = true;
+  const wantIdentity = !isBaby; // 2세는 부모 누구와도 다른 사람이 정상
   const qaOpts = {
-    people: hasSecond ? 2 : isRestore ? 0 : 1,
+    people: isBaby ? 1 : hasSecond ? 2 : isRestore ? 0 : 1,
     panels: isFourcut && fourcutStyle && cutCount && Number(cutCount) > 1 ? Number(cutCount) : 1,
     art: !!skipFacePrecheck || magicBoothConcept,
   };
@@ -1905,6 +1933,8 @@ async function handleGenerate(req, res, hold) {
   //   경로엔 아예 없었다. SKIN_FINAL 처럼 마지막에 두면 이긴다. 1.5등신 피규어(1127)·픽셀 캐릭터만 일부러 머리가 커서 뺀다.
   const bodyFinal = isSprite || BIG_HEAD_OK_IDS.has(String(conceptId))
     ? ""
+    : CHILD_IDS.has(String(conceptId))
+    ? BODY_FINAL_CHILD
     : skipFacePrecheck || magicBoothConcept
     ? BODY_FINAL_ART
     : BODY_FINAL;
