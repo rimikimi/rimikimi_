@@ -3837,7 +3837,7 @@ function MyGalleryScreen({
         flashToast(t("save.toast.fail"));
         return;
       }
-      const r = await nativeSaveToAlbum(dataUrl, `rimikimi_${it.conceptId || it.id}`);
+      const r = await nativeSaveToAlbum(dataUrl, `rimikimi_${String(it.conceptId || it.id).replace(/[^\w-]/g, "_")}`);
       if (!r?.ok) {
         flashToast(t("save.toast.fail"));
         return;
@@ -3851,7 +3851,7 @@ function MyGalleryScreen({
         const href = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = href;
-        a.download = `rimikimi_${it.conceptId || it.id}.${/jpe?g/i.test(blob.type) ? "jpg" : "png"}`;
+        a.download = `rimikimi_${String(it.conceptId || it.id).replace(/[^\w-]/g, "_")}.${/jpe?g/i.test(blob.type) ? "jpg" : "png"}`;
         document.body.appendChild(a);
         a.click();
         a.remove();
@@ -3886,7 +3886,7 @@ function MyGalleryScreen({
     try {
       const r = await shareImage({
         src: it.url,
-        filename: `rimikimi_${it.conceptId || it.id}.png`,
+        filename: `rimikimi_${String(it.conceptId || it.id).replace(/[^\w-]/g, "_")}.png`,
         title: t("invite.shareTitle"),
         text: t("share.caption"),
       });
@@ -3940,7 +3940,7 @@ function MyGalleryScreen({
         </div>
         <div style={O.viewerActions}>
           <button type="button" style={{ ...O.smallBtn, flex: 1, height: 44 }} disabled={!cur.url}
-            onClick={() => { hap.tap(); setEditor({ src: cur.url, filename: `rimikimi_${cur.conceptId || cur.id}` }); }}>{t("edit.btn")}</button>
+            onClick={() => { hap.tap(); setEditor({ src: cur.url, filename: `rimikimi_${String(cur.conceptId || cur.id).replace(/[^\w-]/g, "_")}` }); }}>{t("edit.btn")}</button>
           <button type="button" style={{ ...O.smallBtn, flex: 1, height: 44 }} disabled={sharingId === cur.id}
             onClick={() => handleShare(cur)}>{t("gallery.action.share")}</button>
           <button type="button" style={{ ...O.smallBtn, flex: 1, height: 44, color: ACCENT }}
@@ -4555,7 +4555,7 @@ function ResultScreen({
     const hi = it.galleryId ? await fetchHiResDataUrl(it.galleryId) : null;
     const r = await shareImage({
       src: hi || it.imageDataUrl,
-      filename: `rimikimi_${it.conceptId || selected?.id || "photo"}_${i + 1}.png`,
+      filename: `rimikimi_${String(it.conceptId || selected?.id || "photo").replace(/[^\w-]/g, "_")}_${i + 1}.png`,
       title: t("invite.shareTitle"),
       text: t("share.caption"),
     });

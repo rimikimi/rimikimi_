@@ -1369,6 +1369,10 @@ async function handleGenerate(req, res, hold) {
   const dress = wedding && typeof wedding.dressCode === "string" ? findDress(wedding.dressCode) : null;
   if (wedding && !dress) return res.status(400).json({ error: "드레스를 찾을 수 없어요." });
   const isWedding = !!dress;
+  // 앱의 가짜 컨셉 id("dress:M48"·"studio:<preset>")를 갤러리 경로에 남긴다 — 연결이 끊겨 앱이 갤러리로 결과를 찾을 때
+  // concept_id 가 0 이라 영영 못 찾고 "결과를 받지 못했어요" 를 띄웠다(오너 11/24 웨딩 드레스 6장: 서버는 6장 다 저장).
+  const galleryKey = isWedding ? "dress-" + String(wedding.dressCode).replace(/[^A-Za-z0-9_-]/g, "")
+    : isStudio && studio && studio.presetId ? "studio-" + String(studio.presetId).replace(/[^A-Za-z0-9_-]/g, "") : null;
   let weddingRefs = [];
   let weddingInstruction = "";
   if (isWedding) {
@@ -1487,7 +1491,7 @@ async function handleGenerate(req, res, hold) {
     let galleryId = null, galleryExpiresAt = null;
     try {
       const saved = await saveToGallery(admin, user, {
-        conceptId: conceptId || 0, conceptTitle: conceptTitle || null, base64: rawData, mimeType: rawMime,
+        conceptId: conceptId || 0, conceptTitle: conceptTitle || null, key: galleryKey, base64: rawData, mimeType: rawMime,
       });
       if (saved.ok) { galleryId = saved.id; galleryExpiresAt = saved.expiresAt; }
       else console.error("[gallery save failed]", saved.error);
@@ -2320,7 +2324,7 @@ async function handleGenerate(req, res, hold) {
       // 게스트는 계정 갤러리가 없다 — 사진은 응답으로만 가고, 앱이 "받기"(로그인) 뒤 앨범에 저장한다.
       if (!isGuest) try {
         const saved = await saveToGallery(admin, user, {
-          conceptId: conceptId || 0, conceptTitle: conceptTitle || null,
+          conceptId: conceptId || 0, conceptTitle: conceptTitle || null, key: galleryKey,
           base64: rawOut, mimeType: rawMime,
         });
         if (saved.ok) { gId = saved.id; gExp = saved.expiresAt; }
@@ -2570,6 +2574,7 @@ async function handleGenerate(req, res, hold) {
   try {
     const saved = await saveToGallery(admin, user, {
       conceptId: conceptId || 0,
+      key: galleryKey,
       conceptTitle: conceptTitle || null,
       base64: rawData,
       mimeType: rawMime,

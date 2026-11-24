@@ -14,7 +14,7 @@ export const TTL_MINUTES = 24 * 60; // 24시간 (오너 지시 2026-09-22, 기�
 
 // 이미지 base64 → Storage 업로드 + DB 기록.
 // 저장 직전에 이 사용자의 만료된 옛 파일을 청소 (lazy purge — 작성 시).
-export async function saveToGallery(admin, user, { conceptId, conceptTitle, base64, mimeType }) {
+export async function saveToGallery(admin, user, { conceptId, conceptTitle, base64, mimeType, key = null }) {
   if (!base64 || !user?.id) return { error: "invalid input" };
 
   // 만료 청소 (write-side lazy purge — cron 없이 동작)
@@ -57,7 +57,8 @@ export async function saveToGallery(admin, user, { conceptId, conceptTitle, base
 
   // 2) Storage 경로: <user_id>/<timestamp>_<conceptId>.<ext>
   const ext = outMime.split("/")[1] || "png";
-  const path = `${user.id}/${Date.now()}_${conceptId}.${ext}`;
+  // key = 앱의 가짜 컨셉 id(dress-M48·studio-xxx). concept_id 칸은 숫자라 경로에 남기고 목록에서 되살린다.
+  const path = `${user.id}/${Date.now()}_${key && /^[A-Za-z0-9_-]+$/.test(key) ? key : conceptId}.${ext}`;
 
   const up = await admin.storage
     .from("gallery")
@@ -121,7 +122,7 @@ export async function listGallery(admin, userId) {
         .createSignedUrl(row.storage_path, 24 * 60 * 60);
       return {
         id: row.id,
-        conceptId: row.concept_id,
+        conceptId: row.concept_id || keyFromPath(row.storage_path) || row.concept_id,
         conceptTitle: row.concept_title,
         createdAt: row.created_at,
         expiresAt: row.expires_at,
@@ -168,4 +169,10 @@ export async function purgeExpired(admin) {
   await admin.from("user_gallery").delete().in("id", ids);
 
   return { deleted: rows.length };
+}
+
+// "<uid>/<ts>_dress-M48.jpeg" → "dress:M48" — 앱 작업 id 와 같은 모양(StudioCatalog syntheticID).
+function keyFromPath(p) {
+  const m = /_(dress|studio)-([A-Za-z0-9_-]+)\.[a-z0-9]+$/i.exec(String(p || ""));
+  return m ? m[1] + ":" + m[2] : null;
 }
